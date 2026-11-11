@@ -70,7 +70,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
    Install? [y/N]
 ```
 
-**Kavat**, the agent, runs on your machine. No cloud, no account, no telemetry. It is a compact model on Ollama, tuned for this system and only this system: it knows your shortcuts, your packages, your configuration and the OS documentation. It understands English and Spanish.
+**Kavat**, the agent, runs on your machine. No cloud, no account, no telemetry. It is a compact model on Ollama, tuned for this system and only this system: it knows your shortcuts, your packages, your configuration and the OS documentation. It understands English and Spanish. Its job is running the system, not writing code: that is what Claude in the editor is for. The model can be swapped for another from the settings panel.
 
 - **It fits next to a game.** Model and voice share 4 GB at most, and unload from memory when you are not using them.
 - **It has a voice.** It listens and speaks through VoiceStudio, also locally.
