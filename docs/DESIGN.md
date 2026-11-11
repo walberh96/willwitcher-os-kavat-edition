@@ -664,11 +664,11 @@ La fase 1 usa Hyprland y Noctalia tal como vienen; los forks y la identidad entr
 
 ## Decisiones en revisión
 
-El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. Todos tienen ya respuesta salvo el shell, que se está evaluando; la columna Estado lo resume. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
+El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. Todos tienen ya respuesta; del shell solo queda decidir dónde vive el panel de ajustes. La columna Estado lo resume. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
 
 | # | Decisión que toca | Qué se encontró | Estado |
 | --- | --- | --- | --- |
-| 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt, con plugins en Luau | Decidido: se usa Noctalia si permite lo que queremos; si no, otro shell. Se está evaluando si la v5 lo permite |
+| 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt, con plugins en Luau | Evaluado: Noctalia 5 permite lo que queremos sin fork, con plugins propios, salvo el panel de ajustes, que no cabe en su ventana de ajustes. Falta decidir dónde vive ese panel; el detalle está debajo de la tabla |
 | 2 | Configuración de Hyprland en archivos que el panel edita línea a línea | Desde Hyprland 0.55 la configuración es Lua y el formato anterior está obsoleto | Decidido: se usa Lua; el panel escribe una tabla de valores que el Lua del sistema carga |
 | 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2 | En parte: la reinscripción será una intervención guiada de `kav update`. Dónde vive el kernel de cada snapshot se ve en la fase 2 |
 | 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca. Es fuente secundaria y aún no está desplegado | Cerrado sin cambios: se mantienen las llaves propias y no se añade nada. Un juego que exija ese anti-cheat no funcionará |
@@ -678,6 +678,30 @@ El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que toc
 | 8 | Perfiles de sandbox para el navegador | secureblue advierte de que envolver Chromium en un segundo sandbox puede restar seguridad | Cerrado sin cambios: se queda como estaba. Si en la fase 3 se ve que debilita el sandbox de Chromium, el perfil del navegador se quita |
 
 Los dos ajustes menores que señalaba el informe tampoco se aplican: la VPN de Incognito sigue siendo OpenVPN o Proton VPN, y el modo Gamer sigue poniendo la CPU en máximo rendimiento.
+
+**Evaluación de Noctalia 5.** El 11 de noviembre de 2026 se leyeron el código y la documentación de Noctalia 5.4.1 contra lo que el diseño le pide al shell. No se ejecutó nada: es lo que el proyecto documenta y lo que ya hacen sus plugins. Está en el repositorio oficial de Arch y su licencia es MIT.
+
+| Lo que el diseño pide | Resultado |
+| --- | --- |
+| Widgets en la barra alimentados por nuestros programas: selector de modo, estado, contador de actualizaciones | Con plugin propio. Los de VPN y sensores de GPU ya vienen |
+| Panel del agente: chat que se va escribiendo, botones de skills, abrirlo con una tecla | Con plugin propio. Ya hay plugins de la comunidad con chats así |
+| Selector de temas | Con plugin propio |
+| Lanzador con resultados nuestros: archivos, ajustes, skills, paquetes | Con plugin propio. Las ventanas abiertas ya vienen |
+| Notificaciones con acciones, historial y no molestar | Ya viene, y se controla desde fuera |
+| Colores, modo claro u oscuro, radio, fuentes y opacidad puestos desde fuera | Sí, con un archivo de paleta y comandos. Sus plantillas para otras apps se apagan, así que nuestros tokens quedan como única fuente |
+| Fondo de vídeo con mpvpaper | Hay un plugin oficial que hace justo eso, y su fondo de imagen se apaga por monitor |
+| hyprlock e hypridle en lugar de su bloqueo | Sí; su bloqueo se desactiva |
+| Hyprland con configuración en Lua y barra distinta por monitor | Sí |
+| Indicador de micrófono, cámara y captura; historial del portapapeles | Ya vienen |
+| OCR, cuentagotas y chuleta de atajos | Solo existen como plugins de la comunidad; se hacen propios |
+| Panel de ajustes de 24 páginas | No cabe en su ventana de ajustes: ahí un plugin solo tiene una página sencilla. Como panel propio queda corto: tamaño fijo, 22 tipos de control, sin tablas ni pestañas, y no puede capturar atajos con Super |
+
+Lo que se desprende:
+
+- **No hace falta fork.** Lo que el diseño llama `kavat-shell` puede ser Noctalia tal como viene más un conjunto de plugins y configuración nuestros. El fork serían unas 360 000 líneas de C++ que sacan versión casi cada semana, y el propio proyecto manda los paneles extra a plugins.
+- **Pendiente: dónde vive el panel de ajustes.** Hay tres caminos. Una aplicación propia que se abre desde la barra, el lanzador o un atajo y usa el mismo tema; es la recomendación. Un panel hecho como plugin, con los límites de la tabla; la página Keybindings sería la más afectada. O el fork, para tener páginas nativas dentro de su ventana.
+- **Versión fijada.** La interfaz de plugins cambió trece veces en ocho semanas y el proyecto no promete estabilidad. El repositorio `[kavat]` fija la versión de Noctalia y solo la sube cuando nuestros plugins pasan las pruebas.
+- **Un solo dueño de los ajustes.** La ventana de ajustes de Noctalia sigue existiendo y escribe su propio archivo. En la fase 3 se decide si se oculta o si nuestro panel la refleja.
 
 ## Ideas de otras distros
 

@@ -319,6 +319,6 @@ This README describes the finished system. Today the project is in **phase 0, de
 | 3 | Themes, settings, greeter, Noctalia fork, `kav` and editor | Pending |
 | 4 | Local agent, skills and voice | Pending |
 
-A study of Omarchy and other distributions reopened eight of those decisions. All are now answered except one, which is being evaluated: whether the current Noctalia can host this shell. They are listed, with their status, in the design document under «Decisiones en revisión».
+A study of Omarchy and other distributions reopened eight of those decisions. All are now answered. The current Noctalia was read against what this shell needs: it can host it through plugins, without a fork, except for the settings panel, whose home is the one point still to decide. They are listed, with their status, in the design document under «Decisiones en revisión».
 
 The design also takes several assumptions for granted that have not been tested. They are listed, with the phase in which each gets verified, at the end of the [design document](docs/DESIGN.md#decisiones).
