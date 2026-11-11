@@ -126,6 +126,8 @@ An allowed package whose PKGBUILD changes does not update until someone reviews 
 
 With no arguments, `kav` opens a full-screen TUI with seven tabs: Dashboard, Browse, Updates, AUR, Snapshots, Doctor and Settings. That is where you review a PKGBUILD diff with the suspicious lines flagged, walk the snapshot timeline and merge a `.pacnew` without leaving.
 
+Updates do not leave you halfway. Changes that pacman does not manage run as one-time migrations after each update; Arch's manual interventions become guided steps instead of a notice to go and read; and a health check remembers the last good snapshot and goes back to it when an update breaks the system.
+
 ## One system, every skin
 
 Appearance is not a folder of dotfiles. It is a set of independent axes that combine:
@@ -162,7 +164,7 @@ A settings panel inside Noctalia configures the whole core, on twenty-four pages
 
 ## The desktop
 
-- **Hyprland**, with modular configuration: the system's in `/usr/share/kavat/`, yours in `~/.config/`, and yours always wins.
+- **Hyprland**, with modular configuration: the system's in `/usr/share/kavat/`, yours in `~/.config/`, and yours always wins. Its configuration is Lua, and the settings panel only ever writes plain values for that Lua to load.
 - **Noctalia**, in its own fork: bar, launcher, notifications, control centre, plus the agent's panel, the mode selector and the settings panel.
 - **LightDM + web-greeter**, with a login screen that uses your theme and your wallpaper. Entering the desktop has no visual cut.
 - **Kitty and zsh**, with a starship prompt cut down to what costs no time: opening a terminal goes unnoticed.
@@ -317,6 +319,6 @@ This README describes the finished system. Today the project is in **phase 0, de
 | 3 | Themes, settings, greeter, Noctalia fork, `kav` and editor | Pending |
 | 4 | Local agent, skills and voice | Pending |
 
-A study of Omarchy and other distributions reopened eight of those decisions: among them the base of the shell, Hyprland's move to Lua configuration and Secure Boot with own keys. They are listed in the design document under «Decisiones en revisión», next to the ideas still waiting for approval.
+A study of Omarchy and other distributions reopened eight of those decisions. Some are settled (Hyprland's Lua configuration, the automatic safe mode); others are still open, among them whether the current Noctalia can host this shell and what Secure Boot with own keys means for anti-cheat. They are listed, with their status, in the design document under «Decisiones en revisión».
 
 The design also takes several assumptions for granted that have not been tested. They are listed, with the phase in which each gets verified, at the end of the [design document](docs/DESIGN.md#decisiones).

@@ -127,6 +127,8 @@ Hyprland compone las ventanas y un fork de Noctalia (hecho sobre Quickshell) pon
 - Los atajos parten de los de tu Willwitcher-OS Endgame, sin cambiar ninguno; lo nuevo solo ocupa teclas que tenías libres. Una hoja de atajos se genera desde la configuración.
 - Animaciones, bordes, radio y desenfoque salen de los tokens del tema, no de valores escritos a mano. Los valores iniciales son los de Endgame: radio 10, borde 2, separación 5 entre ventanas y 20 al borde, animaciones cortas.
 
+Desde Hyprland 0.55 la configuración es Lua, y así se usa. El panel de ajustes y el agente no generan Lua: escriben una tabla de valores, que son datos, y el Lua del sistema la carga. Así ningún texto que venga de fuera llega a ejecutarse.
+
 Atajos: 19 heredados de Endgame tal cual y 9 nuevos para lo que antes no existía.
 
 | Acción | Atajo | Origen |
@@ -256,7 +258,7 @@ Cómo funciona:
 - **Calle de doble sentido.** Si cambias un valor a mano, el panel lo muestra al momento. Si lo cambias en el panel, el panel edita esa línea en el archivo, sin tocar el resto ni los comentarios. No hay una segunda copia que pueda quedar desfasada.
 - **Validar antes de aplicar.** Cada cambio de configuración, venga del panel o de tu editor, se comprueba antes de cargarse. Si el escritorio no recarga bien, vuelve solo a la última versión buena y te dice qué línea falló. Si aun así no arranca, queda el modo seguro del menú de arranque.
 - **Lo que el panel no tiene vive solo en el archivo.** El panel no lo toca, no lo oculta y no lo borra.
-- **Límite en archivos que son código.** En el `init.lua` de Neovim y en `.zshrc`, el panel solo edita el bloque de ajustes que le corresponde; el resto lo deja como está y lo abre en Neovim.
+- **Límite en archivos que son código.** En `la configuración de Hyprland, que es Lua, en el init.lua de Neovim y en .zshrc, el panel solo edita su tabla de valores o su bloque de ajustes`; el resto lo deja como está y lo abre en Neovim.
 - **Abrir la configuración en Neovim, en todas partes.** Cada página del panel y cada pieza del sistema (el panel del agente, el selector de temas, `kav`, Yazi, el navegador, el marketplace) tiene un botón que abre su archivo de configuración en Neovim, en la sección que corresponde.
 - **En vivo y reversible**: cada cambio, venga del panel o del archivo, se aplica al instante; tiene deshacer y queda en un historial para volver a cualquier estado anterior.
 - **Editor de atajos**: muestra todos, detecta conflictos al asignar y regenera la hoja de atajos.
@@ -440,6 +442,13 @@ Tres reglas de la TUI:
 - Los paquetes oficiales se actualizan todos juntos: Arch no soporta actualizaciones parciales, así que la TUI no ofrece elegir uno suelto.
 - Teclado primero, con ratón opcional: los números cambian de pestaña, `/` busca y `?` muestra la ayuda.
 - Usa los colores del tema del sistema y comparte ajustes con la página Packages del panel de Noctalia.
+
+**Actualizaciones que no te dejan a medias.** Cuatro mecanismos tomados de otras distros, aprobados tras el análisis:
+
+- **Migraciones** (de Omarchy): cuando una versión nueva necesita cambiar algo que pacman no gestiona, como tu configuración o un servicio de usuario, lo hace un script que corre una sola vez, después de pacman y en orden. Si uno falla, la cola se detiene y te avisa; nunca migra en silencio. Su estado se guarda dentro de la raíz, así que volver a un snapshot también deshace las migraciones.
+- **Intervenciones guiadas** (de Garuda y EndeavourOS): cada «intervención manual» que publica Arch se convierte en un paso de `kav update` que explica qué pasa, enseña el comando, pide confirmación y anota que ya se aplicó. El primer caso es volver a inscribir el TPM2 tras mkinitcpio 42.
+- **Dos guardas de transacción** (de Omarchy): si un archivo sin dueño choca con un paquete, se aparta, se reintenta una vez y se devuelve lo que el paquete no reclamó; y Hyprland no recarga su configuración mientras pacman la está cambiando, sino una sola vez al final.
+- **Comprobación de salud con memoria** (de openSUSE): tras cada actualización y en cada arranque se comprueba que el sistema está sano, y se guarda cuál fue la última instantánea buena. Si falla justo después de actualizar, vuelve a esa instantánea; si falla un sistema que ya funcionaba, reinicia una vez y, si sigue mal, se queda encendido con los servicios parados. Es también el mecanismo del modo seguro automático.
 
 ## Sistema de temas
 
@@ -655,53 +664,39 @@ La fase 1 usa Hyprland y Noctalia tal como vienen; los forks y la identidad entr
 
 ## Decisiones en revisión
 
-El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. Ninguna está cambiada todavía: cada una espera tu decisión. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
+El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. La columna Estado dice cuáles ya tienen respuesta y cuáles esperan tu decisión. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
 
-| # | Decisión que toca | Qué se encontró | Opciones |
+| # | Decisión que toca | Qué se encontró | Estado |
 | --- | --- | --- | --- |
-| 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt. El fork se queda sin upstream del que tomar parches | Mantener nosotros la v4 congelada; pasar a Noctalia v5 y dejar Quickshell; o partir de otro shell vivo en Quickshell (Dux Shell, Caelestia, illogical-impulse o el de Omarchy) |
-| 2 | Configuración de Hyprland en archivos que el panel edita línea a línea | Desde Hyprland 0.55 la configuración es Lua y el formato anterior está obsoleto | Tratar la de Hyprland como archivo de código: el panel escribe una tabla de valores que el Lua del sistema carga, y nunca genera Lua a partir de texto ajeno |
-| 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2, lo que tensa «cada snapshot con su kernel» en discos cifrados | Convertir la reinscripción en un paso guiado de `kav update`, y decidir en la fase 2 dónde vive el kernel de cada snapshot |
-| 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca; las propias no valdrían. Es fuente secundaria y aún no está desplegado | Aceptar que los juegos que migren a EAC v2 no funcionen; o prever una entrada de arranque con un kernel firmado por un tercero reconocido, sin confirmar que sea viable |
-| 5 | Modo seguro automático tras un arranque fallido | GRUB no cuenta arranques fallidos por sí solo; ese mecanismo es de systemd-boot | Mantener GRUB y construirlo como openSUSE: un archivo con la última instantánea buena y una comprobación de salud al arrancar. Un kernel que no llega a arrancar no lo detectaría |
-| 6 | `kav review` marca lo sospechoso por patrones de texto | Dos oleadas de malware en el AUR en 2026 (más de 1.500 paquetes en junio) burlaron justo ese tipo de detección. La allowlist fijada a commit sí las habría parado | Añadir señales que no dependen del texto: cambio de mantenedor, fecha del último cambio, dependencias nuevas de npm, bun o pip, y compilar sin red |
-| 7 | Snapshots de `/home` cada hora | Omarchy los retiró en su versión 3.6 por uso de disco y por el coste de CPU de las cuotas de Btrfs | Mantenerlos sin cuotas, con menos retención y dejando fuera los juegos de Steam, los prefijos de Wine, las cachés de shaders y los modelos del agente |
-| 8 | Perfiles de sandbox para el navegador | secureblue advierte de que envolver Chromium en un segundo sandbox puede chocar con el suyo y restar seguridad | Diseñar el perfil comprobando que no degrada el sandbox de Chromium; para las apps Electron, usarlas como apps web |
+| 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt, con plugins en Luau | Decidido: se usa Noctalia si permite lo que queremos; si no, otro shell. Se está evaluando si la v5 lo permite |
+| 2 | Configuración de Hyprland en archivos que el panel edita línea a línea | Desde Hyprland 0.55 la configuración es Lua y el formato anterior está obsoleto | Decidido: se usa Lua; el panel escribe una tabla de valores que el Lua del sistema carga |
+| 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2 | En parte: la reinscripción será una intervención guiada de `kav update`. Queda decidir en la fase 2 dónde vive el kernel de cada snapshot |
+| 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca. Es fuente secundaria y aún no está desplegado | Pendiente: aceptar que esos juegos no funcionen, o prever una entrada de arranque con un kernel firmado por un tercero |
+| 5 | Modo seguro automático tras un arranque fallido | GRUB no cuenta arranques fallidos por sí solo | Resuelto con la comprobación de salud con memoria. Un kernel que no llega a arrancar sigue sin detectarse |
+| 6 | `kav review` marca lo sospechoso por patrones de texto | Dos oleadas de malware en el AUR en 2026 burlaron justo ese tipo de detección. La allowlist fijada a commit sí las habría parado | Pendiente: añadir señales que no dependen del texto, como cambio de mantenedor, fecha del último cambio, dependencias nuevas y compilar sin red |
+| 7 | Snapshots de `/home` cada hora | Omarchy los retiró en su versión 3.6 por uso de disco y por el coste de CPU de las cuotas de Btrfs | Pendiente: mantenerlos sin cuotas, con menos retención y dejando fuera juegos, cachés y modelos |
+| 8 | Perfiles de sandbox para el navegador | secureblue advierte de que envolver Chromium en un segundo sandbox puede restar seguridad | Pendiente: diseñar el perfil comprobando que no degrada el sandbox de Chromium |
 
 Dos ajustes menores, también pendientes: Proton recomienda WireGuard y deja OpenVPN para equipos antiguos; y según CachyOS, poner la CPU en máximo rendimiento en modo Gamer no ayuda en todos los equipos.
 
-## Ideas por evaluar
+## Ideas de otras distros
 
-El informe cataloga 54 ideas nuevas, 36 refinamientos y 17 cosas que no copiar, cada una con un código para aprobarla o descartarla. Estas 20 son las que el informe recomienda aprobar primero; el resto se elige por código en el informe. El coste es una estimación del informe, no un dato de las fuentes.
+De las 20 ideas que el informe recomendaba, se aprobaron las cuatro de `kav` y se descartó el resto para no complicar el sistema. El catálogo completo sigue en el informe por si alguna vuelve a interesar.
 
-| Código | Idea | De dónde viene | Coste |
-| --- | --- | --- | --- |
-| A1 | Migraciones del estado de usuario: scripts que corren una sola vez después de cada actualización, con su estado guardado dentro de la raíz | Omarchy | Semanas |
-| A2 | Intervenciones manuales de Arch convertidas en pasos guiados de `kav update` | Garuda, EndeavourOS | Semanas |
-| A8 | Dos guardas de transacción: apartar archivos sin dueño que chocan con un paquete, y pausar la recarga de Hyprland mientras pacman cambia su configuración | Omarchy | Días |
-| R10 | Comprobación de salud con memoria de la última instantánea buena y respuesta escalonada | openSUSE | Semanas |
-| B1 | Snapshot base permanente tomado por el instalador, para volver al estado de fábrica | Omarchy, CachyOS | Días |
-| B4 | Reiniciar un subsistema (Wi-Fi, Bluetooth, audio) antes que el equipo, como skills | Omarchy | Días |
-| C4 | Apps web como aplicaciones de primera clase, cada una con su perfil | Omarchy, Zorin OS | Días |
-| C5 | Programas de terminal como aplicaciones de primera clase, con reglas de ventana propias | Omarchy | Días |
-| D1 | Disposición desplazable por espacio o por proyecto, manejada con flechas | niri; integrada en Hyprland | Días |
-| D6 | Diálogo de contraseña que oscurece la pantalla, bloquea el foco y dice qué se autoriza | elementary OS, Omarchy | Días a semanas |
-| D9 | Copiar el código de verificación desde la notificación, sin guardarlo en el historial | Omarchy | Días |
-| D10 | Cada app en su propio ámbito de systemd, para que un proceso desbocado no tumbe la sesión | Omarchy | Días |
-| D11 | Diagnóstico de fallos como skill: cuando un proceso cae, el agente recibe el volcado | Omarchy | Días a semanas |
-| E5 | Banco de pruebas local con MangoHud, para comprobar si cada ajuste del modo Gamer sirve | MangoHud | Días a semanas |
-| E3 | Proton empaquetado en `[kavat]` y fijable por juego | CachyOS, Nobara | Semanas |
-| E8 | Ajustes baratos para AMD: caché de shaders mayor y planificador de disco según el tipo | CachyOS | Días |
-| F1 | Navegador de Incognito con su perfil en memoria, que desaparece al salir | Kicksecure, Firejail | Días |
-| F3 | Borde de color en las ventanas de Incognito o en sandbox | Qubes OS | Días |
-| F5 | Con la sesión bloqueada, rechazar dispositivos USB nuevos; tras muchas horas bloqueada, reiniciar | GrapheneOS, secureblue | Días a semanas |
-| F9 | Docker sin el grupo `docker`, que equivale a root sin contraseña | Omarchy | Días |
+| Código | Idea aprobada | De dónde viene |
+| --- | --- | --- |
+| A1 | Migraciones que corren una vez tras cada actualización | Omarchy |
+| A2 | Intervenciones manuales de Arch como pasos guiados | Garuda, EndeavourOS |
+| A8 | Dos guardas durante la actualización | Omarchy |
+| R10 | Comprobación de salud que recuerda la última instantánea buena | openSUSE |
+
+Están descritas en «Gestor de paquetes».
 
 Lo que el informe recomienda no copiar: los repos binarios de CachyOS, porque su política lo prohíbe; el modelo de imagen inmutable; meter el bloqueo de pantalla dentro del shell; los demonios globales de rendimiento; y el endurecimiento que rompe Steam.
 
 ## Decisiones
 
-Las decisiones de esta tabla están tomadas, pero ocho están en revisión por lo que encontró el análisis de otras distros; ver «Decisiones en revisión».
+Las decisiones de esta tabla están tomadas; las que el análisis de otras distros dejó en revisión están en «Decisiones en revisión», con su estado.
 
 | Decidido | Decisión |
 | --- | --- |
@@ -714,11 +709,11 @@ Las decisiones de esta tabla están tomadas, pero ocho están en revisión por l
 | Pantalla de carga | Plymouth con tema propio y cuatro estilos, configurable desde Noctalia |
 | Modo seguro | Entrada del menú de arranque que ignora tu configuración y usa la de fábrica; se selecciona sola tras un arranque fallido |
 | Login | LightDM + web-greeter con tema propio |
-| Hyprland | Sin fork, con configuración propia; fork desde el día 1 solo si la versión actual impide algo |
+| Hyprland | Sin fork, con configuración propia en Lua; el panel solo escribe datos. Fork desde el día 1 solo si la versión actual impide algo |
 | Paleta de comandos | Una sola para todo el sistema, con la gramática de la consola del navegador y de Neovim |
 | Coherencia | Proyectos, un comando `kavat` para todo, hoja de atajos según contexto y captura con texto |
 | Lenguaje de `kav` y `kavatd` | Rust |
-| Gestor de paquetes | `kav` con comandos y con TUI completa sobre el mismo núcleo |
+| Gestor de paquetes | `kav` con comandos y con TUI completa sobre el mismo núcleo; migraciones, intervenciones guiadas, guardas de transacción y comprobación de salud con memoria |
 | Dependencias | Lo que un ajuste, una skill o un plugin necesita lo instala y lo protege `kav` |
 | Software diario | Kitty, zsh, Neovim, Yazi y un fork de Chromium |
 | Prompt de zsh | starship con preset mínimo, sin módulos que lancen procesos |
@@ -758,7 +753,7 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 | La prueba tras actualizar detecta un arranque gráfico roto y ofrece volver atrás | 2 |
 | Regenerar la pantalla de carga en segundo plano no bloquea ni rompe el arranque | 3 |
 | Kitty y Neovim distinguen los atajos con `Ctrl+Shift` y `Ctrl+Tab`, y el panel de Claude sigue conectado al editor cuando lo abre Kitty en una división | 3 |
-| Hyprland y Kitty aceptan en vivo todos los cambios del panel de ajustes | 3 |
+| Hyprland y Kitty aceptan en vivo todos los cambios del panel de ajustes; en Hyprland, cargando la tabla de valores desde su configuración en Lua | 3 |
 | El panel puede leer la configuración de cada app y editar una línea suya sin romper el formato ni los comentarios | 3 |
 | La configuración de cada app se puede validar antes de cargarla | 3 |
 | zsh con starship abre dentro del presupuesto de tiempo | 3 |
