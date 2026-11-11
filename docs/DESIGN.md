@@ -664,20 +664,20 @@ La fase 1 usa Hyprland y Noctalia tal como vienen; los forks y la identidad entr
 
 ## Decisiones en revisión
 
-El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. La columna Estado dice cuáles ya tienen respuesta y cuáles esperan tu decisión. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
+El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. Todos tienen ya respuesta salvo el shell, que se está evaluando; la columna Estado lo resume. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
 
 | # | Decisión que toca | Qué se encontró | Estado |
 | --- | --- | --- | --- |
 | 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt, con plugins en Luau | Decidido: se usa Noctalia si permite lo que queremos; si no, otro shell. Se está evaluando si la v5 lo permite |
 | 2 | Configuración de Hyprland en archivos que el panel edita línea a línea | Desde Hyprland 0.55 la configuración es Lua y el formato anterior está obsoleto | Decidido: se usa Lua; el panel escribe una tabla de valores que el Lua del sistema carga |
-| 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2 | En parte: la reinscripción será una intervención guiada de `kav update`. Queda decidir en la fase 2 dónde vive el kernel de cada snapshot |
-| 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca. Es fuente secundaria y aún no está desplegado | Pendiente: aceptar que esos juegos no funcionen, o prever una entrada de arranque con un kernel firmado por un tercero |
+| 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2 | En parte: la reinscripción será una intervención guiada de `kav update`. Dónde vive el kernel de cada snapshot se ve en la fase 2 |
+| 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca. Es fuente secundaria y aún no está desplegado | Cerrado sin cambios: se mantienen las llaves propias y no se añade nada. Un juego que exija ese anti-cheat no funcionará |
 | 5 | Modo seguro automático tras un arranque fallido | GRUB no cuenta arranques fallidos por sí solo | Resuelto con la comprobación de salud con memoria. Un kernel que no llega a arrancar sigue sin detectarse |
-| 6 | `kav review` marca lo sospechoso por patrones de texto | Dos oleadas de malware en el AUR en 2026 burlaron justo ese tipo de detección. La allowlist fijada a commit sí las habría parado | Pendiente: añadir señales que no dependen del texto, como cambio de mantenedor, fecha del último cambio, dependencias nuevas y compilar sin red |
-| 7 | Snapshots de `/home` cada hora | Omarchy los retiró en su versión 3.6 por uso de disco y por el coste de CPU de las cuotas de Btrfs | Pendiente: mantenerlos sin cuotas, con menos retención y dejando fuera juegos, cachés y modelos |
-| 8 | Perfiles de sandbox para el navegador | secureblue advierte de que envolver Chromium en un segundo sandbox puede restar seguridad | Pendiente: diseñar el perfil comprobando que no degrada el sandbox de Chromium |
+| 6 | `kav review` marca lo sospechoso por patrones de texto | Dos oleadas de malware en el AUR en 2026 burlaron justo ese tipo de detección. La allowlist fijada a commit sí las habría parado | Cerrado sin cambios: no se añaden señales. La protección es la allowlist fijada a commit y tu lectura del diff; las marcas automáticas son una ayuda, no una garantía |
+| 7 | Snapshots de `/home` cada hora | Omarchy los retiró en su versión 3.6 por uso de disco y por el coste de CPU de las cuotas de Btrfs | Cerrado sin cambios: se quedan como estaban. Si en la fase 3 pesan en disco o CPU, se quitan |
+| 8 | Perfiles de sandbox para el navegador | secureblue advierte de que envolver Chromium en un segundo sandbox puede restar seguridad | Cerrado sin cambios: se queda como estaba. Si en la fase 3 se ve que debilita el sandbox de Chromium, el perfil del navegador se quita |
 
-Dos ajustes menores, también pendientes: Proton recomienda WireGuard y deja OpenVPN para equipos antiguos; y según CachyOS, poner la CPU en máximo rendimiento en modo Gamer no ayuda en todos los equipos.
+Los dos ajustes menores que señalaba el informe tampoco se aplican: la VPN de Incognito sigue siendo OpenVPN o Proton VPN, y el modo Gamer sigue poniendo la CPU en máximo rendimiento.
 
 ## Ideas de otras distros
 

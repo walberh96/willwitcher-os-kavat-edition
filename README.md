@@ -319,6 +319,6 @@ This README describes the finished system. Today the project is in **phase 0, de
 | 3 | Themes, settings, greeter, Noctalia fork, `kav` and editor | Pending |
 | 4 | Local agent, skills and voice | Pending |
 
-A study of Omarchy and other distributions reopened eight of those decisions. Some are settled (Hyprland's Lua configuration, the automatic safe mode); others are still open, among them whether the current Noctalia can host this shell and what Secure Boot with own keys means for anti-cheat. They are listed, with their status, in the design document under «Decisiones en revisión».
+A study of Omarchy and other distributions reopened eight of those decisions. All are now answered except one, which is being evaluated: whether the current Noctalia can host this shell. They are listed, with their status, in the design document under «Decisiones en revisión».
 
 The design also takes several assumptions for granted that have not been tested. They are listed, with the phase in which each gets verified, at the end of the [design document](docs/DESIGN.md#decisiones).
