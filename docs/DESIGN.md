@@ -232,8 +232,8 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | GPU | Curvas de ventilador, límite de potencia, sensores en la barra, perfiles por juego | No |
 | Sound | Salida, entrada, volumen por app, supresión de ruido del micrófono | No |
 | Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial | No previsto: admite recarga en vivo |
-| Editor (Neovim) | Preset de atajos, numeración, tabulación, formateo y guardado automáticos, paquetes de lenguaje, plugins | No: es configuración propia (`kavat-nvim`) |
-| Files (Yazi) | Preset de atajos, arrastrar y soltar, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
+| Editor (Neovim) | Preset de atajos, numeración, tabulación, formateo y guardado automáticos, paquetes de lenguaje, plugins, paneles laterales | No: es configuración propia (`kavat-nvim`) |
+| Files (Yazi) | Preset de atajos, arrastrar y soltar, copiador con pop-up, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
 | Shell (zsh) | Prompt, plugins, historial, alias, apps por defecto | No |
 | Browser | Bloqueador, apariencia, perfil por modo, comandos de la consola | El fork de Chromium ya previsto |
 | Bar & widgets | Posición y densidad de la barra, widgets y su orden, lanzador, notificaciones | El fork de Noctalia ya previsto |
@@ -342,6 +342,18 @@ Neovim es el editor del núcleo y llega como `kavat-nvim`: útil nada más abrir
 
 **Ajustes.** La página Editor del panel de Noctalia cambia el preset de atajos (VS Code, Vim o propio), numeración, tabulación, formateo y guardado automáticos y paquetes de lenguaje, y abre el marketplace. Los cambios llegan en vivo a las ventanas de Neovim abiertas.
 
+**Paneles.** Neovim trae paneles laterales de serie, y el primero es Claude: un panel a la derecha con Claude Code, conectado al editor.
+
+- **Quién hace la división**: Kitty, no Neovim. El panel es una ventana real de Kitty junto a la de Neovim, que el editor abre y cierra por control remoto. Claude Code es un programa de terminal completo, con sus propias teclas; en el terminal embebido de Neovim esas teclas chocan, y en una ventana de Kitty se comporta como en cualquier terminal.
+- **Conectado al editor**: con claudecode.nvim, que habla el mismo protocolo que la extensión oficial de VS Code y admite que Claude corra en un terminal externo. Claude ve el archivo y la selección actuales, y lo que propone cambiar se abre como un diff nativo de Neovim que aceptas o rechazas con una tecla.
+- **Teclas**: `Ctrl+Alt+B` abre y cierra el panel, como la barra lateral secundaria de VS Code, y `Ctrl+Alt+K` le manda la selección. Moverse entre editor y panel usa las mismas teclas que entre divisiones de Neovim.
+- **Más de un panel**: el mismo sistema sirve para el agente local Kavat, un terminal inferior, Lazygit o las pruebas. Cada panel es un archivo que dice qué programa abre y dónde.
+- **Sacar y esconder**: una tecla saca el panel a su propia ventana, para que Hyprland la coloque donde quieras, y otra lo oculta sin cerrar la conversación.
+- **Por proyecto**: cada proyecto recuerda sus paneles y retoma su conversación al abrirse.
+- **Fuera de Kitty**: por SSH o en otro terminal, el panel cae a una división normal de Neovim.
+
+Dos cosas a tener claras. Claude Code es un servicio en la nube que usa tu cuenta: es una herramienta tuya de desarrollo, aparte de Kavat, que sigue siendo local. Y el control remoto de Kitty se limita con contraseña a las acciones que los paneles necesitan: abrir, enfocar, redimensionar y cerrar ventanas.
+
 ## Archivos
 
 Yazi es el gestor de archivos del núcleo y llega como `kavat-files`: sigue el tema, arrastra y suelta, y es el explorador de archivos de todo el sistema, incluido el navegador.
@@ -356,6 +368,14 @@ Yazi es el gestor de archivos del núcleo y llega como `kavat-files`: sigue el t
 | «Mostrar en carpeta» | Un servicio propio responde a la interfaz estándar de gestores de archivos, así que cualquier app que lo pida abre Yazi en esa ruta |
 | Abrir con | Las reglas de apertura de Yazi salen de las apps por defecto del panel de ajustes |
 | Agente | Skills «abrir archivos» y «buscar un archivo»; desde Yazi, una tecla pregunta a Kavat por lo seleccionado |
+
+**Copiar y mover con ventana propia.** Pegar abre un pop-up que dice qué se copia y a dónde, con el progreso por archivo y el total, la velocidad y el tiempo que falta. Sustituye al comportamiento de serie de Yazi, donde el progreso apenas se ve y un conflicto de nombres se resuelve sin preguntar.
+
+- **Conflictos a la vista**: si un archivo ya existe en el destino, el pop-up pregunta si reemplazar, omitir o conservar los dos, con la opción de aplicarlo a todos.
+- **Segundo plano**: `Esc` deja la copia trabajando con un indicador en la barra de estado; al terminar, avisa con una notificación si Yazi no está a la vista.
+- **Recordatorio**: tras `Ctrl+C`, una línea dice cuántos elementos hay listos para pegar.
+- **Portapapeles del sistema**: lo copiado en Yazi queda también en el portapapeles, así que se puede pegar como archivo en otra app.
+- **Cómo se hace**: como plugin. Yazi deja que un plugin dibuje su propia ventana, que es como funciona su gestor de discos. Si un plugin no puede seguir el progreso real de la copia, se bifurca.
 
 Ideas añadidas:
 
@@ -702,9 +722,9 @@ Las decisiones de esta tabla están tomadas, pero ocho están en revisión por l
 | Dependencias | Lo que un ajuste, una skill o un plugin necesita lo instala y lo protege `kav` |
 | Software diario | Kitty, zsh, Neovim, Yazi y un fork de Chromium |
 | Prompt de zsh | starship con preset mínimo, sin módulos que lancen procesos |
-| Editor | Neovim en el núcleo, híbrido: modos de Vim con navegación y atajos de VS Code |
+| Editor | Neovim en el núcleo, híbrido: modos de Vim con navegación y atajos de VS Code; panel lateral de Claude y otros paneles, abiertos como divisiones de Kitty |
 | Marketplace de plugins | Partiendo de store.nvim, con catálogo verificado y presets encima |
-| Gestor de archivos | Yazi integrado: tema, arrastrar y soltar, y explorador de archivos del sistema y del navegador |
+| Gestor de archivos | Yazi integrado: tema, arrastrar y soltar, copiar y mover con pop-up de progreso, y explorador de archivos del sistema y del navegador |
 | Fork de Chromium | Modos, tema automático, bloqueador, agente integrado, consola de comandos y Yazi como explorador |
 | Perfiles del navegador | Uno por modo, por ahora |
 | Modos del sistema | Coder, Gamer e Incognito, seleccionables desde Noctalia |
@@ -737,7 +757,7 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 | GRUB, Plymouth y el login enlazan sin parpadeo en la RX 6800 | 2 |
 | La prueba tras actualizar detecta un arranque gráfico roto y ofrece volver atrás | 2 |
 | Regenerar la pantalla de carga en segundo plano no bloquea ni rompe el arranque | 3 |
-| Kitty y Neovim distinguen los atajos con `Ctrl+Shift` y `Ctrl+Tab` | 3 |
+| Kitty y Neovim distinguen los atajos con `Ctrl+Shift` y `Ctrl+Tab`, y el panel de Claude sigue conectado al editor cuando lo abre Kitty en una división | 3 |
 | Hyprland y Kitty aceptan en vivo todos los cambios del panel de ajustes | 3 |
 | El panel puede leer la configuración de cada app y editar una línea suya sin romper el formato ni los comentarios | 3 |
 | La configuración de cada app se puede validar antes de cargarla | 3 |
@@ -746,7 +766,7 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 | Noctalia y mpvpaper conviven: uno pinta la imagen, el otro el vídeo, y la pausa automática funciona | 3 |
 | El portal con Yazi sirve de selector de archivos para Chromium y para las apps GTK y Qt | 3 |
 | El navegador abre Yazi al pulsar una descarga, con el archivo seleccionado | 3 |
-| Yazi acepta archivos soltados sobre su ventana y recarga el tema en vivo, por plugin o por fork | 3 |
+| Yazi acepta archivos soltados sobre su ventana, recarga el tema en vivo y muestra el progreso real de una copia en un pop-up, por plugin o por fork | 3 |
 | Un proyecto restaura ventanas, terminales y editor tal como estaban | 3 |
 | OpenRGB controla las luces de tu teclado y de tu torre | 3 |
 | Las curvas de ventilador y el límite de potencia de la RX 6800 se pueden fijar desde el panel | 3 |

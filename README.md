@@ -47,6 +47,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![Agent and voice](docs/screenshots/settings-agent.png) **Agent and voice.** Model and voice share 4 GB. | ![kav](docs/screenshots/kav-dashboard.png) **`kav`.** The package manager, as a TUI. |
 | ![AUR review](docs/screenshots/kav-aur-review.png) **AUR review.** The diff, with the suspicious lines flagged. | ![Editor](docs/screenshots/editor-marketplace.png) **Editor.** Neovim with a plugin marketplace. |
 | ![Browser](docs/screenshots/browser.png) **Browser.** Command console and the agent's side panel. | ![Installer](docs/screenshots/installer.png) **Installer.** Calamares, appearance step. |
+| ![Claude panel](docs/screenshots/claude-panel.png) **Claude beside the code.** A Kitty split next to Neovim; edits arrive as diffs. | ![Copy pop-up](docs/screenshots/files-copy.png) **Copying you can see.** Progress and name conflicts, in a pop-up. |
 | ![Files](docs/screenshots/files.png) **Files.** Yazi, with previews and a drag-and-drop shelf. | ![File picker](docs/screenshots/files-picker.png) **File picker.** The browser asks for a file and Yazi answers. |
 | ![Launcher](docs/screenshots/launcher.png) **One palette.** Apps, files, settings, skills, packages and windows from one place. | ![Boot settings](docs/screenshots/settings-boot.png) **Boot settings.** The menu and the loading screen, from the panel. |
 | ![GPU settings](docs/screenshots/settings-gpu.png) **GPU.** Fan curve, limits and per-game profiles. | ![Projects](docs/screenshots/settings-projects.png) **Projects.** A whole workspace, saved and reopened. |
@@ -178,6 +179,7 @@ Neovim is part of the core, and it is useful the moment you open it.
 - **Preinstalled.** File explorer, fuzzy finder, command palette, tabs, LSP with completion, format on save, git, floating terminal and multicursor.
 - **A marketplace inside the editor.** `Ctrl+Shift+X` opens a catalogue of plugins by category. Verified ones bring their tested configuration and shortcuts, pinned to a commit; installing is one step.
 - **Language packs.** "Rust" installs the LSP server, formatter, linter and debugger in one go.
+- **Claude beside the code.** `Ctrl+Alt+B` opens Claude Code in a side panel that is a real Kitty split, connected to the editor: it sees your file and selection, and its edits open as native diffs you accept or reject. The same panel system hosts Kavat, a terminal or Lazygit. Claude Code is a cloud service that uses your own account; it is separate from Kavat, which stays local.
 
 ## Files
 
@@ -188,6 +190,7 @@ Yazi is the file manager, and the file explorer for the whole system.
 - **Every app picks files with it.** "Open" and "Save as" open Yazi instead of a foreign dialog, in the browser too.
 - **Downloads land in it.** Click a download in the browser and Yazi opens in the downloads folder with that file selected.
 - **No Vim keys required.** Arrows, `Enter`, `Backspace`, `Ctrl+C` / `Ctrl+V`, `Del` and `F2` work; the Vim ones are still there.
+- **Copying you can see.** Pasting opens a pop-up with per-file and total progress, and asks what to do when a name already exists.
 - **Previews in the terminal.** Images, video thumbnails, PDFs, archives and code.
 
 ## The browser
