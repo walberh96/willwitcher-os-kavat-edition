@@ -28,7 +28,7 @@ La ISO se construye con `archiso` a partir del perfil `releng`, y todo lo propio
 | --- | --- | --- | --- |
 | Construcción de la ISO | `archiso` con perfil propio en `iso/` | Partir de EndeavourOS o CachyOS | Control total y sin heredar decisiones ajenas; se compila en tu PC de escritorio con Arch |
 | Kernel | `linux-zen` + `linux-lts` de respaldo | `linux` estándar | Zen responde mejor en escritorio; LTS salva un arranque roto |
-| Gestor de arranque | systemd-boot con UKI (decidido) | Limine | Es parte de systemd y no añade piezas; kav genera una entrada de arranque por snapshot con su kernel |
+| Gestor de arranque | GRUB con menú propio (decidido) | systemd-boot | Admite tema gráfico y submenús: fondo, entradas propias, modo seguro y lista de snapshots, cada uno con su kernel |
 | Sistema de archivos | Btrfs con subvolúmenes `@`, `@home`, `@log`, `@pkg`, `@snapshots` | ext4 | Snapshots baratos y compresión zstd |
 | Snapshots | Snapper + hook de pacman antes y después de cada transacción | Timeshift | Se integra con el arranque y con `kav` |
 | Cifrado | LUKS2 opcional, desbloqueo por TPM2 | Solo contraseña | Disco cifrado sin teclear dos contraseñas |
@@ -70,6 +70,39 @@ Ideas propias sobre el Calamares de serie:
 - **Instalación sin red**: la ISO lleva los paquetes; con red solo se actualiza al final.
 - **Archivo de respuestas**: un `kavat-install.toml` en el USB reinstala tu máquina sin tocar nada.
 - **Primer arranque**: un asistente dentro de Noctalia termina lo que no pertenece al instalador (cuentas, llaves SSH, descarga del modelo).
+
+## Arranque
+
+Del botón de encendido al escritorio hay tres pantallas con la misma identidad: el menú de GRUB, la pantalla de carga de Plymouth y el login. Las dos primeras se configuran desde la página Boot del panel de Noctalia.
+
+**Menú de arranque (GRUB).**
+
+| Entrada | Qué hace |
+| --- | --- |
+| Willwitcher-OS Kavat Edition | Arranque normal; es la entrada por defecto |
+| Kernel de respaldo | El mismo sistema con `linux-lts` |
+| Modo seguro | Arranca con la configuración de fábrica: tus archivos se ignoran, no se borran; sin agente, sin apps de inicio automático y sin fondo animado |
+| Snapshots | Submenú con los últimos 10 estados arrancables y los fijados |
+| Recuperación | Consola de rescate con `kavat-rescue` |
+| Ajustes del firmware | Entra a la UEFI |
+| Otros sistemas | Solo aparece si hay otro sistema instalado |
+
+- **Tema propio**: fondo, tipografía, colores y logo salen del tema del sistema. El fondo es el fondo de pantalla actual; si es un vídeo, su fotograma fijo.
+- **Modo seguro**: es la red de seguridad de que los archivos de configuración manden. Si un archivo editado a mano deja el escritorio sin arrancar, esta entrada entra sin leerlo.
+- **Arranque fallido**: si el arranque anterior no llegó al escritorio, el menú aparece solo y con Modo seguro ya seleccionado.
+- **Reiniciar hacia**: desde el menú de energía del shell se reinicia directamente al modo seguro, a un snapshot o al firmware, sin pasar por el menú. También son skills del agente.
+- **Configurable**: tiempo de espera, entrada por defecto, qué entradas se muestran, resolución y aspecto. Modo seguro no se puede ocultar.
+
+**Pantalla de carga (Plymouth).**
+
+- **Cuatro estilos**: logo con pulso, anillo giratorio, barra de progreso, o texto con los mensajes de arranque.
+- **Sigue al tema**, con la misma imagen de fondo que el menú y el login, para que no haya salto entre las tres pantallas.
+- **`Esc` muestra los mensajes de arranque.** La pantalla aparece también al apagar y al reiniciar.
+- **Disco cifrado**: la petición de contraseña sale en esta pantalla, con el mismo tema.
+
+**Cómo se aplican los cambios.** El menú y la pantalla de carga son archivos del sistema, y cambiar la pantalla de carga obliga a regenerar la imagen de arranque, que tarda. Por eso el cambio de tema del escritorio sigue siendo instantáneo y el arranque se actualiza después, en segundo plano, con una sola petición de contraseña. Si la regeneración falla, se queda la versión anterior.
+
+Dos límites: GRUB muestra una imagen fija, no reproduce vídeo ni desenfoca; y sus fuentes hay que convertirlas a su propio formato, cosa que hace el generador de temas. GRUB, grub-btrfs (la base del submenú de snapshots) y Plymouth están en los repos oficiales de Arch.
 
 ## Login
 
@@ -133,6 +166,13 @@ Atajos: 19 heredados de Endgame tal cual y 9 nuevos para lo que antes no existí
 - Añadidos propios: panel del agente, selector de temas con vista previa, panel de `kav` (actualizaciones, snapshots, solicitudes de AUR) y el asistente de primer arranque.
 - El motor de colores de Noctalia se sustituye o se alimenta desde los tokens del sistema, para que haya una sola fuente de verdad.
 
+**Paleta de comandos.** `Super+D` abre una sola paleta para todo el sistema: apps, archivos, ajustes, skills, paquetes, ventanas abiertas y pestañas del navegador. Usa la misma gramática y los mismos nombres de comando que la consola del navegador y la paleta de Neovim, y lo que no encuentra se lo puede pasar al agente.
+
+- **Proyectos.** Un proyecto guarda un espacio de trabajo entero: carpeta, terminales, editor, perfil del navegador y disposición de ventanas. Se abre desde la paleta o desde la barra, y vuelve tal como lo dejaste.
+- **Un comando `kavat` para todo.** `kavat theme`, `mode`, `wallpaper`, `project`, `ask` y `doctor` comparten verbos y autocompletado; todo lo que hace el panel se puede hacer desde la terminal.
+- **Hoja de atajos según contexto.** `Super+/` muestra los atajos de la app que tiene el foco, además de los del sistema.
+- **Captura con texto.** Al capturar una zona de la pantalla se puede copiar su texto, con reconocimiento local.
+
 **Regla para todos los forks.** Cada fork lleva un `PATCHES.md` con qué cambia y por qué, y una tarea automática que avisa cuando upstream publica versión y si los parches aplican limpio.
 
 ## Modos del sistema
@@ -168,25 +208,43 @@ Límite a tener claro: la VPN oculta tu IP a los sitios y tu tráfico a tu prove
 
 Al entrar en Incognito, las ventanas normales del navegador ya abiertas se ocultan en un espacio aparte y vuelven al salir.
 
+## Juego y hardware
+
+El equipo es un escritorio con una Radeon RX 6800, y el sistema lo trata como tal.
+
+- **Perfil por juego**: en modo Gamer, cada juego puede tener su monitor de rendimiento, su límite de fotogramas y su perfil de GPU.
+- **Página de GPU**: curvas de ventilador, límites de potencia y sensores en la barra.
+- **Las luces siguen al tema**: con OpenRGB, teclado y torre toman el color de acento y cambian con el modo.
+- **Supresión de ruido del micrófono**: activa de serie, para la voz del agente y para directos.
+
 ## Ajustes desde Noctalia
 
 Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema desde un solo sitio, y cada pieza nueva que entre al núcleo llega con su página de ajustes.
 
 | Página del panel | Qué se ajusta | Fork necesario |
 | --- | --- | --- |
-| Appearance | Todo el sistema de temas: paleta, modo, acento, tono, tipografía, perfiles | Propio |
+| Appearance | Todo el sistema de temas: paleta, modo, acento, tono, tipografía, perfiles; luces que siguen al acento | Propio |
 | Wallpaper | Imagen o vídeo, carpetas, ajustes del vídeo, reglas de pausa, fondo por pantalla | No: mpvpaper para el vídeo |
+| Accessibility | Reducir movimiento, escala de texto, contraste alto | Propio |
 | Windows (Hyprland) | Separación, bordes, animaciones, disposición, ratón y teclado, reglas de ventana | No previsto: admite cambios en vivo |
 | Keybindings | Todos los atajos, con detección de conflictos y hoja de atajos | No |
 | Displays | Resolución, frecuencia, escala, rotación, sincronización adaptativa, luz nocturna, reparto de espacios de trabajo | No: lo aplica Hyprland |
+| GPU | Curvas de ventilador, límite de potencia, sensores en la barra, perfiles por juego | No |
+| Sound | Salida, entrada, volumen por app, supresión de ruido del micrófono | No |
 | Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial | No previsto: admite recarga en vivo |
 | Editor (Neovim) | Preset de atajos, numeración, tabulación, formateo y guardado automáticos, paquetes de lenguaje, plugins | No: es configuración propia (`kavat-nvim`) |
+| Files (Yazi) | Preset de atajos, arrastrar y soltar, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
 | Shell (zsh) | Prompt, plugins, historial, alias, apps por defecto | No |
 | Browser | Bloqueador, apariencia, perfil por modo, comandos de la consola | El fork de Chromium ya previsto |
 | Bar & widgets | Posición y densidad de la barra, widgets y su orden, lanzador, notificaciones | El fork de Noctalia ya previsto |
 | Modes | Qué hace cada modo, automatización con Steam, VPN de Incognito, modos nuevos | Propio |
-| Agent & voice | Presupuesto de memoria, modelo, permisos por nivel, voz, registro de actividad; las skills tienen su propia página | Propio |
-| Packages (kav) | Fuentes, actualizaciones, snapshots, allowlist del AUR y solicitudes | Propio |
+| Projects | Proyectos guardados: carpeta, terminales, editor, perfil del navegador y ventanas de cada uno | Propio |
+| Agent & voice | Presupuesto de memoria, modelo, permisos por nivel, voz y cómo se activa, avisos, registro de actividad | Propio |
+| Skills | Skills de serie y propias, sus pasos, atajo, frase de voz, dónde se fijan y cuándo se lanzan solas | Propio |
+| Packages (kav) | Fuentes, actualizaciones y su comprobación, snapshots, allowlist del AUR y solicitudes | Propio |
+| Backup & sync | Snapshots de `/home`, copias externas, historial de la configuración y su sincronización | Propio |
+| Privacy & network | Qué app usó micrófono, cámara o pantalla; reglas del cortafuegos por aplicación | No |
+| Boot | Menú de GRUB (espera, entrada por defecto, entradas visibles, aspecto) y pantalla de carga (estilo, mensajes) | No: temas generados para GRUB y Plymouth |
 | Login & lock | Fondo, reloj, usuarios, idioma del login, tiempos de bloqueo | El fork de web-greeter ya previsto |
 | Language & region | Idioma del sistema (inglés o español), distribuciones de teclado, formatos | Propio |
 
@@ -194,9 +252,13 @@ En Neovim, como en el resto, tus archivos en \~/.config/nvim/ ganan sobre lo que
 
 Cómo funciona:
 
-- **Una sola fuente**: el panel solo escribe en `~/.config/kavat/settings.toml`. El mismo generador de los temas produce la configuración de cada app y la recarga.
-- **En vivo y reversible**: cada cambio se ve al instante, tiene deshacer, y queda en un historial para volver a cualquier estado anterior.
-- **Tus archivos ganan**: si editas a mano un archivo en `~/.config/hypr/` o el de Kitty, el panel marca ese ajuste como «sobrescrito por tu archivo» en vez de pisarlo.
+- **El archivo de configuración es la verdad.** Cada ajuste vive en un solo sitio: el archivo de configuración de su app, o `~/.config/kavat/` para lo propio del sistema. Lo que hay en el archivo es lo que vale.
+- **Calle de doble sentido.** Si cambias un valor a mano, el panel lo muestra al momento. Si lo cambias en el panel, el panel edita esa línea en el archivo, sin tocar el resto ni los comentarios. No hay una segunda copia que pueda quedar desfasada.
+- **Validar antes de aplicar.** Cada cambio de configuración, venga del panel o de tu editor, se comprueba antes de cargarse. Si el escritorio no recarga bien, vuelve solo a la última versión buena y te dice qué línea falló. Si aun así no arranca, queda el modo seguro del menú de arranque.
+- **Lo que el panel no tiene vive solo en el archivo.** El panel no lo toca, no lo oculta y no lo borra.
+- **Límite en archivos que son código.** En el `init.lua` de Neovim y en `.zshrc`, el panel solo edita el bloque de ajustes que le corresponde; el resto lo deja como está y lo abre en Neovim.
+- **Abrir la configuración en Neovim, en todas partes.** Cada página del panel y cada pieza del sistema (el panel del agente, el selector de temas, `kav`, Yazi, el navegador, el marketplace) tiene un botón que abre su archivo de configuración en Neovim, en la sección que corresponde.
+- **En vivo y reversible**: cada cambio, venga del panel o del archivo, se aplica al instante; tiene deshacer y queda en un historial para volver a cualquier estado anterior.
 - **Editor de atajos**: muestra todos, detecta conflictos al asignar y regenera la hoja de atajos.
 - **Buscador**: escribir «gaps» o «fuente» lleva al ajuste, esté en la app que esté.
 - **El agente usa lo mismo**: «sube la separación a 10» cambia el mismo valor que el panel, con el mismo deshacer.
@@ -215,7 +277,7 @@ Regla para los forks: una app se bifurca cuando no deja cambiar su configuració
 
 ## Navegador
 
-`kavat-browser` es un fork de Chromium con cinco cambios: sigue los modos del sistema, cambia de tema con el sistema, bloquea anuncios de serie, habla con el agente y tiene una consola de comandos.
+`kavat-browser` es un fork de Chromium con seis cambios: sigue los modos del sistema, cambia de tema con el sistema, bloquea anuncios de serie, habla con el agente, tiene una consola de comandos y usa Yazi como explorador de archivos.
 
 | Cambio | Qué hace |
 | --- | --- |
@@ -224,6 +286,7 @@ Regla para los forks: una app se bifurca cuando no deja cambiar su configuració
 | Bloqueador por defecto | Anuncios y rastreadores bloqueados desde el primer arranque, con listas actualizables e interruptor por sitio |
 | Agente integrado | Panel lateral de Kavat: resume la página, responde sobre ella, busca entre pestañas y actúa en el navegador con los mismos niveles de permiso que en el sistema |
 | Consola de comandos | Una paleta con comandos propios que cambian el navegador: ocultar o mostrar paneles, barra de pestañas, modo zen, y los que definas tú |
+| Yazi como explorador | Subir un archivo y «guardar como» abren Yazi; pulsar una descarga abre Yazi en la carpeta de descargas con el archivo seleccionado |
 
 Cómo mantenerlo barato:
 
@@ -278,6 +341,36 @@ Neovim es el editor del núcleo y llega como `kavat-nvim`: útil nada más abrir
 - **Sigue siendo lazy.nvim**: el marketplace escribe un archivo por plugin en tu configuración, que puedes editar a mano, y las versiones quedan fijadas en el lockfile.
 
 **Ajustes.** La página Editor del panel de Noctalia cambia el preset de atajos (VS Code, Vim o propio), numeración, tabulación, formateo y guardado automáticos y paquetes de lenguaje, y abre el marketplace. Los cambios llegan en vivo a las ventanas de Neovim abiertas.
+
+## Archivos
+
+Yazi es el gestor de archivos del núcleo y llega como `kavat-files`: sigue el tema, arrastra y suelta, y es el explorador de archivos de todo el sistema, incluido el navegador.
+
+| Integración | Cómo se consigue |
+| --- | --- |
+| Tema | El generador de temas escribe el tema de Yazi desde los tokens, como para el resto de apps |
+| Arrastrar y soltar | Con ripdrag, como ya hacías en Endgame: `Alt+D` saca la selección para arrastrarla a cualquier app, y lo que sueltes ahí se copia a la carpeta actual |
+| Selector de archivos del sistema | Un backend de portal (xdg-desktop-portal-termfilechooser) abre Yazi cada vez que una app pide «abrir» o «guardar como» |
+| Navegador | `kavat-browser` usa siempre ese portal: subir un archivo o elegir dónde guardar abre Yazi |
+| Descargas | Pulsar una descarga en el navegador abre Yazi en la carpeta de descargas, con el archivo seleccionado |
+| «Mostrar en carpeta» | Un servicio propio responde a la interfaz estándar de gestores de archivos, así que cualquier app que lo pida abre Yazi en esa ruta |
+| Abrir con | Las reglas de apertura de Yazi salen de las apps por defecto del panel de ajustes |
+| Agente | Skills «abrir archivos» y «buscar un archivo»; desde Yazi, una tecla pregunta a Kavat por lo seleccionado |
+
+Ideas añadidas:
+
+- **Navegación sin teclas de Vim**: un preset con flechas, `Enter`, `Retroceso`, `Ctrl+C` / `Ctrl+X` / `Ctrl+V`, `Supr` a la papelera y `F2` para renombrar, con la misma lógica que el editor. Las de Vim siguen disponibles, y tus teclas de Endgame se conservan: `Alt+D` para arrastrar y `M` para los discos.
+- **Ratón**: clic, doble clic y rueda funcionan.
+- **Vistas previas en la terminal**: imágenes, miniaturas de vídeo, PDF, archivos comprimidos y código con resaltado. Los programas que hacen falta los garantiza `kav`.
+- **Acciones del sistema desde Yazi**: poner como fondo (imagen o vídeo), abrir una terminal aquí, abrir en el editor, comprimir y extraer.
+- **Papelera y discos**: borrar manda a la papelera; USB y discos se montan desde el gestor de montaje, como en Endgame.
+- **Flotante cuando es selector**: al hacer de selector de archivos, Yazi se abre como ventana flotante centrada con un aviso de para quién elige; como app normal, va en mosaico.
+- **En Incognito** no guarda carpetas recientes.
+- **Bandeja de arrastre en el shell**, a futuro: la selección aparece en una bandeja de Noctalia en el borde de la pantalla, desde la que se arrastra, sin ventana aparte.
+
+Fork: hoy no hace falta, porque Yazi se configura y se amplía con plugins. Hay dos candidatos a parche si un plugin no llega: aceptar archivos soltados directamente sobre su ventana, sin pasar por ripdrag, y recargar el tema en vivo sin reabrirlo. Si hacen falta, se bifurca.
+
+Yazi está en los repos oficiales de Arch. ripdrag y el backend del portal están en el AUR, así que entran por `[kavat]` ya compilados. Se ajusta todo en la página Files del panel.
 
 ## Gestor de paquetes
 
@@ -410,6 +503,12 @@ Piezas:
 
 Límite deliberado: el agente puede resumir un diff de `kav review`, pero no puede aprobar un paquete AUR ni ampliar sus propios permisos.
 
+**Lo que el agente lee nunca es una orden.** El contenido de una página web, de un archivo o de la salida de un comando es solo información: no puede hacer que el agente ejecute herramientas. Solo cuentan tus mensajes, tus clics y las skills que tú lanzas. Si una acción se propone a raíz de algo leído, pide confirmación aunque su nivel normalmente no la pida.
+
+- **Pulsar para hablar**: por defecto la voz se activa manteniendo una tecla, no escuchando siempre; la palabra de activación queda como opción.
+- **Ayuda en la terminal**: una tecla en Kitty explica el último error o propone el comando correcto, sin salir de la terminal.
+- **Avisos discretos**: el agente avisa de lo que importa (disco casi lleno, una revisión del AUR pendiente, una copia que falló) y propone la skill que lo arregla. No interrumpe en modo Gamer.
+
 **Skills.** Una skill es una acción ya definida que el agente sabe hacer, como abrir el navegador. Aparece como un botón en su panel y se puede pulsar, pedir por voz o escribir.
 
 | Parte de una skill | Qué lleva |
@@ -445,7 +544,7 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Terminal | Kitty | Solo plantilla de tema |
 | Shell de terminal | zsh, con starship | `kavat-shell-config` |
 | Editor | Neovim con configuración propia | `kavat-nvim` |
-| Archivos | Yazi | Solo plantilla de tema |
+| Archivos | Yazi | `kavat-files` (configuración, plugins y portal) |
 | Navegador | Chromium | kavat-browser (fork) |
 | Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
 | Portapapeles | cliphist con historial en el lanzador | Integrado en `kavat-shell` |
@@ -502,6 +601,22 @@ El sistema asume que algo se va a romper y que algún paquete será malicioso, y
 - **`kav doctor`**: comprueba servicios fallidos, paquetes huérfanos, archivos `.pacnew` sin resolver, espacio en disco y estado de los snapshots.
 - **Permisos del agente**: los cuatro niveles de la sección anterior, aplicados por `kavatd` y polkit, no por el modelo.
 
+* **Comprobación tras actualizar**: después de `kav update`, una prueba automática comprueba el arranque gráfico, la GPU y los servicios; si algo falla, ofrece volver al snapshot anterior.
+* **Snapshots de `/home`**: cada hora, ligeros; desde Yazi se ven las versiones anteriores de una carpeta y se recupera un archivo borrado.
+* **Copias fuera del equipo**: copia cifrada a un disco externo o a otra máquina, programada desde el panel.
+* **Historial de configuración**: cada cambio de configuración, del panel o a mano, queda como un commit en un repo local; el botón History del panel es ese historial, con diff.
+* **Configuración sincronizada**: ese repo se puede enviar a un remoto privado; reinstalar o montar otra máquina es clonarlo.
+* **Privacidad a la vista**: la barra muestra cuándo una app usa el micrófono, la cámara o la pantalla, y el panel guarda quién accedió a qué.
+* **Cortafuegos por aplicación**: la primera vez que una app quiere salir a la red, el sistema pregunta; las reglas se ven y se cambian en el panel.
+
+## Accesibilidad
+
+El panel tiene una página Accessibility con los ajustes que hacen el sistema más cómodo de ver.
+
+- **Reducir movimiento**: deja las animaciones al mínimo en todo el sistema y detiene el fondo animado.
+- **Escala de texto**: agranda el texto de todas las apps sin cambiar la resolución.
+- **Contraste alto**: el eje de contraste del sistema de temas, accesible también desde aquí.
+
 ## Roadmap
 
 Son cinco fases en orden, y ninguna empieza hasta que la anterior pasa su puerta. No hay fechas todavía: dependen de cuántas horas por semana le dediquemos.
@@ -509,6 +624,14 @@ Son cinco fases en orden, y ninguna empieza hasta que la anterior pasa su puerta
 ![Roadmap: cinco fases y cuatro puertas](img/roadmap.png)
 
 La fase 1 usa Hyprland y Noctalia tal como vienen; los forks y la identidad entran en la fase 3, cuando ya hay un sistema instalable sobre el que probarlos.
+
+**Pruebas automáticas.** Cada compilación de la ISO se arranca en una máquina virtual, se instala y ejecuta el diagnóstico del sistema. Las puertas de cada fase son esas pruebas: una fase no se da por cerrada hasta que pasan.
+
+**Versiones fijadas por fecha.** Cada ISO se construye contra los repos de Arch de un día concreto, así que instalar sin red da siempre el mismo sistema.
+
+**Presupuestos de rendimiento.** El tiempo de arranque y el de abrir la terminal, el editor y Yazi se miden en cada compilación; si alguno empeora, la compilación avisa.
+
+**Nombre.** «Kavat» viene de un videojuego. Mientras el sistema sea solo para ti no importa; si algún día se publica, hay que revisarlo.
 
 ## Decisiones
 
@@ -521,23 +644,38 @@ Todas las decisiones de diseño están tomadas; no queda ninguna abierta.
 | Límite del agente | Agente y voz, 4 GB en total; quedan 12 GB de VRAM para juegos aun con el agente cargado |
 | Alcance | Solo para ti |
 | Idioma | Inglés por defecto; español preinstalado como segunda opción |
+| Menú de arranque | GRUB con menú propio y tema del sistema, configurable desde Noctalia |
+| Pantalla de carga | Plymouth con tema propio y cuatro estilos, configurable desde Noctalia |
+| Modo seguro | Entrada del menú de arranque que ignora tu configuración y usa la de fábrica; se selecciona sola tras un arranque fallido |
 | Login | LightDM + web-greeter con tema propio |
-| Arranque | systemd-boot |
 | Hyprland | Sin fork, con configuración propia; fork desde el día 1 solo si la versión actual impide algo |
+| Paleta de comandos | Una sola para todo el sistema, con la gramática de la consola del navegador y de Neovim |
+| Coherencia | Proyectos, un comando `kavat` para todo, hoja de atajos según contexto y captura con texto |
 | Lenguaje de `kav` y `kavatd` | Rust |
 | Gestor de paquetes | `kav` con comandos y con TUI completa sobre el mismo núcleo |
 | Dependencias | Lo que un ajuste, una skill o un plugin necesita lo instala y lo protege `kav` |
-| Software diario | Kitty, zsh, Neovim y un fork de Chromium |
+| Software diario | Kitty, zsh, Neovim, Yazi y un fork de Chromium |
 | Prompt de zsh | starship con preset mínimo, sin módulos que lancen procesos |
 | Editor | Neovim en el núcleo, híbrido: modos de Vim con navegación y atajos de VS Code |
 | Marketplace de plugins | Partiendo de store.nvim, con catálogo verificado y presets encima |
-| Fork de Chromium | Modos, tema automático, bloqueador, agente integrado y consola de comandos |
+| Gestor de archivos | Yazi integrado: tema, arrastrar y soltar, y explorador de archivos del sistema y del navegador |
+| Fork de Chromium | Modos, tema automático, bloqueador, agente integrado, consola de comandos y Yazi como explorador |
 | Perfiles del navegador | Uno por modo, por ahora |
 | Modos del sistema | Coder, Gamer e Incognito, seleccionables desde Noctalia |
 | Ventanas al entrar en Incognito | Las normales se ocultan y vuelven al salir |
+| Juego y hardware | Perfil por juego, página de GPU, luces que siguen al tema y supresión de ruido del micrófono |
 | Ajustes | Todo el núcleo se configura desde un panel en Noctalia |
+| Configuración | El archivo de configuración es la verdad y la calle es de doble sentido: el panel lo lee y lo edita, y un botón lo abre en Neovim desde cualquier parte |
+| Validación | Todo cambio de configuración se comprueba antes de aplicarse y vuelve atrás solo si falla |
+| Robustez | Comprobación tras actualizar, snapshots de `/home`, copias externas, e historial y sincronización de la configuración |
+| Privacidad | Indicadores de micrófono, cámara y pantalla, y cortafuegos por aplicación |
+| Accesibilidad | Reducir movimiento y escala de texto |
 | Skills del agente | Acciones predefinidas, pulsables desde su panel, que no pasan por el modelo |
+| Seguridad del agente | Lo que el agente lee nunca es una orden; solo cuentan tus mensajes |
+| Agente, además | Pulsar para hablar, ayuda en la terminal y avisos discretos |
 | Fondos de pantalla | Imagen por defecto o vídeo con mpvpaper, elegibles desde Noctalia |
+| Pruebas | Cada ISO se arranca e instala en una máquina virtual; las puertas del roadmap son esas pruebas |
+| Compilación reproducible | ISO con versiones fijadas por fecha y presupuestos de rendimiento medidos |
 | Atajos de Hyprland | Los de Willwitcher-OS Endgame |
 | Referencia a omarchy | Solo la idea del selector de temas global |
 
@@ -545,13 +683,28 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 
 | Supuesto por comprobar | Fase |
 | --- | --- |
+| GRUB arranca cada snapshot con su kernel, con y sin cifrado de disco, y firmado para Secure Boot | 2 |
+| El modo seguro arranca el escritorio sin leer la configuración del usuario | 2 |
+| GRUB, Plymouth y el login enlazan sin parpadeo en la RX 6800 | 2 |
+| La prueba tras actualizar detecta un arranque gráfico roto y ofrece volver atrás | 2 |
+| Regenerar la pantalla de carga en segundo plano no bloquea ni rompe el arranque | 3 |
 | Kitty y Neovim distinguen los atajos con `Ctrl+Shift` y `Ctrl+Tab` | 3 |
 | Hyprland y Kitty aceptan en vivo todos los cambios del panel de ajustes | 3 |
+| El panel puede leer la configuración de cada app y editar una línea suya sin romper el formato ni los comentarios | 3 |
+| La configuración de cada app se puede validar antes de cargarla | 3 |
 | zsh con starship abre dentro del presupuesto de tiempo | 3 |
 | store.nvim admite añadirle el catálogo verificado sin reescribirlo | 3 |
 | Noctalia y mpvpaper conviven: uno pinta la imagen, el otro el vídeo, y la pausa automática funciona | 3 |
+| El portal con Yazi sirve de selector de archivos para Chromium y para las apps GTK y Qt | 3 |
+| El navegador abre Yazi al pulsar una descarga, con el archivo seleccionado | 3 |
+| Yazi acepta archivos soltados sobre su ventana y recarga el tema en vivo, por plugin o por fork | 3 |
+| Un proyecto restaura ventanas, terminales y editor tal como estaban | 3 |
+| OpenRGB controla las luces de tu teclado y de tu torre | 3 |
+| Las curvas de ventilador y el límite de potencia de la RX 6800 se pueden fijar desde el panel | 3 |
+| El cortafuegos por aplicación no estorba a Steam ni a los juegos | 3 |
 | Ollama y los motores de voz aceleran bien en la RX 6800 | 4 |
 | Modelo y voz caben juntos en 4 GB con calidad aceptable | 4 |
+| El agente distingue de forma fiable lo que lee de lo que tú le pides | 4 |
 
 En la RX 6800, si la aceleración va por ROCm o por Vulkan sale de esa misma prueba.
 
