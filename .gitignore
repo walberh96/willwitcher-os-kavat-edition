@@ -1,0 +1,11 @@
+# ISOs de Arch descargadas y artefactos de compilación
+vendor/
+out/
+work/
+*.iso
+*.img
+*.pkg.tar.zst
+*.pkg.tar.zst.sig
+
+# Sistema
+.DS_Store

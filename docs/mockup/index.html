@@ -1,0 +1,741 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Willwitcher-OS Kavat Edition · UI</title>
+<style>
+:root{
+  --bg:#0d0f14;--surface:#151821;--surface2:#1e2230;--text:#e8e6df;--muted:#8b90a0;--border:#2a2f3f;
+  --accent:#f2a93b;--ok:#7ec77a;--warn:#e6b450;--danger:#ef6b73;--info:#6cb6ff;
+  --r:.9em;--gap:.7em;--blur:18px;--alpha:86%;
+  --accent-text:color-mix(in oklab,var(--accent) 88%,var(--text));
+  --glass:color-mix(in srgb,var(--surface) var(--alpha),transparent);
+  --ui:system-ui,-apple-system,"Inter","Segoe UI",sans-serif;
+  --mono:ui-monospace,"JetBrains Mono","SF Mono",Menlo,Consolas,monospace;
+}
+:root[data-mode=light]{--ok:#3d8b40;--warn:#a86f00;--danger:#c7384a;--info:#2468c4;
+  --accent-text:color-mix(in oklab,var(--accent) 62%,var(--text))}
+*{box-sizing:border-box;margin:0}
+body{background:#08090c;color:#d8d8d8;font-family:var(--ui);min-height:100vh;padding:20px;display:flex;flex-direction:column;align-items:center;gap:14px}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+
+/* ---------- control strip (outside the OS) ---------- */
+.strip{width:min(1320px,100%);display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;font-size:13px}
+.strip h1{font-size:14px;font-weight:600;letter-spacing:.02em;margin-right:6px}
+.strip h1 span{color:#777;font-weight:400}
+.tabs{display:flex;gap:4px;background:#15171c;padding:4px;border-radius:10px}
+.tabs button{padding:6px 12px;border-radius:7px;color:#9a9da6}
+.tabs button.on{background:#2a2d36;color:#fff}
+.strip label{color:#777;font-size:12px}
+.strip select{font:inherit;background:#15171c;color:#ddd;border:1px solid #2a2d36;border-radius:7px;padding:5px 8px}
+.hint{color:#666;font-size:12px;width:min(1320px,100%)}
+
+/* ---------- monitor ---------- */
+.monitor{width:min(1320px,100%);aspect-ratio:16/10;container-type:inline-size;border-radius:14px;overflow:hidden;box-shadow:0 0 0 1px #24262d,0 30px 80px #000a}
+.screen{font-size:1cqw;width:100%;height:100%;position:relative;color:var(--text);font-family:var(--ui);overflow:hidden;
+  background:
+   radial-gradient(60em 40em at 82% 12%,color-mix(in srgb,var(--accent) 38%,transparent),transparent 62%),
+   radial-gradient(50em 38em at 8% 96%,color-mix(in srgb,var(--accent) 20%,var(--surface2)),transparent 60%),
+   linear-gradient(160deg,var(--surface2),var(--bg) 62%);
+  transition:background .35s}
+.screen *{transition:background-color .3s,border-color .3s,color .3s,border-radius .3s}
+.wall-mark{position:absolute;right:6em;top:9em;width:26em;opacity:.16;color:var(--text)}
+.scene{position:absolute;inset:0;display:none}
+.scene.on{display:block}
+.mono{font-family:var(--mono)}
+.muted{color:var(--muted)}.acc{color:var(--accent-text)}.ok{color:var(--ok)}.warn{color:var(--warn)}.bad{color:var(--danger)}.info{color:var(--info)}
+.glass{background:var(--glass);backdrop-filter:blur(var(--blur));-webkit-backdrop-filter:blur(var(--blur));border:.1em solid var(--border);border-radius:var(--r)}
+
+/* ---------- bar ---------- */
+.bar{position:absolute;left:var(--gap);right:var(--gap);top:var(--gap);height:2.7em;display:flex;align-items:center;justify-content:space-between;padding:0 .9em;font-size:.92em;z-index:3}
+.bar .grp{display:flex;align-items:center;gap:.9em}
+.logo{width:1.35em;height:1.35em;color:var(--accent)}
+.ws{display:flex;gap:.35em;align-items:center}
+.ws i{width:.55em;height:.55em;border-radius:1em;background:var(--muted);opacity:.5}
+.ws i.on{width:1.6em;background:var(--accent);opacity:1}
+.pill{display:flex;align-items:center;gap:.4em;padding:.2em .65em;border-radius:calc(var(--r)*.7);background:var(--surface2);font-size:.9em}
+.pill.accent{background:var(--accent);color:#14110a;font-weight:600}
+.modes{padding:.15em;font-size:.88em}.modes button{flex:none;padding:.15em .75em}.js-vpn{display:none}.screen[data-sys=incog] .js-vpn{display:flex;color:var(--ok)}.pill.off{background:var(--surface2);color:var(--muted);font-weight:400;text-decoration:line-through}
+.dot{width:.5em;height:.5em;border-radius:1em;background:var(--ok);display:inline-block}
+
+/* ---------- windows ---------- */
+.tiles{position:absolute;left:var(--gap);right:var(--gap);bottom:var(--gap);top:calc(var(--gap)*2 + 2.7em);display:grid;grid-template-columns:1.3fr 1fr;grid-template-rows:1.15fr 1fr;gap:var(--gap)}
+.win{overflow:hidden;display:flex;flex-direction:column;border-width:.14em}
+.win.active{border-color:var(--accent)}
+.win.tall{grid-row:span 2}
+.term{font-family:var(--mono);font-size:.86em;line-height:1.55;padding:1em 1.2em;white-space:pre;flex:1;overflow:hidden}
+.code{flex:1;font-family:var(--mono);font-size:.86em;line-height:1.6;padding:.9em 0;white-space:pre;overflow:hidden}
+.code .ln{display:inline-block;width:3em;text-align:right;margin-right:1.2em;color:var(--muted);opacity:.6}
+.code .cur{background:color-mix(in srgb,var(--surface2) 80%,transparent);display:block}
+.bufs{display:flex;font-family:var(--mono);font-size:.8em;background:var(--surface2)}.bufs span{padding:.4em 1.1em;color:var(--muted)}.bufs .on{background:var(--surface);color:var(--text);box-shadow:inset 0 -.15em 0 var(--accent)}
+.fetch{display:flex;gap:1.8em;align-items:center;white-space:normal}.fetch pre{font:inherit;margin:0;white-space:pre}.fetch .cat{line-height:1;font-size:.62em}
+.status{display:flex;font-family:var(--mono);font-size:.78em;background:var(--surface2)}
+.status span{padding:.25em .9em}
+.status .mode{background:var(--accent);color:#14110a;font-weight:700}
+.status .sp{flex:1}
+.tabstrip{display:flex;align-items:center;gap:.4em;padding:.45em .6em 0;background:var(--surface2);font-size:.82em}
+.tab{padding:.4em .9em;border-radius:calc(var(--r)*.6) calc(var(--r)*.6) 0 0;color:var(--muted)}
+.tab.on{background:var(--surface);color:var(--text)}
+.url{display:flex;align-items:center;gap:.6em;padding:.45em .7em;font-size:.82em;border-bottom:.1em solid var(--border)}
+.url div{flex:1;background:var(--surface2);border-radius:calc(var(--r)*.6);padding:.35em .8em;color:var(--muted)}
+.page{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.1em}
+.page .big{font-size:1.5em;font-weight:650;letter-spacing:-.01em}
+.search{width:62%;padding:.6em 1em;border-radius:calc(var(--r)*.8);background:var(--surface2);color:var(--muted);font-size:.9em;border:.1em solid var(--border)}
+.tilesm{display:flex;gap:.7em}
+.tilesm span{width:3.1em;height:3.1em;border-radius:calc(var(--r)*.7);background:var(--surface2);display:grid;place-items:center;font-size:.8em;color:var(--muted)}
+
+/* ---------- overlays ---------- */
+.dim{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 55%,transparent);z-index:4;display:none}
+.ov{position:absolute;z-index:5;display:none}
+.screen[data-ov=agent] .dim,.screen[data-ov=agent] #ov-agent,
+.screen[data-ov=themes] #ov-themes,.screen[data-ov=kav] .dim,.screen[data-ov=kav] #ov-kav{display:flex}
+.screen[data-ov=agent] .dim,.screen[data-ov=kav] .dim{display:block}
+
+#ov-agent{left:50%;top:9%;transform:translateX(-50%);width:46em;max-height:82%;flex-direction:column;padding:0;box-shadow:0 2em 5em #0006}
+.ag-head{display:flex;align-items:center;gap:.7em;padding:.9em 1.2em;border-bottom:.1em solid var(--border)}
+.ag-head b{font-size:1.05em}.ag-head .sp{flex:1}
+.ag-body{padding:1.1em 1.2em;display:flex;flex-direction:column;gap:.85em;font-size:.95em}
+.msg{max-width:84%;padding:.6em .9em;border-radius:var(--r);line-height:1.45}
+.msg.me{align-self:flex-end;background:var(--accent);color:#14110a}
+.msg.ai{background:var(--surface2)}
+.tool{display:flex;align-items:center;gap:.6em;font-family:var(--mono);font-size:.82em;color:var(--muted);padding:.1em .3em}
+.badge{font-family:var(--ui);font-size:.85em;padding:.1em .6em;border-radius:1em;border:.1em solid currentColor}
+.btns{display:flex;gap:.5em;margin-top:.6em}
+.btn{padding:.4em 1em;border-radius:calc(var(--r)*.7);background:var(--surface);border:.1em solid var(--border);font-size:.92em}
+.btn.pri{background:var(--accent);color:#14110a;border-color:transparent;font-weight:600}
+.ag-in{display:flex;align-items:center;gap:.8em;padding:.8em 1.2em;border-top:.1em solid var(--border);color:var(--muted)}
+.ag-in .sp{flex:1}.kbd{font-family:var(--mono);font-size:.78em;padding:.15em .5em;border:.1em solid var(--border);border-radius:.4em}
+
+#ov-themes{right:var(--gap);top:calc(var(--gap)*2 + 2.7em);bottom:var(--gap);width:31em;flex-direction:column;gap:1em;padding:1.2em;overflow:hidden;box-shadow:0 2em 5em #0005}
+.sec{font-size:.78em;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:.5em}
+.cards{display:grid;grid-template-columns:repeat(4,1fr);gap:.6em}
+.card{border-radius:calc(var(--r)*.7);border:.14em solid transparent;padding:.25em;text-align:left;cursor:pointer}
+.card.on{border-color:var(--accent)}
+.card .pv{height:3.6em;border-radius:calc(var(--r)*.55);position:relative;overflow:hidden;display:block}
+.card .pv i{position:absolute;border-radius:.25em}
+.card small{display:block;font-size:.74em;margin-top:.35em;padding-left:.15em;color:var(--text)}
+.seg{display:flex;background:var(--surface2);border-radius:calc(var(--r)*.7);padding:.2em;gap:.2em}
+.seg button{flex:1;padding:.4em;border-radius:calc(var(--r)*.55);font-size:.9em;color:var(--muted)}
+.seg button.on{background:var(--surface);color:var(--text);box-shadow:0 .1em .3em #0003}
+.sw{display:flex;gap:.6em}
+.sw button{width:2em;height:2em;border-radius:50%;border:.16em solid transparent;outline:.14em solid transparent;outline-offset:.12em}
+.sw button.on{outline-color:var(--text)}
+.row{display:flex;align-items:center;gap:.8em;font-size:.9em}
+.row>span:first-child{width:7.5em;color:var(--muted)}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+.tog{width:2.6em;height:1.45em;border-radius:1em;background:var(--surface2);position:relative;border:.1em solid var(--border)}
+.tog::after{content:"";position:absolute;left:.15em;top:.12em;width:1em;height:1em;border-radius:50%;background:var(--muted);transition:.2s}
+.tog.on{background:var(--accent)}.tog.on::after{left:1.25em;background:#14110a}
+
+#ov-browser{left:7%;right:7%;top:11%;bottom:6%;flex-direction:column;border-width:.14em;border-color:var(--accent);box-shadow:0 2em 5em #0006}
+.screen[data-ov=browser] .dim{display:block}.screen[data-ov=browser] #ov-browser{display:flex}
+.bw{flex:1;display:flex;min-height:0;position:relative}
+.bpage{flex:1;padding:2.2em 2.6em;display:flex;flex-direction:column;gap:.85em}
+.bpage h3{font-size:1.7em;font-weight:650;margin-bottom:.3em}.bpage h4{font-size:1.1em;margin-top:.8em}
+.sk{height:.7em;border-radius:1em;background:var(--surface2)}
+.bside{width:22em;border-left:.1em solid var(--border);padding:1em;display:flex;flex-direction:column;gap:.7em;font-size:.9em}
+.bside .msg{max-width:100%}
+.cmd{position:absolute;left:38%;top:7%;transform:translateX(-50%);width:34em;padding:.5em;box-shadow:0 1.5em 4em #0008;font-family:var(--mono);font-size:.88em;z-index:2}
+.cmd .in{padding:.55em .8em;border-bottom:.1em solid var(--border);margin-bottom:.3em}
+.cmd .it{display:flex;gap:1em;padding:.42em .8em;border-radius:calc(var(--r)*.5)}
+.cmd .it.on{background:var(--accent);color:#14110a}
+.cmd .it span:last-child{margin-left:auto;opacity:.75;font-family:var(--ui)}
+#ov-settings{left:10%;right:10%;top:12%;bottom:7%;overflow:hidden;box-shadow:0 2em 5em #0006}
+.screen[data-ov=settings] .dim{display:block}.screen[data-ov=settings] #ov-settings{display:flex}
+.sside{width:15.5em;background:var(--surface2);padding:1.2em .9em;display:flex;flex-direction:column;gap:.12em;font-size:.92em}
+.sside .find{padding:.5em .8em;border-radius:calc(var(--r)*.6);background:var(--surface);color:var(--muted);margin-bottom:.8em;border:.1em solid var(--border)}
+.sside .cat{padding:.48em .8em;border-radius:calc(var(--r)*.6);color:var(--muted);display:flex;justify-content:space-between}
+.sside .cat.on{background:var(--surface);color:var(--text)}
+.sside .cat small{opacity:.7}
+.smain{flex:1;padding:1.6em 2em;display:flex;flex-direction:column;gap:1em;min-width:0}
+.smain h2{font-size:1.5em;font-weight:650}
+.smain h2 small{font-size:.55em;font-weight:400;color:var(--muted);margin-left:.8em}
+.sgrid{display:grid;grid-template-columns:1fr 1fr;gap:1.2em 2.2em}
+.sgrid .row>span:first-child{width:11.5em}
+.sel{flex:1;padding:.35em .8em;border-radius:calc(var(--r)*.6);background:var(--surface2);border:.1em solid var(--border);display:flex;justify-content:space-between}
+.note{font-size:.85em;padding:.6em .9em;border-radius:calc(var(--r)*.6);background:color-mix(in srgb,var(--warn) 14%,transparent);color:var(--text);border:.1em solid color-mix(in srgb,var(--warn) 45%,transparent)}
+.sfoot{margin-top:auto;display:flex;justify-content:space-between;align-items:center;font-size:.9em}
+.sp{flex:1}
+.spage{display:none;flex-direction:column;gap:1.1em;flex:1;min-height:0}.spage.on{display:flex}
+.cat{cursor:pointer}
+.col{display:flex;flex-direction:column;gap:1.2em;min-width:0}
+.rows{display:flex;flex-direction:column;gap:.62em}
+.row>.sel,.row>.seg{flex:1;min-width:0}
+.sgrid .row.w>span:first-child{width:auto;flex:1}
+.seg.local button{cursor:pointer}
+.tog{cursor:pointer;flex:none}.tog.lock{opacity:.55;cursor:default}
+.hint{font-size:.85em}
+.skills{padding:.8em 1.2em .9em;border-bottom:.1em solid var(--border);display:flex;flex-direction:column;gap:.6em}
+.skh{display:flex;align-items:center;gap:.8em;font-size:.85em}
+.skg{display:grid;grid-template-columns:repeat(4,1fr);gap:.5em}
+.skill{display:flex;flex-direction:column;gap:.1em;text-align:left;padding:.5em .7em;border-radius:calc(var(--r)*.6);background:var(--surface2);border:.1em solid var(--border);cursor:pointer}
+.skill:hover{border-color:var(--accent)}
+.skill b{font-size:.88em;font-weight:600}
+.skill small{font-size:.72em;color:var(--muted)}
+.row small{font-size:.8em;margin-left:.4em}
+.chips{display:flex;gap:.5em;flex-wrap:wrap;align-items:center}
+.chips .pill,.chips .btn{font-size:.86em}
+.lst{display:flex;flex-direction:column;font-size:.9em}
+.lst+.chips{margin-top:.6em}
+.li{display:flex;align-items:center;gap:.8em;padding:.36em .7em;border-radius:calc(var(--r)*.5)}
+.li:nth-child(odd){background:color-mix(in srgb,var(--surface2) 55%,transparent)}
+.li .btn{padding:.12em .7em;font-size:.9em}
+.radio{width:1em;height:1em;border-radius:50%;border:.14em solid var(--muted);flex:none}
+.radio.on{border-color:var(--accent);background:radial-gradient(var(--accent) 42%,transparent 48%)}
+.ktool{display:flex;gap:.8em;align-items:center;font-size:.9em}
+.ktool .find{padding:.42em .8em;border-radius:calc(var(--r)*.6);background:var(--surface2);color:var(--muted);border:.1em solid var(--border)}
+.ktab{display:flex;flex-direction:column;font-size:.9em}
+.kr{display:grid;grid-template-columns:1.2fr 1.9fr .8fr;align-items:center;padding:.3em .8em;border-radius:calc(var(--r)*.5)}
+.kr:nth-child(even){background:color-mix(in srgb,var(--surface2) 55%,transparent)}
+.kr.head{color:var(--muted);font-size:.82em;text-transform:uppercase;letter-spacing:.06em}
+.kr.edit{outline:.12em solid var(--accent);background:none}
+.kr .btn{padding:.12em .7em;font-size:.9em}
+.keys{display:flex;gap:.3em;align-items:center;flex-wrap:wrap}
+.dcanvas{flex:1;min-height:13em;border-radius:var(--r);border:.1em dashed var(--border);display:grid;place-items:center}
+.dmon{width:58%;aspect-ratio:16/9;border-radius:calc(var(--r)*.6);border:.16em solid var(--accent);display:grid;place-items:center;text-align:center;line-height:1.3;
+  background:radial-gradient(12em 8em at 85% 10%,color-mix(in srgb,var(--accent) 40%,transparent),transparent 65%),linear-gradient(160deg,var(--surface2),var(--bg))}
+.dmon b{font-size:1.6em}
+.tprev{font-family:var(--mono);font-size:.86em;line-height:1.6;padding:.9em 1.2em;border-radius:var(--r);border:.1em solid var(--border);background:var(--bg);white-space:pre;overflow:hidden}
+.mcards{display:grid;grid-template-columns:repeat(3,1fr);gap:1em}
+.mcard{border:.14em solid var(--border);border-radius:var(--r);padding:.9em 1em;display:flex;flex-direction:column;gap:.45em;font-size:.9em;background:color-mix(in srgb,var(--surface2) 40%,transparent)}
+.mhead{display:flex;align-items:center}.mhead b{font-size:1.2em}
+.mcard ul{list-style:none;padding:0;display:flex;flex-direction:column;gap:.28em}
+.mcard li::before{content:"· ";color:var(--accent-text);font-weight:700}
+.screen[data-sys=coder] .mcard[data-m=coder],.screen[data-sys=gamer] .mcard[data-m=gamer],.screen[data-sys=incog] .mcard[data-m=incog]{border-color:var(--accent)}
+.btn .if-on{display:none}.btn.on .if-on{display:inline}.btn.on .if-off{display:none}
+button.btn{cursor:pointer}button.btn.on{background:var(--accent);color:#14110a;border-color:transparent;font-weight:600}
+.budget{display:flex;height:1.9em;border-radius:1em;overflow:hidden;background:var(--surface2);font-size:.82em;border:.1em solid var(--border)}
+.budget i{display:flex;align-items:center;justify-content:center;font-style:normal;color:#14110a;white-space:nowrap;font-weight:600}
+.lprev{flex:1;min-height:17em;border-radius:var(--r);border:.1em solid var(--border);display:grid;place-items:center;
+  background:radial-gradient(16em 11em at 85% 10%,color-mix(in srgb,var(--accent) 40%,transparent),transparent 65%),linear-gradient(160deg,var(--surface2),var(--bg))}
+.lpc{display:flex;flex-direction:column;align-items:center;gap:.8em}
+.lpt{font-size:3.6em;font-weight:200;letter-spacing:-.03em;line-height:1}
+.lpa{width:2.6em;height:2.6em;border-radius:50%;background:var(--accent);border:.14em solid var(--surface)}
+.lpp{width:9.5em;height:1.7em;border-radius:var(--r);background:var(--glass);border:.1em solid var(--border)}
+.tui{flex:1;display:flex;flex-direction:column;font-family:var(--mono);font-size:.8em;line-height:1.55;padding:.8em 1em .5em;gap:.9em;min-height:0}
+.ttabs{display:flex;gap:.3em;align-items:center}
+.ttabs b{margin-right:.8em}
+.ttabs span[data-ktab]{padding:.1em .8em;border-radius:.3em;color:var(--muted);cursor:pointer}
+.ttabs span[data-ktab].on{background:var(--accent);color:#14110a}
+.ttabs u{text-decoration:none;opacity:.6;margin-right:.5em}
+.kpage{display:none;flex:1;flex-direction:column;gap:1.1em;min-height:0}.kpage.on{display:flex}
+.krow{display:flex;gap:.9em;min-height:0}
+.kcol{display:flex;flex-direction:column;gap:1.1em;min-width:0;min-height:0}
+.pane{border:.1em solid var(--border);border-radius:.35em;position:relative;padding:.9em .7em .6em;display:flex;flex-direction:column;min-width:0}
+.pane.focus{border-color:var(--accent)}
+.pane>.pt{position:absolute;top:-.85em;left:.8em;padding:0 .5em;background:var(--surface);color:var(--accent-text)}
+.tl{display:flex;gap:1.2ch;white-space:nowrap;overflow:hidden;padding:0 .5em;min-height:1.55em}
+.tl.cur{background:var(--accent);color:#14110a}
+.tl.cur span{color:inherit}
+.tl.flag{background:color-mix(in srgb,var(--warn) 16%,transparent)}
+.tl .dots{flex:1;border-bottom:.1em dotted var(--border);margin:0 0 .5em;min-width:2ch}
+.stat{font-family:var(--ui);font-size:2.3em;font-weight:650;line-height:1.15;padding:0 .2em}
+.tkeys{display:flex;gap:1.6em;color:var(--muted);padding:0 .5em;flex-wrap:wrap}
+.tkeys b{color:var(--text);font-weight:400;background:var(--surface2);padding:0 .5em;border-radius:.25em;margin-right:.5em}
+#ov-editor{left:7%;right:7%;top:10%;bottom:6%;flex-direction:column;border-width:.14em;border-color:var(--accent);box-shadow:0 2em 5em #0006}
+.screen[data-ov=editor] .dim{display:block}.screen[data-ov=editor] #ov-editor{display:flex}
+.ed{flex:1;display:flex;min-height:0;position:relative}
+.etree{width:15em;border-right:.1em solid var(--border);padding:.8em .7em;display:flex;flex-direction:column;gap:.15em;color:var(--muted);white-space:pre;font-family:var(--mono);font-size:.82em}
+.etree b{font-size:.85em;letter-spacing:.08em;margin-bottom:.5em;font-weight:400}
+.etree .on{color:var(--text);background:var(--surface2);border-radius:.3em}
+.ed .code{opacity:.5}
+.mk{position:absolute;left:8%;right:5%;top:5%;bottom:7%;display:flex;flex-direction:column;box-shadow:0 1.5em 4em #000a;border-color:var(--accent);overflow:hidden;z-index:2;font-family:var(--mono);font-size:.82em}
+.mkh{display:flex;align-items:center;gap:1.2em;padding:.7em 1em;border-bottom:.1em solid var(--border)}
+.mks{flex:1;padding:.3em .8em;border-radius:.4em;background:var(--surface2);border:.1em solid var(--border)}
+.mkb{flex:1;display:grid;grid-template-columns:14em 1.15fr 1.2fr;min-height:0}
+.mkb>div{padding:.7em .6em;display:flex;flex-direction:column;gap:.15em;min-width:0}
+.mkb>div+div{border-left:.1em solid var(--border)}
+.mc{padding:.22em .7em;border-radius:.3em;color:var(--muted);display:flex}
+.mc.on{background:var(--surface2);color:var(--text)}
+.mp{padding:.35em .7em;border-radius:.3em;display:flex;flex-direction:column}
+.mp .l1{display:flex;gap:.9em}
+.mp.cur{background:var(--accent);color:#14110a}
+.mp.cur span{color:inherit}
+.mkb>.mprev{gap:.55em;padding:1em 1.2em;font-family:var(--ui);font-size:1.12em}
+.mprev .lst{font-size:.92em}
+.mkf{padding:.5em 1em;border-top:.1em solid var(--border)}
+.w-theme{background:radial-gradient(ellipse 55% 60% at 82% 12%,color-mix(in srgb,var(--accent) 38%,transparent),transparent 70%),radial-gradient(ellipse 45% 55% at 8% 96%,color-mix(in srgb,var(--accent) 20%,var(--surface2)),transparent 70%),linear-gradient(160deg,var(--surface2),var(--bg) 62%)}
+.w-dunes{background:linear-gradient(168deg,transparent 58%,color-mix(in srgb,var(--accent) 34%,var(--bg)) 58.2% 70%,transparent 70.2%),linear-gradient(176deg,transparent 68%,color-mix(in srgb,var(--accent) 60%,var(--surface2)) 68.2% 84%,var(--bg) 84.2%),radial-gradient(ellipse 22% 32% at 78% 24%,color-mix(in srgb,var(--accent) 75%,transparent),transparent 70%),linear-gradient(180deg,var(--surface2),var(--bg))}
+.w-mesh{background:radial-gradient(ellipse 45% 55% at 18% 22%,color-mix(in srgb,var(--info) 45%,transparent),transparent 70%),radial-gradient(ellipse 50% 60% at 82% 74%,color-mix(in srgb,var(--accent) 50%,transparent),transparent 70%),radial-gradient(ellipse 40% 45% at 62% 12%,color-mix(in srgb,var(--danger) 30%,transparent),transparent 70%),var(--bg)}
+.w-aurora{background:linear-gradient(115deg,var(--bg) 0%,color-mix(in srgb,var(--ok) 42%,var(--bg)) 18%,var(--bg) 34%,color-mix(in srgb,var(--info) 46%,var(--bg)) 52%,var(--bg) 68%,color-mix(in srgb,var(--accent) 46%,var(--bg)) 84%,var(--bg) 100%);background-size:300% 300%;animation:drift 12s ease-in-out infinite alternate}
+.w-ember{background:radial-gradient(ellipse 35% 45% at 30% 60%,color-mix(in srgb,var(--accent) 65%,transparent),transparent 70%),radial-gradient(ellipse 30% 40% at 70% 35%,color-mix(in srgb,var(--danger) 45%,transparent),transparent 70%),radial-gradient(ellipse 25% 30% at 55% 80%,color-mix(in srgb,var(--warn) 40%,transparent),transparent 70%),var(--bg);background-size:180% 180%;animation:drift 9s ease-in-out infinite alternate}
+@keyframes drift{from{background-position:0% 0%}to{background-position:100% 100%}}
+.screen[data-sys=gamer],.screen[data-still=true]{animation-play-state:paused}
+.wgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:.6em}
+.wcard{border:.14em solid transparent;border-radius:calc(var(--r)*.7);padding:.25em;text-align:left;cursor:pointer;display:flex;flex-direction:column;gap:.3em}
+.wcard.on{border-color:var(--accent)}
+.wpv{display:block;height:5.4em;border-radius:calc(var(--r)*.55);border:.1em solid var(--border)}
+.wl{display:flex;justify-content:space-between;font-size:.78em;padding:0 .2em}
+.wl .live{color:var(--accent-text)}
+.wadd{display:grid;place-items:center;color:var(--muted);border-style:dashed;font-size:1.4em;height:3.86em}
+body.bare{padding:0;gap:0;display:block}
+body.bare .strip,body.bare .hint{display:none}
+body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
+#ov-kav{left:7%;right:7%;top:10%;bottom:6%;flex-direction:column;border-width:.14em;border-color:var(--accent);box-shadow:0 2em 5em #0006}
+
+/* ---------- login ---------- */
+#login .veil{position:absolute;inset:0;backdrop-filter:blur(calc(var(--blur)*1.6));-webkit-backdrop-filter:blur(calc(var(--blur)*1.6));background:color-mix(in srgb,var(--bg) 35%,transparent)}
+.lg{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:.6em}
+.clock{font-size:8.5em;font-weight:200;letter-spacing:-.04em;line-height:1}
+.date{font-size:1.25em;color:var(--muted);margin-bottom:2.2em;text-transform:capitalize}
+.avatar{width:5.4em;height:5.4em;border-radius:50%;background:var(--accent);color:#14110a;display:grid;place-items:center;font-size:1em;font-weight:700;border:.2em solid var(--surface)}
+.avatar svg{width:3em;height:3em}
+.uname{font-size:1.15em;font-weight:600;margin:.3em 0 .5em}
+.pw{width:19em;padding:.75em 1.1em;display:flex;align-items:center;gap:.7em;font-size:1em}
+.pw span{flex:1;letter-spacing:.3em}.pw b{color:var(--accent-text)}
+.corner{position:absolute;bottom:1.6em;display:flex;gap:.7em;align-items:center;font-size:.9em}
+.corner.l{left:1.8em}.corner.r{right:1.8em}
+.corner .pill{background:var(--glass);border:.1em solid var(--border);padding:.4em .9em}
+
+/* ---------- installer ---------- */
+#cal{position:absolute;left:11%;right:11%;top:13%;bottom:8%;display:flex;overflow:hidden;box-shadow:0 2em 5em #0006}
+.side{width:15em;background:var(--surface2);padding:1.6em 1.2em;display:flex;flex-direction:column;gap:.15em}
+.side .brand{display:flex;align-items:center;gap:.6em;font-weight:650;margin-bottom:1.6em;font-size:1.05em}
+.side .brand small{display:block;font-weight:400;color:var(--muted);font-size:.72em}
+.step{display:flex;align-items:center;gap:.7em;padding:.5em .6em;border-radius:calc(var(--r)*.6);font-size:.92em;color:var(--muted)}
+.step i{width:1.5em;height:1.5em;border-radius:50%;border:.12em solid var(--border);display:grid;place-items:center;font-style:normal;font-size:.78em}
+.step.done i{background:var(--ok);border-color:transparent;color:#0c1a0c}
+.step.on{background:var(--surface);color:var(--text)}.step.on i{background:var(--accent);border-color:transparent;color:#14110a;font-weight:700}
+.main{flex:1;padding:1.7em 2em;display:flex;flex-direction:column;gap:1.1em;min-width:0}
+.main h2{font-size:1.55em;font-weight:650;letter-spacing:-.01em}
+.main p{color:var(--muted);font-size:.95em;margin-top:-.6em}
+.two{display:grid;grid-template-columns:1fr 1.05fr;gap:1.6em;flex:1;min-height:0}
+.two>div{display:flex;flex-direction:column;gap:1em}
+.mini{flex:1;border-radius:var(--r);border:.1em solid var(--border);position:relative;overflow:hidden;
+  background:radial-gradient(18em 12em at 85% 10%,color-mix(in srgb,var(--accent) 40%,transparent),transparent 65%),linear-gradient(160deg,var(--surface2),var(--bg))}
+.mini .b{position:absolute;left:4%;right:4%;top:5%;height:8%;border-radius:calc(var(--r)*.5);background:var(--glass);border:.1em solid var(--border)}
+.mini .w{position:absolute;border-radius:calc(var(--r)*.6);background:var(--glass);border:.12em solid var(--border)}
+.mini .w1{left:4%;top:18%;width:52%;bottom:6%;border-color:var(--accent)}
+.mini .w2{right:4%;top:18%;width:37%;height:36%}.mini .w3{right:4%;bottom:6%;width:37%;height:34%}
+.foot{display:flex;justify-content:space-between;align-items:center}
+</style>
+</head>
+<body>
+
+<div class="strip">
+  <h1>Willwitcher-OS <span>Kavat Edition · UI</span></h1>
+  <div class="tabs" id="tabs">
+    <button data-scene="login">Login</button>
+    <button data-scene="desk">Desktop</button>
+    <button data-scene="agent">Kavat</button>
+    <button data-scene="themes">Themes</button>
+    <button data-scene="settings">Settings</button>
+    <button data-scene="browser">Browser</button>
+    <button data-scene="editor">Editor</button>
+    <button data-scene="kav">kav</button>
+    <button data-scene="install">Installer</button>
+  </div>
+  <label>Palette <select id="selPal"></select></label>
+  <div class="tabs" id="modeTabs"><button data-mode="dark">Dark</button><button data-mode="light">Light</button></div>
+</div>
+<div class="hint">Everything inside the monitor is the OS, shown in its default language (English; Spanish ships preinstalled). In “Themes” the controls are the system’s own and they work.</div>
+
+<div class="monitor"><div class="screen" id="screen">
+  <svg class="wall-mark" viewBox="0 0 100 100" fill="none" stroke="currentColor" stroke-width="1.2"><path d="M18 34 L30 8 L46 30 M82 34 L70 8 L54 30 M18 34 Q16 70 50 90 Q84 70 82 34 M30 50 L42 56 L30 60 Z M70 50 L58 56 L70 60 Z M46 70 L50 74 L54 70"/></svg>
+
+  <!-- ============ LOGIN ============ -->
+  <section class="scene" id="login">
+    <div class="veil"></div>
+    <div class="lg">
+      <div class="clock js-time">21:47</div>
+      <div class="date js-date">Wednesday, November 11</div>
+      <div class="avatar"><svg viewBox="0 0 100 100" fill="currentColor"><path d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/></svg></div>
+      <div class="uname">willwitcher</div>
+      <div class="pw glass"><span>••••••••<b>▏</b></span><span style="flex:0;letter-spacing:0" class="muted">↵</span></div>
+    </div>
+    <div class="corner l"><span class="pill">Session · Hyprland</span><span class="pill">Keyboard · US</span><span class="pill">English ▾</span></div>
+    <div class="corner r"><span class="pill"><span class="dot"></span> Network connected</span><span class="pill">3 updates</span><span class="pill">⏻</span></div>
+  </section>
+
+  <!-- ============ DESKTOP (+ overlays) ============ -->
+  <section class="scene" id="desk">
+    <div class="bar glass">
+      <div class="grp">
+        <svg class="logo" viewBox="0 0 100 100" fill="currentColor"><path d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/></svg>
+        <div class="ws"><i></i><i class="on"></i><i></i><i></i><i></i></div>
+        <span class="muted js-title">kitty — nvim kav/src/resolve.rs</span>
+      </div>
+      <div class="grp"><b class="js-time">21:47</b><span class="muted js-dshort">Wed, Nov 11</span></div>
+      <div class="grp">
+        <span class="seg modes js-sys"><button data-sys="coder">Coder</button><button data-sys="gamer">Gamer</button><button data-sys="incog">Incognito</button></span><span class="pill js-vpn"><span class="dot"></span> VPN</span><span class="pill accent js-agentpill">Kavat</span>
+        <span class="pill">kav · 3 ↑</span>
+        <span class="pill">CPU 7%</span><span class="pill js-ram">RAM 9.2 GB</span><span class="pill">🔊 62</span><span class="pill"><span class="dot"></span> eth</span>
+      </div>
+    </div>
+
+    <div class="tiles">
+      <div class="win glass active tall">
+<div class="bufs"><span class="on">resolve.rs</span><span>allowlist.rs</span><span>main.rs</span></div>
+<div class="code"><span class="ln">11</span><span class="muted">// kav: resolve where a package comes from</span>
+<span class="ln">10</span><span class="acc">use</span> crate::{allowlist, repos};
+<span class="ln">9</span>
+<span class="ln">8</span><span class="acc">pub enum</span> <span class="info">Source</span> {
+<span class="ln">7</span>    Arch,
+<span class="ln">6</span>    Kavat,
+<span class="ln">5</span>    Aur { commit: <span class="info">String</span> },
+<span class="ln">4</span>    Rejected,
+<span class="ln">3</span>}
+<span class="ln">2</span>
+<span class="ln">1</span><span class="acc">pub fn</span> <span class="ok">resolve</span>(pkg: &amp;<span class="info">str</span>) -&gt; <span class="info">Source</span> {
+<span class="cur"><span class="ln">12</span>    <span class="acc">if</span> repos::<span class="ok">official</span>(pkg) { <span class="acc">return</span> Source::Arch; }</span><span class="ln">1</span>    <span class="acc">if</span> repos::<span class="ok">kavat</span>(pkg)    { <span class="acc">return</span> Source::Kavat; }
+<span class="ln">2</span>    <span class="acc">match</span> allowlist::<span class="ok">get</span>(pkg) {
+<span class="ln">3</span>        <span class="info">Some</span>(e) =&gt; Source::Aur { commit: e.commit },
+<span class="ln">4</span>        <span class="info">None</span>    =&gt; Source::Rejected, <span class="muted">// never the AUR blindly</span>
+<span class="ln">5</span>    }
+<span class="ln">6</span>}
+<span class="ln">7</span>
+<span class="ln">8</span><span class="muted">#[cfg(test)]</span>
+<span class="ln">9</span><span class="acc">mod</span> tests {
+<span class="ln">10</span>    <span class="acc">use super</span>::*;
+<span class="ln">11</span>    <span class="muted">#[test]</span>
+<span class="ln">12</span>    <span class="acc">fn</span> <span class="ok">unlisted_is_rejected</span>() {
+<span class="ln">13</span>        assert!(matches!(resolve(<span class="warn">"random-package-git"</span>), Source::Rejected));
+<span class="ln">14</span>    }
+<span class="ln">15</span>}</div>
+        <div class="status"><span class="mode">NORMAL</span><span>kav/src/resolve.rs</span><span class="sp"></span><span class="muted">rust</span><span>12:5</span></div>
+      </div>
+
+      <div class="win glass">
+        <div class="tabstrip"><span class="tab on">Home</span><span class="tab">Arch Wiki</span><span class="tab">+</span></div>
+        <div class="url"><span class="muted">← → ⟳</span><div>kavat://home</div><span class="muted">⋮</span></div>
+        <div class="page">
+          <div class="big js-btitle">Kavat Browser</div>
+          <div class="search">Search or type an address</div>
+          <div class="tilesm"><span>wiki</span><span>git</span><span>aur</span><span>docs</span><span>+</span></div>
+        </div>
+      </div>
+
+      <div class="win glass">
+<div class="term fetch"><pre class="cat acc">⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣶⣦⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢀⣤⣤⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⡄⠀⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⣿⣿⡄⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣷⡀⠀⠀⠀⠀⠀⠀⠠⣾⣿⣿⣿⣿⣿⡀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⡆⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡀⠀⠀⠀⣸⣿⣿⣿⣿⣿⣿⣿⣿⣧⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣧⣤⣤⣴⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⢸⣿⣿⣿⣿⣿⣿⣿⡿⠿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠈⣿⣿⣿⣿⣿⠋⠁⠀⠀⠈⠹⣿⣿⣿⣿⣿⡿⠋⠀⠀⠈⠻⣿⣿⣿⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣿⣿⣿⣿⠃⠀⠀⠀⣴⣶⡄⢹⣿⣿⣿⣿⠃⢰⣶⡄⠀⠀⣿⣿⣿⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣿⣿⣿⣿⡆⠀⠀⠀⠹⠿⠁⣸⣿⣿⣿⣿⡀⠘⡿⠃⠀⢀⣿⣿⣿⡆⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣶⣿⣿⣯⣹⣿⣷⣤⣾⣿⣿⣿⣿⣿⣿⣃⣀⣀⣀⣀⠀
+⠀⠾⠿⠟⠛⠻⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠛⠋⠉⠉⠋⠀
+⠠⣤⣤⣶⡶⠿⠛⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡿⠛⠛⠛⠛⠷⣶⡄
+⠀⠀⠉⢀⣠⣶⠾⠟⠉⠻⢿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠟⠛⠛⠳⢶⣦⣄⡀⠀⠀
+⠀⠀⠀⠟⠋⠁⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡏⠁⠀⠀⠀⠀⠀⠀⠀⠉⠁⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⢰⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⠀⢠⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⠀⢀⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⠀⢀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⠀⢀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡀⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⢀⣾⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣇⠀⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⠀⣼⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡄⠀⠀⠀⠀⠀⠀⠀⠀⠀
+⠀⠀⠀⠀⣸⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⣿⡇⠀⠀⠀⠀⠀⠀⠀⠀⠀</pre><pre><b>willwitcher</b><span class="muted">@</span><b>kavat</b>
+<span class="muted">───────────────────</span>
+<span class="muted">OS     </span> Willwitcher-OS Kavat Edition
+<span class="muted">Kernel </span> linux-zen
+<span class="muted">WM     </span> Hyprland · kavat-shell
+<span class="muted">Shell  </span> zsh · kitty
+<span class="muted">Theme  </span> <span class="js-theme acc">Kavat · dark</span>
+<span class="muted">Locale </span> en_US · es
+<span class="muted">Agent  </span> <span class="js-agentline"><span class="ok">●</span> local · idle</span>
+
+<span class="acc">❯</span> <span class="muted">▏</span></pre></div>
+      </div>
+    </div>
+
+    <div class="dim"></div>
+
+    <!-- agent -->
+    <div class="ov glass" id="ov-agent">
+      <div class="ag-head"><svg class="logo" viewBox="0 0 100 100" fill="currentColor"><path d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/></svg><b>Kavat</b><span class="sp"></span><span class="muted" style="font-size:.85em"><span class="dot"></span> <span class="js-agstatus">local · offline · 3.6 GB</span></span></div>
+      <div class="skills"><div class="skh"><span class="sec" style="margin:0">Skills</span><span class="muted">click, say or type · a click needs no model</span><span class="sp"></span><span class="acc" data-act="skills" style="cursor:pointer">Manage ›</span></div><div class="skg"><button class="skill" data-act="browser"><b>Open browser</b><small>Super+B</small></button><button class="skill" data-act="editor"><b>Open editor</b><small>reversible</small></button><button class="skill" data-act="gamer"><b>Gamer mode</b><small>Super+Shift+M</small></button><button class="skill" data-act="mode"><b>Light / dark</b><small>“night mode”</small></button><button class="skill" data-act="wall"><b>Next wallpaper</b><small>reversible</small></button><button class="skill" data-act="update"><b>Update system</b><small>snapshot first</small></button><button class="skill" data-act="settings"><b>Open settings</b><small>reversible</small></button><button class="skill" data-act="stream"><b>Start stream</b><small>yours · 3 steps</small></button></div></div>
+      <div class="ag-body">
+        <div class="msg me">dark mode and dim the screen, I’m coding tonight</div>
+        <div class="tool">⚙ kavat-theme.apply(profile="night") <span class="badge ok">reversible</span></div>
+        <div class="msg ai">Done. <b>night</b> profile applied, brightness at 35%.</div>
+        <div class="msg me">what’s eating my RAM</div>
+        <div class="tool">⚙ system.processes(sort="ram") <span class="badge info">read</span></div>
+        <div class="msg ai">Kavat Browser 4.1 GB (63 tabs) · docker 2.8 GB · me 3.6 GB. Want me to suspend the idle tabs?</div>
+        <div class="msg me">no, install obs</div>
+        <div class="tool">⚙ kav.install("obs-studio") <span class="badge warn">snapshot</span></div>
+        <div class="msg ai"><b>obs-studio</b> is in the official Arch repos. I’ll take a snapshot before installing.
+          <div class="btns"><span class="btn pri">Install</span><span class="btn">Cancel</span></div></div>
+      </div>
+      <div class="ag-in"><span>Ask Kavat anything…</span><span class="sp"></span><span class="kbd">Super</span><span class="kbd">Space</span></div>
+    </div>
+
+    <!-- themes -->
+    <div class="ov glass" id="ov-themes">
+      <div><div class="sec">Palette</div><div class="cards js-cards"></div></div>
+      <div><div class="sec">Mode</div><div class="seg js-mode"><button data-mode="light">Light</button><button data-mode="dark">Dark</button><button data-mode="auto">Auto</button></div></div>
+      <div><div class="sec">Accent</div><div class="sw js-acc"></div></div>
+      <div><div class="sec">Shape</div>
+        <div class="row"><span>Corners</span><input type="range" id="rRad" min="0" max="1.6" step="0.1"></div>
+        <div class="row"><span>Gaps</span><input type="range" id="rGap" min="0" max="1.6" step="0.1"></div></div>
+      <div><div class="sec">Effects</div>
+        <div class="row"><span>Blur</span><button class="tog" id="tBlur"></button></div>
+        <div class="row"><span>OLED black</span><button class="tog" id="tOled"></button></div></div>
+      <div style="margin-top:auto" class="row"><span class="btn pri" style="width:auto;color:#14110a">Save as profile</span><span class="muted" style="width:auto">work · night · presenting</span></div>
+    </div>
+
+    <!-- settings -->
+    <div class="ov glass" id="ov-settings">
+      <div class="sside">
+        <div class="find">Search settings…</div>
+        <div class="cat" data-spage="appearance">Appearance</div>
+        <div class="cat" data-spage="wallpaper">Wallpaper</div>
+        <div class="cat" data-spage="windows">Windows <small>Hyprland</small></div>
+        <div class="cat" data-spage="keys">Keybindings</div>
+        <div class="cat" data-spage="displays">Displays</div>
+        <div class="cat" data-spage="terminal">Terminal <small>Kitty</small></div>
+        <div class="cat" data-spage="editor">Editor <small>Neovim</small></div>
+        <div class="cat" data-spage="shell">Shell <small>zsh</small></div>
+        <div class="cat" data-spage="browser">Browser</div>
+        <div class="cat" data-spage="bar">Bar &amp; widgets</div>
+        <div class="cat" data-spage="modes">Modes</div>
+        <div class="cat" data-spage="agent">Agent &amp; voice</div>
+        <div class="cat" data-spage="skills">Skills</div>
+        <div class="cat" data-spage="packages">Packages <small>kav</small></div>
+        <div class="cat" data-spage="login">Login &amp; lock</div>
+        <div class="cat" data-spage="lang">Language &amp; region</div>
+      </div>
+      <div class="smain">
+        <div class="spage" data-page="appearance"><h2>Appearance <small>one theme, every app</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Palette</div><div class="cards js-cards"></div></div><div class="blk"><div class="sec">Mode</div><div class="seg js-mode"><button data-mode="light">Light</button><button data-mode="dark">Dark</button><button data-mode="auto">Auto</button></div></div><div class="blk"><div class="sec">Accent</div><div class="sw js-acc"></div></div></div><div class="col"><div class="blk"><div class="sec">Tone &amp; contrast</div><div class="rows"><div class="row"><span>Tone</span><div class="seg local"><button class="on">Neutral</button><button>Warm</button><button>Cool</button></div></div><div class="row"><span>Contrast</span><div class="seg local"><button class="on">Normal</button><button>High</button></div></div><div class="row"><span>OLED black</span><button class="tog" data-tog="oled"></button></div></div></div><div class="blk"><div class="sec">Typography</div><div class="rows"><div class="row"><span>Interface</span><div class="sel"><span>Inter</span><span class="muted">▾</span></div></div><div class="row"><span>Monospace</span><div class="sel"><span>JetBrains Mono Nerd Font</span><span class="muted">▾</span></div></div><div class="row"><span>Scale</span><div class="sel"><span>100%</span><span class="muted">▾</span></div></div></div></div><div class="blk"><div class="sec">Profiles</div><div class="rows"><div class="chips"><span class="pill">work</span><span class="pill accent">night</span><span class="pill">presenting</span><span class="pill">+ Save current</span></div><div class="row w"><span>Switch to “night” at sunset</span><button class="tog on"></button></div></div></div></div></div></div>
+        <div class="spage" data-page="wallpaper"><h2>Wallpaper <small>image or live video · <span class="js-wallstate"></span></small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Library</div><div class="ktool" style="margin-bottom:.7em"><div class="seg local"><button class="on">All</button><button>Images</button><button>Live</button></div><span class="sp"></span><span class="btn">+ Add file</span></div><div class="wgrid"><button class="wcard" data-wall="theme"><span class="wpv w-theme"></span><span class="wl"><span>Kavat</span><span class="muted">Image</span></span></button><button class="wcard" data-wall="dunes"><span class="wpv w-dunes"></span><span class="wl"><span>Dunes</span><span class="muted">Image</span></span></button><button class="wcard" data-wall="mesh"><span class="wpv w-mesh"></span><span class="wl"><span>Mesh</span><span class="muted">Image</span></span></button><button class="wcard" data-wall="aurora"><span class="wpv w-aurora"></span><span class="wl"><span>Aurora</span><span class="live">▶ Live</span></span></button><button class="wcard" data-wall="ember"><span class="wpv w-ember"></span><span class="wl"><span>Ember</span><span class="live">▶ Live</span></span></button><button class="wcard"><span class="wpv wadd">+</span><span class="wl"><span class="muted">Drop a file here</span></span></button></div></div><div class="blk"><div class="sec">Folders</div><div class="rows"><div class="row"><span>Images</span><div class="sel"><span>~/Pictures/Wallpapers/images</span><span class="muted">▾</span></div></div><div class="row"><span>Live</span><div class="sel"><span>~/Pictures/Wallpapers/live</span><span class="muted">▾</span></div></div><div class="row"><span>Slideshow</span><div class="sel"><span>Off</span><span class="muted">▾</span></div></div></div></div></div><div class="col"><div class="blk"><div class="sec">Live wallpaper</div><div class="rows"><div class="row"><span>Player</span><div class="sel"><span>mpvpaper</span><span class="muted">▾</span></div></div><div class="row"><span>Engine package</span><span class="ok">mpvpaper installed · kept by kav</span></div><div class="row"><span>Sound</span><button class="tog"></button></div><div class="row"><span>Fit</span><div class="sel"><span>Fill</span><span class="muted">▾</span></div></div><div class="row"><span>GPU decoding</span><button class="tog on"></button></div></div></div><div class="blk"><div class="sec">Pause the video when</div><div class="rows"><div class="row w"><span>A window is fullscreen</span><button class="tog on"></button></div><div class="row w"><span>The wallpaper is covered</span><button class="tog on"></button></div><div class="row w"><span>Gamer mode is on</span><button class="tog on"></button></div><div class="row w"><span>The screen is locked or off</span><button class="tog on"></button></div></div></div><div class="blk"><div class="sec">Also</div><div class="rows"><div class="row w"><span>Login and lock use a still frame</span><button class="tog on"></button></div><div class="row w"><span>Take theme colors from the wallpaper</span><button class="tog"></button></div><div class="row w"><span>A different wallpaper per display</span><button class="tog"></button></div></div></div></div></div></div>
+        <div class="spage" data-page="windows"><h2>Windows <small>Hyprland · changes apply live</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Layout</div><div class="rows"><div class="row"><span>Tiling</span><div class="sel"><span>Dwindle</span><span class="muted">▾</span></div></div><div class="row"><span>Gaps</span><input type="range" data-bind="gap" min="0" max="1.6" step="0.1"></div><div class="row"><span>Corner radius</span><input type="range" data-bind="rad" min="0" max="1.6" step="0.1"></div><div class="row"><span>Border width</span><div class="sel"><span>2 px</span><span class="muted">▾</span></div></div></div></div><div class="blk"><div class="sec">Input</div><div class="rows"><div class="row"><span>Keyboard</span><div class="sel"><span>English (US)</span><span class="muted">▾</span></div></div><div class="row"><span>Focus follows mouse</span><button class="tog on"></button></div><div class="row"><span>Pointer speed</span><input type="range" min="0" max="100" value="50"></div></div></div></div><div class="col"><div class="blk"><div class="sec">Effects</div><div class="rows"><div class="row"><span>Blur</span><button class="tog" data-tog="blur"></button></div><div class="row"><span>Animations</span><button class="tog on"></button></div><div class="row"><span>Animation speed</span><div class="sel"><span>Fast</span><span class="muted">▾</span></div></div><div class="row"><span>Shadows</span><button class="tog on"></button></div></div></div><div class="blk"><div class="sec">Window rules</div><div class="rows"><div class="row"><span>Steam</span><div class="sel"><span>Workspace 5 · float dialogs</span><span class="muted">▾</span></div></div><div class="row"><span>Vesktop</span><div class="sel"><span>Workspace 4</span><span class="muted">▾</span></div></div><div class="chips"><span class="btn">+ Add rule</span></div></div></div></div></div><div class="note">“Border width” is overridden by your file <span class="mono">~/.config/hypr/look.conf</span> — your file wins. <u>Open file</u></div></div>
+        <div class="spage" data-page="keys"><h2>Keybindings <small>28 bindings · yours from Endgame, plus the new ones</small></h2><div class="ktool"><div class="find" style="flex:1">Filter bindings…</div><div class="seg local"><button class="on">All</button><button>Windows</button><button>Workspaces</button><button>Apps</button><button>System</button></div><span class="btn">Cheat sheet</span></div><div class="ktab"><div class="kr head"><span>Action</span><span>Shortcut</span><span>Source</span></div><div class="kr"><span>Terminal</span><span class="keys"><span class="kbd">Super</span><span class="kbd">Enter</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Close window</span><span class="keys"><span class="kbd">Super</span><span class="kbd">Q</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>App launcher</span><span class="keys"><span class="kbd">Super</span><span class="kbd">D</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Files (Yazi)</span><span class="keys"><span class="kbd">Super</span><span class="kbd">E</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Toggle floating</span><span class="keys"><span class="kbd">Super</span><span class="kbd">V</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Toggle split</span><span class="keys"><span class="kbd">Super</span><span class="kbd">J</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Move focus</span><span class="keys"><span class="kbd">Super</span><span class="kbd">← ↑ ↓ →</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Go to workspace</span><span class="keys"><span class="kbd">Super</span><span class="kbd">1 … 0</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Scratchpad</span><span class="keys"><span class="kbd">Super</span><span class="kbd">S</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Clipboard history</span><span class="keys"><span class="kbd">Super</span><span class="kbd">Shift</span><span class="kbd">V</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Lock</span><span class="keys"><span class="kbd">Super</span><span class="kbd">Shift</span><span class="kbd">L</span></span><span><span class="badge muted">Endgame</span></span></div><div class="kr"><span>Ask Kavat</span><span class="keys"><span class="kbd">Super</span><span class="kbd">Space</span></span><span><span class="badge acc">Kavat</span></span></div><div class="kr"><span>Switch mode</span><span class="keys"><span class="kbd">Super</span><span class="kbd">Shift</span><span class="kbd">M</span></span><span><span class="badge acc">Kavat</span></span></div><div class="kr edit"><span>Theme picker</span><span class="keys"><span class="kbd">Super</span><span class="kbd">J</span><span class="bad" style="margin-left:.6em">already used by “Toggle split”</span></span><span><span class="btn">Keep Super+T</span></span></div></div></div>
+        <div class="spage" data-page="displays"><h2>Displays <small>1 connected</small></h2><div class="sgrid"><div class="col"><div class="dcanvas"><div class="dmon"><div><b>1</b><br><span class="muted">DP-1</span></div></div></div><div class="muted hint">Drag displays to arrange them. A second display shows up here when you plug it in.</div><div class="blk"><div class="sec">Workspaces</div><div class="rows"><div class="row"><span>Workspaces 1–10</span><div class="sel"><span>DP-1</span><span class="muted">▾</span></div></div><div class="row"><span>New displays</span><div class="sel"><span>Extend to the right</span><span class="muted">▾</span></div></div></div></div></div><div class="col"><div class="blk"><div class="sec">DP-1</div><div class="rows"><div class="row"><span>Resolution</span><div class="sel"><span>1920 × 1080</span><span class="muted">▾</span></div></div><div class="row"><span>Refresh rate</span><div class="sel"><span>100 Hz</span><span class="muted">▾</span></div></div><div class="row"><span>Scale</span><div class="sel"><span>100%</span><span class="muted">▾</span></div></div><div class="row"><span>Rotation</span><div class="sel"><span>None</span><span class="muted">▾</span></div></div><div class="row"><span>Adaptive sync</span><button class="tog on"></button></div></div></div><div class="blk"><div class="sec">Night light</div><div class="rows"><div class="row"><span>Enabled</span><button class="tog"></button></div><div class="row"><span>Schedule</span><div class="sel"><span>Sunset to sunrise</span><span class="muted">▾</span></div></div><div class="row"><span>Warmth</span><input type="range" min="0" max="100" value="40"></div></div></div></div></div></div>
+        <div class="spage" data-page="terminal"><h2>Terminal <small>Kitty · reloads live</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Text</div><div class="rows"><div class="row"><span>Font</span><div class="sel"><span>JetBrains Mono Nerd Font</span><span class="muted">▾</span></div></div><div class="row"><span>Size</span><div class="sel"><span>12 pt</span><span class="muted">▾</span></div></div><div class="row"><span>Ligatures</span><button class="tog on"></button></div></div></div><div class="blk"><div class="sec">Cursor</div><div class="rows"><div class="row"><span>Shape</span><div class="seg local"><button class="on">Block</button><button>Beam</button><button>Underline</button></div></div><div class="row"><span>Blink</span><button class="tog"></button></div></div></div></div><div class="col"><div class="blk"><div class="sec">Window</div><div class="rows"><div class="row"><span>Opacity</span><input type="range" min="0" max="100" value="92"></div><div class="row"><span>Padding</span><div class="sel"><span>12 px</span><span class="muted">▾</span></div></div><div class="row"><span>Tab bar</span><div class="seg local"><button class="on">Hidden</button><button>Top</button><button>Bottom</button></div></div><div class="row"><span>Colors</span><div class="sel"><span>Follow system theme</span><span class="muted">▾</span></div></div></div></div><div class="blk"><div class="sec">Behavior</div><div class="rows"><div class="row"><span>Scrollback</span><div class="sel"><span>10,000 lines</span><span class="muted">▾</span></div></div><div class="row"><span>Confirm before closing</span><button class="tog on"></button></div><div class="row"><span>Copy on select</span><button class="tog"></button></div></div></div></div></div><div class="blk"><div class="sec">Preview</div><div class="tprev"><span class="acc">❯</span> kav search obs
+  obs-studio      <span class="muted">Arch official</span>
+<span class="acc">❯</span> <span class="muted">▏</span></div></div></div>
+        <div class="spage" data-page="editor"><h2>Editor <small>Neovim · applies live to open windows</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Keymap</div><div class="rows"><div class="row"><span>Preset</span><div class="seg local"><button class="on">VS Code</button><button>Vim</button><button>Custom</button></div></div><div class="row"><span>Open ready to type</span><button class="tog on"></button></div><div class="row"><span>Keep Vim modes</span><button class="tog on"></button></div><div class="row"><span>VS Code navigation</span><button class="tog on"></button></div><div class="row"><span>Endgame leader shortcuts</span><button class="tog on"></button></div></div></div><div class="blk"><div class="sec">Editing</div><div class="rows"><div class="row"><span>Line numbers</span><div class="seg local"><button class="on">Relative</button><button>Absolute</button></div></div><div class="row"><span>Indent</span><div class="sel"><span>4 spaces</span><span class="muted">▾</span></div></div><div class="row"><span>Format on save</span><button class="tog on"></button></div><div class="row"><span>Auto save</span><div class="sel"><span>On focus change</span><span class="muted">▾</span></div></div><div class="row"><span>Word wrap</span><button class="tog"></button></div></div></div></div><div class="col"><div class="blk"><div class="sec">Language packs</div><div class="lst"><div class="li"><span>Rust</span><span class="sp"></span><span class="muted">LSP · format · lint · debug</span><span class="ok">installed</span></div><div class="li"><span>Lua</span><span class="sp"></span><span class="muted">LSP · format</span><span class="ok">installed</span></div><div class="li"><span>TypeScript</span><span class="sp"></span><span class="btn">Add</span></div><div class="li"><span>Python</span><span class="sp"></span><span class="btn">Add</span></div></div></div><div class="blk"><div class="sec">Plugins</div><div class="rows"><div class="row"><span>Installed</span><span>23 · 2 updates</span></div><div class="row"><span>Catalog</span><div class="seg local"><button>Verified only</button><button class="on">With community</button></div></div><div class="chips"><span class="btn pri">Open Marketplace</span><span class="btn">Open lazy.nvim</span></div></div></div><div class="blk"><div class="sec">Kavat in the editor</div><div class="rows"><div class="row"><span>Ask about selection</span><span class="keys"><span class="kbd">Ctrl</span><span class="kbd">I</span></span></div><div class="row"><span>Explain errors</span><button class="tog on"></button></div></div></div></div></div></div>
+        <div class="spage" data-page="shell"><h2>Shell <small>zsh · applies to new shells</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Prompt</div><div class="rows"><div class="row"><span>Style</span><div class="sel"><span>Starship · Kavat minimal</span><span class="muted">▾</span></div></div><div class="row"><span>Git branch</span><button class="tog on"></button></div><div class="row"><span>Git status <small class="warn">slower</small></span><button class="tog"></button></div><div class="row"><span>Language versions <small class="warn">slower</small></span><button class="tog"></button></div><div class="row"><span>Color ❯ by exit status</span><button class="tog on"></button></div><div class="row"><span>New shell opens in</span><span class="ok">38 ms</span><span class="muted">budget 100 ms</span></div></div></div><div class="blk"><div class="sec">Plugins</div><div class="rows"><div class="row"><span>Autosuggestions</span><button class="tog on"></button></div><div class="row"><span>Syntax highlighting</span><button class="tog on"></button></div><div class="row"><span>Completions</span><button class="tog on"></button></div><div class="row"><span>zoxide (smart cd)</span><button class="tog on"></button></div></div></div><div class="blk"><div class="sec">History</div><div class="rows"><div class="row"><span>Size</span><div class="sel"><span>50,000 commands</span><span class="muted">▾</span></div></div><div class="row"><span>Shared between shells</span><button class="tog on"></button></div></div></div></div><div class="col"><div class="blk"><div class="sec">Aliases</div><div class="lst"><div class="li"><span class="mono ">ls</span><span class="muted">→</span><span class="mono ">lsd</span></div><div class="li"><span class="mono ">grep</span><span class="muted">→</span><span class="mono ">rg</span></div><div class="li"><span class="mono ">find</span><span class="muted">→</span><span class="mono ">fd</span></div><div class="li"><span class="mono ">y</span><span class="muted">→</span><span class="muted">Yazi, and stay in the folder you left</span></div></div><div class="chips"><span class="btn">+ Add alias</span></div></div><div class="blk"><div class="sec">Default apps</div><div class="rows"><div class="row"><span>Editor</span><div class="sel"><span>Neovim</span><span class="muted">▾</span></div></div><div class="row"><span>Browser</span><div class="sel"><span>Kavat Browser</span><span class="muted">▾</span></div></div><div class="row"><span>File manager</span><div class="sel"><span>Yazi</span><span class="muted">▾</span></div></div></div></div><div class="blk"><div class="sec">Preview</div><div class="tprev"><span class="info">willwitcher</span>  <span class="acc">~/Projects/kavat</span>  <span class="warn">main</span>
+<span class="ok">❯</span> <span class="muted">▏</span></div></div></div></div></div>
+        <div class="spage" data-page="browser"><h2>Browser <small>Kavat Browser</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Shield</div><div class="rows"><div class="row"><span>Block ads &amp; trackers</span><button class="tog on"></button></div><div class="row"><span>Filter lists</span><div class="sel"><span>4 lists</span><span class="muted">▾</span></div></div><div class="row"><span>Shield off on</span><div class="sel"><span>2 sites</span><span class="muted">▾</span></div></div></div></div><div class="blk"><div class="sec">Look</div><div class="rows"><div class="row"><span>Follow system theme</span><button class="tog on"></button></div><div class="row"><span>Kavat side panel</span><button class="tog on"></button></div><div class="row"><span>Tab bar</span><div class="seg local"><button class="on">Shown</button><button>Auto-hide</button><button>Hidden</button></div></div></div></div><div class="blk"><div class="sec">Profile per mode</div><div class="rows"><div class="row"><span>Coder</span><div class="sel"><span>Default</span><span class="muted">▾</span></div></div><div class="row"><span>Gamer</span><div class="sel"><span>Default · tabs suspended</span><span class="muted">▾</span></div></div><div class="row"><span>Incognito</span><div class="sel"><span>Private · nothing saved</span><span class="muted">▾</span></div></div></div></div></div><div class="col"><div class="blk"><div class="sec">Console commands</div><div class="lst"><div class="li"><span class="mono ">hide-tabs</span><span class="sp"></span><span class="muted">Hide the tab strip</span></div><div class="li"><span class="mono ">hide-sidebar</span><span class="sp"></span><span class="muted">Hide the Kavat panel</span></div><div class="li"><span class="mono ">hide-toolbar</span><span class="sp"></span><span class="muted">Hide address bar and buttons</span></div><div class="li"><span class="mono ">zen</span><span class="sp"></span><span class="muted">Hide everything but the page</span></div><div class="li"><span class="mono ">shield off</span><span class="sp"></span><span class="muted">Allow ads on this site</span></div></div><div class="chips"><span class="btn">+ New command</span><span class="btn">Open commands.toml</span></div></div><div class="blk"><div class="sec">Console</div><div class="rows"><div class="row"><span>Open with</span><span class="keys"><span class="kbd">Ctrl</span><span class="kbd">Space</span></span></div><div class="row"><span>Kavat can run commands</span><button class="tog on"></button></div></div></div></div></div></div>
+        <div class="spage" data-page="bar"><h2>Bar &amp; widgets <small>Noctalia shell</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Bar</div><div class="rows"><div class="row"><span>Position</span><div class="seg local"><button class="on">Top</button><button>Bottom</button></div></div><div class="row"><span>Floating</span><button class="tog on"></button></div><div class="row"><span>Density</span><div class="seg local"><button class="on">Compact</button><button>Normal</button></div></div><div class="row"><span>Show on</span><div class="sel"><span>All displays</span><span class="muted">▾</span></div></div></div></div><div class="blk"><div class="sec">Launcher</div><div class="rows"><div class="row"><span>Open with</span><span class="keys"><span class="kbd">Super</span><span class="kbd">D</span></span></div><div class="row"><span>Searches</span><div class="sel"><span>Apps, files, commands, Kavat</span><span class="muted">▾</span></div></div></div></div><div class="blk"><div class="sec">Notifications</div><div class="rows"><div class="row"><span>Position</span><div class="sel"><span>Top right</span><span class="muted">▾</span></div></div><div class="row"><span>Timeout</span><div class="sel"><span>5 seconds</span><span class="muted">▾</span></div></div><div class="row"><span>Silent in Gamer mode</span><button class="tog on"></button></div></div></div></div><div class="col"><div class="blk"><div class="sec">Widgets · drag to reorder</div><div class="lst"><div class="li"><span class="muted">⋮⋮</span><span class="">Workspaces</span><span class="sp"></span><span class="muted">Left</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">Window title</span><span class="sp"></span><span class="muted">Left</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">Clock and date</span><span class="sp"></span><span class="muted">Center</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">Mode switcher</span><span class="sp"></span><span class="muted">Right</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">Kavat</span><span class="sp"></span><span class="muted">Right</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">kav updates</span><span class="sp"></span><span class="muted">Right</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">CPU</span><span class="sp"></span><span class="muted">Right</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">RAM</span><span class="sp"></span><span class="muted">Right</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">GPU</span><span class="sp"></span><span class="muted">Right</span><button class="tog"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">Volume</span><span class="sp"></span><span class="muted">Right</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">Network</span><span class="sp"></span><span class="muted">Right</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">Recording indicator</span><span class="sp"></span><span class="muted">Right</span><button class="tog on"></button></div><div class="li"><span class="muted">⋮⋮</span><span class="">Tray</span><span class="sp"></span><span class="muted">Right</span><button class="tog"></button></div></div></div></div></div></div>
+        <div class="spage" data-page="modes"><h2>Modes <small>switch from the bar or with Super+Shift+M</small></h2><div class="mcards"><div class="mcard" data-m="coder"><div class="mhead"><b>Coder</b><span class="sp"></span><button class="btn" data-sys="coder"><span class="if-off">Activate</span><span class="if-on">Active</span></button></div><span class="muted">Everyday mode</span><ul><li>Agent on</li><li>Network direct</li><li>Browser normal</li><li>All background services running</li></ul></div><div class="mcard" data-m="gamer"><div class="mhead"><b>Gamer</b><span class="sp"></span><button class="btn" data-sys="gamer"><span class="if-off">Activate</span><span class="if-on">Active</span></button></div><span class="muted">Everything for the game</span><ul><li>Agent off, model and voice unloaded</li><li>Containers, indexing and scheduled updates paused</li><li>Do not disturb</li><li>CPU on performance</li><li>Browser tabs suspended</li><li>Live wallpaper paused</li><li>Animations stay on</li></ul></div><div class="mcard" data-m="incog"><div class="mhead"><b>Incognito</b><span class="sp"></span><button class="btn" data-sys="incog"><span class="if-off">Activate</span><span class="if-on">Active</span></button></div><span class="muted">Private session</span><ul><li>All traffic through the VPN</li><li>Kill switch if the VPN drops</li><li>Browser opens private windows</li><li>Normal windows hidden until you leave</li><li>Agent keeps no history</li><li>Clipboard and shell history paused</li></ul></div></div><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Automation</div><div class="rows"><div class="row w"><span>Enter Gamer when a Steam game starts</span><button class="tog on"></button></div><div class="row w"><span>Return to Coder when it exits</span><button class="tog on"></button></div></div></div></div><div class="col"><div class="blk"><div class="sec">VPN for Incognito</div><div class="rows"><div class="row"><span>Provider</span><div class="sel"><span>Proton VPN</span><span class="muted">▾</span></div></div><div class="row"><span>Server</span><div class="sel"><span>Fastest</span><span class="muted">▾</span></div></div><div class="row"><span>Kill switch</span><button class="tog on"></button></div></div></div></div></div><div class="chips"><span class="btn">+ New mode</span><span class="btn">Open modes folder</span></div></div>
+        <div class="spage" data-page="agent"><h2>Agent &amp; voice <small>Kavat · runs on this machine</small></h2><div class="blk"><div class="sec">Memory budget · model and voice share 4 GB</div><div class="budget"><i style="width:72.5%;background:var(--accent)">Language model · 2.9 GB</i><i style="width:17.5%;background:var(--info)">Voice · 0.7 GB</i><i style="flex:1;color:var(--muted)">free</i></div></div><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Model</div><div class="rows"><div class="row"><span>Model</span><div class="sel"><span>kavat-agent · on Ollama</span><span class="muted">▾</span></div></div><div class="row"><span>Runs on</span><div class="sel"><span>GPU · Radeon RX 6800</span><span class="muted">▾</span></div></div><div class="row"><span>Unload when idle</span><div class="sel"><span>After 5 minutes</span><span class="muted">▾</span></div></div><div class="row"><span>Keep history</span><button class="tog on"></button></div><div class="row"><span>Network tools</span><button class="tog"></button></div></div></div><div class="blk"><div class="sec">Permissions</div><div class="rows"><div class="row"><span>Read</span><div class="sel"><span>Always allow</span><span class="muted">▾</span></div></div><div class="row"><span>Reversible</span><div class="sel"><span>Allow and log</span><span class="muted">▾</span></div></div><div class="row"><span>With snapshot</span><div class="sel"><span>Ask once</span><span class="muted">▾</span></div></div><div class="row"><span>Privileged</span><div class="sel"><span>Ask with password</span><span class="muted">▾</span></div></div></div></div></div><div class="col"><div class="blk"><div class="sec">Voice · VoiceStudio</div><div class="rows"><div class="row"><span>Enabled</span><button class="tog on"></button></div><div class="row"><span>Wake word</span><div class="sel"><span>“Hey Kavat”</span><span class="muted">▾</span></div></div><div class="row"><span>Voice</span><div class="sel"><span>Kavat (custom)</span><span class="muted">▾</span></div></div><div class="row"><span>Languages</span><div class="sel"><span>English, Spanish</span><span class="muted">▾</span></div></div><div class="row"><span>Speak replies</span><div class="seg local"><button>Always</button><button class="on">Voice only</button><button>Never</button></div></div></div></div><div class="blk"><div class="sec">Recent activity</div><div class="lst"><div class="li"><span class="mono muted">14:02</span><span class="mono ">kavat-theme.apply</span><span class="sp"></span><span class="badge ok">reversible</span><span class="btn">Undo</span></div><div class="li"><span class="mono muted">13:41</span><span class="mono ">system.processes</span><span class="sp"></span><span class="badge info">read</span></div><div class="li"><span class="mono muted">13:40</span><span class="mono ">kav.install</span><span class="sp"></span><span class="badge warn">snapshot</span><span class="btn">Undo</span></div></div><div class="chips"><span class="btn">Open full log</span><span class="btn">Clear history</span></div></div></div></div></div>
+        <div class="spage" data-page="skills"><h2>Skills <small>what Kavat can do with one click, one phrase or one key</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">14 built in · 1 yours</div><div class="lst"><div class="li"><span class="acc">★</span><span class="">Open browser</span><span class="sp"></span><span class="keys"><span class="kbd">Super</span><span class="kbd">B</span></span><span class="badge ok">reversible</span></div><div class="li"><span class="acc">★</span><span class="">Open terminal</span><span class="sp"></span><span class="keys"><span class="kbd">Super</span><span class="kbd">Enter</span></span><span class="badge ok">reversible</span></div><div class="li"><span class="acc">★</span><span class="">Switch mode</span><span class="sp"></span><span class="keys"><span class="kbd">Super</span><span class="kbd">Shift</span><span class="kbd">M</span></span><span class="badge ok">reversible</span></div><div class="li"><span class="acc">★</span><span class="">Light / dark</span><span class="sp"></span><span class="muted">“night mode”</span><span class="badge ok">reversible</span></div><div class="li"><span class="muted">☆</span><span class="">Next wallpaper</span><span class="sp"></span><span class="muted">—</span><span class="badge ok">reversible</span></div><div class="li"><span class="muted">☆</span><span class="">Screenshot a region</span><span class="sp"></span><span class="keys"><span class="kbd">Print</span></span><span class="badge ok">reversible</span></div><div class="li"><span class="acc">★</span><span class="">Update system</span><span class="sp"></span><span class="muted">“update everything”</span><span class="badge warn">snapshot</span></div><div class="li"><span class="acc">★</span><span class="">Start stream</span><span class="badge acc">yours</span><span class="sp"></span><span class="keys"><span class="kbd">Super</span><span class="kbd">F9</span></span><span class="badge ok">reversible</span></div></div><div class="chips"><span class="btn pri">+ New skill</span><span class="btn">Save last task as skill</span><span class="btn">Import</span></div></div></div><div class="col"><div class="blk"><div class="sec">Start stream · steps</div><div class="lst"><div class="li"><span class="muted">1</span><span class="">Open OBS</span><span class="sp"></span><span class="muted">app</span></div><div class="li"><span class="muted">2</span><span class="">Switch to Gamer mode</span><span class="sp"></span><span class="muted">mode</span></div><div class="li"><span class="muted">3</span><span class="">Turn on Do not disturb</span><span class="sp"></span><span class="muted">notifications</span></div></div><div class="chips"><span class="btn">+ Add step</span><span class="btn">Try it</span></div></div><div class="blk"><div class="sec">How it runs</div><div class="rows"><div class="row"><span>Shortcut</span><span class="keys"><span class="kbd">Super</span><span class="kbd">F9</span></span></div><div class="row"><span>Voice phrase</span><div class="sel"><span>“start stream”</span><span class="muted">▾</span></div></div><div class="row"><span>Pinned to</span><div class="seg local"><button class="on">Panel</button><button>Bar</button><button>Launcher</button></div></div><div class="row"><span>Runs by itself</span><div class="sel"><span>Never</span><span class="muted">▾</span></div></div><div class="row"><span>Asks before running</span><button class="tog"></button></div></div></div><div class="blk"><div class="sec">Needs</div><div class="lst"><div class="li"><span class="mono">obs-studio</span><span class="sp"></span><span class="ok">installed · kept by kav</span></div></div></div></div></div></div>
+        <div class="spage" data-page="packages"><h2>Packages <small>kav</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">Sources</div><div class="lst"><div class="li"><span class="">Arch official</span><span class="sp"></span><span class="ok">always allowed</span></div><div class="li"><span class="mono ">[kavat]</span><span class="sp"></span><span class="ok">signed · always allowed</span></div><div class="li"><span class="">AUR</span><span class="sp"></span><span class="warn">allowlist only</span></div></div></div><div class="blk"><div class="sec">Updates</div><div class="rows"><div class="row"><span>Check</span><div class="sel"><span>Daily</span><span class="muted">▾</span></div></div><div class="row"><span>Install</span><div class="sel"><span>Ask me first</span><span class="muted">▾</span></div></div><div class="row"><span>Read Arch news first</span><button class="tog on lock"></button></div></div></div><div class="blk"><div class="sec">Snapshots</div><div class="rows"><div class="row"><span>Before every change</span><button class="tog on lock"></button></div><div class="row"><span>Keep bootable</span><div class="sel"><span>Last 10</span><span class="muted">▾</span></div></div></div></div></div><div class="col"><div class="blk"><div class="sec">AUR allowlist</div><div class="lst"><div class="li"><span class="mono ">visual-studio-code-bin</span><span class="sp"></span><span class="mono muted">3f9c2ab</span><span class="ok">pinned</span></div><div class="li"><span class="mono ">vesktop-bin</span><span class="sp"></span><span class="mono muted">9c2e7f1</span><span class="ok">pinned</span></div><div class="li"><span class="mono ">spotify</span><span class="sp"></span><span class="mono muted">a81d04e</span><span class="warn">upstream changed</span><span class="btn pri">Review</span></div></div></div><div class="blk"><div class="sec">Requests</div><div class="lst"><div class="li"><span class="mono ">random-package-git</span><span class="sp"></span><span class="muted">waiting for review</span><span class="btn">Review</span></div></div><div class="chips"><span class="btn">+ Request a package</span><span class="btn">Run kav doctor</span></div></div></div></div></div>
+        <div class="spage" data-page="login"><h2>Login &amp; lock <small>LightDM · web-greeter · hyprlock</small></h2><div class="sgrid"><div class="col"><div class="lprev"><div class="lpc"><div class="lpt js-time">21:47</div><div class="lpa"></div><div class="lpp"></div></div></div><div class="muted hint">Login and lock screen share this design and follow your theme.</div></div><div class="col"><div class="blk"><div class="sec">Login screen</div><div class="rows"><div class="row"><span>Background</span><div class="sel"><span>Desktop wallpaper, blurred</span><span class="muted">▾</span></div></div><div class="row"><span>Clock</span><div class="seg local"><button class="on">24-hour</button><button>12-hour</button></div></div><div class="row"><span>System status</span><button class="tog on"></button></div><div class="row"><span>User list</span><button class="tog"></button></div><div class="row"><span>Language</span><div class="sel"><span>English</span><span class="muted">▾</span></div></div><div class="row"><span>Log in automatically</span><button class="tog"></button></div></div></div><div class="blk"><div class="sec">Lock</div><div class="rows"><div class="row"><span>Lock after</span><div class="sel"><span>10 minutes idle</span><span class="muted">▾</span></div></div><div class="row"><span>Screen off after</span><div class="sel"><span>15 minutes</span><span class="muted">▾</span></div></div><div class="row"><span>Lock on suspend</span><button class="tog on"></button></div><div class="row"><span>Notifications on lock</span><button class="tog"></button></div></div></div></div></div></div>
+        <div class="spage" data-page="lang"><h2>Language &amp; region <small>English and Spanish come preinstalled</small></h2><div class="sgrid"><div class="col"><div class="blk"><div class="sec">System language</div><div class="lst"><div class="li"><span class="radio on"></span><span class="">English (United States)</span><span class="sp"></span><span class="muted">default</span></div><div class="li"><span class="radio"></span><span class="">Español</span><span class="sp"></span><span class="muted">installed</span></div></div><div class="chips"><span class="btn">+ Add a language</span></div></div><div class="blk"><div class="sec">Applies to</div><div class="rows"><div class="row w"><span>Shell, login screen and installer</span><button class="tog on"></button></div><div class="row w"><span>kav and system messages</span><button class="tog on"></button></div><div class="row w"><span>Kavat replies in the language you use</span><button class="tog on"></button></div></div></div></div><div class="col"><div class="blk"><div class="sec">Keyboard layouts</div><div class="lst"><div class="li"><span class="radio on"></span><span class="">English (US)</span><span class="sp"></span><span class="muted">default</span></div><div class="li"><span class="radio"></span><span class="">Spanish</span><span class="sp"></span><span class="btn">Add</span></div></div></div><div class="blk"><div class="sec">Formats</div><div class="rows"><div class="row"><span>Region</span><div class="sel"><span>Follow language</span><span class="muted">▾</span></div></div><div class="row"><span>Clock</span><div class="seg local"><button class="on">24-hour</button><button>12-hour</button></div></div><div class="row"><span>First day of week</span><div class="sel"><span>Monday</span><span class="muted">▾</span></div></div></div></div></div></div></div>
+        <div class="sfoot"><span class="muted">Saved to <span class="mono">~/.config/kavat/settings.toml</span> · 3 changes this session</span><div class="btns" style="margin:0"><span class="btn">Undo</span><span class="btn">History</span><span class="btn pri">Export</span></div></div>
+      </div>
+    </div>
+
+    <!-- browser -->
+    <div class="ov glass win" id="ov-browser">
+      <div class="tabstrip"><span class="tab on">Hyprland - ArchWiki</span><span class="tab">GitHub</span><span class="tab">+</span><span style="flex:1"></span><span class="pill" style="margin-bottom:.35em">Shield · 14 blocked</span></div>
+      <div class="url"><span class="muted">← → ⟳</span><div>wiki.archlinux.org/title/Hyprland</div><span class="pill">Profile · <span class="js-bprofile">Coder</span></span><span class="pill accent">Kavat</span></div>
+      <div class="bw">
+        <div class="bpage">
+          <h3>Hyprland</h3>
+          <div class="sk" style="width:92%"></div><div class="sk" style="width:86%"></div><div class="sk" style="width:64%"></div>
+          <h4>Installation</h4>
+          <div class="sk" style="width:88%"></div><div class="sk" style="width:79%"></div><div class="sk" style="width:83%"></div><div class="sk" style="width:41%"></div>
+          <h4>Configuration</h4>
+          <div class="sk" style="width:90%"></div><div class="sk" style="width:72%"></div><div class="sk" style="width:85%"></div>
+        </div>
+        <div class="bside">
+          <div class="row"><b>Kavat</b><span class="muted" style="width:auto;margin-left:auto">this page</span></div>
+          <div class="msg me">summarize this page for me</div>
+          <div class="tool">⚙ browser.read_page() <span class="badge info">read</span></div>
+          <div class="msg ai">It covers installing Hyprland, starting it, and where its config lives. Want the configuration section in more detail?</div>
+          <div class="msg me">hide the tab bar while I read</div>
+          <div class="tool">⚙ browser.run("hide-tabs") <span class="badge ok">reversible</span></div>
+          <div style="margin-top:auto" class="pw glass"><span style="letter-spacing:0" class="muted">Ask about this page…</span></div>
+        </div>
+        <div class="cmd glass">
+          <div class="in"><span class="acc">:</span> hide<span class="muted">▏</span></div>
+          <div class="it on"><span>hide-tabs</span><span>Hide the tab strip</span></div>
+          <div class="it"><span>hide-sidebar</span><span>Hide the Kavat panel</span></div>
+          <div class="it"><span>hide-toolbar</span><span>Hide address bar and buttons</span></div>
+          <div class="it"><span>zen</span><span>Hide everything but the page</span></div>
+          <div class="it"><span>shield off</span><span>Allow ads on this site</span></div>
+          <div class="it"><span>theme follow-system</span><span>Match the system theme</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- kav TUI -->
+    <div class="ov glass win" id="ov-kav">
+      <div class="tui">
+        <div class="ttabs"><b class="acc">kav</b><span data-ktab="dash"><u>1</u>Dashboard</span><span data-ktab="browse"><u>2</u>Browse</span><span data-ktab="updates"><u>3</u>Updates</span><span data-ktab="aur"><u>4</u>AUR</span><span data-ktab="snaps"><u>5</u>Snapshots</span><span data-ktab="doctor"><u>6</u>Doctor</span><span data-ktab="settings"><u>7</u>Settings</span><span class="sp"></span><span class="muted">willwitcher@kavat</span></div>
+        <div class="kpage" data-k="dash"><div class="krow" style="flex:none"><div class="pane" style="flex:1"><span class="pt">Updates</span><div class="stat">44</div><div class="tl "><span class="">41 Arch · 3 [kavat]</span></div><div class="tl "><span class="muted">u  update all</span></div></div><div class="pane" style="flex:1"><span class="pt">AUR reviews</span><div class="stat">1</div><div class="tl "><span class="">spotify changed upstream</span></div><div class="tl "><span class="muted">4  open review</span></div></div><div class="pane" style="flex:1"><span class="pt">Last snapshot</span><div class="stat">#216</div><div class="tl "><span class="">today 14:20 · 10 kept</span></div><div class="tl "><span class="muted">5  open timeline</span></div></div><div class="pane" style="flex:1"><span class="pt">Installed</span><div class="stat">1,284</div><div class="tl "><span class="">143 explicit · 3 from AUR</span></div><div class="tl "><span class="muted">2  browse</span></div></div></div><div class="krow" style="flex:1"><div class="pane" style="flex:1"><span class="pt">Health</span><div class="tl "><span class="ok">✓</span><span class="" style="width:14ch;flex:none">Services</span><span class="muted">no failed units</span></div><div class="tl "><span class="warn">!</span><span class="" style="width:14ch;flex:none">Config files</span><span class="warn">2 .pacnew files to merge</span></div><div class="tl "><span class="warn">!</span><span class="" style="width:14ch;flex:none">Orphans</span><span class="warn">7 packages · 210 MB</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:14ch;flex:none">Cache</span><span class="muted">1.8 GB · keeps 2 versions</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:14ch;flex:none">Keyring</span><span class="muted">up to date</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:14ch;flex:none">Mirrors</span><span class="muted">ranked 2 days ago</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:14ch;flex:none">Disk</span><span class="muted">btrfs healthy · scrubbed 6 days ago</span></div></div><div class="pane focus" style="flex:1.3"><span class="pt">Recent activity</span><div class="tl "><span class="muted" style="width:12ch;flex:none">today 14:02</span><span class="info" style="width:8ch;flex:none">install</span><span class="">obs-studio +3 deps</span><span class="sp"></span><span class="muted">by Kavat</span><span class="acc">#215</span></div><div class="tl "><span class="muted" style="width:12ch;flex:none">Tue 09:12</span><span class="info" style="width:8ch;flex:none">update</span><span class="">38 packages</span><span class="sp"></span><span class="acc">#214</span></div><div class="tl "><span class="muted" style="width:12ch;flex:none">Mon 21:40</span><span class="info" style="width:8ch;flex:none">install</span><span class="">vesktop-bin</span><span class="warn">AUR</span><span class="sp"></span><span class="acc">#213</span></div><div class="tl "><span class="muted" style="width:12ch;flex:none">Mon 21:38</span><span class="info" style="width:8ch;flex:none">review</span><span class="">approved vesktop-bin @ 9c2e7f1</span></div><div class="tl "><span class="muted" style="width:12ch;flex:none">Sun 18:05</span><span class="info" style="width:8ch;flex:none">remove</span><span class="">7 orphans</span><span class="sp"></span><span class="acc">#212</span></div></div></div><div class="krow" style="flex:none"><div class="pane" style="flex:1"><span class="pt">Arch news</span><div class="tl "><span class="ok">✓</span><span class="">Nothing needs manual intervention since your last update</span><span class="sp"></span><span class="muted">checked today 14:20</span></div></div></div><div class="tkeys"><span><b>1-7</b>tabs</span><span><b>/</b>search</span><span><b>u</b>update all</span><span><b>↵</b>open</span><span><b>?</b>help</span><span><b>q</b>quit</span></div></div>
+        <div class="kpage" data-k="browse"><div class="krow" style="flex:1"><div class="kcol" style="flex:1"><div class="pane focus" style="flex:1"><span class="pt">Search · all sources</span><div class="tl "><span class="acc">/</span><span class="">obs<span class="muted">▏</span></span></div><div class="tl "><span class="acc">[All]</span><span class="muted">Installed</span><span class="muted">Explicit</span><span class="muted">Orphans</span><span class="muted">AUR</span></div><div class="tl "><span class=""></span></div><div class="tl "><span class="muted" style="width:28ch;flex:none">NAME</span><span class="muted" style="width:14ch;flex:none">SOURCE</span><span class="muted">STATUS</span></div><div class="tl cur "><span class="" style="width:28ch;flex:none">obs-studio</span><span class="ok" style="width:14ch;flex:none">Arch</span><span class="">installed</span></div><div class="tl "><span class="" style="width:28ch;flex:none">obsidian</span><span class="ok" style="width:14ch;flex:none">Arch</span><span class="muted">—</span></div><div class="tl "><span class="" style="width:28ch;flex:none">kavat-obs-scenes</span><span class="ok" style="width:14ch;flex:none">[kavat]</span><span class="muted">—</span></div><div class="tl "><span class="" style="width:28ch;flex:none">obs-plugin-example-git</span><span class="warn" style="width:14ch;flex:none">AUR</span><span class="bad">not on allowlist</span></div></div></div><div class="kcol" style="flex:1.2"><div class="pane" style="flex:1"><span class="pt">obs-studio</span><div class="tl "><span class="acc">[Info]</span><span class="muted">Files</span><span class="muted">Dependency tree</span><span class="muted">History</span></div><div class="tl "><span class=""></span></div><div class="tl"><span class="muted">Description</span><span class="dots"></span><span class="">Live streaming and recording software</span></div><div class="tl"><span class="muted">Source</span><span class="dots"></span><span class="ok">Arch official · extra</span></div><div class="tl"><span class="muted">Version</span><span class="dots"></span><span class="">installed is latest</span></div><div class="tl"><span class="muted">Installed</span><span class="dots"></span><span class="">today 14:02 · explicit · by Kavat</span></div><div class="tl"><span class="muted">Size</span><span class="dots"></span><span class="">34 MB download · 96 MB on disk</span></div><div class="tl"><span class="muted">License</span><span class="dots"></span><span class="">GPL-2.0-or-later</span></div><div class="tl"><span class="muted">Depends on</span><span class="dots"></span><span class="">27 packages · 3 installed for it</span></div><div class="tl"><span class="muted">Required by</span><span class="dots"></span><span class="">nothing · safe to remove</span></div><div class="tl"><span class="muted">Snapshot</span><span class="dots"></span><span class="acc">#215 taken before install</span></div></div></div></div><div class="tkeys"><span><b>/</b>search</span><span><b>i</b>install</span><span><b>r</b>remove</span><span><b>d</b>dependency tree</span><span><b>f</b>files</span><span><b>w</b>why installed</span><span><b>Tab</b>switch pane</span></div></div>
+        <div class="kpage" data-k="updates"><div class="krow" style="flex:1"><div class="pane focus" style="flex:1.2"><span class="pt">44 updates</span><div class="tl "><span class="acc">Arch official · 41</span></div><div class="tl cur "><span class="" style="width:22ch;flex:none">  linux-zen</span><span class="muted" style="width:9ch;flex:none">6.17.7</span><span class="">→</span><span class="" style="width:10ch;flex:none">6.17.8</span><span class="warn">reboot</span></div><div class="tl "><span class="" style="width:22ch;flex:none">  mesa</span><span class="muted" style="width:9ch;flex:none">25.2.6</span><span class="">→</span><span class="">25.2.7</span></div><div class="tl "><span class="" style="width:22ch;flex:none">  pipewire</span><span class="muted" style="width:9ch;flex:none">1.4.8</span><span class="">→</span><span class="">1.4.9</span></div><div class="tl "><span class="" style="width:22ch;flex:none">  hyprland</span><span class="muted">held by the kavat-hyprland pin</span></div><div class="tl "><span class="muted">  … 37 more</span></div><div class="tl "><span class=""></span></div><div class="tl "><span class="acc">[kavat] · 3</span></div><div class="tl "><span class="" style="width:22ch;flex:none">  kavat-shell</span><span class="muted" style="width:9ch;flex:none">1.4.0</span><span class="">→</span><span class="">1.4.1</span></div><div class="tl "><span class="" style="width:22ch;flex:none">  kavat-browser</span><span class="muted" style="width:9ch;flex:none">142.0-2</span><span class="">→</span><span class="">142.0-3</span></div><div class="tl "><span class="" style="width:22ch;flex:none">  kavat-theme</span><span class="muted" style="width:9ch;flex:none">0.9.2</span><span class="">→</span><span class="">0.9.3</span></div><div class="tl "><span class=""></span></div><div class="tl "><span class="warn">AUR · 1 held</span></div><div class="tl "><span class="" style="width:22ch;flex:none">  spotify</span><span class="warn">PKGBUILD changed · review first</span></div></div><div class="kcol" style="flex:1"><div class="pane" style="flex:none"><span class="pt">This update</span><div class="tl"><span class="muted">Download</span><span class="dots"></span><span class="">412 MB</span></div><div class="tl"><span class="muted">Disk</span><span class="dots"></span><span class="">+38 MB</span></div><div class="tl"><span class="muted">Snapshot</span><span class="dots"></span><span class="acc">#217 is taken first</span></div><div class="tl"><span class="muted">Reboot</span><span class="dots"></span><span class="warn">recommended · new kernel</span></div><div class="tl"><span class="muted">Arch news</span><span class="dots"></span><span class="ok">nothing needs manual intervention</span></div></div><div class="pane" style="flex:1"><span class="pt">linux-zen</span><div class="tl"><span class="muted">Source</span><span class="dots"></span><span class="ok">Arch official · extra</span></div><div class="tl"><span class="muted">Also kept</span><span class="dots"></span><span class="">linux-lts as fallback kernel</span></div><div class="tl "><span class=""></span></div><div class="tl "><span class="muted">Official packages update together: Arch does not</span></div><div class="tl "><span class="muted">support partial upgrades, so there is no per-package pick.</span></div></div></div></div><div class="tkeys"><span><b>u</b>update all</span><span><b>h</b>hold an AUR package</span><span><b>n</b>read Arch news</span><span><b>↵</b>details</span><span><b>4</b>go to AUR review</span></div></div>
+        <div class="kpage" data-k="aur"><div class="krow" style="flex:1"><div class="pane focus" style="flex:.9"><span class="pt">Allowlist</span><div class="tl "><span class="ok">✓</span><span class="" style="width:26ch;flex:none">visual-studio-code-bin</span><span class="muted" style="width:9ch;flex:none">3f9c2ab</span><span class="muted">reviewed 2026-11-11</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:26ch;flex:none">vesktop-bin</span><span class="muted" style="width:9ch;flex:none">9c2e7f1</span><span class="muted">reviewed 2026-11-09</span></div><div class="tl cur "><span class="warn">!</span><span class="" style="width:26ch;flex:none">spotify</span><span class="" style="width:9ch;flex:none">a81d04e</span><span class="">upstream changed</span></div><div class="tl "><span class=""></span></div><div class="tl "><span class="acc">Requests</span></div><div class="tl "><span class="info">?</span><span class="" style="width:26ch;flex:none">random-package-git</span><span class="muted">requested today</span></div></div><div class="kcol" style="flex:1.5"><div class="pane" style="flex:1.4"><span class="pt">Review spotify · a81d04e → 5be9c11</span><div class="tl "><span class="muted">  pkgname=spotify</span></div><div class="tl "><span class="bad">- pkgver=1.2.45</span></div><div class="tl "><span class="ok">+ pkgver=1.2.47</span></div><div class="tl "><span class="bad">- sha256sums=('9f2c…')</span></div><div class="tl "><span class="ok">+ sha256sums=('c41a…')</span></div><div class="tl flag"><span class="ok">+ source+=("https://cdn-example.net/post.sh")</span><span class="sp"></span><span class="warn">⚠ new download domain</span></div><div class="tl flag"><span class="ok">+ install=spotify.install</span><span class="sp"></span><span class="warn">⚠ new install script, runs as root</span></div><div class="tl "><span class="muted">  package() {</span></div></div><div class="pane" style="flex:none"><span class="pt">Kavat summary</span><div class="tl "><span class="">Version bump, plus a new script fetched from a domain not seen before.</span></div><div class="tl "><span class="muted">Read both flagged lines before approving. Kavat cannot approve for you.</span></div></div></div></div><div class="tkeys"><span><b>a</b>approve and pin</span><span><b>x</b>reject</span><span><b>o</b>full PKGBUILD</span><span><b>k</b>ask Kavat</span><span><b>+</b>request a package</span></div></div>
+        <div class="kpage" data-k="snaps"><div class="krow" style="flex:1"><div class="pane focus" style="flex:1.2"><span class="pt">Timeline</span><div class="tl "><span class="acc" style="width:6ch;flex:none">#216</span><span class="muted" style="width:13ch;flex:none">today 14:20</span><span class="" style="width:30ch;flex:none">before update</span><span class="ok">bootable</span></div><div class="tl cur "><span class="" style="width:6ch;flex:none">#215</span><span class="" style="width:13ch;flex:none">today 14:02</span><span class="" style="width:30ch;flex:none">before install obs-studio</span><span class="">bootable</span></div><div class="tl "><span class="acc" style="width:6ch;flex:none">#214</span><span class="muted" style="width:13ch;flex:none">Tue 09:12</span><span class="" style="width:30ch;flex:none">before update · 38 packages</span><span class="ok">bootable</span></div><div class="tl "><span class="acc" style="width:6ch;flex:none">#213</span><span class="muted" style="width:13ch;flex:none">Mon 21:40</span><span class="" style="width:30ch;flex:none">before install vesktop-bin</span><span class="ok">bootable</span></div><div class="tl "><span class="acc" style="width:6ch;flex:none">#212</span><span class="muted" style="width:13ch;flex:none">Sun 18:05</span><span class="" style="width:30ch;flex:none">before removing 7 orphans</span><span class="ok">bootable</span></div><div class="tl "><span class="acc" style="width:6ch;flex:none">#210</span><span class="muted" style="width:13ch;flex:none">Nov 02</span><span class="" style="width:30ch;flex:none">“fresh install”</span><span class="info">pinned</span></div></div><div class="kcol" style="flex:1"><div class="pane" style="flex:1"><span class="pt">#215 compared with now</span><div class="tl "><span class="ok">+ obs-studio</span></div><div class="tl "><span class="ok">+ 3 dependencies</span></div><div class="tl "><span class="muted">  0 removed · 0 config files changed</span></div><div class="tl "><span class=""></span></div><div class="tl"><span class="muted">Space</span><span class="dots"></span><span class="">212 MB only in this snapshot</span></div><div class="tl"><span class="muted">Covers</span><span class="dots"></span><span class="">system only · /home untouched</span></div></div><div class="pane" style="flex:none"><span class="pt">Keep</span><div class="tl"><span class="muted">Bootable</span><span class="dots"></span><span class="">last 10</span></div><div class="tl"><span class="muted">Pinned</span><span class="dots"></span><span class="">kept forever</span></div><div class="tl"><span class="muted">Total</span><span class="dots"></span><span class="">4.1 GB</span></div></div></div></div><div class="tkeys"><span><b>r</b>roll back to this</span><span><b>b</b>boot into it once</span><span><b>d</b>diff</span><span><b>p</b>pin</span><span><b>x</b>delete</span></div></div>
+        <div class="kpage" data-k="doctor"><div class="krow" style="flex:1"><div class="pane focus" style="flex:1"><span class="pt">Checks</span><div class="tl "><span class="ok">✓</span><span class="" style="width:16ch;flex:none">Services</span><span class="muted">no failed units</span></div><div class="tl cur "><span class="warn">!</span><span class="" style="width:16ch;flex:none">Config files</span><span class="">2 .pacnew files to merge</span><span class="sp"></span><span class="">f merge</span></div><div class="tl "><span class="warn">!</span><span class="" style="width:16ch;flex:none">Orphans</span><span class="warn">7 packages · 210 MB</span><span class="sp"></span><span class="muted">f remove</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:16ch;flex:none">Cache</span><span class="muted">1.8 GB · keeps 2 versions</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:16ch;flex:none">Keyring</span><span class="muted">up to date</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:16ch;flex:none">Mirrors</span><span class="muted">ranked 2 days ago</span><span class="sp"></span><span class="muted">f rank now</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:16ch;flex:none">Snapshots</span><span class="muted">10 kept · 4.1 GB</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:16ch;flex:none">Requirements</span><span class="muted">everything Settings and skills need is installed</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:16ch;flex:none">Secure Boot</span><span class="muted">keys enrolled</span></div><div class="tl "><span class="ok">✓</span><span class="" style="width:16ch;flex:none">Disk</span><span class="muted">btrfs healthy · scrubbed 6 days ago</span></div></div><div class="pane" style="flex:1.2"><span class="pt">/etc/pacman.conf · yours vs .pacnew</span><div class="tl "><span class="muted">  [options]</span></div><div class="tl "><span class="muted">  Color</span></div><div class="tl "><span class="bad">- ParallelDownloads = 5</span><span class="sp"></span><span class="muted">yours</span></div><div class="tl "><span class="ok">+ #ParallelDownloads = 5</span><span class="sp"></span><span class="muted">new default</span></div><div class="tl "><span class="ok">+ DownloadUser = alpm</span><span class="sp"></span><span class="muted">new option</span></div><div class="tl "><span class=""></span></div><div class="tl "><span class="acc">Suggested: keep your value, take the new option.</span></div></div></div><div class="tkeys"><span><b>f</b>fix selected</span><span><b>m</b>keep mine</span><span><b>n</b>take new</span><span><b>e</b>merge by hand</span><span><b>a</b>fix everything safe</span></div></div>
+        <div class="kpage" data-k="settings"><div class="krow" style="flex:1"><div class="kcol" style="flex:1"><div class="pane" style="flex:none"><span class="pt">General</span><div class="tl"><span class="muted">Confirm before changes</span><span class="dots"></span><span class="">yes</span></div><div class="tl"><span class="muted">Colors</span><span class="dots"></span><span class="">follow system theme</span></div><div class="tl"><span class="muted">Mouse</span><span class="dots"></span><span class="">on</span></div><div class="tl"><span class="muted">Keys</span><span class="dots"></span><span class="">arrows + vim</span></div></div><div class="pane" style="flex:none"><span class="pt">Mirrors and downloads</span><div class="tl"><span class="muted">Mirrors</span><span class="dots"></span><span class="">auto · ranked weekly</span></div><div class="tl"><span class="muted">Parallel downloads</span><span class="dots"></span><span class="">5</span></div><div class="tl"><span class="muted">Cache</span><span class="dots"></span><span class="">keep 2 versions · clean weekly</span></div></div><div class="pane" style="flex:none"><span class="pt">Updates</span><div class="tl"><span class="muted">Check</span><span class="dots"></span><span class="">daily</span></div><div class="tl"><span class="muted">Notify</span><span class="dots"></span><span class="">in the bar</span></div><div class="tl"><span class="muted">Read Arch news first</span><span class="dots"></span><span class="muted">always · locked</span></div><div class="tl"><span class="muted">Hyprland</span><span class="dots"></span><span class="">pinned by kavat-hyprland</span></div></div></div><div class="kcol" style="flex:1"><div class="pane focus" style="flex:none"><span class="pt">AUR</span><div class="tl"><span class="muted">Source</span><span class="dots"></span><span class="muted">allowlist only · locked</span></div><div class="tl"><span class="muted">Build</span><span class="dots"></span><span class="muted">clean chroot · locked</span></div><div class="tl"><span class="muted">Review</span><span class="dots"></span><span class="muted">every PKGBUILD change · locked</span></div><div class="tl"><span class="muted">Build jobs</span><span class="dots"></span><span class="">all cores</span></div><div class="tl"><span class="muted">Build logs</span><span class="dots"></span><span class="">keep 30 days</span></div></div><div class="pane" style="flex:none"><span class="pt">Snapshots</span><div class="tl"><span class="muted">Before every change</span><span class="dots"></span><span class="muted">always · locked</span></div><div class="tl"><span class="muted">Keep bootable</span><span class="dots"></span><span class="">last 10</span></div><div class="tl"><span class="muted">Pinned</span><span class="dots"></span><span class="">kept forever</span></div><div class="tl"><span class="muted">Clean older than</span><span class="dots"></span><span class="">30 days</span></div></div><div class="pane" style="flex:none"><span class="pt">Kavat</span><div class="tl"><span class="muted">Search and explain</span><span class="dots"></span><span class="">allowed</span></div><div class="tl"><span class="muted">Install and remove</span><span class="dots"></span><span class="">asks first</span></div><div class="tl"><span class="muted">Summarize AUR diffs</span><span class="dots"></span><span class="">allowed</span></div><div class="tl"><span class="muted">Approve AUR packages</span><span class="dots"></span><span class="muted">never · locked</span></div></div></div></div><div class="tkeys"><span><b>↵</b>change</span><span><b>Space</b>toggle</span><span><b>e</b>open settings.toml</span><span><b>R</b>reset this section</span><span><b>Tab</b>next section</span></div></div>
+      </div>
+      <div class="status"><span class="mode">kav</span><span>~</span><span class="sp"></span><span class="muted">zsh · kitty</span></div>
+    </div>
+
+    <!-- editor: nvim + marketplace -->
+    <div class="ov glass win" id="ov-editor">
+      <div class="bufs"><span class="on">resolve.rs</span><span>allowlist.rs</span><span>main.rs</span></div>
+      <div class="ed">
+        <div class="etree"><b>EXPLORER</b><span>▾ kav</span><span>  ▾ src</span><span class="on">      resolve.rs</span><span>      allowlist.rs</span><span>      main.rs</span><span>  ▸ tests</span><span>    Cargo.toml</span><span>    README.md</span></div>
+        <div class="code"><span class="ln">9</span><span class="acc">pub fn</span> <span class="ok">resolve</span>(pkg: &amp;<span class="info">str</span>) -&gt; <span class="info">Source</span> {
+<span class="ln">10</span>    <span class="acc">if</span> repos::<span class="ok">official</span>(pkg) { <span class="acc">return</span> Source::Arch; }
+<span class="ln">11</span>    <span class="acc">if</span> repos::<span class="ok">kavat</span>(pkg)    { <span class="acc">return</span> Source::Kavat; }
+<span class="ln">12</span>    <span class="acc">match</span> allowlist::<span class="ok">get</span>(pkg) {
+<span class="ln">13</span>        <span class="info">Some</span>(e) =&gt; Source::Aur { commit: e.commit },
+<span class="ln">14</span>        <span class="info">None</span>    =&gt; Source::Rejected,
+<span class="ln">15</span>    }
+<span class="ln">16</span>}</div>
+        <div class="mk glass">
+          <div class="mkh"><b class="acc">Marketplace</b><div class="mks"><span class="acc">/</span> git<span class="muted">▏</span></div><span class="muted">verified first · community index from store.nvim</span></div>
+          <div class="mkb">
+            <div><div class="mc"><span>Featured</span><span class="sp"></span><span class="muted"></span></div><div class="mc"><span>Language packs</span><span class="sp"></span><span class="muted"></span></div><div class="mc"><span>Completion</span><span class="sp"></span><span class="muted"></span></div><div class="mc on"><span>Git</span><span class="sp"></span><span class="muted">7</span></div><div class="mc"><span>Files &amp; search</span><span class="sp"></span><span class="muted"></span></div><div class="mc"><span>Editing</span><span class="sp"></span><span class="muted"></span></div><div class="mc"><span>Interface</span><span class="sp"></span><span class="muted"></span></div><div class="mc"><span>Debug &amp; test</span><span class="sp"></span><span class="muted"></span></div><div class="mc"><span>Notes &amp; markdown</span><span class="sp"></span><span class="muted"></span></div><div class="mc"><span class="muted">────────────</span></div><div class="mc"><span>Installed</span><span class="sp"></span><span class="muted">23</span></div><div class="mc"><span>Updates</span><span class="sp"></span><span class="muted">2</span></div></div>
+            <div><div class="mp"><div class="l1"><span>gitsigns.nvim</span><span class="sp"></span><span class="muted">installed</span><span class="ok">✓ Verified</span></div><span class="muted">Git changes in the gutter, blame and hunks</span></div><div class="mp"><div class="l1"><span>neogit</span><span class="sp"></span><span class="muted">installed</span><span class="ok">✓ Verified</span></div><span class="muted">A full Git interface inside the editor</span></div><div class="mp"><div class="l1"><span>diffview.nvim</span><span class="sp"></span><span class="muted">installed</span><span class="ok">✓ Verified</span></div><span class="muted">Side-by-side diffs and file history</span></div><div class="mp cur"><div class="l1"><span>lazygit.nvim</span><span class="sp"></span><span class="ok">✓ Verified</span></div><span class="muted">Open Lazygit in a floating window</span></div><div class="mp"><div class="l1"><span>git-conflict.nvim</span><span class="sp"></span><span class="ok">✓ Verified</span></div><span class="muted">Resolve merge conflicts with one key</span></div><div class="mp"><div class="l1"><span>gitlinker.nvim</span><span class="sp"></span><span class="muted">Community</span></div><span class="muted">Copy a link to the current line on GitHub</span></div><div class="mp"><div class="l1"><span>octo.nvim</span><span class="sp"></span><span class="muted">Community</span></div><span class="muted">Review pull requests and issues</span></div></div>
+            <div class="mprev"><div class="l1" style="display:flex;align-items:center;gap:.8em"><b style="font-size:1.25em">lazygit.nvim</b><span class="badge ok">Verified</span></div><span class="muted mono">kdheepak/lazygit.nvim</span><span>Open Lazygit in a floating window without leaving the editor.</span><div class="sec" style="margin:.6em 0 0">Preset included</div><div class="lst"><div class="li"><span class="keys"><span class="kbd">Ctrl</span><span class="kbd">Shift</span><span class="kbd">G</span></span><span class="sp"></span><span class="muted">open Lazygit</span></div><div class="li"><span class="keys"><span class="kbd">&lt;leader&gt;gg</span></span><span class="sp"></span><span class="muted">same, in normal mode</span></div><div class="li"><span>Colors</span><span class="sp"></span><span class="muted">follow the system theme</span></div></div><div class="sec" style="margin:.6em 0 0">Needs</div><div class="lst"><div class="li"><span class="mono">lazygit</span><span class="sp"></span><span class="ok">Arch official · kav installs it</span></div></div><span class="muted" style="font-size:.88em">Pinned to commit 4f1c9e2 · reviewed 2026-11-08</span><div class="btns" style="margin-top:auto"><span class="btn pri">Install</span><span class="btn">README</span><span class="btn">Repository</span></div></div>
+          </div>
+          <div class="tkeys mkf"><span><b>/</b>search</span><span><b>↵</b>install</span><span><b>Space</b>preview</span><span><b>Tab</b>switch pane</span><span><b>u</b>update</span><span><b>x</b>remove</span><span><b>Esc</b>close</span></div>
+        </div>
+      </div>
+      <div class="status"><span class="mode">INSERT</span><span>main</span><span>0 errors</span><span class="sp"></span><span class="muted">Keymap: VS Code</span><span class="muted">Spaces: 4</span><span class="muted">rust</span><span>Ln 12, Col 5</span></div>
+    </div>
+
+  </section>
+
+  <!-- ============ INSTALLER ============ -->
+  <section class="scene" id="install">
+    <div class="bar glass">
+      <div class="grp"><svg class="logo" viewBox="0 0 100 100" fill="currentColor"><path d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/></svg><span class="muted">Live session · Installer</span></div>
+      <div class="grp"><b class="js-time">21:47</b></div>
+      <div class="grp"><span class="pill">No network · offline install</span><span class="pill">English ▾</span></div>
+    </div>
+    <div class="glass" id="cal">
+      <div class="side">
+        <div class="brand"><svg class="logo" viewBox="0 0 100 100" fill="currentColor"><path d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/></svg><div>Willwitcher-OS<small>Kavat Edition</small></div></div>
+        <div class="step done"><i>✓</i>Welcome</div>
+        <div class="step done"><i>✓</i>Disk</div>
+        <div class="step done"><i>✓</i>User</div>
+        <div class="step done"><i>✓</i>Hardware</div>
+        <div class="step done"><i>✓</i>Profile</div>
+        <div class="step on"><i>6</i>Appearance</div>
+        <div class="step"><i>7</i>Install</div>
+      </div>
+      <div class="main">
+        <h2>Appearance</h2>
+        <p>Your choice is applied to the login screen, the boot splash and the desktop from the very first start.</p>
+        <div class="two">
+          <div>
+            <div><div class="sec">Palette</div><div class="cards js-cards"></div></div>
+            <div><div class="sec">Mode</div><div class="seg js-mode"><button data-mode="light">Light</button><button data-mode="dark">Dark</button><button data-mode="auto">Auto</button></div></div>
+            <div><div class="sec">Accent</div><div class="sw js-acc"></div></div>
+          </div>
+          <div><div class="sec">Preview</div><div class="mini"><div class="b"></div><div class="w w1"></div><div class="w w2"></div><div class="w w3"></div></div></div>
+        </div>
+        <div class="foot"><span class="muted" style="font-size:.9em">Step 6 of 7 · change it any time with <span class="mono">Super+T</span></span><div class="btns" style="margin:0"><span class="btn">Back</span><span class="btn pri">Next</span></div></div>
+      </div>
+    </div>
+  </section>
+</div></div>
+
+<script>
+const P = {
+  kavat:{n:'Kavat',d:['#0d0f14','#151821','#1e2230','#e8e6df','#8b90a0','#2a2f3f'],l:['#ece8de','#fbf9f4','#e6e0d2','#1d1f26','#646873','#d2cbba'],a:['#f2a93b','#3ecfb2','#9d7bff','#ff6b8a','#a6d94a']},
+  catppuccin:{n:'Catppuccin',d:['#11111b','#1e1e2e','#313244','#cdd6f4','#a6adc8','#45475a'],l:['#dce0e8','#eff1f5','#ccd0da','#4c4f69','#6c6f85','#bcc0cc'],a:['#89b4fa','#cba6f7','#a6e3a1','#fab387','#f5c2e7']},
+  gruvbox:{n:'Gruvbox',d:['#1d2021','#282828','#3c3836','#ebdbb2','#a89984','#504945'],l:['#f2e5bc','#fbf1c7','#ebdbb2','#3c3836','#7c6f64','#d5c4a1'],a:['#fabd2f','#fe8019','#b8bb26','#83a598','#d3869b']},
+  tokyo:{n:'Tokyo Night',d:['#16161e','#1a1b26','#292e42','#c0caf5','#7982a9','#3b4261'],l:['#d0d5e3','#e1e2e7','#c4c8da','#343b58','#6172b0','#a8aecb'],a:['#7aa2f7','#bb9af7','#7dcfff','#9ece6a','#ff9e64']},
+  nord:{n:'Nord',d:['#242933','#2e3440','#3b4252','#eceff4','#a3adc2','#4c566a'],l:['#d8dee9','#eceff4','#dfe4ee','#2e3440','#5c677d','#c2cad9'],a:['#88c0d0','#81a1c1','#a3be8c','#ebcb8b','#b48ead']},
+  rose:{n:'Rosé Pine',d:['#191724','#1f1d2e','#26233a','#e0def4','#908caa','#403d52'],l:['#ede3d9','#faf4ed','#f2e9e1','#575279','#797593','#dfdad9'],a:['#ebbcba','#c4a7e7','#9ccfd8','#f6c177','#eb6f92']},
+  everforest:{n:'Everforest',d:['#232a2e','#2d353b','#3d484d','#d3c6aa','#9da9a0','#475258'],l:['#efebd4','#fdf6e3','#e6e2cc','#5c6a72','#829181','#d5d0b8'],a:['#a7c080','#7fbbb3','#dbbc7f','#e69875','#d699b6']},
+};
+const S = {wall:'theme',bare:false,ktab:'dash',spage:'windows',sys:'coder',scene:'desk',pal:'kavat',mode:'dark',acc:0,rad:.9,gap:.7,blur:true,oled:false};
+location.hash.slice(1).split('&').forEach(kv=>{const [k,v]=kv.split('=');if(k in S)S[k]=isNaN(v)?(v==='true'?true:v==='false'?false:v):+v});
+
+const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
+const root=document.documentElement, screen_=$('#screen');
+const eff=()=>S.mode==='auto'?((h=>h>=7&&h<19)(new Date().getHours())?'light':'dark'):S.mode;
+
+function apply(){
+  const m=eff(), p=P[S.pal], c=[...(m==='dark'?p.d:p.l)];
+  if(S.oled&&m==='dark'){c[0]='#000000';c[1]='#0a0a0c'}
+  ['--bg','--surface','--surface2','--text','--muted','--border'].forEach((k,i)=>root.style.setProperty(k,c[i]));
+  root.style.setProperty('--accent',p.a[S.acc]);
+  root.style.setProperty('--r',S.rad+'em');root.style.setProperty('--gap',S.gap+'em');
+  root.style.setProperty('--blur',S.blur?'18px':'0px');root.style.setProperty('--alpha',S.blur?'86%':'100%');
+  root.dataset.mode=m;
+
+  const ov={agent:'agent',themes:'themes',kav:'kav',browser:'browser',settings:'settings',editor:'editor'}[S.scene]||'';
+  screen_.dataset.ov=ov;
+  const sc=S.scene==='login'?'login':S.scene==='install'?'install':'desk';
+  $$('.scene').forEach(s=>s.classList.toggle('on',s.id===sc));
+  $$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.scene===S.scene));
+  $$('[data-mode]').forEach(b=>b.classList.toggle('on',b.dataset.mode===S.mode));
+  $('#selPal').value=S.pal;
+
+  $$('.js-cards').forEach(el=>el.innerHTML=Object.entries(P).map(([k,q])=>{const v=m==='dark'?q.d:q.l;
+    return `<button class="card ${k===S.pal?'on':''}" data-pal="${k}"><span class="pv" style="background:${v[0]}"><i style="left:8%;top:14%;width:50%;bottom:14%;background:${v[1]};border:1px solid ${q.a[0]}"></i><i style="right:8%;top:14%;width:28%;height:30%;background:${v[2]}"></i><i style="right:8%;bottom:14%;width:28%;height:30%;background:${q.a[0]}"></i></span><small>${q.n}</small></button>`}).join('')
+    +`<button class="card"><span class="pv" style="background:conic-gradient(from 40deg,#f2a93b,#ff6b8a,#9d7bff,#3ecfb2,#f2a93b)"></span><small>From wallpaper</small></button>`);
+  $$('.js-acc').forEach(el=>el.innerHTML=p.a.map((a,i)=>`<button class="${i===S.acc?'on':''}" data-acc="${i}" style="background:${a}"></button>`).join(''));
+  screen_.dataset.sys=S.sys;
+  $$('[data-sys]').forEach(b=>b.classList.toggle('on',b.dataset.sys===S.sys));
+  const g=S.sys==='gamer', inc=S.sys==='incog';
+  $$('.js-agentpill').forEach(e=>{e.textContent=g?'Kavat off':inc?'Kavat · no history':'Kavat';e.classList.toggle('off',g);e.classList.toggle('accent',!g)});
+  $$('.js-ram').forEach(e=>e.textContent=g?'RAM 3.1 GB':'RAM 9.2 GB');
+  $$('.js-agentline').forEach(e=>e.innerHTML=g?'<span class="muted">○ off · gamer mode</span>':inc?'<span class="ok">●</span> local · no history':'<span class="ok">●</span> local · idle');
+  $$('.js-bprofile').forEach(e=>e.textContent=inc?'Incognito':g?'Gamer':'Coder');
+  $$('.js-btitle').forEach(e=>e.textContent=inc?'Kavat Browser · Incognito':'Kavat Browser');
+  $$('.js-agstatus').forEach(e=>e.textContent=inc?'local · VPN · history off':'local · offline · 3.6 GB');
+  ['theme','dunes','mesh','aurora','ember'].forEach(w=>screen_.classList.toggle('w-'+w,S.wall===w));
+  screen_.dataset.still=(S.scene==='login');document.body.classList.toggle('bare',!!S.bare);
+  $$('[data-wall]').forEach(b=>b.classList.toggle('on',b.dataset.wall===S.wall));
+  const live=['aurora','ember'].includes(S.wall);
+  $$('.js-wallstate').forEach(e=>e.textContent=!live?'still image':g?'paused by Gamer mode':'playing, muted');
+  $$('[data-ktab]').forEach(b=>b.classList.toggle('on',b.dataset.ktab===S.ktab));
+  $$('.kpage').forEach(x=>x.classList.toggle('on',x.dataset.k===S.ktab));
+  $$('[data-spage]').forEach(b=>b.classList.toggle('on',b.dataset.spage===S.spage));
+  $$('.spage').forEach(x=>x.classList.toggle('on',x.dataset.page===S.spage));
+  $$('[data-bind]').forEach(e=>e.value=S[e.dataset.bind]);$$('[data-tog]').forEach(e=>e.classList.toggle('on',S[e.dataset.tog]));
+  $('#rRad').value=S.rad;$('#rGap').value=S.gap;
+  $('#tBlur').classList.toggle('on',S.blur);$('#tOled').classList.toggle('on',S.oled);
+  $$('.js-theme').forEach(e=>e.textContent=`${p.n} · ${m==='dark'?'dark':'light'}`);
+  $$('.js-title').forEach(e=>e.textContent={agent:'Kavat',themes:'Appearance',kav:'kitty — kav',browser:'Kavat Browser',settings:'Settings'}[S.scene]||'kitty — nvim kav/src/resolve.rs');
+}
+function tick(){const d=new Date();
+  $$('.js-time').forEach(e=>e.textContent=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
+  $$('.js-date').forEach(e=>e.textContent=d.toLocaleDateString('en-US',{weekday:'long',day:'numeric',month:'long'}));
+  $$('.js-dshort').forEach(e=>e.textContent=d.toLocaleDateString('en-US',{weekday:'short',day:'numeric',month:'short'}));}
+
+$('#selPal').innerHTML=Object.entries(P).map(([k,q])=>`<option value="${k}">${q.n}</option>`).join('');
+$('#selPal').onchange=e=>{S.pal=e.target.value;S.acc=0;apply()};
+$('#rRad').oninput=e=>{S.rad=+e.target.value;apply()};
+$('#rGap').oninput=e=>{S.gap=+e.target.value;apply()};
+document.addEventListener('input',e=>{const b=e.target.dataset&&e.target.dataset.bind;if(b){S[b]=+e.target.value;apply()}});
+document.addEventListener('click',e=>{
+  const tg=e.target.closest('[data-tog]');if(tg){S[tg.dataset.tog]=!S[tg.dataset.tog];apply();return}
+  const ac=e.target.closest('[data-act]');if(ac){const a=ac.dataset.act;
+    if(a==='browser'||a==='editor'||a==='settings')S.scene=a;
+    else if(a==='skills'){S.scene='settings';S.spage='skills'}
+    else if(a==='update'){S.scene='kav';S.ktab='updates'}
+    else if(a==='gamer')S.sys=S.sys==='gamer'?'coder':'gamer';
+    else if(a==='stream')S.sys='gamer';
+    else if(a==='mode')S.mode=eff()==='dark'?'light':'dark';
+    else if(a==='wall'){const w=['theme','dunes','mesh','aurora','ember'];S.wall=w[(w.indexOf(S.wall)+1)%w.length]}
+    apply();return}
+  const lt=e.target.closest('.tog:not([data-tog]):not([id]):not(.lock)');if(lt){lt.classList.toggle('on');return}
+  const sb=e.target.closest('.seg.local button');if(sb){[...sb.parentNode.children].forEach(x=>x.classList.toggle('on',x===sb));return}
+  const t=e.target.closest('[data-wall],[data-ktab],[data-spage],[data-sys],[data-scene],[data-mode],[data-pal],[data-acc],#tBlur,#tOled');if(!t)return;
+  if(t.dataset.wall)S.wall=t.dataset.wall;
+  else if(t.dataset.ktab)S.ktab=t.dataset.ktab;
+  else if(t.dataset.spage)S.spage=t.dataset.spage;
+  else if(t.dataset.sys)S.sys=t.dataset.sys;
+  else if(t.dataset.scene)S.scene=t.dataset.scene;
+  else if(t.dataset.mode)S.mode=t.dataset.mode;
+  else if(t.dataset.pal){S.pal=t.dataset.pal;S.acc=0}
+  else if(t.dataset.acc)S.acc=+t.dataset.acc;
+  else if(t.id==='tBlur')S.blur=!S.blur;
+  else if(t.id==='tOled')S.oled=!S.oled;
+  apply();
+});
+tick();setInterval(tick,20000);apply();
+</script>
+</body>
+</html>
