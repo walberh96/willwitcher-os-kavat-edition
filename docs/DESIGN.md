@@ -425,7 +425,7 @@ Tres reglas de la TUI:
 
 Un tema es un archivo de tokens y el sistema genera la configuración de cada app desde plantillas, así que modo, paleta y acento se cambian por separado y en vivo.
 
-La diferencia con omarchy: allí un tema es una carpeta con un archivo de configuración por app, y claro u oscuro es otro tema distinto. Aquí la apariencia tiene ejes independientes que se combinan:
+La diferencia con Omarchy: allí un tema es un archivo de colores más plantillas, como aquí, pero cada tema es una sola variante, sin par claro y oscuro. Aquí la apariencia tiene ejes independientes que se combinan:
 
 | Eje | Valores | Ejemplo |
 | --- | --- | --- |
@@ -633,9 +633,55 @@ La fase 1 usa Hyprland y Noctalia tal como vienen; los forks y la identidad entr
 
 **Nombre.** «Kavat» viene de un videojuego. Mientras el sistema sea solo para ti no importa; si algún día se publica, hay que revisarlo.
 
+## Decisiones en revisión
+
+El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. Ninguna está cambiada todavía: cada una espera tu decisión. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
+
+| # | Decisión que toca | Qué se encontró | Opciones |
+| --- | --- | --- | --- |
+| 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt. El fork se queda sin upstream del que tomar parches | Mantener nosotros la v4 congelada; pasar a Noctalia v5 y dejar Quickshell; o partir de otro shell vivo en Quickshell (Dux Shell, Caelestia, illogical-impulse o el de Omarchy) |
+| 2 | Configuración de Hyprland en archivos que el panel edita línea a línea | Desde Hyprland 0.55 la configuración es Lua y el formato anterior está obsoleto | Tratar la de Hyprland como archivo de código: el panel escribe una tabla de valores que el Lua del sistema carga, y nunca genera Lua a partir de texto ajeno |
+| 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2, lo que tensa «cada snapshot con su kernel» en discos cifrados | Convertir la reinscripción en un paso guiado de `kav update`, y decidir en la fase 2 dónde vive el kernel de cada snapshot |
+| 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca; las propias no valdrían. Es fuente secundaria y aún no está desplegado | Aceptar que los juegos que migren a EAC v2 no funcionen; o prever una entrada de arranque con un kernel firmado por un tercero reconocido, sin confirmar que sea viable |
+| 5 | Modo seguro automático tras un arranque fallido | GRUB no cuenta arranques fallidos por sí solo; ese mecanismo es de systemd-boot | Mantener GRUB y construirlo como openSUSE: un archivo con la última instantánea buena y una comprobación de salud al arrancar. Un kernel que no llega a arrancar no lo detectaría |
+| 6 | `kav review` marca lo sospechoso por patrones de texto | Dos oleadas de malware en el AUR en 2026 (más de 1.500 paquetes en junio) burlaron justo ese tipo de detección. La allowlist fijada a commit sí las habría parado | Añadir señales que no dependen del texto: cambio de mantenedor, fecha del último cambio, dependencias nuevas de npm, bun o pip, y compilar sin red |
+| 7 | Snapshots de `/home` cada hora | Omarchy los retiró en su versión 3.6 por uso de disco y por el coste de CPU de las cuotas de Btrfs | Mantenerlos sin cuotas, con menos retención y dejando fuera los juegos de Steam, los prefijos de Wine, las cachés de shaders y los modelos del agente |
+| 8 | Perfiles de sandbox para el navegador | secureblue advierte de que envolver Chromium en un segundo sandbox puede chocar con el suyo y restar seguridad | Diseñar el perfil comprobando que no degrada el sandbox de Chromium; para las apps Electron, usarlas como apps web |
+
+Dos ajustes menores, también pendientes: Proton recomienda WireGuard y deja OpenVPN para equipos antiguos; y según CachyOS, poner la CPU en máximo rendimiento en modo Gamer no ayuda en todos los equipos.
+
+## Ideas por evaluar
+
+El informe cataloga 54 ideas nuevas, 36 refinamientos y 17 cosas que no copiar, cada una con un código para aprobarla o descartarla. Estas 20 son las que el informe recomienda aprobar primero; el resto se elige por código en el informe. El coste es una estimación del informe, no un dato de las fuentes.
+
+| Código | Idea | De dónde viene | Coste |
+| --- | --- | --- | --- |
+| A1 | Migraciones del estado de usuario: scripts que corren una sola vez después de cada actualización, con su estado guardado dentro de la raíz | Omarchy | Semanas |
+| A2 | Intervenciones manuales de Arch convertidas en pasos guiados de `kav update` | Garuda, EndeavourOS | Semanas |
+| A8 | Dos guardas de transacción: apartar archivos sin dueño que chocan con un paquete, y pausar la recarga de Hyprland mientras pacman cambia su configuración | Omarchy | Días |
+| R10 | Comprobación de salud con memoria de la última instantánea buena y respuesta escalonada | openSUSE | Semanas |
+| B1 | Snapshot base permanente tomado por el instalador, para volver al estado de fábrica | Omarchy, CachyOS | Días |
+| B4 | Reiniciar un subsistema (Wi-Fi, Bluetooth, audio) antes que el equipo, como skills | Omarchy | Días |
+| C4 | Apps web como aplicaciones de primera clase, cada una con su perfil | Omarchy, Zorin OS | Días |
+| C5 | Programas de terminal como aplicaciones de primera clase, con reglas de ventana propias | Omarchy | Días |
+| D1 | Disposición desplazable por espacio o por proyecto, manejada con flechas | niri; integrada en Hyprland | Días |
+| D6 | Diálogo de contraseña que oscurece la pantalla, bloquea el foco y dice qué se autoriza | elementary OS, Omarchy | Días a semanas |
+| D9 | Copiar el código de verificación desde la notificación, sin guardarlo en el historial | Omarchy | Días |
+| D10 | Cada app en su propio ámbito de systemd, para que un proceso desbocado no tumbe la sesión | Omarchy | Días |
+| D11 | Diagnóstico de fallos como skill: cuando un proceso cae, el agente recibe el volcado | Omarchy | Días a semanas |
+| E5 | Banco de pruebas local con MangoHud, para comprobar si cada ajuste del modo Gamer sirve | MangoHud | Días a semanas |
+| E3 | Proton empaquetado en `[kavat]` y fijable por juego | CachyOS, Nobara | Semanas |
+| E8 | Ajustes baratos para AMD: caché de shaders mayor y planificador de disco según el tipo | CachyOS | Días |
+| F1 | Navegador de Incognito con su perfil en memoria, que desaparece al salir | Kicksecure, Firejail | Días |
+| F3 | Borde de color en las ventanas de Incognito o en sandbox | Qubes OS | Días |
+| F5 | Con la sesión bloqueada, rechazar dispositivos USB nuevos; tras muchas horas bloqueada, reiniciar | GrapheneOS, secureblue | Días a semanas |
+| F9 | Docker sin el grupo `docker`, que equivale a root sin contraseña | Omarchy | Días |
+
+Lo que el informe recomienda no copiar: los repos binarios de CachyOS, porque su política lo prohíbe; el modelo de imagen inmutable; meter el bloqueo de pantalla dentro del shell; los demonios globales de rendimiento; y el endurecimiento que rompe Steam.
+
 ## Decisiones
 
-Todas las decisiones de diseño están tomadas; no queda ninguna abierta.
+Las decisiones de esta tabla están tomadas, pero ocho están en revisión por lo que encontró el análisis de otras distros; ver «Decisiones en revisión».
 
 | Decidido | Decisión |
 | --- | --- |
@@ -677,14 +723,17 @@ Todas las decisiones de diseño están tomadas; no queda ninguna abierta.
 | Pruebas | Cada ISO se arranca e instala en una máquina virtual; las puertas del roadmap son esas pruebas |
 | Compilación reproducible | ISO con versiones fijadas por fecha y presupuestos de rendimiento medidos |
 | Atajos de Hyprland | Los de Willwitcher-OS Endgame |
-| Referencia a omarchy | Solo la idea del selector de temas global |
+| Referencia a omarchy | El selector de temas global y los mecanismos que apruebes del análisis de otras distros; sus atajos y sus valores por defecto, no |
 
 Estos supuestos del diseño no son decisiones: se confirman al implementar, y si alguno falla se revisa la parte que depende de él.
 
 | Supuesto por comprobar | Fase |
 | --- | --- |
 | GRUB arranca cada snapshot con su kernel, con y sin cifrado de disco, y firmado para Secure Boot | 2 |
+| Con el disco cifrado, GRUB no pide la contraseña dos veces | 2 |
+| El desbloqueo por TPM2 sobrevive a una actualización de mkinitcpio, o `kav` guía la reinscripción | 2 |
 | El modo seguro arranca el escritorio sin leer la configuración del usuario | 2 |
+| El modo seguro automático tras un arranque fallido tiene un mecanismo real con GRUB sobre Btrfs | 2 |
 | GRUB, Plymouth y el login enlazan sin parpadeo en la RX 6800 | 2 |
 | La prueba tras actualizar detecta un arranque gráfico roto y ofrece volver atrás | 2 |
 | Regenerar la pantalla de carga en segundo plano no bloquea ni rompe el arranque | 3 |
@@ -702,10 +751,12 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 | OpenRGB controla las luces de tu teclado y de tu torre | 3 |
 | Las curvas de ventilador y el límite de potencia de la RX 6800 se pueden fijar desde el panel | 3 |
 | El cortafuegos por aplicación no estorba a Steam ni a los juegos | 3 |
+| Los snapshots horarios de `/home` no degradan el disco ni la CPU | 3 |
+| El perfil de sandbox del navegador no debilita el sandbox propio de Chromium | 3 |
 | Ollama y los motores de voz aceleran bien en la RX 6800 | 4 |
 | Modelo y voz caben juntos en 4 GB con calidad aceptable | 4 |
 | El agente distingue de forma fiable lo que lee de lo que tú le pides | 4 |
 
 En la RX 6800, si la aceleración va por ROCm o por Vulkan sale de esa misma prueba.
 
-De omarchy solo se toma una idea: el selector de temas que cambia la interfaz de todo el sistema. El resto se diseña desde cero, y los atajos en especial no siguen los suyos.
+De Omarchy se tomó la idea del selector de temas que cambia todo el sistema. Sus atajos y sus valores por defecto no se siguen; sus mecanismos se evalúan uno a uno en «Ideas por evaluar».

@@ -270,6 +270,7 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 | Interactive mockup of the interface | [`docs/mockup/index.html`](docs/mockup/index.html) |
 | Screenshots of the mockup | [`docs/screenshots/`](docs/screenshots/) |
 | The cat's ASCII art for the terminal | [`docs/assets/kavat-ascii.txt`](docs/assets/kavat-ascii.txt) |
+| Research: what Omarchy and other distributions do, and which ideas are worth taking (in Spanish) | [`reports/Ideas de otras distros Linux.md`](reports/Ideas%20de%20otras%20distros%20Linux.md) |
 
 ## The repository
 
@@ -303,14 +304,16 @@ A kavat is a companion feline: fast, quiet, and always beside whoever raised it.
 
 ## Real project status
 
-This README describes the finished system. Today the project is in **phase 0, design**: none of the above is implemented yet. What exists is the [design document](docs/DESIGN.md), with every decision made, and the [mockup](docs/mockup/index.html) of the interface.
+This README describes the finished system. Today the project is in **phase 0, design**: none of the above is implemented yet. What exists is the [design document](docs/DESIGN.md), with the decisions made so far, and the [mockup](docs/mockup/index.html) of the interface.
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
-| 0 | Design closed and documented | Done, pending review |
+| 0 | Design documented | Done; eight decisions under review |
 | 1 | ISO that boots to Hyprland + Noctalia | Pending |
 | 2 | Calamares installer with Btrfs and snapshots | Pending |
 | 3 | Themes, settings, greeter, Noctalia fork, `kav` and editor | Pending |
 | 4 | Local agent, skills and voice | Pending |
 
-The design takes several assumptions for granted that have not been tested. They are listed, with the phase in which each gets verified, at the end of the [design document](docs/DESIGN.md#decisiones).
+A study of Omarchy and other distributions reopened eight of those decisions: among them the base of the shell, Hyprland's move to Lua configuration and Secure Boot with own keys. They are listed in the design document under «Decisiones en revisión», next to the ideas still waiting for approval.
+
+The design also takes several assumptions for granted that have not been tested. They are listed, with the phase in which each gets verified, at the end of the [design document](docs/DESIGN.md#decisiones).

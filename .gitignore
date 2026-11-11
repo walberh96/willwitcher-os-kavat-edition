@@ -9,3 +9,6 @@ work/
 
 # Sistema
 .DS_Store
+
+# Notas de investigación en bruto (el informe final vive en reports/)
+research_notes/
