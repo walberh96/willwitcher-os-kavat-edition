@@ -4,8 +4,11 @@
 // usage: NODE_PATH=<folder>/node_modules node tools/make-video.cjs [seconds]
 //   seconds   render only the first seconds, for a quick look
 //
-// Needs macOS (the voice is `say`), Google Chrome, and two npm packages installed in any
-// folder outside the repository:  npm i puppeteer-core ffmpeg-static
+// Needs Chrome or Chromium, two npm packages installed in any folder outside the repository
+// (npm i puppeteer-core ffmpeg-static) and the voice: Supertonic-3, the model the design gives
+// Kavat (pip install supertonic, in a virtual environment; it downloads the model on first use).
+//   SUPERTONIC   path to the supertonic command, when it is not on the PATH
+//   CHROME       path to the browser, when it is not Google Chrome on macOS
 //
 // How it works: each line of the film is spoken to a file and measured; the page is told how
 // long each line lasts; then the page is asked for one frame at a time, so the picture never
@@ -20,14 +23,19 @@ const ffmpeg = require('ffmpeg-static');
 const repo = path.dirname(__dirname);
 const out = path.join(repo, 'docs', 'video', 'kavat-tour.mp4');
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'kavat-video-'));
-const FPS = 30, VOICE = 'Samantha', RATE = '172';
+const FPS = 30, VOICE = 'F2', SPEED = '1.05';
+const supertonic = process.env.SUPERTONIC || 'supertonic';
 const only = Number(process.argv[2]) || 0;
 // what the voice should say where the caption would be read wrong
-const speak = t => t.replace(/\bAUR\b/g, 'A U R').replace(/\bkav\b/g, 'cav').replace(/\bISO\b/g, 'I S O').replace(/Yazi/g, 'Yah-zee');
+// Kavat is stressed on its last syllable; spelled as it is, the voice stresses the first
+const speak = t => t.replace(/\bKavat\b/g, 'Cavat').replace(/\bAUR\b/g, 'A U R').replace(/\bVPN\b/g, 'V P N')
+  .replace(/\bUSB\b/g, 'U S B').replace(/\bOBS\b/g, 'O B S');
+// seconds of sound in a WAV file, read from its header
+const seconds = f => { const b = fs.readFileSync(f), i = b.indexOf('data', 12, 'latin1'); return b.readUInt32LE(i + 4) / b.readUInt32LE(28); };
 
 (async () => {
   const browser = await puppeteer.launch({
-    executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+    executablePath: process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     headless: 'new', args: ['--hide-scrollbars', '--allow-file-access-from-files'],
     defaultViewport: { width: 1920, height: 1080 },
   });
@@ -38,10 +46,9 @@ const speak = t => t.replace(/\bAUR\b/g, 'A U R').replace(/\bkav\b/g, 'cav').rep
   // 1. speak every line and measure it
   const lines = await page.evaluate(() => window.cues().map(c => c.say));
   const durations = lines.map((text, i) => {
-    const f = path.join(tmp, `line${i}.aiff`);
-    execFileSync('say', ['-v', VOICE, '-r', RATE, '-o', f, speak(text)]);
-    const info = execFileSync('afinfo', [f]).toString();
-    return Number(/estimated duration: ([\d.]+)/.exec(info)[1]);
+    const f = path.join(tmp, `line${i}.wav`);
+    execFileSync(supertonic, ['tts', speak(text), '-o', f, '--voice', VOICE, '--lang', 'en', '--speed', SPEED, '--steps', '12'], { stdio: 'ignore' });
+    return seconds(f);
   });
   const total = await page.evaluate(d => window.setDurations(d), durations);
   const cues = await page.evaluate(() => window.cues().map(c => c.at));
@@ -50,14 +57,14 @@ const speak = t => t.replace(/\bAUR\b/g, 'A U R').replace(/\bkav\b/g, 'cav').rep
 
   // 2. the voice track: every line delayed to its cue, mixed into one file
   const voice = path.join(tmp, 'voice.wav');
-  const inputs = lines.flatMap((_, i) => ['-i', path.join(tmp, `line${i}.aiff`)]);
+  const inputs = lines.flatMap((_, i) => ['-i', path.join(tmp, `line${i}.wav`)]);
   const graph = lines.map((_, i) => `[${i}]adelay=${Math.round(cues[i] * 1000)}:all=1[a${i}]`).join(';')
     + ';' + lines.map((_, i) => `[a${i}]`).join('') + `amix=inputs=${lines.length}:normalize=0,apad=whole_dur=${total}[v]`;
   execFileSync(ffmpeg, ['-y', '-loglevel', 'error', ...inputs, '-filter_complex', graph, '-map', '[v]', '-t', String(total), voice]);
 
   // 3. the picture, frame by frame, straight into the encoder
   const enc = spawn(ffmpeg, ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
-    '-i', voice, '-t', String(length), '-c:v', 'libx264', '-preset', 'slow', '-crf', '26', '-pix_fmt', 'yuv420p',
+    '-i', voice, '-t', String(length), '-c:v', 'libx264', '-preset', 'slow', '-crf', '28', '-pix_fmt', 'yuv420p',
     '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', out], { stdio: ['pipe', 'inherit', 'inherit'] });
   const frames = Math.round(length * FPS);
   for (let n = 0; n < frames; n++) {

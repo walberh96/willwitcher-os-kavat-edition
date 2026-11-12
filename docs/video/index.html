@@ -4,11 +4,12 @@
 <meta charset="utf-8">
 <title>Willwitcher-OS Kavat Edition · a tour with Kavat</title>
 <!--
-  The film behind docs/video/kavat-tour.mp4. Kavat, the system's agent, shows the system around.
+  The film behind docs/video/kavat-tour.mp4. Kavat, the system's agent, shows the system around,
+  as the finished system it will be.
   Every picture is the interactive mockup (docs/mockup/index.html), loaded in frames, one per shot.
 
   Open this file in a browser to watch it play, without sound. tools/make-video.cjs renders it
-  to a video: it speaks each line, tells this page how long each one lasts, and then asks for
+  to a video: it speaks each line with Supertonic-3, the voice model of the design, tells this page how long each one lasts, and then asks for
   one frame at a time through setT(seconds). Nothing here reads the clock while rendering.
 -->
 <style>
@@ -45,7 +46,7 @@ body{font-family:Inter,-apple-system,"SF Pro Display","Segoe UI",sans-serif;colo
   <div id="shots"></div>
   <div id="chapter"></div>
   <div id="title"><h1>Willwitcher-OS<small>Kavat Edition</small></h1></div>
-  <div id="end"><b>Willwitcher-OS <i>Kavat Edition</i></b>Phase 0 · the design, the mockup and every decision are in this repository</div>
+  <div id="end"><b>Willwitcher-OS <i>Kavat Edition</i></b>Arch, with an opinion. And a cat.</div>
   <svg id="kavat" viewBox="0 0 340 120">
     <g id="whs"></g>
     <g transform="translate(110 0) scale(1.2)">
@@ -60,17 +61,22 @@ body{font-family:Inter,-apple-system,"SF Pro Display","Segoe UI",sans-serif;colo
 // One entry per line Kavat says. `say` is the caption; `shots` are states of the mockup,
 // shown one after another while the line lasts. An empty `shots` leaves the stage to Kavat.
 const SEG = [
-  {ch:'Meet Kavat', say:"Hi. I'm Kavat. I live inside this computer, and I'd like to show you around.", shots:[]},
-  {ch:'Arch, with an opinion', say:"This is Willwitcher OS, Kavat Edition. Underneath, it is Arch Linux. On top, it has an opinion: installed in ten minutes, and already set up the way you work.", shots:['scene=desk']},
-  {ch:'A voice of its own', say:"You can talk to me. I run on this machine, offline, in four gigabytes of the graphics card. When I answer, an island drops from the bar, and my whiskers move with my voice.", shots:['scene=voice&voice=speak','scene=settings&spage=agent']},
-  {ch:'No shell, typed tools', say:"I never get a shell. I get typed tools with four levels of permission. Everything I do is logged, and everything can be undone.", shots:['scene=agent','scene=settings&spage=skills']},
-  {ch:'One theme, every app', say:"One theme dresses everything: the desktop, the terminal, the editor, the boot screen, even the icons and the cursor. Change the palette, and the whole system follows in under a second.", shots:['scene=themes','scene=themes&pal=tokyo','scene=themes&pal=rose&mode=light','scene=desk&pal=everforest','scene=settings&spage=appearance&pal=gruvbox']},
-  {ch:'Three modes', say:"Three modes switch the whole machine. Coder, for every day. Gamer, where I step aside and the game gets everything. And Incognito, where all traffic leaves through a VPN.", shots:['scene=settings&spage=modes','scene=desk&sys=gamer','scene=desk&sys=incog']},
-  {ch:'kav', say:"Packages go through kav. Official packages are free. The AUR only enters through a reviewed list, pinned to a commit. And every change takes a snapshot you can boot back into.", shots:['scene=kav&ktab=dash','scene=kav&ktab=aur','scene=kav&ktab=snaps']},
-  {ch:'Two-way settings', say:"Every setting lives in a plain file. Change it in the panel, or change it in Neovim. Each one follows the other.", shots:['scene=settings&spage=windows','scene=editor&cfg=windows']},
-  {ch:'Ask what is running', say:"When something runs hot, ask me. I will tell you what it is, who started it, and whether to worry.", shots:['scene=desk&notices=true','scene=top','scene=top&ttab=history']},
-  {ch:'And the rest', say:"Files in Yazi. Notes with reminders. A browser of its own. One palette for everything. And an installer that lets you pick your tools before the first boot.", shots:['scene=files','scene=notes','scene=browser','scene=launcher','scene=install&istep=software']},
-  {ch:'Where it stands', say:"Today, all of this is a design. Nothing is built yet. The first ISO comes next. I will be waiting.", shots:['scene=boot']},
+  {ch:'Meet Kavat', say:"Hi! I'm Kavat. I live inside this computer, and I can't wait to show you around.", shots:[]},
+  {ch:'Arch, with an opinion', say:"This is Willwitcher OS, Kavat Edition. Underneath, it's pure Arch Linux. On top, it has an opinion: ten minutes to install, and it's already set up the way you work.", shots:['scene=desk']},
+  {ch:'A voice of its own', say:"And you can just talk to me! I run right here on this machine, offline, in four gigabytes of the graphics card. When I answer, an island drops from the bar, my whiskers dance with my voice, and even the keyboard lights pulse along.", shots:['scene=voice&voice=speak','scene=settings&spage=agent']},
+  {ch:'Typed tools, not a shell', say:"I'm not a chatbot with a shell. I use typed tools, with four levels of permission. Reading is free. Anything bigger asks you first and takes a snapshot. Everything I do is logged, and all of it can be undone.", shots:['scene=agent','scene=settings&spage=agent']},
+  {ch:'Skills', say:"My skills are one click, one phrase, or one key away. Say start stream, and I open OBS, switch to Gamer mode, and silence your notifications. You can teach me new ones, too!", shots:['scene=settings&spage=skills','scene=agent']},
+  {ch:'Notes and reminders', say:"Notes are my favorite. Say, remind me to order thermal paste on Friday at six, and it's saved, tagged and scheduled before you finish the sentence. I file my own notes, bring you a summary every morning, and find anything by what it means, not just by its words.", shots:['scene=desk&cap=true&rem=true','scene=notes','scene=note','scene=settings&spage=notes']},
+  {ch:'One theme, every app', say:"One theme dresses everything! The desktop, the terminal, the editor, the boot screen, even the icons and the cursor. Ask me for night mode, and the whole system follows in under a second.", shots:['scene=themes','scene=themes&pal=tokyo','scene=themes&pal=rose&mode=light','scene=desk&pal=everforest','scene=settings&spage=appearance&pal=gruvbox']},
+  {ch:'Three modes', say:"Three modes switch the whole machine. Coder, for every day. Gamer starts by itself when you launch a game: I step aside and hand the game every last megabyte. And in Incognito, all traffic leaves through a VPN, and I keep no history.", shots:['scene=settings&spage=modes','scene=desk&sys=gamer','scene=desk&sys=incog']},
+  {ch:'kav', say:"Need an app? Ask me, and kav installs it. Official packages are free. The AUR only gets in through a reviewed list, pinned to a commit. I can summarize a change for you, but I can never approve it. And every install takes a snapshot you can boot back into.", shots:['scene=kav&ktab=dash','scene=kav&ktab=browse','scene=kav&ktab=aur','scene=kav&ktab=snaps']},
+  {ch:'Two-way settings', say:"Every setting lives in a plain file. Change it in the panel, change it in Neovim, or just tell me, raise the gaps to ten. It's the same value, with the same undo.", shots:['scene=settings&spage=windows','scene=editor&cfg=windows','scene=settings&spage=keys']},
+  {ch:'Editor, terminal, files', say:"For code, there's Neovim with the shortcuts you already know, and Claude in a panel right beside it. In the terminal, one key and I explain the last error. And Yazi handles your files, with previews and drag and drop.", shots:['scene=editor','scene=claude','scene=files']},
+  {ch:'A browser of its own', say:"The browser is ours, too. It follows the theme, blocks ads from the first start, and has me in its side panel. Clip any page straight into your notes, and keep your favorite sites as albums.", shots:['scene=browser','scene=browser&clip=true','scene=albums']},
+  {ch:'Ask what is running', say:"When something runs hot, I notice. Ask me, and I'll tell you what it is, who started it, and whether to worry. I even remember the last twenty four hours.", shots:['scene=desk&notices=true','scene=top','scene=top&ttab=history']},
+  {ch:'Built for a gaming desktop', say:"It's built for a gaming desktop. Drag your displays into place. Tune the fans. Give every game its own profile. And find anything, or do the math, from one palette.", shots:['scene=settings&spage=displays&dsel=1','scene=settings&spage=gpu','scene=launcher','scene=launcher&calc=true']},
+  {ch:'Hard to break', say:"And it's very hard to break. Bootable snapshots. Hourly copies of your files. A firewall that asks before any app goes online. And a safe mode that is always there.", shots:['scene=kav&ktab=snaps','scene=settings&spage=backup','scene=settings&spage=privacy','scene=grub&gsel=safe']},
+  {ch:'Ten minutes', say:"Ten minutes, from a USB stick to your desktop. It's your computer, and I come with it. I'm Kavat. Come in!", shots:['scene=install&istep=software','scene=boot','scene=login']},
 ];
 const LEAD=.35, TAIL=.75, FADE=.45, INTRO=1.6, OUTRO=2.6;
 const $=s=>document.querySelector(s), clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));

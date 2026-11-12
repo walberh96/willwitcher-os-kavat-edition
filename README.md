@@ -309,7 +309,7 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 | --- | --- |
 | Design document: every piece, every decision and what is still to be verified (in Spanish) | [`docs/DESIGN.md`](docs/DESIGN.md) |
 | Pending decisions: what is still waiting for an answer (in Spanish) | [`docs/PENDING.md`](docs/PENDING.md) |
-| A two-minute tour, narrated by Kavat | [`docs/video/kavat-tour.mp4`](docs/video/kavat-tour.mp4) |
+| A tour of the system, narrated by Kavat (3 min 30 s) | [`docs/video/kavat-tour.mp4`](docs/video/kavat-tour.mp4) |
 | Interactive mockup of the interface | [`docs/mockup/index.html`](docs/mockup/index.html) |
 | Screenshots of the mockup | [`docs/screenshots/`](docs/screenshots/) |
 | The cat's ASCII art for the terminal | [`docs/assets/kavat-ascii.txt`](docs/assets/kavat-ascii.txt) |
