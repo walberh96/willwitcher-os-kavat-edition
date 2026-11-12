@@ -89,7 +89,7 @@ La categoría Development trae lo que hace falta para trabajar en lanequarters, 
 | Móvil, Android | jdk17-openjdk, SDK de Android con emulador, android-tools, watchman, maestro | Compilar la app de Expo para Android y probarla en el emulador o en un teléfono |
 | Al primer arranque, con pnpm | Navegadores de Playwright, vercel, eas-cli | No son paquetes de pacman: los instala pnpm y `kav` no los gestiona |
 
-En la categoría de oficina, OnlyOffice sale como casilla sin marcar; viene del AUR.
+En la categoría de oficina, OnlyOffice sale como casilla sin marcar; viene del AUR. En la de navegadores, el vídeo protegido con Widevine sale marcado.
 
 La extensión de navegador se prueba en `kavat-browser`, que es un fork de Chromium y admite las extensiones de Chrome. Seis de la lista vienen del AUR (claude-code, supabase, stripe-cli, el SDK de Android, watchman y maestro) y necesitan su entrada en la allowlist; en qué repositorio está cada paquete se comprueba al escribirla.
 
@@ -277,7 +277,7 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | Files (Yazi) | Preset de atajos, arrastrar y soltar, copiador con pop-up, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
 | Notes (nb) | Carpeta de notas, cuaderno por defecto, nota rápida, recordatorios y cuánto posponen, vistas de tareas, qué cuadernos lee el agente, cifrado y sincronización | Fork de nb (kavat-notes) |
 | Shell (zsh) | Prompt, plugins, historial, alias, apps por defecto | No |
-| Browser | Bloqueador, apariencia, perfil por modo, comandos de la consola, recortes y álbumes | El fork de Chromium ya previsto |
+| Browser | Bloqueador, apariencia, perfil por modo, vídeo protegido, comandos de la consola, recortes y álbumes | El fork de Chromium ya previsto |
 | Bar & widgets | Posición y densidad de la barra, widgets y su orden, lanzador, notificaciones | El fork de Noctalia ya previsto |
 | Modes | Qué hace cada modo, automatización con Steam, VPN de Incognito, modos nuevos | Propio |
 | Projects | Proyectos guardados: carpeta, terminales, editor, perfil del navegador y ventanas de cada uno | Propio |
@@ -319,7 +319,7 @@ Regla para los forks: una app se bifurca cuando no deja cambiar su configuració
 
 ## Navegador
 
-`kavat-browser` es un fork de Chromium con siete cambios: sigue los modos del sistema, cambia de tema con el sistema, bloquea anuncios de serie, habla con el agente, tiene una consola de comandos, usa Yazi como explorador de archivos y guarda recortes y álbumes en las notas.
+`kavat-browser` es un fork de Chromium con ocho cambios: sigue los modos del sistema, cambia de tema con el sistema, bloquea anuncios de serie, habla con el agente, tiene una consola de comandos, usa Yazi como explorador de archivos, guarda recortes y álbumes en las notas y reproduce vídeo protegido.
 
 | Cambio | Qué hace |
 | --- | --- |
@@ -342,6 +342,8 @@ Ideas añadidas:
 - **Los comandos de la consola son también herramientas del agente**: lo que puedes escribir en la consola, se lo puedes pedir a Kavat, y `kavatd` puede dispararlo desde fuera (por ejemplo, al cambiar de modo).
 - **Comandos en un archivo**: los comandos propios se definen en un TOML en `~/.config/kavat/browser/`, con nombre, atajo y acción.
 - **En Incognito el agente no guarda** nada de lo que lee en el navegador.
+- **Vídeo protegido (DRM)**: el navegador se compila con soporte para Widevine, para ver Netflix, Prime Video, Disney+ o Spotify web. El módulo de Widevine es propietario de Google y no se puede redistribuir, así que no va en `[kavat]` ni en la ISO: lo instala `kav` desde la allowlist del AUR, que lo descarga de Google. En el instalador es una casilla del paso Software, marcada de serie, y como el resto de ese paso necesita red.
+- **Límite del vídeo protegido**: en Linux Widevine corre por software, y los servicios limitan la calidad en ese caso; lo habitual es 720p, sin 4K ni HDR. Pasa igual en cualquier navegador de Linux.
 - **Bloqueador**: empezar con uBlock Origin incluido de fábrica y pasar a un bloqueador nativo solo si hace falta, porque Chromium limita cada vez más lo que las extensiones de bloqueo pueden hacer.
 
 ## Editor
@@ -815,6 +817,7 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Archivos | Yazi | `kavat-files` (configuración, plugins y portal) |
 | Notas | nb | kavat-notes (fork, TUI e índice) |
 | Navegador | Chromium | kavat-browser (fork) |
+| Vídeo protegido | Widevine, desde el AUR | Casilla del instalador, marcada de serie |
 | Información del sistema | fastfetch | `kavat-fetch` (fork) |
 | Monitor del sistema | btop | `kavat-top` (fork) |
 | Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
@@ -1000,8 +1003,9 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Editor | Neovim en el núcleo, híbrido: modos de Vim con navegación y atajos de VS Code; panel lateral de Claude y otros paneles, abiertos como divisiones de Kitty |
 | Marketplace de plugins | Partiendo de store.nvim, con catálogo verificado y presets encima |
 | Gestor de archivos | Yazi integrado: tema, arrastrar y soltar, copiar y mover con pop-up de progreso, y explorador de archivos del sistema y del navegador |
-| Fork de Chromium | Modos, tema automático, bloqueador, agente integrado, consola de comandos, Yazi como explorador, y recortes y álbumes en las notas |
+| Fork de Chromium | Modos, tema automático, bloqueador, agente integrado, consola de comandos, Yazi como explorador, recortes y álbumes en las notas, y vídeo protegido |
 | Perfiles del navegador | Uno por modo, por ahora |
+| Vídeo protegido | `kavat-browser` reproduce contenido con DRM mediante Widevine, instalado por `kav` desde el AUR; la calidad queda en lo que los servicios dan a Linux |
 | Modos del sistema | Coder, Gamer e Incognito, seleccionables desde Noctalia |
 | Ventanas al entrar en Incognito | Las normales se ocultan y vuelven al salir |
 | Juego y hardware | Perfil por juego, página de GPU, varias pantallas colocadas desde el panel, luces que siguen al tema y a la voz de Kavat, y supresión de ruido del micrófono |
@@ -1070,6 +1074,7 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 | El cortafuegos por aplicación no estorba a Steam ni a los juegos | 3 |
 | Los snapshots horarios de `/home` no degradan el disco ni la CPU | 3 |
 | El perfil de sandbox del navegador no debilita el sandbox propio de Chromium | 3 |
+| Los servicios de vídeo aceptan `kavat-browser` con Widevine, aunque no sea un navegador firmado por Google; se prueba servicio por servicio | 3 |
 | Ollama acelera bien en la RX 6800, el modelo elegido cabe cargado en 4 GB de VRAM y la voz va sobrada en la CPU | 4 |
 | Modelo y voz caben juntos en 4 GB con calidad aceptable | 4 |
 | El agente distingue de forma fiable lo que lee de lo que tú le pides | 4 |

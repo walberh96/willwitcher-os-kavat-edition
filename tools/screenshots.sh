@@ -54,6 +54,7 @@ shots=(
   "settings-agent|scene=settings&spage=agent"
   "settings-backup|scene=settings&spage=backup"
   "settings-boot|scene=settings&spage=boot"
+  "settings-browser|scene=settings&spage=browser"
   "settings-displays|scene=settings&spage=displays&dsel=1"
   "settings-gpu|scene=settings&spage=gpu"
   "settings-icons|scene=settings&spage=appearance"
