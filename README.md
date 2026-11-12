@@ -63,6 +63,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![Notices](docs/screenshots/notices.png) **Notices.** A process running hot, a disk just plugged in. | ![Calculator](docs/screenshots/launcher-calc.png) **Calculator.** Sums and unit conversions in the palette. |
 | ![Updates](docs/screenshots/kav-updates.png) **Updates.** Packages and firmware in one pass. | ![Shell settings](docs/screenshots/settings-shell.png) **Shell settings.** Prompt, plugins and the default apps. |
 | ![Software step](docs/screenshots/installer-software.png) **Choose your software.** Tick programs by category while installing; `kav` installs them. | ![Software step, offline](docs/screenshots/installer-software-offline.png) **No network.** The base system installs as it comes and the step is skipped. |
+| ![Icons and cursor](docs/screenshots/settings-icons.png) **Icons and cursor.** Made from the theme: folders and the cursor take the accent. | ![Tinted icons](docs/screenshots/settings-icons-tinted.png) **Tinted icons.** An optional style that paints every icon with the palette. |
 
 ## Talk to it
 
@@ -158,7 +159,7 @@ wallpaper   image · video
 
 Change one value and everything changes at once, in under a second and without restarting anything: Hyprland, the shell, the terminal, GTK, Qt, Neovim, the browser, the login screen, the lock screen, the boot splash and even the installer. If one piece fails, none is applied.
 
-Light mode is designed, not inverted. Profiles have names (`work`, `night`, `presenting`) and can switch on their own by time of day or by the monitor you plug in. A third-party theme is a single TOML file.
+Icons and the cursor are made from the same theme: folders, system icons and the cursor's edge take the accent, and two optional icon styles paint everything with the palette or draw it in plain lines. Light mode is designed, not inverted. Profiles have names (`work`, `night`, `presenting`) and can switch on their own by time of day or by the monitor you plug in. A third-party theme is a single TOML file.
 
 **The wallpaper can move.** An image is the default; a looping video is one more option in the same grid. The video pauses by itself when you cannot see it, when something is fullscreen and in Gamer mode, and the login screen uses a still frame.
 

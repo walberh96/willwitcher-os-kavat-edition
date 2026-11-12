@@ -263,7 +263,7 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 
 | Página del panel | Qué se ajusta | Fork necesario |
 | --- | --- | --- |
-| Appearance | Todo el sistema de temas: paleta, modo, acento, tono, tipografía, perfiles; luces que siguen al acento | Propio |
+| Appearance | Todo el sistema de temas: paleta, modo, acento, tono, tipografía, perfiles; estilo de los iconos y tamaño del cursor; luces que siguen al acento | Propio |
 | Wallpaper | Imagen o vídeo, carpetas, ajustes del vídeo, reglas de pausa, fondo por pantalla | No: mpvpaper para el vídeo |
 | Accessibility | Reducir movimiento, escala de texto, contraste alto | Propio |
 | Windows (Hyprland) | Separación, bordes, animaciones, disposición, ratón y teclado, reglas de ventana | No previsto: admite cambios en vivo |
@@ -664,13 +664,24 @@ La diferencia con Omarchy: allí un tema es un archivo de colores más plantilla
 | Forma | Radio de esquinas, grosor de borde, separación entre ventanas | Recto y compacto, o redondo y amplio |
 | Efectos | Desenfoque, transparencia, sombras, velocidad de animación | Todo apagado en batería |
 | Tipografía | Fuente de interfaz, fuente mono, escala | Inter + JetBrains Mono al 110% |
+| Iconos y cursor | Estilo de los iconos (Colour, Tinted o Line) y tamaño del cursor; sus colores salen del resto de ejes | Colour con cursor de 24 |
 
 Cómo funciona:
 
 1. `~/.config/kavat/theme.toml` guarda la combinación activa. Es lo único que editas.
 2. `kavat-theme apply` resuelve los tokens (unos 40 colores semánticos: `surface`, `text`, `accent`, `danger`, etc.) y rellena las plantillas.
-3. Cada app recibe su archivo y una señal de recarga: Hyprland, Noctalia, terminal, GTK, Qt, Neovim, el monitor y la información del sistema, el greeter, hyprlock, Plymouth, el instalador y las apps Electron que lo permitan.
+3. Cada app recibe su archivo y una señal de recarga: Hyprland, Noctalia, terminal, GTK, Qt, Neovim, el monitor y la información del sistema, los iconos, el cursor, el greeter, hyprlock, Plymouth, el instalador y las apps Electron que lo permitan.
 4. El cambio es atómico: se genera todo en un directorio nuevo y se cambia un enlace. Si una plantilla falla, no se aplica nada.
+
+**Iconos y cursor.** También salen de los tokens, así que cambian con la paleta, el modo y el acento.
+
+- **Iconos generados (`kavat-icons`)**: un juego de iconos en SVG, hecho a partir de Papirus, que `kavat-theme` vuelve a colorear en cada cambio de tema.
+- **Tres estilos**: Colour, el de serie, deja a cada app su color de marca y pone el acento en las carpetas y en los iconos de sistema. Tinted pinta todos los iconos con colores de la paleta. Line los dibuja de línea, en el color del texto.
+- **Cursor generado (`kavat-cursor`)**: el relleno sigue al modo, claro sobre oscuro y al revés, y el borde lleva el acento. Tamaños 24, 32 y 48.
+- **Iconos de archivo en la terminal**: los de Yazi, Neovim y `kav` usan los colores de la paleta, no un color fijo por tipo de archivo.
+- **Bandeja en un solo color**: los iconos de la bandeja de la barra se pintan en el color del texto.
+- **Lo que no sigue el tema, a la vista**: la página Appearance dice qué apps no se pueden tematizar, como Steam u OnlyOffice.
+- **Límite**: una app cuyo icono no esté en el juego trae el suyo, sin tematizar.
 
 Ideas propias:
 
@@ -820,6 +831,7 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Firmware | fwupd | Integrado en `kav` |
 | Impresión y escáner | CUPS y SANE | Opcional, en el instalador |
 | Fuentes | Inter, JetBrains Mono Nerd Font, Noto para emoji y CJK | `kavat-fonts` |
+| Iconos y cursor | Papirus como base, recoloreado; cursor propio | `kavat-icons` y `kavat-cursor` |
 | Agente | Ollama + `kavatd` + modelo | `kavat-agent` |
 
 Un metapaquete `kavat-desktop` depende de todo lo anterior, de modo que una instalación de Arch existente se convierte en Willwitcher-OS con un solo `pacman -S`.
@@ -1020,6 +1032,7 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Skills del agente | Acciones predefinidas, pulsables desde su panel, que no pasan por el modelo |
 | Seguridad del agente | Lo que el agente lee nunca es una orden; solo cuentan tus mensajes |
 | Agente, además | Pulsar para hablar, isla de voz con subtítulos, ayuda en la terminal y avisos discretos |
+| Iconos y cursor | Generados desde el tema: iconos en estilo Colour de serie, con Tinted y Line como opción, y cursor con el acento |
 | Fondos de pantalla | Imagen por defecto o vídeo con mpvpaper, elegibles desde Noctalia |
 | Pruebas | Cada ISO se arranca e instala en una máquina virtual; las puertas del roadmap son esas pruebas |
 | Compilación reproducible | ISO con versiones fijadas por fecha y presupuestos de rendimiento medidos |
@@ -1050,6 +1063,8 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 | Yazi acepta archivos soltados sobre su ventana, recarga el tema en vivo y muestra el progreso real de una copia en un pop-up, por plugin o por fork | 3 |
 | Un proyecto restaura ventanas, terminales y editor tal como estaban | 3 |
 | OpenRGB controla las luces de tu teclado y de tu torre | 3 |
+| Los iconos de Papirus se recolorean bien de forma automática, también los de app en el estilo Tinted | 3 |
+| El cursor cambia en vivo con el tema, también en las apps ya abiertas | 3 |
 | La versión web de VIA configura el teclado Keychron desde `kavat-browser` con solo la regla de udev | 3 |
 | Las curvas de ventilador y el límite de potencia de la RX 6800 se pueden fijar desde el panel | 3 |
 | El cortafuegos por aplicación no estorba a Steam ni a los juegos | 3 |
