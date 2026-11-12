@@ -889,7 +889,7 @@ Lo que el informe recomienda no copiar: los repos binarios de CachyOS, porque su
 
 ## Decisiones
 
-Las decisiones de esta tabla están tomadas; las que el análisis de otras distros dejó en revisión están en «Decisiones en revisión», con su estado. Lo que todavía espera tu decisión está en un documento aparte, «Decisiones pendientes»; cuando se aprueba, pasa a este.
+Las decisiones de esta tabla están tomadas; las que el análisis de otras distros dejó en revisión están en «Decisiones en revisión», con su estado. Lo que todavía espera tu decisión está en un documento aparte, [«Decisiones pendientes»](PENDING.md); cuando se aprueba, pasa a este.
 
 | Decidido | Decisión |
 | --- | --- |
