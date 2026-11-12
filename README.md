@@ -276,6 +276,7 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 | Screenshots of the mockup | [`docs/screenshots/`](docs/screenshots/) |
 | The cat's ASCII art for the terminal | [`docs/assets/kavat-ascii.txt`](docs/assets/kavat-ascii.txt) |
 | Research: what Omarchy and other distributions do, and which ideas are worth taking (in Spanish) | [`reports/Ideas de otras distros Linux.md`](reports/Ideas%20de%20otras%20distros%20Linux.md) |
+| Research: which local model should be the agent, how to split the 4 GB with voice, and the test that confirms it (in Spanish) | [`reports/Modelo local para el agente Kavat.md`](reports/Modelo%20local%20para%20el%20agente%20Kavat.md) |
 
 ## The repository
 

@@ -530,6 +530,22 @@ Piezas:
 - **Registro**: cada llamada a una herramienta queda en un log legible con qué pidió, qué hizo y cómo deshacerlo.
 - **Sin red**: el agente funciona sin conexión y no envía nada fuera. Cualquier herramienta que use red se activa aparte.
 
+**Análisis del modelo.** En noviembre de 2026 se compararon los modelos pequeños de Ollama para este trabajo. Lo que sigue es una propuesta: ningún modelo se ha ejecutado todavía en la máquina real. El informe completo, con sus fuentes, está en [`reports/Modelo local para el agente Kavat.md`](../reports/Modelo%20local%20para%20el%20agente%20Kavat.md).
+
+| Pieza | Propuesta | Dónde corre | Memoria |
+| --- | --- | --- | --- |
+| Modelo de lenguaje | LFM3 1.7B de Liquid AI (`lfm3:1.7b-q4_K_M`) | GPU | 1,4 a 1,5 GB |
+| Reconocimiento de voz | Parakeet TDT v3, dentro de VoiceStudio | CPU | 1 a 1,5 GB, estimado |
+| Síntesis de voz | Supertonic-3, dentro de VoiceStudio | CPU | 0,4 a 0,5 GB, estimado |
+| VoiceStudio en sí |  | CPU | 0,5 GB |
+| Total |  |  | 3,3 a 4,0 GB |
+
+- **Por qué LFM3 1.7B**: es el único modelo de 2026 hecho para agentes con herramientas que cabe con margen junto a una voz buena en inglés y español. Es provisional: sus notas son del fabricante y lleva dos semanas disponible en Linux.
+- **Alternativas, por orden**: Qwen3.5 2B, Qwen3 1.7B (el único de su tamaño medido por terceros) y Bonsai 2 4B.
+- **El mejor medido no cabe**: Qwen3.5 4B es el modelo pequeño con mejores pruebas independientes, pero no cabe junto a la voz en 4 GB. Cabría si el límite contara solo la memoria de la GPU.
+- **Cómo se confirma**: con la prueba que este documento ya pedía, ahora con números: unos 240 casos propios en inglés y español, cuatro veces por candidato, midiendo aciertos, latencia y memoria con un juego abierto.
+- **El modelo pequeño necesita ayuda del diseño**: el informe propone enseñarle de cinco a ocho herramientas por petición en lugar de todas, usar nombres en inglés por dentro, y que una skill de varios pasos sea una sola llamada que ejecuta `kavatd`. Las frases exactas que no pasan por el modelo ya están en el diseño.
+
 Límite deliberado: el agente puede resumir un diff de `kav review`, pero no puede aprobar un paquete AUR ni ampliar sus propios permisos.
 
 **Lo que el agente lee nunca es una orden.** El contenido de una página web, de un archivo o de la salida de un comando es solo información: no puede hacer que el agente ejecute herramientas. Solo cuentan tus mensajes, tus clics y las skills que tú lanzas. Si una acción se propone a raíz de algo leído, pide confirmación aunque su nivel normalmente no la pida.
