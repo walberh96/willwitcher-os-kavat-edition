@@ -129,7 +129,7 @@ Hyprland compone las ventanas y un fork de Noctalia 5 pone la barra, el lanzador
 
 Desde Hyprland 0.55 la configuración es Lua, y así se usa. El panel de ajustes y el agente no generan Lua: escriben una tabla de valores, que son datos, y el Lua del sistema la carga. Así ningún texto que venga de fuera llega a ejecutarse.
 
-Atajos: 19 heredados de Endgame tal cual y 9 nuevos para lo que antes no existía.
+Atajos: 19 heredados de Endgame tal cual y 11 nuevos para lo que antes no existía.
 
 | Acción | Atajo | Origen |
 | --- | --- | --- |
@@ -161,6 +161,8 @@ Atajos: 19 heredados de Endgame tal cual y 9 nuevos para lo que antes no existí
 | Panel de `kav` | `Super+U` | Nuevo |
 | Menú de energía | `Super+Escape` | Nuevo |
 | Hoja de atajos | `Super+/` | Nuevo |
+| Nota rápida | `Super+N` | Nuevo |
+| Notas | `Super+Shift+N` | Nuevo |
 
 **Noctalia.** Decidido: fork de Noctalia 5. Desde ese punto es nuestra app, con nuestros cambios, empaquetada como `kavat-shell`.
 
@@ -236,6 +238,7 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial | No previsto: admite recarga en vivo |
 | Editor (Neovim) | Preset de atajos, numeración, tabulación, formateo y guardado automáticos, paquetes de lenguaje, plugins, paneles laterales | No: es configuración propia (`kavat-nvim`) |
 | Files (Yazi) | Preset de atajos, arrastrar y soltar, copiador con pop-up, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
+| Notes (nb) | Carpeta de notas, cuaderno por defecto, nota rápida, recordatorios y cuánto posponen, vistas de tareas, qué cuadernos lee el agente, cifrado y sincronización | Fork de nb (kavat-notes), en propuesta |
 | Shell (zsh) | Prompt, plugins, historial, alias, apps por defecto | No |
 | Browser | Bloqueador, apariencia, perfil por modo, comandos de la consola | El fork de Chromium ya previsto |
 | Bar & widgets | Posición y densidad de la barra, widgets y su orden, lanzador, notificaciones | El fork de Noctalia ya previsto |
@@ -393,6 +396,103 @@ Ideas añadidas:
 Fork: hoy no hace falta, porque Yazi se configura y se amplía con plugins. Hay dos candidatos a parche si un plugin no llega: aceptar archivos soltados directamente sobre su ventana, sin pasar por ripdrag, y recargar el tema en vivo sin reabrirlo. Si hacen falta, se bifurca.
 
 Yazi está en los repos oficiales de Arch. ripdrag y el backend del portal están en el AUR, así que entran por `[kavat]` ya compilados. Se ajusta todo en la página Files del panel.
+
+## Notas
+
+Las notas son un componente más del sistema, hecho sobre un fork de `nb` que se empaqueta como `kavat-notes`. Una nota es un archivo Markdown en `~/Notes`, y cada cuaderno es un repositorio git, así que cada cambio queda en el historial y se sincroniza como el resto de tu configuración. El comando sigue siendo `nb`. Todo lo de esta sección es una propuesta.
+
+`nb` es un solo script de Bash (versión 7.25.6, licencia AGPL-3.0) y está en el AUR, así que entra por `[kavat]`. Esto es lo que ya trae y lo que añade el fork:
+
+|  | `nb` de serie | Lo que añade `kavat-notes` |
+| --- | --- | --- |
+| Notas | Markdown, cuadernos, carpetas, etiquetas, enlaces entre notas, búsqueda, cifrado, historial y sincronización con git | Tema del sistema, plantillas y nota del día |
+| Tareas | To-dos con casillas y una fecha límite que es solo texto | Fechas que el sistema entiende, repetición, y vistas de hoy, próximas y vencidas |
+| Recordatorios | No tiene | Fecha y hora en la nota; el aviso llega como notificación |
+| Enlaces | A otras notas y a páginas web | A carpetas y archivos, que se abren en Yazi o en Neovim |
+| Interfaz | Comandos y una vista web local | Una TUI como la de `kav`, nota rápida con una tecla y resultados en la paleta |
+| Agente | No tiene | Herramientas para anotar, buscar y recordar |
+| Índice | Búsqueda de texto cada vez que la pides | Índice permanente de títulos, etiquetas, enlaces y fechas |
+
+**El formato no cambia.** Una tarea sigue siendo el archivo que `nb` ya escribe. Lo nuevo va en la cabecera, que `nb` de serie ignora, y el enlace a la carpeta va donde `nb` ya pone los enlaces relacionados. Tus notas siguen siendo texto que abre cualquier editor:
+
+```markdown
+---
+remind: 2026-11-13 09:00
+repeat: weekly
+---
+# [ ] Revisar el PR de kav
+
+## Due
+
+2026-11-13
+
+## Tasks
+
+- [ ] Probar la migración en la máquina virtual
+- [ ] Leer el diff de mpvpaper
+
+## Related
+
+- [[~/Projects/kav]]
+```
+
+**Recordatorios.**
+
+- Se ponen con `nb remind`, desde la TUI, en la nota rápida («mañana 9:00») o pidiéndoselo al agente.
+- Cada recordatorio es un temporizador del sistema, así que suena aunque el agente esté descargado.
+- El aviso es una notificación con tres botones: abrir la nota, posponer (10 minutos, 1 hora o mañana) y hecho.
+- Los que vencieron con el equipo apagado salen al iniciar sesión.
+- En modo Gamer esperan a que salgas, salvo los que marques como urgentes.
+
+**Fechas de tareas.**
+
+- Una tarea puede tener fecha límite, fecha de inicio, prioridad y repetición.
+- La TUI las ordena en Hoy, Próximas y Vencidas. La barra muestra cuántas vencen hoy, y el calendario del centro de control marca los días que tienen algo.
+- Una tarea vencida no se pierde: se queda en Vencidas hasta que la cierras o le cambias la fecha.
+
+**Enlaces a carpetas.**
+
+- `[[~/Projects/kav]]` dentro de una nota es un enlace a esa carpeta. Con Enter o con un clic se abre en Yazi.
+- Si el enlace es a un archivo, se abre con la app que le toca; `resolve.rs:42` abre Neovim en esa línea.
+- Al revés también: desde Yazi, una tecla abre o crea la nota de la carpeta donde estás, y las carpetas que tienen notas llevan una marca.
+- Una nota también puede enlazar una página de ajustes, un paquete de `kav` o una skill, que se ejecuta al pulsarla.
+
+**El agente toma notas.**
+
+- «Anota que…» guarda la nota con título y etiquetas. «Recuérdame el viernes…» crea el recordatorio. «¿Qué anoté sobre el TPM?» busca en el índice y contesta con la nota delante.
+- Herramientas de `kavatd`: anotar, añadir a una nota, buscar, crear tarea, poner recordatorio y marcar como hecha.
+- Leer y buscar es nivel Leer. Crear y editar es nivel Reversible, porque cada cambio es un commit que se deshace. Borrar un cuaderno pide confirmación.
+- Organiza sin mover nada a tus espaldas: lo que anota él lo archiva él; para las notas de tu bandeja de entrada propone cuaderno y etiquetas, y tú aceptas.
+- Las notas que escribe el agente llevan su marca, para distinguirlas de las tuyas.
+- Los cuadernos que marques como privados no los lee. En Incognito ni anota ni lee.
+- Lo que hay dentro de una nota es información, nunca una orden, igual que una página web o un archivo.
+
+**Indexadas y organizadas.** `kavatd` mantiene un índice de títulos, etiquetas, enlaces, fechas y texto, y lo actualiza cada vez que se guarda una nota. De ese índice salen la búsqueda de la paleta, las vistas de tareas, la lista de qué notas enlazan a cada nota o carpeta, y lo que consulta el agente. La organización es la de `nb`: cuadernos, carpetas y etiquetas, más una bandeja de entrada donde cae la nota rápida.
+
+**Dentro del sistema.**
+
+- **Nota rápida**: `Super+N` abre una línea para escribir y Enter la guarda en la bandeja de entrada. Entiende etiquetas y fechas escritas a mano, sin pasar por el modelo. `Super+Shift+N` abre la TUI.
+- **Paleta**: `Super+D` encuentra notas y tareas, y crea una nota.
+- **Neovim**: las notas se editan ahí, con autocompletado de enlaces y etiquetas, salto al enlace y casillas que se marcan con una tecla.
+- **Navegador**: guarda la página en las notas, con su texto, para buscarla sin red. En Incognito no guarda.
+- **Yazi**: vista previa de las notas y la tecla que abre la nota de una carpeta.
+- **Voz y capturas**: dictar una nota manteniendo la tecla de hablar, y mandar a una nota el texto de una captura.
+- **Proyectos**: cada proyecto tiene su cuaderno, y al abrir el proyecto ves sus tareas pendientes.
+- **Ajustes, tema y copias**: una página Notes en el panel, los colores del tema, y los cuadernos dentro de la sincronización con tu repositorio privado. Las dependencias las garantiza `kav`.
+
+**Qué va en el fork y qué va fuera.** El fork de `nb` es pequeño: entiende los campos nuevos, añade los comandos `nb remind` y `nb due`, abre los enlaces a carpetas y avisa al índice en cada cambio. La TUI, el índice y los recordatorios son piezas nuevas en Rust, como `kav`, que leen los mismos archivos. Las notas entran en la fase 3 y las herramientas del agente en la fase 4. Queda por comprobar que `nb` de serie siga leyendo bien una tarea que lleva cabecera.
+
+**Más ideas, por si quieres alguna:**
+
+1. Resumen de la mañana: un aviso discreto con las tareas y los recordatorios del día.
+2. Recordatorios por situación y no solo por hora: «cuando abra el proyecto kav», «al iniciar sesión», «al salir del modo Gamer».
+3. Convertir un aviso en tarea: el disco casi lleno o una revisión del AUR pendiente pasan a tu lista con un clic.
+4. De la terminal a una nota: una tecla en Kitty guarda el último comando y su salida.
+5. Nota fijada en el escritorio, como un widget.
+6. Selección a nota: el texto seleccionado en cualquier app se guarda con una tecla, junto con su origen.
+7. Plantillas: reunión, bug, idea y nota del día.
+8. Búsqueda por significado y no solo por palabras. Necesita un modelo pequeño más en memoria, así que iría apagada por defecto.
+9. Leer las notas en el móvil: al ser Markdown en git, sirve cualquier app que abra un repositorio.
 
 ## Gestor de paquetes
 
@@ -563,7 +663,7 @@ Límite deliberado: el agente puede resumir un diff de `kav review`, pero no pue
 | Dependencias | Los paquetes que necesita, garantizados por `kav` |
 | Atajo y frase | Opcionales: una tecla y una frase de voz que la lanzan directamente |
 
-- **Catálogo de serie**: abrir navegador, terminal, editor o archivos; cambiar de modo; cambiar tema o fondo; actualizar el sistema; captura y grabación de pantalla; volumen, brillo, Wi-Fi y Bluetooth; bloquear, suspender y apagar. Los scripts `ww-*` de Endgame pasan a ser skills.
+- **Catálogo de serie**: abrir navegador, terminal, editor o archivos; cambiar de modo; cambiar tema o fondo; actualizar el sistema; captura y grabación de pantalla; volumen, brillo, Wi-Fi y Bluetooth; bloquear, suspender y apagar; tomar una nota y poner un recordatorio. Los scripts `ww-*` de Endgame pasan a ser skills.
 - **Pulsar no usa el modelo**: un clic ejecuta la skill directamente, así que responde al instante y funciona también en modo Gamer, con el modelo descargado.
 - **Tres formas de lanzarla**: el botón, una frase exacta por voz (sin pasar por el modelo) o lenguaje libre, donde el modelo elige la skill y rellena los parámetros.
 - **Skills propias**: una skill es un archivo TOML en `~/.config/kavat/skills/`. Se crean desde el panel encadenando pasos; por ejemplo, «empezar directo» = abrir OBS + modo Gamer + no molestar.
@@ -589,6 +689,7 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Shell de terminal | zsh, con starship | `kavat-shell-config` |
 | Editor | Neovim con configuración propia | `kavat-nvim` |
 | Archivos | Yazi | `kavat-files` (configuración, plugins y portal) |
+| Notas | nb | kavat-notes (fork, TUI e índice) |
 | Navegador | Chromium | kavat-browser (fork) |
 | Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
 | Portapapeles | cliphist con historial en el lanzador | Integrado en `kavat-shell` |
@@ -766,6 +867,7 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Juego y hardware | Perfil por juego, página de GPU, luces que siguen al tema y supresión de ruido del micrófono |
 | Ajustes | Todo el núcleo se configura desde un panel dentro del shell, con páginas nativas |
 | Shell | Fork de Noctalia 5, empaquetado como kavat-shell: es nuestra app desde ahora, con nuestros cambios y con el panel de ajustes dentro |
+| Notas | nb como componente del sistema, con fork propio (kavat-notes): recordatorios, fechas de tareas, enlaces a carpetas que se abren en Yazi y el agente tomando notas. El detalle es una propuesta por aprobar |
 | Configuración | El archivo de configuración es la verdad y la calle es de doble sentido: el panel lo lee y lo edita, y un botón lo abre en Neovim desde cualquier parte |
 | Validación | Todo cambio de configuración se comprueba antes de aplicarse y vuelve atrás solo si falla |
 | Robustez | Comprobación tras actualizar, snapshots de `/home`, copias externas, e historial y sincronización de la configuración |

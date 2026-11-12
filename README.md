@@ -49,6 +49,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![Browser](docs/screenshots/browser.png) **Browser.** Command console and the agent's side panel. | ![Installer](docs/screenshots/installer.png) **Installer.** Calamares, appearance step. |
 | ![Claude panel](docs/screenshots/claude-panel.png) **Claude beside the code.** A Kitty split next to Neovim; edits arrive as diffs. | ![Copy pop-up](docs/screenshots/files-copy.png) **Copying you can see.** Progress and name conflicts, in a pop-up. |
 | ![Files](docs/screenshots/files.png) **Files.** Yazi, with previews and a drag-and-drop shelf. | ![File picker](docs/screenshots/files-picker.png) **File picker.** The browser asks for a file and Yazi answers. |
+| ![Notes](docs/screenshots/notes.png) **Notes.** To-dos with dates, reminders and links to folders, on top of `nb`. | ![Quick note](docs/screenshots/notes-quick.png) **Quick note and reminders.** `Super+N` from anywhere; a reminder arrives as a notification. |
 | ![Launcher](docs/screenshots/launcher.png) **One palette.** Apps, files, settings, skills, packages and windows from one place. | ![Boot settings](docs/screenshots/settings-boot.png) **Boot settings.** The menu and the loading screen, from the panel. |
 | ![GPU settings](docs/screenshots/settings-gpu.png) **GPU.** Fan curve, limits and per-game profiles. | ![Projects](docs/screenshots/settings-projects.png) **Projects.** A whole workspace, saved and reopened. |
 | ![Backup and sync](docs/screenshots/settings-backup.png) **Backup and sync.** Home snapshots, external copies and configuration history. | ![Privacy and network](docs/screenshots/settings-privacy.png) **Privacy.** Who used the microphone, camera or screen, and the per-app firewall. |
@@ -152,7 +153,7 @@ Light mode is designed, not inverted. Profiles have names (`work`, `night`, `pre
 
 ## Everything is set in one place
 
-A settings panel inside Noctalia configures the whole core, on twenty-four pages: from appearance, windows and keybindings to GPU, sound, projects, backups, privacy and boot.
+A settings panel inside the shell configures the whole core, on twenty-five pages: from appearance, windows and keybindings to GPU, sound, notes, projects, backups, privacy and boot.
 
 - **One place per setting.** Each setting lives in its app's own config file, or in `~/.config/kavat/` for the system's own.
 - **Live and reversible.** Every change shows instantly, has undo and lands in a history.
@@ -194,6 +195,17 @@ Yazi is the file manager, and the file explorer for the whole system.
 - **No Vim keys required.** Arrows, `Enter`, `Backspace`, `Ctrl+C` / `Ctrl+V`, `Del` and `F2` work; the Vim ones are still there.
 - **Copying you can see.** Pasting opens a pop-up with per-file and total progress, and asks what to do when a name already exists.
 - **Previews in the terminal.** Images, video thumbnails, PDFs, archives and code.
+
+## Notes
+
+Notes are part of the system, built on a fork of [`nb`](https://github.com/xwmx/nb). A note is a Markdown file in `~/Notes`, every notebook is a git repository, and the command is still `nb`.
+
+- **To-dos with dates.** Due dates the system understands, with Today, Upcoming and Overdue views and a count in the bar.
+- **Reminders.** A date and time on any note. The reminder arrives as a notification you can open, snooze or mark as done, and it waits while you play.
+- **Links to folders.** A link to a folder opens it in Yazi, and a link to `file:line` opens Neovim on that line. From Yazi, one key opens the note of the folder you are in.
+- **Kavat takes notes.** "Note that…", "remind me on Friday…", "what did I write about the TPM?". What it writes is marked as its own, every change is a commit you can undo, and private notebooks stay closed to it.
+- **Quick note.** `Super+N` from anywhere: one line, read for tags and dates as you type, saved to the inbox.
+- **Indexed.** Titles, tags, links and dates are indexed as you save, so the palette, the to-do views and the agent all search the same thing.
 
 ## The browser
 
@@ -290,6 +302,7 @@ Today the repository holds this README and the `docs/` folder. The rest arrives 
 | `themes/` | Tokens, templates and bundled themes | 3 |
 | `greeter/` | web-greeter theme | 3 |
 | `kav/` | The package manager, its TUI and the AUR allowlist | 3 |
+| `notes/` | `kavat-notes`: the `nb` fork, its TUI, the index and the reminders | 3 |
 | `agent/` | `kavatd`, tools, skills and the agent's Modelfile | 4 |
 | `tests/` | Boots and installs every ISO build in a virtual machine | 1 |
 
