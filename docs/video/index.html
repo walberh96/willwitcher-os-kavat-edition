@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Willwitcher-OS Kavat Edition · a tour with Kavat</title>
+<!--
+  The film behind docs/video/kavat-tour.mp4. Kavat, the system's agent, shows the system around.
+  Every picture is the interactive mockup (docs/mockup/index.html), loaded in frames, one per shot.
+
+  Open this file in a browser to watch it play, without sound. tools/make-video.cjs renders it
+  to a video: it speaks each line, tells this page how long each one lasts, and then asks for
+  one frame at a time through setT(seconds). Nothing here reads the clock while rendering.
+-->
+<style>
+*{box-sizing:border-box;margin:0}
+html,body{background:#07080c;overflow:hidden;height:100%}
+body{font-family:Inter,-apple-system,"SF Pro Display","Segoe UI",sans-serif;color:#e9e6df}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;
+  background:radial-gradient(1200px 700px at 78% 8%,#3a2a12 0,transparent 60%),radial-gradient(900px 600px at 8% 96%,#1b2440 0,transparent 62%),#0b0d13}
+#shots{position:absolute;left:240px;top:28px;width:1440px;height:900px;border-radius:22px;overflow:hidden;
+  box-shadow:0 0 0 1px #262a33,0 40px 110px #000c,0 0 90px -20px #f2a93b55}
+.shot{position:absolute;left:0;top:0;width:1600px;height:1000px;border:0;transform-origin:0 0;opacity:0;background:#0e1016}
+#chapter{position:absolute;left:60px;top:44px;width:160px;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:#f2a93b;line-height:1.5}
+#chapter b{display:block;font-size:44px;letter-spacing:0;color:#e9e6df;opacity:.22;font-weight:700;margin-bottom:6px}
+#bar{position:absolute;left:0;bottom:0;height:4px;background:#f2a93b}
+#cap{position:absolute;left:390px;right:120px;top:946px;height:120px;display:flex;align-items:center;font-size:35px;line-height:1.32;font-weight:500;letter-spacing:-.01em}
+#cap span{color:#77736b}
+#cap span.said{color:#e9e6df}
+#cap span.now{color:#14110a;background:#f2a93b;border-radius:8px;box-shadow:0 0 0 5px #f2a93b}
+#kavat{position:absolute;left:0;top:0;width:340px;height:120px;transform-origin:170px 60px}
+#kavat .head{fill:#f2a93b}
+#kavat .eye{fill:#0e1016;transform-box:fill-box;transform-origin:center}
+#kavat .wh{fill:none;stroke:#f2a93b;stroke-width:2.4;stroke-linecap:round}
+#title,#end{position:absolute;left:0;right:0;text-align:center}
+#title{top:620px}
+#title h1{font-size:92px;letter-spacing:-.03em;font-weight:750}
+#title h1 small{display:block;font-size:34px;letter-spacing:.34em;text-transform:uppercase;color:#f2a93b;font-weight:600;margin-top:14px}
+#end{top:600px;font-size:30px;color:#a9a59c;line-height:1.7}
+#end b{display:block;font-size:64px;color:#e9e6df;letter-spacing:-.02em}
+#end i{font-style:normal;color:#f2a93b}
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="shots"></div>
+  <div id="chapter"></div>
+  <div id="title"><h1>Willwitcher-OS<small>Kavat Edition</small></h1></div>
+  <div id="end"><b>Willwitcher-OS <i>Kavat Edition</i></b>Phase 0 · the design, the mockup and every decision are in this repository</div>
+  <svg id="kavat" viewBox="0 0 340 120">
+    <g id="whs"></g>
+    <g transform="translate(110 0) scale(1.2)">
+      <path class="head" d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/>
+      <path class="eye" d="M30 50 L42 56 L30 60 Z"/><path class="eye" d="M70 50 L58 56 L70 60 Z"/>
+    </g>
+  </svg>
+  <div id="cap"></div>
+  <div id="bar"></div>
+</div>
+<script>
+// One entry per line Kavat says. `say` is the caption; `shots` are states of the mockup,
+// shown one after another while the line lasts. An empty `shots` leaves the stage to Kavat.
+const SEG = [
+  {ch:'Meet Kavat', say:"Hi. I'm Kavat. I live inside this computer, and I'd like to show you around.", shots:[]},
+  {ch:'Arch, with an opinion', say:"This is Willwitcher OS, Kavat Edition. Underneath, it is Arch Linux. On top, it has an opinion: installed in ten minutes, and already set up the way you work.", shots:['scene=desk']},
+  {ch:'A voice of its own', say:"You can talk to me. I run on this machine, offline, in four gigabytes of the graphics card. When I answer, an island drops from the bar, and my whiskers move with my voice.", shots:['scene=voice&voice=speak','scene=settings&spage=agent']},
+  {ch:'No shell, typed tools', say:"I never get a shell. I get typed tools with four levels of permission. Everything I do is logged, and everything can be undone.", shots:['scene=agent','scene=settings&spage=skills']},
+  {ch:'One theme, every app', say:"One theme dresses everything: the desktop, the terminal, the editor, the boot screen, even the icons and the cursor. Change the palette, and the whole system follows in under a second.", shots:['scene=themes','scene=themes&pal=tokyo','scene=themes&pal=rose&mode=light','scene=desk&pal=everforest','scene=settings&spage=appearance&pal=gruvbox']},
+  {ch:'Three modes', say:"Three modes switch the whole machine. Coder, for every day. Gamer, where I step aside and the game gets everything. And Incognito, where all traffic leaves through a VPN.", shots:['scene=settings&spage=modes','scene=desk&sys=gamer','scene=desk&sys=incog']},
+  {ch:'kav', say:"Packages go through kav. Official packages are free. The AUR only enters through a reviewed list, pinned to a commit. And every change takes a snapshot you can boot back into.", shots:['scene=kav&ktab=dash','scene=kav&ktab=aur','scene=kav&ktab=snaps']},
+  {ch:'Two-way settings', say:"Every setting lives in a plain file. Change it in the panel, or change it in Neovim. Each one follows the other.", shots:['scene=settings&spage=windows','scene=editor&cfg=windows']},
+  {ch:'Ask what is running', say:"When something runs hot, ask me. I will tell you what it is, who started it, and whether to worry.", shots:['scene=desk&notices=true','scene=top','scene=top&ttab=history']},
+  {ch:'And the rest', say:"Files in Yazi. Notes with reminders. A browser of its own. One palette for everything. And an installer that lets you pick your tools before the first boot.", shots:['scene=files','scene=notes','scene=browser','scene=launcher','scene=install&istep=software']},
+  {ch:'Where it stands', say:"Today, all of this is a design. Nothing is built yet. The first ISO comes next. I will be waiting.", shots:['scene=boot']},
+];
+const LEAD=.35, TAIL=.75, FADE=.45, INTRO=1.6, OUTRO=2.6;
+const $=s=>document.querySelector(s), clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const ease=u=>{u=clamp(u);return u*u*(3-2*u)}, mix=(a,b,u)=>a+(b-a)*u;
+
+// shots: one frame of the mockup each, stacked; setT decides which ones show
+const frames=[];
+SEG.forEach((s,i)=>{s.f=s.shots.map(h=>{const f=document.createElement('iframe');f.className='shot';f.src='../mockup/index.html#bare=true&'+h;$('#shots').appendChild(f);frames.push(f);return f})});
+window.ready=Promise.all(frames.map(f=>new Promise(r=>f.addEventListener('load',r)))).then(()=>new Promise(r=>setTimeout(r,600)));
+
+// each line is split into sentences, and each sentence into words, for the captions
+SEG.forEach(s=>{s.sent=s.say.match(/[^.!?:]+[.!?:]+/g).map(x=>x.trim());s.chars=s.sent.reduce((a,x)=>a+x.length,0)});
+function setDurations(d){let t=0;SEG.forEach((s,i)=>{s.speech=d?d[i]:s.say.split(' ').length/2.6;s.lead=LEAD+(i===0?INTRO:0);s.len=s.lead+s.speech+TAIL+(i===SEG.length-1?OUTRO:0);s.t0=t;t+=s.len});window.total=t;return t}
+setDurations();
+window.setDurations=setDurations;
+// where each line starts speaking, for the tool that lays the voice under the picture
+window.cues=()=>SEG.map(s=>({at:s.t0+s.lead,say:s.say}));
+
+// whiskers: three a side, drawn as waves that travel away from the face while Kavat speaks
+const WH=[[-7,10,2.2,5.2,0],[0,12,2.8,6.4,1.7],[7,10,3.3,5.8,3.1]];
+$('#whs').innerHTML=WH.map(([a])=>[1,-1].map(s=>`<g transform="translate(${170+s*36} 62) scale(${s} 1) rotate(${a})"><path class="wh"/></g>`).join('')).join('');
+const whp=[...document.querySelectorAll('.wh')];
+function whiskers(t,loud){whp.forEach((el,i)=>{const [,amp,k,sp,f]=WH[i>>1];const l=.07+loud*(.3+.7*Math.abs(Math.sin(t*2.3+f)*Math.sin(t*3.7+f*2+(i&1)*.5))**.6);
+  let d='M0 0';for(let j=1;j<=48;j++){const u=j/48;d+=` L${(128*u).toFixed(1)} ${(amp*l*2.3*Math.sqrt(u)*(1-u)**.9*Math.sin(2*Math.PI*k*u-sp*t+f)).toFixed(2)}`}el.setAttribute('d',d)})}
+
+function setT(t){
+  t=clamp(t,0,window.total-.001);
+  const i=SEG.findIndex(s=>t<s.t0+s.len), s=SEG[i], lt=t-s.t0, last=i===SEG.length-1;
+  const speak=clamp((lt-s.lead)/s.speech), talking=lt>s.lead&&lt<s.lead+s.speech;
+  // shots
+  SEG.forEach((x,j)=>x.f.forEach((f,k)=>{
+    const n=x.f.length, span=(x.len-(j===SEG.length-1?OUTRO:0))/n, a=x.t0+k*span, b=a+span;
+    const first=j===1&&k===0, end=j===SEG.length-1&&k===n-1;
+    let o=ease((t-a)/FADE+(first?0:.5))*(1-ease((t-b)/FADE+.5));
+    if(end)o=ease((t-a)/FADE+.5)*(1-ease((t-b+.3)/.8));
+    f.style.opacity=o;f.style.visibility=o>0?'visible':'hidden';
+    const z=.9*mix(1,1.012,clamp((t-a)/span));f.style.transform=`scale(${z}) translate(${-800*(1-.9/z)}px,${-500*(1-.9/z)}px)`}));
+  // Kavat: centre stage for the first line and at the very end, in the corner in between
+  const out=last?ease((lt-(s.len-OUTRO))/.9):0, m=i===0?0:i===1?ease(lt/.8):1-out;
+  const sc=mix(3.4,1.05,m)*ease(t/.9+.02), bob=Math.sin(t*1.7)*4*(1-m*.6);
+  $('#shots').style.opacity=i===0?0:i===1?ease(lt/.7):1-out;
+  $('#kavat').style.transform=`translate(${mix(790,20,m)}px,${mix(340,946,m)+bob}px) scale(${sc})`;
+  const blink=(t%3.7)<.13?.12:1;document.querySelectorAll('#kavat .eye').forEach(e=>e.style.transform=`scaleY(${blink})`);
+  whiskers(t,talking?1:0);
+  // words
+  $('#title').style.opacity=i===0?ease((t-.7)/.8):0;$('#title').style.transform=`translateY(${i===0?mix(24,0,ease((t-.7)/.8)):0}px)`;
+  $('#end').style.opacity=out;$('#end').style.transform=`translateY(${mix(24,0,out)}px)`;
+  $('#chapter').innerHTML=i?`<b>${String(i).padStart(2,'0')}</b>${s.ch}`:'';$('#chapter').style.opacity=i?(1-out)*ease(lt/.5):0;
+  let done=0,html='';
+  for(const x of s.sent){const a=done/s.chars,b=(done+x.length)/s.chars;done+=x.length;
+    if(speak<b||x===s.sent[s.sent.length-1]){const w=x.split(' '),n=Math.floor(clamp((speak-a)/(b-a))*w.length);
+      html=w.map((v,j)=>`<span class="${j<n?'said':j===n&&talking?'now':''}">${v}</span>`).join(' ');break}}
+  $('#cap').innerHTML='<div>'+html+'</div>';$('#cap').style.opacity=(i===0?ease((lt-INTRO+.2)/.4):1)*(1-out);
+  $('#bar').style.width=(t/window.total*1920)+'px';
+}
+window.setT=setT;setT(0);
+
+// watching it in a browser: fit the window and play against the clock
+if(!location.hash.includes('render')){
+  const fit=()=>{const k=Math.min(innerWidth/1920,innerHeight/1080);$('#stage').style.transform=`translate(${(innerWidth-1920*k)/2}px,${(innerHeight-1080*k)/2}px) scale(${k})`};
+  fit();addEventListener('resize',fit);
+  window.ready.then(()=>{const t0=performance.now();(function loop(){setT(((performance.now()-t0)/1000)%window.total);requestAnimationFrame(loop)})()});
+}
+</script>
+</body>
+</html>

@@ -16,7 +16,7 @@ Fast like a tiling WM. Curated like one person's system. And with someone inside
 
 `Arch Linux` · `Hyprland` · `Noctalia` · `Calamares` · `kav` · `Neovim` · `Yazi` · `Custom Chromium` · `Local agent`
 
-**[Interactive mockup](docs/mockup/index.html)** · **[Design document](docs/DESIGN.md)** (in Spanish) · **[Screenshots](docs/screenshots/)**
+**[Watch the tour](docs/video/kavat-tour.mp4)** · **[Interactive mockup](docs/mockup/index.html)** · **[Design document](docs/DESIGN.md)** (in Spanish) · **[Screenshots](docs/screenshots/)**
 
 </div>
 
@@ -309,6 +309,7 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 | --- | --- |
 | Design document: every piece, every decision and what is still to be verified (in Spanish) | [`docs/DESIGN.md`](docs/DESIGN.md) |
 | Pending decisions: what is still waiting for an answer (in Spanish) | [`docs/PENDING.md`](docs/PENDING.md) |
+| A two-minute tour, narrated by Kavat | [`docs/video/kavat-tour.mp4`](docs/video/kavat-tour.mp4) |
 | Interactive mockup of the interface | [`docs/mockup/index.html`](docs/mockup/index.html) |
 | Screenshots of the mockup | [`docs/screenshots/`](docs/screenshots/) |
 | The cat's ASCII art for the terminal | [`docs/assets/kavat-ascii.txt`](docs/assets/kavat-ascii.txt) |
@@ -317,7 +318,7 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 
 ## The repository
 
-Today the repository holds this README, the `docs/` folder, the research reports in `reports/` and two maintenance scripts in `tools/`, which check the documents' links and retake the screenshots. The rest arrives with each phase:
+Today the repository holds this README, the `docs/` folder, the research reports in `reports/` and three maintenance scripts in `tools/`, which check the documents' links, retake the screenshots and render the tour video. The rest arrives with each phase:
 
 | Folder | Contents | Phase |
 | --- | --- | --- |

@@ -38,4 +38,5 @@ Los dos diagramas del documento de diseño son imágenes en `docs/img/` y no tie
 ## Herramientas
 
 - `tools/check-links.py`: comprueba que los enlaces del README, de `docs/DESIGN.md` y de `docs/PENDING.md` apuntan a archivos que existen. Se pasa tras editar cualquiera de los tres.
+- `tools/make-video.cjs [segundos]`: rehace `docs/video/kavat-tour.mp4`, el recorrido narrado por Kavat, desde `docs/video/index.html`, que usa el mockup como imagen. Solo funciona en macOS, por la voz, y pide `puppeteer-core` y `ffmpeg-static` instalados fuera del repo; el uso está en la cabecera del script. El vídeo va en inglés.
 - `tools/screenshots.sh [nombre ...]`: rehace las capturas de `docs/screenshots/` desde el mockup, con Chrome o Chromium sin ventana.
