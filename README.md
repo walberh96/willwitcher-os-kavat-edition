@@ -56,6 +56,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![GPU settings](docs/screenshots/settings-gpu.png) **GPU.** Fan curve, limits and per-game profiles. | ![Projects](docs/screenshots/settings-projects.png) **Projects.** A whole workspace, saved and reopened. |
 | ![Backup and sync](docs/screenshots/settings-backup.png) **Backup and sync.** Home snapshots, external copies and configuration history. | ![Privacy and network](docs/screenshots/settings-privacy.png) **Privacy.** Who used the microphone, camera or screen, and the per-app firewall. |
 | ![Windows settings](docs/screenshots/settings-windows.png) **Two-way settings.** Change a value in the panel or in the file; each follows the other. | ![Config in Neovim](docs/screenshots/config-in-neovim.png) **One click to the file.** Every page opens its config in Neovim. |
+| ![Kavat speaking](docs/screenshots/agent-voice.png) **Kavat speaking.** An island under the bar: its whiskers move with its voice, and captions follow word by word. | |
 
 ## Talk to it
 
@@ -78,6 +79,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 - **It fits next to a game.** The agent takes at most 4 GB of the GPU's memory. It stays loaded while you work, so it answers at once, and leaves memory in Gamer mode. Its voice runs on the CPU.
 - **Small model, made reliable.** It starts on Qwen3.5 4B. For each request it sees only the five to eight tools that fit, a skill with several steps is a single call, and an exact phrase never reaches the model.
 - **It has a voice.** It listens and speaks through VoiceStudio, also locally.
+- **You can see it speak.** While it talks, an island drops from the bar with Kavat's face. Its whiskers are the sound of its voice, and the words appear as captions, lit one by one. The same island shows what it heard you say and which tool it is calling, and the keyboard and case lights pulse along.
 - **It has no shell.** It talks to `kavatd`, a daemon of typed tools with four permission levels. Reading is free. Changing a theme is free and logged. Installing something asks first and takes a snapshot. Touching disks, users or the network asks for your password.
 - **It cannot grant itself permissions**, and everything it does can be undone.
 - **What it reads is never an order.** A web page, a file or a command's output is only information. Only your messages, your clicks and the skills you launch can make it act.
@@ -227,7 +229,7 @@ A Chromium of its own, with seven changes.
 ## Built for a gaming desktop
 
 - **A GPU page.** Fan curve, power limit and sensors in the bar for the Radeon RX 6800.
-- **Lights follow the theme.** Keyboard and case take the accent colour and change with the mode.
+- **Lights follow the theme.** Keyboard and case take the accent colour, change with the mode and pulse with Kavat's voice.
 - **A clean microphone.** Noise suppression is on out of the box, for the agent's voice and for streams.
 - **Easier on the eyes.** Reduce motion, text scale and high contrast, on one page.
 
@@ -241,9 +243,9 @@ A Chromium of its own, with seven changes.
 - **Config is checked before it is applied.** A bad edit rolls back to the last good version and tells you which line failed.
 - **`kav doctor`** tells you what is wrong before you notice.
 - **A health check after every update**, with an offer to roll back if it fails.
-- **Your files too.** Hourly snapshots of `/home`, browsable from Yazi, and an encrypted copy to an external disk.
+- **Your files too.** Hourly snapshots of `/home`, browsable from Yazi, and an encrypted copy to an external disk. The Steam library has its own subvolume and stays out of the snapshots.
 - **Configuration history.** Every change, from the panel or by hand, is a commit; the history can sync to a private repository.
-- **Privacy in plain sight.** The bar shows when an app uses the microphone, camera or screen, and a per-app firewall asks the first time an app reaches for the network.
+- **Privacy in plain sight.** The bar shows when an app uses the microphone, camera or screen, and a per-app firewall asks the first time an app reaches for the network. Games launched by Steam use Steam's rule.
 
 ## From power button to desktop
 
