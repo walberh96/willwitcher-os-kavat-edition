@@ -114,11 +114,11 @@ LightDM con web-greeter muestra un tema propio en HTML/CSS/JS que lee los mismos
 - **Varios usuarios**: selector por avatar; cada usuario ve el login con su propio tema.
 - **Bloqueo de pantalla**: mismo diseño que el login, hecho con hyprlock, para que bloquear y entrar se vean iguales.
 
-Decidido: LightDM + web-greeter con tema propio. Riesgo a vigilar: web-greeter vive en el AUR, depende de Qt WebEngine y su mantenimiento es irregular. La propuesta es hacer fork y empaquetarlo como `kavat-greeter`. El plan B es greetd con un greeter en Quickshell, que reutiliza el código de Noctalia y corre en Wayland nativo.
+Decidido: LightDM + web-greeter con tema propio. Riesgo a vigilar: web-greeter vive en el AUR, depende de Qt WebEngine y su mantenimiento es irregular. La propuesta es hacer fork y empaquetarlo como `kavat-greeter`. El plan B es greetd con el greeter del propio Noctalia, que corre en Wayland nativo.
 
 ## Escritorio
 
-Hyprland compone las ventanas y un fork de Noctalia (hecho sobre Quickshell) pone la barra, el lanzador, las notificaciones, el centro de control y el panel del agente.
+Hyprland compone las ventanas y un fork de Noctalia 5 pone la barra, el lanzador, las notificaciones, el centro de control, el panel del agente y el panel de ajustes.
 
 **Hyprland.** Decidido: no tocar el código del compositor al principio. La identidad va en un paquete `kavat-hyprland` con configuración modular y plugins; si la versión actual de Hyprland impide algo que queramos hacer, el fork del código se abre desde el día 1.
 
@@ -162,10 +162,10 @@ Atajos: 19 heredados de Endgame tal cual y 9 nuevos para lo que antes no existí
 | Menú de energía | `Super+Escape` | Nuevo |
 | Hoja de atajos | `Super+/` | Nuevo |
 
-**Noctalia.** Aquí sí hay fork de código, empaquetado como `kavat-shell`.
+**Noctalia.** Decidido: fork de Noctalia 5. Desde ese punto es nuestra app, con nuestros cambios, empaquetada como `kavat-shell`.
 
-- Parches chicos sobre cada tag de upstream, reaplicados en cada versión; lo que sea útil para todos se propone upstream para cargar menos diferencia.
-- Añadidos propios: panel del agente, selector de temas con vista previa, panel de `kav` (actualizaciones, snapshots, solicitudes de AUR) y el asistente de primer arranque.
+- Parte de Noctalia 5.4.1, escrito en C++ y con licencia MIT. No se sigue cada versión de upstream: lo que interese de ellas se trae a mano, así que la regla de reaplicar parches no vale para este fork.
+- Añadidos propios: panel de ajustes con páginas nativas, panel del agente, selector de temas con vista previa, panel de `kav` (actualizaciones, snapshots, solicitudes de AUR) y el asistente de primer arranque.
 - El motor de colores de Noctalia se sustituye o se alimenta desde los tokens del sistema, para que haya una sola fuente de verdad.
 
 **Paleta de comandos.** `Super+D` abre una sola paleta para todo el sistema: apps, archivos, ajustes, skills, paquetes, ventanas abiertas y pestañas del navegador. Usa la misma gramática y los mismos nombres de comando que la consola del navegador y la paleta de Neovim, y lo que no encuentra se lo puede pasar al agente.
@@ -523,26 +523,25 @@ Piezas:
 
 - **`kavatd`**: daemon que expone las herramientas (por D-Bus o MCP). `kav`, `kavat-theme` y `hyprctl` son las primeras. El modelo nunca recibe una shell libre.
 - **Modelo**: un Modelfile sobre un modelo base de Ollama elegido por pruebas, no por nombre. Se mide contra un conjunto de tareas reales del sistema («pon modo oscuro», «qué está usando la RAM», «instala X») y gana el más pequeño que las acierta. El ajuste fino queda para una segunda vuelta. No tiene que programar ni hacer tareas pesadas: para eso está Claude en el editor. Su trabajo es manejar el sistema. El modelo es configurable: se puede cambiar por otro desde el panel.
-- **Límite de 4 GB**: el modelo de lenguaje y los modelos de voz ocupan juntos 4 GB como máximo cargados en memoria, para que el agente conviva con un juego sin tener que cerrarlo. El reparto entre ambos se decide midiendo; los modelos de voz solo se cargan cuando la voz está activa. Se descarga de memoria tras unos minutos sin uso.
-- **Voz con VoiceStudio**: el agente escucha y habla a través de VoiceStudio, que corre en local y ofrece dictado, transcripción, síntesis y clonación de voz por una API local y por MCP. kavatd lo usa como servicio: lo que dices se transcribe, pasa al modelo y la respuesta se sintetiza con una voz propia de Kavat. Se empaqueta como kavat-voice; su licencia es AGPL-3.0, sin problema para uso personal. Sus modelos cuentan dentro del límite de 4 GB, así que se eligen los motores de voz más ligeros que den buena calidad.
+- **Límite de 4 GB**: el agente ocupa como máximo 4 GB de la memoria de la GPU, para que conviva con un juego sin tener que cerrarlo. El modelo de lenguaje corre en la GPU, que es donde se nota la velocidad. La voz corre en la CPU: sus motores ligeros son de CPU, y ahí ya reconocen varias veces más rápido que el tiempo real. Usa entre 1 y 2,5 GB de RAM, que no cuentan en el límite, y sus modelos solo se cargan cuando la voz está activa. Se descarga de memoria tras unos minutos sin uso.
+- **Voz con VoiceStudio**: el agente escucha y habla a través de VoiceStudio, que corre en local y ofrece dictado, transcripción, síntesis y clonación de voz por una API local y por MCP. kavatd lo usa como servicio: lo que dices se transcribe, pasa al modelo y la respuesta se sintetiza con una voz propia de Kavat. Se empaqueta como kavat-voice; su licencia es AGPL-3.0, sin problema para uso personal. Sus motores corren en la CPU y no gastan memoria de la GPU; aun así se eligen los más ligeros que den buena calidad.
 - **Interfaz**: panel en Noctalia con `Super+Space`, y `kavat ask "..."` en el terminal.
 - **Contexto del sistema**: el agente conoce la documentación de Willwitcher-OS, tus atajos y tu configuración, así que contesta sobre tu máquina, no sobre Linux en general.
 - **Registro**: cada llamada a una herramienta queda en un log legible con qué pidió, qué hizo y cómo deshacerlo.
 - **Sin red**: el agente funciona sin conexión y no envía nada fuera. Cualquier herramienta que use red se activa aparte.
 
-**Análisis del modelo.** En noviembre de 2026 se compararon los modelos pequeños de Ollama para este trabajo. Lo que sigue es una propuesta: ningún modelo se ha ejecutado todavía en la máquina real. El informe completo, con sus fuentes, está en [`reports/Modelo local para el agente Kavat.md`](../reports/Modelo%20local%20para%20el%20agente%20Kavat.md).
+**Análisis del modelo.** En noviembre de 2026 se compararon los modelos pequeños de Ollama para este trabajo. Lo que sigue es una propuesta: ningún modelo se ha ejecutado todavía en la máquina real. El informe completo, con sus fuentes, está en [`reports/Modelo local para el agente Kavat.md`](../reports/Modelo%20local%20para%20el%20agente%20Kavat.md); como el límite es de memoria de la GPU, vale su apartado «Si el límite contara solo la VRAM».
 
 | Pieza | Propuesta | Dónde corre | Memoria |
 | --- | --- | --- | --- |
-| Modelo de lenguaje | LFM3 1.7B de Liquid AI (`lfm3:1.7b-q4_K_M`) | GPU | 1,4 a 1,5 GB |
-| Reconocimiento de voz | Parakeet TDT v3, dentro de VoiceStudio | CPU | 1 a 1,5 GB, estimado |
-| Síntesis de voz | Supertonic-3, dentro de VoiceStudio | CPU | 0,4 a 0,5 GB, estimado |
-| VoiceStudio en sí |  | CPU | 0,5 GB |
-| Total |  |  | 3,3 a 4,0 GB |
+| Modelo de lenguaje | Qwen3.5 4B (`qwen3.5:4b-q4_K_M`) | GPU | 3,3 GB de descarga; cargado, cerca de 4 GB de VRAM, sin medir |
+| Reconocimiento de voz | Parakeet TDT v3, dentro de VoiceStudio | CPU | 1 a 1,5 GB de RAM, estimado |
+| Síntesis de voz | Supertonic-3, dentro de VoiceStudio | CPU | 0,4 a 0,5 GB de RAM, estimado |
+| VoiceStudio en sí |  | CPU | 0,5 GB de RAM |
 
-- **Por qué LFM3 1.7B**: es el único modelo de 2026 hecho para agentes con herramientas que cabe con margen junto a una voz buena en inglés y español. Es provisional: sus notas son del fabricante y lleva dos semanas disponible en Linux.
-- **Alternativas, por orden**: Qwen3.5 2B, Qwen3 1.7B (el único de su tamaño medido por terceros) y Bonsai 2 4B.
-- **El mejor medido no cabe**: Qwen3.5 4B es el modelo pequeño con mejores pruebas independientes, pero no cabe junto a la voz en 4 GB. Cabría si el límite contara solo la memoria de la GPU.
+- **Por qué Qwen3.5 4B**: es el modelo pequeño con mejores pruebas independientes: 87 % en el banco de pruebas de Home Assistant, que es el proyecto más parecido a este, y 97,5 % en otra prueba de 40 casos.
+- **Cabe justo**: su memoria cargada no está medida. De sus 3,3 GB, 0,7 son un proyector de visión que el agente no usa, y no se sabe si Ollama lo carga. Si no entra en 4 GB, se acorta el contexto o se pasa a una alternativa.
+- **Alternativas, por orden**: Ministral 3 3B (80 % en el mismo banco), Qwen3 4B Instruct (75 %; es el que Home Assistant usa por defecto) y LFM3 1.7B, que ocupa 1,5 GB pero solo tiene notas del fabricante.
 - **Cómo se confirma**: con la prueba que este documento ya pedía, ahora con números: unos 240 casos propios en inglés y español, cuatro veces por candidato, midiendo aciertos, latencia y memoria con un juego abierto.
 - **El modelo pequeño necesita ayuda del diseño**: el informe propone enseñarle de cinco a ocho herramientas por petición en lugar de todas, usar nombres en inglés por dentro, y que una skill de varios pasos sea una sola llamada que ejecuta `kavatd`. Las frases exactas que no pasan por el modelo ya están en el diseño.
 
@@ -680,11 +679,11 @@ La fase 1 usa Hyprland y Noctalia tal como vienen; los forks y la identidad entr
 
 ## Decisiones en revisión
 
-El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. Todos tienen ya respuesta; del shell solo queda decidir dónde vive el panel de ajustes. La columna Estado lo resume. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
+El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. Todos tienen ya respuesta; la columna Estado lo resume. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
 
 | # | Decisión que toca | Qué se encontró | Estado |
 | --- | --- | --- | --- |
-| 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt, con plugins en Luau | Evaluado: Noctalia 5 permite lo que queremos sin fork, con plugins propios, salvo el panel de ajustes, que no cabe en su ventana de ajustes. Falta decidir dónde vive ese panel; el detalle está debajo de la tabla |
+| 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt, con plugins en Luau | Decidido: fork de Noctalia 5, empaquetado como kavat-shell; desde ese punto es nuestra app. La evaluación mostró que casi todo cabía con plugins, pero el panel de ajustes no; con el fork queda dentro. El detalle está debajo de la tabla |
 | 2 | Configuración de Hyprland en archivos que el panel edita línea a línea | Desde Hyprland 0.55 la configuración es Lua y el formato anterior está obsoleto | Decidido: se usa Lua; el panel escribe una tabla de valores que el Lua del sistema carga |
 | 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2 | En parte: la reinscripción será una intervención guiada de `kav update`. Dónde vive el kernel de cada snapshot se ve en la fase 2 |
 | 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca. Es fuente secundaria y aún no está desplegado | Cerrado sin cambios: se mantienen las llaves propias y no se añade nada. Un juego que exija ese anti-cheat no funcionará |
@@ -714,10 +713,10 @@ Los dos ajustes menores que señalaba el informe tampoco se aplican: la VPN de I
 
 Lo que se desprende:
 
-- **No hace falta fork.** Lo que el diseño llama `kavat-shell` puede ser Noctalia tal como viene más un conjunto de plugins y configuración nuestros. El fork serían unas 360 000 líneas de C++ que sacan versión casi cada semana, y el propio proyecto manda los paneles extra a plugins.
-- **Pendiente: dónde vive el panel de ajustes.** Hay tres caminos. Una aplicación propia que se abre desde la barra, el lanzador o un atajo y usa el mismo tema; es la recomendación. Un panel hecho como plugin, con los límites de la tabla; la página Keybindings sería la más afectada. O el fork, para tener páginas nativas dentro de su ventana.
-- **Versión fijada.** La interfaz de plugins cambió trece veces en ocho semanas y el proyecto no promete estabilidad. El repositorio `[kavat]` fija la versión de Noctalia y solo la sube cuando nuestros plugins pasan las pruebas.
-- **Un solo dueño de los ajustes.** La ventana de ajustes de Noctalia sigue existiendo y escribe su propio archivo. En la fase 3 se decide si se oculta o si nuestro panel la refleja.
+- **Decidido: fork.** Para que el panel de ajustes quede dentro del shell, con páginas nativas, se hace fork de Noctalia 5. Desde ese punto `kavat-shell` es nuestra app, con nuestros cambios.
+- **Lo demás de la tabla sigue valiendo.** Lo que ya viene se aprovecha tal cual. Lo que pedía un plugin propio se puede hacer como plugin o directamente en el código, según convenga en cada caso.
+- **El coste.** Son unas 360 000 líneas de C++, y upstream saca versión casi cada semana. No se sigue ese ritmo: se parte de la 5.4.1 y se trae a mano lo que interese.
+- **Un solo dueño de los ajustes.** La ventana de ajustes pasa a ser la nuestra, así que ya no hay dos sitios que escriban la configuración.
 
 ## Ideas de otras distros
 
@@ -742,7 +741,7 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | --- | --- |
 | Compilación de la ISO | En tu PC de escritorio con Arch |
 | Máquina objetivo | Escritorio con AMD Radeon RX 6800 de 16 GB de VRAM |
-| Límite del agente | Agente y voz, 4 GB en total; quedan 12 GB de VRAM para juegos aun con el agente cargado |
+| Límite del agente | El agente ocupa como máximo 4 GB de VRAM; quedan 12 GB para juegos aun con él cargado. La voz corre en la CPU y usa RAM aparte |
 | Alcance | Solo para ti |
 | Idioma | Inglés por defecto; español preinstalado como segunda opción |
 | Menú de arranque | GRUB con menú propio y tema del sistema, configurable desde Noctalia |
@@ -765,7 +764,8 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Modos del sistema | Coder, Gamer e Incognito, seleccionables desde Noctalia |
 | Ventanas al entrar en Incognito | Las normales se ocultan y vuelven al salir |
 | Juego y hardware | Perfil por juego, página de GPU, luces que siguen al tema y supresión de ruido del micrófono |
-| Ajustes | Todo el núcleo se configura desde un panel en Noctalia |
+| Ajustes | Todo el núcleo se configura desde un panel dentro del shell, con páginas nativas |
+| Shell | Fork de Noctalia 5, empaquetado como kavat-shell: es nuestra app desde ahora, con nuestros cambios y con el panel de ajustes dentro |
 | Configuración | El archivo de configuración es la verdad y la calle es de doble sentido: el panel lo lee y lo edita, y un botón lo abre en Neovim desde cualquier parte |
 | Validación | Todo cambio de configuración se comprueba antes de aplicarse y vuelve atrás solo si falla |
 | Robustez | Comprobación tras actualizar, snapshots de `/home`, copias externas, e historial y sincronización de la configuración |
@@ -808,7 +808,7 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 | El cortafuegos por aplicación no estorba a Steam ni a los juegos | 3 |
 | Los snapshots horarios de `/home` no degradan el disco ni la CPU | 3 |
 | El perfil de sandbox del navegador no debilita el sandbox propio de Chromium | 3 |
-| Ollama y los motores de voz aceleran bien en la RX 6800 | 4 |
+| Ollama acelera bien en la RX 6800, el modelo elegido cabe cargado en 4 GB de VRAM y la voz va sobrada en la CPU | 4 |
 | Modelo y voz caben juntos en 4 GB con calidad aceptable | 4 |
 | El agente distingue de forma fiable lo que lee de lo que tú le pides | 4 |
 

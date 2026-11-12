@@ -44,7 +44,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![Login](docs/screenshots/login.png) **Login.** LightDM with its own theme, over your blurred wallpaper. | ![The agent](docs/screenshots/agent.png) **Kavat.** The agent, its clickable skills, and every tool it uses with its permission level. |
 | ![Light theme](docs/screenshots/themes-light.png) **Themes.** Palette, mode, accent and shape, live. | ![Wallpapers](docs/screenshots/settings-wallpaper.png) **Wallpapers.** Image or video, from the settings panel. |
 | ![Modes](docs/screenshots/settings-modes.png) **Modes.** Coder, Gamer and Incognito. | ![Skills](docs/screenshots/settings-skills.png) **Skills.** What the agent does with one click, one phrase or one key. |
-| ![Agent and voice](docs/screenshots/settings-agent.png) **Agent and voice.** Model and voice share 4 GB. | ![kav](docs/screenshots/kav-dashboard.png) **`kav`.** The package manager, as a TUI. |
+| ![Agent and voice](docs/screenshots/settings-agent.png) **Agent and voice.** At most 4 GB of the GPU. | ![kav](docs/screenshots/kav-dashboard.png) **`kav`.** The package manager, as a TUI. |
 | ![AUR review](docs/screenshots/kav-aur-review.png) **AUR review.** The diff, with the suspicious lines flagged. | ![Editor](docs/screenshots/editor-marketplace.png) **Editor.** Neovim with a plugin marketplace. |
 | ![Browser](docs/screenshots/browser.png) **Browser.** Command console and the agent's side panel. | ![Installer](docs/screenshots/installer.png) **Installer.** Calamares, appearance step. |
 | ![Claude panel](docs/screenshots/claude-panel.png) **Claude beside the code.** A Kitty split next to Neovim; edits arrive as diffs. | ![Copy pop-up](docs/screenshots/files-copy.png) **Copying you can see.** Progress and name conflicts, in a pop-up. |
@@ -72,7 +72,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 
 **Kavat**, the agent, runs on your machine. No cloud, no account, no telemetry. It is a compact model on Ollama, tuned for this system and only this system: it knows your shortcuts, your packages, your configuration and the OS documentation. It understands English and Spanish. Its job is running the system, not writing code: that is what Claude in the editor is for. The model can be swapped for another from the settings panel.
 
-- **It fits next to a game.** Model and voice share 4 GB at most, and unload from memory when you are not using them.
+- **It fits next to a game.** The agent takes at most 4 GB of the GPU's memory and unloads when you are not using it. Its voice runs on the CPU.
 - **It has a voice.** It listens and speaks through VoiceStudio, also locally.
 - **It has no shell.** It talks to `kavatd`, a daemon of typed tools with four permission levels. Reading is free. Changing a theme is free and logged. Installing something asks first and takes a snapshot. Touching disks, users or the network asks for your password.
 - **It cannot grant itself permissions**, and everything it does can be undone.
@@ -320,6 +320,6 @@ This README describes the finished system. Today the project is in **phase 0, de
 | 3 | Themes, settings, greeter, Noctalia fork, `kav` and editor | Pending |
 | 4 | Local agent, skills and voice | Pending |
 
-A study of Omarchy and other distributions reopened eight of those decisions. All are now answered. The current Noctalia was read against what this shell needs: it can host it through plugins, without a fork, except for the settings panel, whose home is the one point still to decide. They are listed, with their status, in the design document under «Decisiones en revisión».
+A study of Omarchy and other distributions reopened eight of those decisions. All are now answered. The current Noctalia was read against what this shell needs: plugins could host almost all of it, but not the settings panel, so the shell is a fork of Noctalia 5 and from that point on it is this system's own application. They are listed, with their status, in the design document under «Decisiones en revisión».
 
 The design also takes several assumptions for granted that have not been tested. They are listed, with the phase in which each gets verified, at the end of the [design document](docs/DESIGN.md#decisiones).
