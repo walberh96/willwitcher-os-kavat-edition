@@ -51,7 +51,7 @@ Los forks (Hyprland, Noctalia) viven en repos aparte y aquí solo está su PKGBU
 
 ## Instalador
 
-Calamares con branding propio hace una instalación sin red en 7 pantallas. Calamares no está en los repos oficiales de Arch, así que se empaqueta como `kavat-calamares` en `[kavat]`.
+Calamares con branding propio hace la instalación en 7 pantallas, y el sistema base se instala sin red. Calamares no está en los repos oficiales de Arch, así que se empaqueta como `kavat-calamares` en `[kavat]`.
 
 El idioma por defecto es inglés, con español como segunda opción del selector. Los dos vienen ya instalados en la ISO y en el sistema, con teclado US por defecto. Todo lo propio (instalador, greeter, shell, `kav` y agente) trae sus textos en ambos idiomas.
 
@@ -59,7 +59,7 @@ El idioma por defecto es inglés, con español como segunda opción del selector
 2. **Disco**: borrar todo, junto a otro sistema, o manual. Btrfs y subvolúmenes ya decididos; cifrado como un interruptor.
 3. **Usuario**: nombre, contraseña, nombre del equipo.
 4. **Hardware**: detecta GPU y propone controladores (NVIDIA, AMD, Intel) en vez de preguntar a ciegas. En tu equipo, AMD con los controladores libres de Mesa, que ya vienen en la ISO.
-5. **Perfil**: conjuntos de software opcionales (desarrollo, creación, juegos) y si se instala el agente con su modelo.
+5. **Software**: programas que se añaden al sistema base, marcados uno a uno por categorías, y si se instala el agente con su modelo. Necesita red; el detalle está debajo.
 6. **Apariencia**: tema, modo claro u oscuro y tono de acento, con vista previa en vivo del propio instalador.
 7. **Resumen e instalación**: lista exacta de lo que se va a hacer y barra de progreso con diapositivas.
 
@@ -67,9 +67,27 @@ Ideas propias sobre el Calamares de serie:
 
 - **Módulo `kavat-theme`**: lo elegido en la pantalla 6 queda aplicado al greeter, a Plymouth y al escritorio antes del primer arranque.
 - **Módulo `kavat-hardware`**: escribe la configuración de Hyprland según monitores y GPU detectados.
-- **Instalación sin red**: la ISO lleva los paquetes; con red solo se actualiza al final.
+- **Instalación sin red**: la ISO lleva los paquetes del sistema base; con red se actualiza al final y se añade el software elegido.
 - **Archivo de respuestas**: un `kavat-install.toml` en el USB reinstala tu máquina sin tocar nada.
 - **Primer arranque**: un asistente dentro de Noctalia termina lo que no pertenece al instalador (cuentas, llaves SSH, descarga del modelo).
+
+**Elegir el software.** En el paso 5 se marca lo que el sistema trae desde el primer arranque, además del sistema base.
+
+- **Categorías y casillas**: navegadores, desarrollo, creación, juegos, comunicación, multimedia y oficina, con una casilla por programa, como Firefox u OBS.
+- **Cualquier paquete**: un buscador añade lo que no esté en la lista, de los repos de Arch, de `[kavat]` o de la allowlist del AUR.
+- **Lo instala `kav`**, con sus reglas de siempre; lo del AUR solo entra por la allowlist.
+- **Necesita red**: lo que no viene en el sistema base se descarga durante la instalación. Sin red, el paso se salta y no deja añadir nada; el sistema se instala tal como viene.
+- **Se recuerda**: lo marcado queda en `kavat-install.toml`, así que reinstalar lo repite.
+
+La categoría Development trae lo que hace falta para trabajar en lanequarters, salvo su app móvil, que se compila en una Mac.
+
+| Grupo | Programas | Para qué |
+| --- | --- | --- |
+| Esenciales | git, github-cli, mise, pnpm, docker con compose, claude-code | Los proyectos piden Node 22 o superior y pnpm; mise pone la versión de Node de cada uno |
+| Web | supabase, postgresql (cliente `psql`), stripe-cli | `supabase start` levanta la base local en Docker; `stripe listen` recibe los webhooks |
+| Al primer arranque, con pnpm | Navegadores de Playwright, vercel | No son paquetes de pacman: los instala pnpm y `kav` no los gestiona |
+
+La extensión de navegador se prueba en `kavat-browser`, que es un fork de Chromium y admite las extensiones de Chrome. Tres de la lista vienen del AUR (claude-code, supabase y stripe-cli) y necesitan su entrada en la allowlist; en qué repositorio está cada paquete se comprueba al escribirla.
 
 ## Arranque
 
@@ -218,7 +236,7 @@ Al entrar en Incognito, las ventanas normales del navegador ya abiertas se ocult
 
 El equipo es un escritorio con una Radeon RX 6800, y el sistema lo trata como tal.
 
-- **Perfil por juego**: en modo Gamer, cada juego puede tener su monitor de rendimiento, su límite de fotogramas y su perfil de GPU. El monitor y el límite son de MangoHud, y gamescope fija la resolución y el escalado de cada juego; los dos van en el perfil de juegos del instalador.
+- **Perfil por juego**: en modo Gamer, cada juego puede tener su monitor de rendimiento, su límite de fotogramas y su perfil de GPU. El monitor y el límite son de MangoHud, y gamescope fija la resolución y el escalado de cada juego; los dos van en la categoría de juegos del instalador.
 - **Página de GPU**: curvas de ventilador, límites de potencia y sensores en la barra.
 - **Las luces siguen al tema**: con OpenRGB, teclado y torre toman el color de acento, cambian con el modo y laten con la voz de Kavat.
 - **Supresión de ruido del micrófono**: activa de serie, para la voz del agente y para directos.
@@ -784,14 +802,14 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Monitor del sistema | btop | `kavat-top` (fork) |
 | Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
 | Portapapeles | cliphist con historial en el lanzador | Integrado en `kavat-shell` |
-| Desarrollo | git, docker o podman, mise para versiones de lenguajes | Perfil opcional del instalador |
+| Desarrollo | git, github-cli, mise, pnpm, docker, claude-code, supabase, postgresql y stripe-cli | Categoría Development del instalador |
 | Visores | imv para imágenes, mpv para vídeo y audio, zathura para PDF; los comprimidos se abren en Yazi como carpetas | Solo plantilla de tema |
-| Juego | MangoHud y gamescope | Perfil de juegos del instalador |
+| Juego | MangoHud y gamescope | Categoría de juegos del instalador |
 | Red y Bluetooth | NetworkManager y BlueZ | Página en `kavat-shell` |
 | Llavero y llaves | gnome-keyring, ssh-agent y gpg-agent | Configuración en `kavat-desktop` |
 | Discos extraíbles | udisks2 | Integrado en `kavat-shell` |
 | Firmware | fwupd | Integrado en `kav` |
-| Impresión y escáner | CUPS y SANE | Perfil opcional del instalador |
+| Impresión y escáner | CUPS y SANE | Opcional, en el instalador |
 | Fuentes | Inter, JetBrains Mono Nerd Font, Noto para emoji y CJK | `kavat-fonts` |
 | Agente | Ollama + `kavatd` + modelo | `kavat-agent` |
 
@@ -825,7 +843,7 @@ De tu repo anterior se conservan tal cual los atajos de Hyprland y tus preferenc
 | Asistentes de primer inicio (git y gh, tema GTK, fondo, apps por defecto) | Un solo asistente de primer arranque; tema, fondo y apps por defecto ya vienen puestos |
 | Catppuccin Mocha con acento azul, fijo | Una paleta más del sistema de temas, con ese azul como acento inicial |
 | Wi-Fi y Bluetooth apagados al iniciar | Se conserva como ajuste por defecto en escritorio |
-| Steam y Vesktop al iniciar; Yazi, zathura, btop, cliphist, hyprpicker | Se conservan, btop como base de `kavat-top`; Steam y Vesktop entran en el perfil de juegos del instalador |
+| Steam y Vesktop al iniciar; Yazi, zathura, btop, cliphist, hyprpicker | Se conservan, btop como base de `kavat-top`; Steam y Vesktop entran en la categoría de juegos del instalador |
 | WezTerm | Kitty |
 | NixOS con flake | Arch con paquetes `kavat-*` |
 
@@ -956,6 +974,7 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Gestor de paquetes | `kav` con comandos y con TUI completa sobre el mismo núcleo; migraciones, intervenciones guiadas, guardas de transacción y comprobación de salud con memoria |
 | Dependencias | Lo que un ajuste, una skill o un plugin necesita lo instala y lo protege `kav` |
 | Software diario | Kitty, zsh, Neovim, Yazi y un fork de Chromium |
+| Software en el instalador | Se elige programa a programa en el paso Software y lo instala `kav`; necesita red, y sin ella el paso se salta. La categoría Development cubre lanequarters, sin su app móvil |
 | Prompt de zsh | starship con preset mínimo, sin módulos que lancen procesos |
 | Editor | Neovim en el núcleo, híbrido: modos de Vim con navegación y atajos de VS Code; panel lateral de Claude y otros paneles, abiertos como divisiones de Kitty |
 | Marketplace de plugins | Partiendo de store.nvim, con catálogo verificado y presets encima |
@@ -973,10 +992,10 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Red y Bluetooth | Página propia en el panel |
 | Llavero y llaves | Llavero abierto al iniciar sesión y agente para las llaves SSH y GPG |
 | Apps por defecto | imv, mpv y zathura; los comprimidos, en Yazi |
-| Capa de juego | MangoHud y gamescope en el perfil de juegos; sin tiendas fuera de Steam |
+| Capa de juego | MangoHud y gamescope en la categoría de juegos del instalador; sin tiendas fuera de Steam |
 | Discos extraíbles y firmware | Los USB se montan solos con aviso; el firmware se actualiza dentro de `kav update` |
 | Calculadora | Cuentas y conversiones de unidades en la paleta |
-| Impresión y escáner | Perfil opcional del instalador |
+| Impresión y escáner | Opcional, en el instalador |
 | Diálogo de contraseña | Lo dibuja el shell, con el tema, diciendo quién pide permiso y para qué |
 | Modelo del agente | Qwen3.5 4B como punto de partida, en la GPU y configurable; queda cargado en Coder y se confirma con una prueba propia |
 | Cómo acierta el agente | Ve de cinco a ocho herramientas por petición, con nombres en inglés, y cada skill es una sola llamada |

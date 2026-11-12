@@ -62,6 +62,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![Network settings](docs/screenshots/settings-network.png) **Network and Bluetooth.** Connections, VPNs and devices on one page. | ![Password dialog](docs/screenshots/password-dialog.png) **Password dialog.** Drawn by the shell: who asks, and what for. |
 | ![Notices](docs/screenshots/notices.png) **Notices.** A process running hot, a disk just plugged in. | ![Calculator](docs/screenshots/launcher-calc.png) **Calculator.** Sums and unit conversions in the palette. |
 | ![Updates](docs/screenshots/kav-updates.png) **Updates.** Packages and firmware in one pass. | ![Shell settings](docs/screenshots/settings-shell.png) **Shell settings.** Prompt, plugins and the default apps. |
+| ![Software step](docs/screenshots/installer-software.png) **Choose your software.** Tick programs by category while installing; `kav` installs them. | ![Software step, offline](docs/screenshots/installer-software-offline.png) **No network.** The base system installs as it comes and the step is skipped. |
 
 ## Talk to it
 
@@ -272,13 +273,13 @@ Three screens, one identity: the boot menu, the loading screen and the login.
 
 ## Installation
 
-A Calamares installer with its own identity. Seven screens, no network, about ten minutes. English by default, with Spanish already installed as the second option.
+A Calamares installer with its own identity. Seven screens, about ten minutes, and the base system installs with no network. English by default, with Spanish already installed as the second option.
 
 1. Language and keyboard
 2. Disk (encryption is one switch)
 3. User
 4. Detected hardware and suggested drivers
-5. Software profile
+5. Software: tick the programs you want, by category, or search for any package; `kav` installs them. This step needs a network
 6. Appearance, with a live preview
 7. Install
 

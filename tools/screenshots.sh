@@ -38,6 +38,7 @@ shots=(
   "files-picker|scene=files&pick=true"
   "installer|scene=install&pal=tokyo"
   "installer-software|scene=install&istep=software"
+  "installer-software-offline|scene=install&istep=software&inet=false"
   "kav-aur-review|scene=kav&ktab=aur"
   "kav-dashboard|scene=kav&ktab=dash"
   "kav-updates|scene=kav&ktab=updates"

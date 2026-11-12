@@ -508,7 +508,7 @@ body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
 .mini .w1{left:4%;top:18%;width:52%;bottom:6%;border-color:var(--accent)}
 .mini .w2{right:4%;top:18%;width:37%;height:36%}.mini .w3{right:4%;bottom:6%;width:37%;height:34%}
 .foot{display:flex;justify-content:space-between;align-items:center}
-/* proposal D21: a Software step that picks packages, installed by kav */
+/* the Software step: picks packages, installed by kav; it needs a network */
 #cal .isoft{display:none}
 .screen[data-istep=software] #cal .main:not(.isoft){display:none}
 .screen[data-istep=software] #cal .isoft{display:flex}
@@ -520,6 +520,8 @@ body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
 .pk i{width:1.05em;height:1.05em;flex:none;border-radius:.25em;border:.12em solid var(--border);display:grid;place-items:center;font-style:normal;font-size:.8em;color:#14110a}
 .pk.on i{background:var(--accent);border-color:transparent}
 .pk small{color:var(--muted);overflow:hidden;text-overflow:ellipsis}
+.snonet{display:none;padding:.8em 1em;border:.1em solid var(--warn);border-radius:calc(var(--r)*.6);color:var(--warn);font-size:.92em}
+.screen[data-inet=false] .snonet{display:block}.screen[data-inet=false] .sw3,.screen[data-inet=false] .isoft .foot>span{opacity:.3}
 .pk u{margin-left:auto;text-decoration:none;font-size:.82em;color:var(--muted)}.pk u.aur{color:var(--warn)}
 </style>
 </head>
@@ -1017,7 +1019,7 @@ body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
         <div class="step done"><i>✓</i>Disk</div>
         <div class="step done"><i>✓</i>User</div>
         <div class="step done"><i>✓</i>Hardware</div>
-        <div class="step done"><i>✓</i>Profile</div>
+        <div class="step done"><i>✓</i>Software</div>
         <div class="step on"><i>6</i>Appearance</div>
         <div class="step"><i>7</i>Install</div>
       </div>
@@ -1035,12 +1037,13 @@ body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
         <div class="foot"><span class="muted" style="font-size:.9em">Step 6 of 7 · change it any time with <span class="mono">Super+T</span></span><div class="btns" style="margin:0"><span class="btn">Back</span><span class="btn pri">Next</span></div></div>
       </div>
       <div class="main isoft">
-        <h2>Software <span class="badge warn" style="font-size:.5em;vertical-align:middle">proposal · D21</span></h2>
+        <h2>Software</h2>
         <p>Pick what the system brings from its first start. Everything here is installed by <span class="mono">kav</span>, with its usual rules.</p>
         <div class="sw3">
-          <div><div class="scat ">Browsers<b>1</b></div><div class="scat on">Development<b>18</b></div><div class="scat ">Creation<b>1</b></div><div class="scat ">Games<b>2</b></div><div class="scat ">Communication<b>1</b></div><div class="scat ">Media</div><div class="scat ">Office</div><div class="find" style="margin-top:.4em">Add any package…</div><div class="muted" style="white-space:normal">Searches Arch, [kavat] and the AUR allowlist.</div></div><div><div class="sec">Essentials</div><div class="pk on"><i>✓</i><span>git · github-cli</span><small>version control, gh</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>mise</span><small>Node 22 and 24, per project</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>pnpm</span><small>package manager</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>docker · compose</span><small>containers</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>claude-code</span><small>Claude in the terminal</small><u class="aur">AUR</u></div><div class="sec">Web · Next.js, Supabase, Prisma</div><div class="pk on"><i>✓</i><span>supabase</span><small>local stack, in Docker</small><u class="aur">AUR</u></div><div class="pk on"><i>✓</i><span>postgresql</span><small>psql client</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>stripe-cli</span><small>webhooks: stripe listen</small><u class="aur">AUR</u></div><div class="pk on"><i>✓</i><span>playwright browsers</span><small>end-to-end tests</small><u class="">pnpm</u></div><div class="pk on"><i>✓</i><span>vercel</span><small>deploys, env</small><u class="">pnpm</u></div></div><div><div class="sec">Mobile · Expo, Android</div><div class="pk on"><i>✓</i><span>jdk17-openjdk</span><small>Android builds</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>android-sdk · emulator</span><small>run the app</small><u class="aur">AUR</u></div><div class="pk on"><i>✓</i><span>android-tools</span><small>adb</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>watchman</span><small>file watching</small><u class="aur">AUR</u></div><div class="pk on"><i>✓</i><span>maestro</span><small>mobile end-to-end tests</small><u class="aur">AUR</u></div><div class="pk on"><i>✓</i><span>eas-cli</span><small>builds and updates</small><u class="">pnpm</u></div><div class="sec">Extension · WXT</div><div class="pk on"><i>✓</i><span>firefox</span><small>web-ext runs it</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>kavat-browser</span><small>Chromium side, already installed</small><u class="">[kavat]</u></div><div class="sec">Not on Linux</div><div class="pk "><i></i><span>iOS builds</span><small>need a Mac, or EAS in the cloud</small><u class="">—</u></div></div>
+          <div><div class="scat ">Browsers<b>1</b></div><div class="scat on">Development<b>10</b></div><div class="scat ">Creation<b>1</b></div><div class="scat ">Games<b>2</b></div><div class="scat ">Communication<b>1</b></div><div class="scat ">Media</div><div class="scat ">Office</div><div class="find" style="margin-top:.4em">Add any package…</div><div class="muted" style="white-space:normal">Searches Arch, [kavat] and the AUR allowlist.</div></div><div><div class="sec">Essentials</div><div class="pk on"><i>✓</i><span>git · github-cli</span><small>version control, gh</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>mise</span><small>Node 22 and 24, per project</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>pnpm</span><small>package manager</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>docker · compose</span><small>containers</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>claude-code</span><small>Claude in the terminal</small><u class="aur">AUR</u></div><div class="sec">Web · Next.js, Supabase, Prisma</div><div class="pk on"><i>✓</i><span>supabase</span><small>local stack, in Docker</small><u class="aur">AUR</u></div><div class="pk on"><i>✓</i><span>postgresql</span><small>psql client</small><u class="">Arch</u></div><div class="pk on"><i>✓</i><span>stripe-cli</span><small>webhooks: stripe listen</small><u class="aur">AUR</u></div></div><div><div class="sec">Set up at the first start · with pnpm</div><div class="pk on"><i>✓</i><span>playwright browsers</span><small>end-to-end tests</small><u class="">pnpm</u></div><div class="pk on"><i>✓</i><span>vercel</span><small>deploys, env</small><u class="">pnpm</u></div><div class="sec">Already in the system</div><div class="pk on"><i>✓</i><span>kavat-browser</span><small>runs Chrome extensions</small><u class="">[kavat]</u></div><div class="pk on"><i>✓</i><span>neovim · kitty · yazi</span><small>editor, terminal, files</small><u class="">[kavat]</u></div><div class="muted" style="white-space:normal">Mobile builds are left out: they are done on a Mac.</div></div>
         </div>
-        <div class="foot"><span class="muted" style="font-size:.9em">23 selected · 3.4 GB to download · 6 from the AUR allowlist · saved to <span class="mono">kavat-install.toml</span></span><div class="btns" style="margin:0"><span class="btn">Back</span><span class="btn pri">Next</span></div></div>
+        <div class="snonet">No network. The system installs as it comes, and this step is skipped: connect to add software.</div>
+        <div class="foot"><span class="muted" style="font-size:.9em">15 selected · 1.9 GB to download · 3 from the AUR allowlist · saved to <span class="mono">kavat-install.toml</span></span><div class="btns" style="margin:0"><span class="btn">Back</span><span class="btn pri">Next</span></div></div>
       </div>
     </div>
   </section>
@@ -1056,7 +1059,7 @@ const P = {
   rose:{n:'Rosé Pine',d:['#191724','#1f1d2e','#26233a','#e0def4','#908caa','#403d52'],l:['#ede3d9','#faf4ed','#f2e9e1','#575279','#797593','#dfdad9'],a:['#ebbcba','#c4a7e7','#9ccfd8','#f6c177','#eb6f92']},
   everforest:{n:'Everforest',d:['#232a2e','#2d353b','#3d484d','#d3c6aa','#9da9a0','#475258'],l:['#efebd4','#fdf6e3','#e6e2cc','#5c6a72','#829181','#d5d0b8'],a:['#a7c080','#7fbbb3','#dbbc7f','#e69875','#d699b6']},
 };
-const S = {istep:'',ttab:'proc',notices:false,calc:false,dlay:'pv',dsel:0,voice:'auto',clip:false,cap:false,rem:false,copy:false,gsel:'main',ps:'logo',cfg:'',pick:false,fsel:'img',wall:'theme',bare:false,ktab:'dash',spage:'windows',sys:'coder',scene:'desk',pal:'kavat',mode:'dark',acc:0,rad:.9,gap:.7,blur:true,oled:false};
+const S = {istep:'',inet:true,ttab:'proc',notices:false,calc:false,dlay:'pv',dsel:0,voice:'auto',clip:false,cap:false,rem:false,copy:false,gsel:'main',ps:'logo',cfg:'',pick:false,fsel:'img',wall:'theme',bare:false,ktab:'dash',spage:'windows',sys:'coder',scene:'desk',pal:'kavat',mode:'dark',acc:0,rad:.9,gap:.7,blur:true,oled:false};
 location.hash.slice(1).split('&').forEach(kv=>{const [k,v]=kv.split('=');if(k in S)S[k]=isNaN(v)?(v==='true'?true:v==='false'?false:v):+v});
 
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1152,7 +1155,7 @@ function apply(){
   $$('.js-agentline').forEach(e=>e.innerHTML=g?'<span class="muted">○ off · gamer mode</span>':inc?'<span class="ok">●</span> local · no history':'<span class="ok">●</span> local · idle');
   $$('.tpage').forEach(x=>x.classList.toggle('on',x.dataset.t===S.ttab));$$('[data-ttab]').forEach(b=>b.classList.toggle('on',b.dataset.ttab===S.ttab));
   screen_.dataset.notices=!!S.notices&&S.scene==='desk';screen_.dataset.calc=!!S.calc;
-  screen_.dataset.istep=S.istep;{const sw=S.istep==='software',cur=sw?4:5;$$('#cal .step').forEach((e,i)=>{e.className='step'+(i<cur?' done':i===cur?' on':'');e.firstElementChild.textContent=i<cur?'✓':i+1;if(i===4)e.lastChild.textContent=sw?'Software':'Profile'});$$('.js-inet').forEach(e=>e.textContent=sw?'Online · packages download while installing':'No network · offline install')}
+  screen_.dataset.istep=S.istep;{const sw=S.istep==='software',cur=sw?4:5;$$('#cal .step').forEach((e,i)=>{e.className='step'+(i<cur?' done':i===cur?' on':'');e.firstElementChild.textContent=i<cur?'✓':i+1;});screen_.dataset.inet=S.inet;$$('.js-inet').forEach(e=>e.textContent=sw&&S.inet?'Online · packages download while installing':'No network · offline install')}
   $$('.js-fmode').forEach(e=>e.textContent=inc?'Incognito':g?'Gamer':'Coder');
   $$('.js-bprofile').forEach(e=>e.textContent=inc?'Incognito':g?'Gamer':'Coder');
   $$('.js-btitle').forEach(e=>e.textContent=inc?'Kavat Browser · Incognito':'Kavat Browser');
