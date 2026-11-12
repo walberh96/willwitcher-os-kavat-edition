@@ -399,7 +399,7 @@ Yazi está en los repos oficiales de Arch. ripdrag y el backend del portal está
 
 ## Notas
 
-Las notas son un componente más del sistema, hecho sobre un fork de `nb` que se empaqueta como `kavat-notes`. Una nota es un archivo Markdown en `~/Notes`, y cada cuaderno es un repositorio git, así que cada cambio queda en el historial y se sincroniza como el resto de tu configuración. El comando sigue siendo `nb`. Todo lo de esta sección es una propuesta.
+Las notas son un componente más del sistema, hecho sobre un fork de `nb` que se empaqueta como `kavat-notes`. Una nota es un archivo Markdown en `~/Notes`, y cada cuaderno es un repositorio git, así que cada cambio queda en el historial y se sincroniza como el resto de tu configuración. El comando sigue siendo `nb`. Todo lo de esta sección es una propuesta, y se decide en el documento «Decisiones pendientes», puntos D6 y D7.
 
 `nb` es un solo script de Bash (versión 7.25.6, licencia AGPL-3.0) y está en el AUR, así que entra por `[kavat]`. Esto es lo que ya trae y lo que añade el fork:
 
@@ -481,18 +481,6 @@ repeat: weekly
 - **Ajustes, tema y copias**: una página Notes en el panel, los colores del tema, y los cuadernos dentro de la sincronización con tu repositorio privado. Las dependencias las garantiza `kav`.
 
 **Qué va en el fork y qué va fuera.** El fork de `nb` es pequeño: entiende los campos nuevos, añade los comandos `nb remind` y `nb due`, abre los enlaces a carpetas y avisa al índice en cada cambio. La TUI, el índice y los recordatorios son piezas nuevas en Rust, como `kav`, que leen los mismos archivos. Las notas entran en la fase 3 y las herramientas del agente en la fase 4. Queda por comprobar que `nb` de serie siga leyendo bien una tarea que lleva cabecera.
-
-**Más ideas, por si quieres alguna:**
-
-1. Resumen de la mañana: un aviso discreto con las tareas y los recordatorios del día.
-2. Recordatorios por situación y no solo por hora: «cuando abra el proyecto kav», «al iniciar sesión», «al salir del modo Gamer».
-3. Convertir un aviso en tarea: el disco casi lleno o una revisión del AUR pendiente pasan a tu lista con un clic.
-4. De la terminal a una nota: una tecla en Kitty guarda el último comando y su salida.
-5. Nota fijada en el escritorio, como un widget.
-6. Selección a nota: el texto seleccionado en cualquier app se guarda con una tecla, junto con su origen.
-7. Plantillas: reunión, bug, idea y nota del día.
-8. Búsqueda por significado y no solo por palabras. Necesita un modelo pequeño más en memoria, así que iría apagada por defecto.
-9. Leer las notas en el móvil: al ser Markdown en git, sirve cualquier app que abra un repositorio.
 
 ## Gestor de paquetes
 
@@ -630,7 +618,7 @@ Piezas:
 - **Registro**: cada llamada a una herramienta queda en un log legible con qué pidió, qué hizo y cómo deshacerlo.
 - **Sin red**: el agente funciona sin conexión y no envía nada fuera. Cualquier herramienta que use red se activa aparte.
 
-**Análisis del modelo.** En noviembre de 2026 se compararon los modelos pequeños de Ollama para este trabajo. Lo que sigue es una propuesta: ningún modelo se ha ejecutado todavía en la máquina real. El informe completo, con sus fuentes, está en [`reports/Modelo local para el agente Kavat.md`](../reports/Modelo%20local%20para%20el%20agente%20Kavat.md); como el límite es de memoria de la GPU, vale su apartado «Si el límite contara solo la VRAM».
+**Análisis del modelo.** En noviembre de 2026 se compararon los modelos pequeños de Ollama para este trabajo. Lo que sigue es una propuesta, que se decide en el documento «Decisiones pendientes», puntos D1 a D5; ningún modelo se ha ejecutado todavía en la máquina real. El informe completo, con sus fuentes, está en [`reports/Modelo local para el agente Kavat.md`](../reports/Modelo%20local%20para%20el%20agente%20Kavat.md); como el límite es de memoria de la GPU, vale su apartado «Si el límite contara solo la VRAM».
 
 | Pieza | Propuesta | Dónde corre | Memoria |
 | --- | --- | --- | --- |
@@ -836,7 +824,7 @@ Lo que el informe recomienda no copiar: los repos binarios de CachyOS, porque su
 
 ## Decisiones
 
-Las decisiones de esta tabla están tomadas; las que el análisis de otras distros dejó en revisión están en «Decisiones en revisión», con su estado.
+Las decisiones de esta tabla están tomadas; las que el análisis de otras distros dejó en revisión están en «Decisiones en revisión», con su estado. Lo que todavía espera tu decisión está en un documento aparte, «Decisiones pendientes»; cuando se aprueba, pasa a este.
 
 | Decidido | Decisión |
 | --- | --- |
