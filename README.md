@@ -56,7 +56,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![GPU settings](docs/screenshots/settings-gpu.png) **GPU.** Fan curve, limits and per-game profiles. | ![Projects](docs/screenshots/settings-projects.png) **Projects.** A whole workspace, saved and reopened. |
 | ![Backup and sync](docs/screenshots/settings-backup.png) **Backup and sync.** Home snapshots, external copies and configuration history. | ![Privacy and network](docs/screenshots/settings-privacy.png) **Privacy.** Who used the microphone, camera or screen, and the per-app firewall. |
 | ![Windows settings](docs/screenshots/settings-windows.png) **Two-way settings.** Change a value in the panel or in the file; each follows the other. | ![Config in Neovim](docs/screenshots/config-in-neovim.png) **One click to the file.** Every page opens its config in Neovim. |
-| ![Kavat speaking](docs/screenshots/agent-voice.png) **Kavat speaking.** An island under the bar: its whiskers move with its voice, and captions follow word by word. | |
+| ![Kavat speaking](docs/screenshots/agent-voice.png) **Kavat speaking.** An island under the bar: its whiskers move with its voice, and captions follow word by word. | ![Displays](docs/screenshots/settings-displays.png) **Displays.** One, two side by side, or landscape next to portrait: placed by dragging, remembered for each set of displays. |
 
 ## Talk to it
 
@@ -229,6 +229,7 @@ A Chromium of its own, with seven changes.
 ## Built for a gaming desktop
 
 - **A GPU page.** Fan curve, power limit and sensors in the bar for the Radeon RX 6800.
+- **Any number of displays.** Place them by dragging in the settings panel, landscape or portrait. Each set of displays keeps its own layout, so one synced configuration fits a PC with one screen and another with two.
 - **Lights follow the theme.** Keyboard and case take the accent colour, change with the mode and pulse with Kavat's voice.
 - **A clean microphone.** Noise suppression is on out of the box, for the agent's voice and for streams.
 - **Easier on the eyes.** Reduce motion, text scale and high contrast, on one page.
