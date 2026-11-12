@@ -79,15 +79,16 @@ Ideas propias sobre el Calamares de serie:
 - **Necesita red**: lo que no viene en el sistema base se descarga durante la instalación. Sin red, el paso se salta y no deja añadir nada; el sistema se instala tal como viene.
 - **Se recuerda**: lo marcado queda en `kavat-install.toml`, así que reinstalar lo repite.
 
-La categoría Development trae lo que hace falta para trabajar en lanequarters, salvo su app móvil, que se compila en una Mac.
+La categoría Development trae lo que hace falta para trabajar en lanequarters, incluida su app móvil en Android. La de iOS se compila en una Mac.
 
 | Grupo | Programas | Para qué |
 | --- | --- | --- |
 | Esenciales | git, github-cli, mise, pnpm, docker con compose, claude-code | Los proyectos piden Node 22 o superior y pnpm; mise pone la versión de Node de cada uno |
 | Web | supabase, postgresql (cliente `psql`), stripe-cli | `supabase start` levanta la base local en Docker; `stripe listen` recibe los webhooks |
-| Al primer arranque, con pnpm | Navegadores de Playwright, vercel | No son paquetes de pacman: los instala pnpm y `kav` no los gestiona |
+| Móvil, Android | jdk17-openjdk, SDK de Android con emulador, android-tools, watchman, maestro | Compilar la app de Expo para Android y probarla en el emulador o en un teléfono |
+| Al primer arranque, con pnpm | Navegadores de Playwright, vercel, eas-cli | No son paquetes de pacman: los instala pnpm y `kav` no los gestiona |
 
-La extensión de navegador se prueba en `kavat-browser`, que es un fork de Chromium y admite las extensiones de Chrome. Tres de la lista vienen del AUR (claude-code, supabase y stripe-cli) y necesitan su entrada en la allowlist; en qué repositorio está cada paquete se comprueba al escribirla.
+La extensión de navegador se prueba en `kavat-browser`, que es un fork de Chromium y admite las extensiones de Chrome. Seis de la lista vienen del AUR (claude-code, supabase, stripe-cli, el SDK de Android, watchman y maestro) y necesitan su entrada en la allowlist; en qué repositorio está cada paquete se comprueba al escribirla.
 
 ## Arranque
 
@@ -802,7 +803,7 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Monitor del sistema | btop | `kavat-top` (fork) |
 | Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
 | Portapapeles | cliphist con historial en el lanzador | Integrado en `kavat-shell` |
-| Desarrollo | git, github-cli, mise, pnpm, docker, claude-code, supabase, postgresql y stripe-cli | Categoría Development del instalador |
+| Desarrollo | git, github-cli, mise, pnpm, docker, claude-code, supabase, postgresql y stripe-cli; para Android, JDK 17, el SDK con emulador, android-tools, watchman y maestro | Categoría Development del instalador |
 | Visores | imv para imágenes, mpv para vídeo y audio, zathura para PDF; los comprimidos se abren en Yazi como carpetas | Solo plantilla de tema |
 | Juego | MangoHud y gamescope | Categoría de juegos del instalador |
 | Red y Bluetooth | NetworkManager y BlueZ | Página en `kavat-shell` |
@@ -974,7 +975,7 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Gestor de paquetes | `kav` con comandos y con TUI completa sobre el mismo núcleo; migraciones, intervenciones guiadas, guardas de transacción y comprobación de salud con memoria |
 | Dependencias | Lo que un ajuste, una skill o un plugin necesita lo instala y lo protege `kav` |
 | Software diario | Kitty, zsh, Neovim, Yazi y un fork de Chromium |
-| Software en el instalador | Se elige programa a programa en el paso Software y lo instala `kav`; necesita red, y sin ella el paso se salta. La categoría Development cubre lanequarters, sin su app móvil |
+| Software en el instalador | Se elige programa a programa en el paso Software y lo instala `kav`; necesita red, y sin ella el paso se salta. La categoría Development cubre lanequarters, con su app móvil en Android y sin la de iOS |
 | Prompt de zsh | starship con preset mínimo, sin módulos que lancen procesos |
 | Editor | Neovim en el núcleo, híbrido: modos de Vim con navegación y atajos de VS Code; panel lateral de Claude y otros paneles, abiertos como divisiones de Kitty |
 | Marketplace de plugins | Partiendo de store.nvim, con catálogo verificado y presets encima |

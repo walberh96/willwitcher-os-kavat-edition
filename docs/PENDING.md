@@ -14,4 +14,4 @@ Aquí está solo lo que espera tu decisión. Todo lo demás vive en el [document
 
 No hay decisiones pendientes.
 
-La última, D21, se resolvió el 12 de noviembre de 2026: elegir el software en el instalador quedó aprobado y ya está en el documento de diseño, con tres ajustes tuyos. Firefox sale de Development, porque la extensión se prueba en `kavat-browser`. El grupo de móvil sale entero, porque esa app se compila en una Mac. Y sin red no hay cola: el paso Software se salta.
+La última, D21, se resolvió el 12 de noviembre de 2026: elegir el software en el instalador quedó aprobado y ya está en el documento de diseño, con tres ajustes tuyos. Firefox sale de Development, porque la extensión se prueba en `kavat-browser`. El grupo de móvil se queda solo con Android, que sí se prueba en el PC con Arch; iOS se compila en una Mac. Y sin red no hay cola: el paso Software se salta.
