@@ -29,7 +29,7 @@ La ISO se construye con `archiso` a partir del perfil `releng`, y todo lo propio
 | Construcción de la ISO | `archiso` con perfil propio en `iso/` | Partir de EndeavourOS o CachyOS | Control total y sin heredar decisiones ajenas; se compila en tu PC de escritorio con Arch |
 | Kernel | `linux-zen` + `linux-lts` de respaldo | `linux` estándar | Zen responde mejor en escritorio; LTS salva un arranque roto |
 | Gestor de arranque | GRUB con menú propio (decidido) | systemd-boot | Admite tema gráfico y submenús: fondo, entradas propias, modo seguro y lista de snapshots, cada uno con su kernel |
-| Sistema de archivos | Btrfs con subvolúmenes `@`, `@home`, `@log`, `@pkg`, `@snapshots` | ext4 | Snapshots baratos y compresión zstd |
+| Sistema de archivos | Btrfs con subvolúmenes `@`, `@home`, `@games`, `@log`, `@pkg`, `@snapshots` | ext4 | Snapshots baratos y compresión zstd |
 | Snapshots | Snapper + hook de pacman antes y después de cada transacción | Timeshift | Se integra con el arranque y con `kav` |
 | Cifrado | LUKS2 opcional, desbloqueo por TPM2 | Solo contraseña | Disco cifrado sin teclear dos contraseñas |
 | Memoria | zram con zstd, sin partición swap | Swapfile | Menos escrituras a disco; la hibernación queda como opción del instalador |
@@ -218,8 +218,16 @@ El equipo es un escritorio con una Radeon RX 6800, y el sistema lo trata como ta
 
 - **Perfil por juego**: en modo Gamer, cada juego puede tener su monitor de rendimiento, su límite de fotogramas y su perfil de GPU.
 - **Página de GPU**: curvas de ventilador, límites de potencia y sensores en la barra.
-- **Las luces siguen al tema**: con OpenRGB, teclado y torre toman el color de acento y cambian con el modo.
+- **Las luces siguen al tema**: con OpenRGB, teclado y torre toman el color de acento, cambian con el modo y laten con la voz de Kavat.
 - **Supresión de ruido del micrófono**: activa de serie, para la voz del agente y para directos.
+
+**Pantallas.** Se admite cualquier número de pantallas, y se colocan desde la página Displays del panel.
+
+- **Arrastrando**: cada pantalla conectada se dibuja a escala y se coloca arrastrándola, en horizontal o en vertical; los bordes se pegan entre sí. Vale para una pantalla, dos una al lado de otra, o una horizontal junto a una vertical.
+- **Una disposición por conjunto de pantallas**: cada conjunto guarda la suya y se reconoce por el modelo y el número de serie de las pantallas, no por el puerto. El conjunto conectado decide cuál se aplica, así que una misma configuración sincronizada sirve en equipos con pantallas distintas.
+- **Pantalla principal**: en ella se abren el lanzador, Kavat, las notificaciones y los juegos. Los espacios de trabajo se reparten por pantalla.
+- **Confirmar o deshacer**: un cambio que no se confirma en 10 segundos se deshace solo.
+- **En el archivo**: las disposiciones viven en `~/.config/hypr/monitors.lua`, como tabla de valores. Por defecto, una pantalla nueva se extiende a la derecha.
 
 ## Ajustes desde Noctalia
 
@@ -232,7 +240,7 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | Accessibility | Reducir movimiento, escala de texto, contraste alto | Propio |
 | Windows (Hyprland) | Separación, bordes, animaciones, disposición, ratón y teclado, reglas de ventana | No previsto: admite cambios en vivo |
 | Keybindings | Todos los atajos, con detección de conflictos y hoja de atajos | No |
-| Displays | Resolución, frecuencia, escala, rotación, sincronización adaptativa, luz nocturna, reparto de espacios de trabajo | No: lo aplica Hyprland |
+| Displays | Disposición de las pantallas arrastrando, una por cada conjunto de pantallas; pantalla principal; resolución, frecuencia, escala, rotación, sincronización adaptativa y espacios de trabajo de cada una; luz nocturna | No: lo aplica Hyprland |
 | GPU | Curvas de ventilador, límite de potencia, sensores en la barra, perfiles por juego | No |
 | Sound | Salida, entrada, volumen por app, supresión de ruido del micrófono | No |
 | Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial | No previsto: admite recarga en vivo |
@@ -244,7 +252,7 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | Bar & widgets | Posición y densidad de la barra, widgets y su orden, lanzador, notificaciones | El fork de Noctalia ya previsto |
 | Modes | Qué hace cada modo, automatización con Steam, VPN de Incognito, modos nuevos | Propio |
 | Projects | Proyectos guardados: carpeta, terminales, editor, perfil del navegador y ventanas de cada uno | Propio |
-| Agent & voice | Presupuesto de memoria, modelo, permisos por nivel, voz y cómo se activa, avisos, registro de actividad | Propio |
+| Agent & voice | Presupuesto de memoria, modelo, permisos por nivel, voz y cómo se activa, lo que se ve mientras habla, avisos, registro de actividad | Propio |
 | Skills | Skills de serie y propias, sus pasos, atajo, frase de voz, dónde se fijan y cuándo se lanzan solas | Propio |
 | Packages (kav) | Fuentes, actualizaciones y su comprobación, snapshots, allowlist del AUR y solicitudes | Propio |
 | Backup & sync | Snapshots de `/home`, copias externas, historial de la configuración y su sincronización | Propio |
@@ -690,6 +698,14 @@ Límite deliberado: el agente puede resumir un diff de `kav review`, pero no pue
 - **Ayuda en la terminal**: una tecla en Kitty explica el último error o propone el comando correcto, sin salir de la terminal.
 - **Avisos discretos**: el agente avisa de lo que importa (disco casi lleno, una revisión del AUR pendiente, una copia que falló) y propone la skill que lo arregla. No interrumpe en modo Gamer.
 
+**Isla de voz.** Cuando le hablas por voz, una isla baja de la barra con la cara de Kavat y se queda mientras escucha, piensa y contesta. Como preguntaste mientras trabajabas, la respuesta llega sobre lo que estabas haciendo.
+
+- **Los bigotes son la onda**: se mueven con el sonido de la voz. Las ondas van hacia la cara mientras Kavat escucha y salen de ella mientras habla, y toman el color de quien habla: el de acento para Kavat, el del texto para ti.
+- **Subtítulos**: la isla muestra lo que te ha entendido, la herramienta que llama con su nivel de permiso y la respuesta palabra por palabra, con la palabra que suena resaltada.
+- **Las luces laten con la voz**: teclado y torre pulsan mientras Kavat habla.
+- **La tecla de hablar**: soltarla envía lo que dijiste; mientras Kavat habla, un toque lo calla y mantenerla es contestarle.
+- **Tres interruptores**: isla, subtítulos y luces se apagan por separado en la página Agent & voice o en `agent.toml`, en `[voice.feedback]`. Los tres vienen encendidos.
+
 **Skills.** Una skill es una acción ya definida que el agente sabe hacer, como abrir el navegador. Aparece como un botón en su panel y se puede pulsar, pedir por voz o escribir.
 
 | Parte de una skill | Qué lleva |
@@ -784,12 +800,12 @@ El sistema asume que algo se va a romper y que algún paquete será malicioso, y
 - **Permisos del agente**: los cuatro niveles de la sección anterior, aplicados por `kavatd` y polkit, no por el modelo.
 
 * **Comprobación tras actualizar**: después de `kav update`, una prueba automática comprueba el arranque gráfico, la GPU y los servicios; si algo falla, ofrece volver al snapshot anterior.
-* **Snapshots de `/home`**: cada hora, ligeros; desde Yazi se ven las versiones anteriores de una carpeta y se recupera un archivo borrado.
+* **Snapshots de `/home`**: cada hora, ligeros; desde Yazi se ven las versiones anteriores de una carpeta y se recupera un archivo borrado. La biblioteca de Steam vive en su propio subvolumen y queda fuera de ellos.
 * **Copias fuera del equipo**: copia cifrada a un disco externo o a otra máquina, programada desde el panel.
 * **Historial de configuración**: cada cambio de configuración, del panel o a mano, queda como un commit en un repo local; el botón History del panel es ese historial, con diff.
 * **Configuración sincronizada**: ese repo se puede enviar a un remoto privado; reinstalar o montar otra máquina es clonarlo.
 * **Privacidad a la vista**: la barra muestra cuándo una app usa el micrófono, la cámara o la pantalla, y el panel guarda quién accedió a qué.
-* **Cortafuegos por aplicación**: la primera vez que una app quiere salir a la red, el sistema pregunta; las reglas se ven y se cambian en el panel.
+* **Cortafuegos por aplicación**: la primera vez que una app quiere salir a la red, el sistema pregunta; las reglas se ven y se cambian en el panel. Los juegos que lanza Steam usan la regla de Steam, así que no pregunta por cada juego.
 
 ## Accesibilidad
 
@@ -901,7 +917,7 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Perfiles del navegador | Uno por modo, por ahora |
 | Modos del sistema | Coder, Gamer e Incognito, seleccionables desde Noctalia |
 | Ventanas al entrar en Incognito | Las normales se ocultan y vuelven al salir |
-| Juego y hardware | Perfil por juego, página de GPU, luces que siguen al tema y supresión de ruido del micrófono |
+| Juego y hardware | Perfil por juego, página de GPU, varias pantallas colocadas desde el panel, luces que siguen al tema y a la voz de Kavat, y supresión de ruido del micrófono |
 | Ajustes | Todo el núcleo se configura desde un panel dentro del shell, con páginas nativas |
 | Shell | Fork de Noctalia 5, empaquetado como kavat-shell: es nuestra app desde ahora, con nuestros cambios y con el panel de ajustes dentro |
 | Notas | nb como componente del sistema, con fork propio (kavat-notes): recordatorios, fechas de tareas, enlaces a carpetas que se abren en Yazi y el agente tomando notas; además, resumen de la mañana, recordatorios por situación, plantillas y búsqueda por significado. En Neovim se ven con formato y color |
@@ -910,12 +926,12 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Idioma del agente | Se le habla en inglés; el sistema sigue en inglés o español |
 | Configuración | El archivo de configuración es la verdad y la calle es de doble sentido: el panel lo lee y lo edita, y un botón lo abre en Neovim desde cualquier parte |
 | Validación | Todo cambio de configuración se comprueba antes de aplicarse y vuelve atrás solo si falla |
-| Robustez | Comprobación tras actualizar, snapshots de `/home`, copias externas, e historial y sincronización de la configuración |
-| Privacidad | Indicadores de micrófono, cámara y pantalla, y cortafuegos por aplicación |
+| Robustez | Comprobación tras actualizar, snapshots de `/home` sin la biblioteca de Steam, copias externas, e historial y sincronización de la configuración |
+| Privacidad | Indicadores de micrófono, cámara y pantalla, y cortafuegos por aplicación, con los juegos bajo la regla de Steam |
 | Accesibilidad | Reducir movimiento y escala de texto |
 | Skills del agente | Acciones predefinidas, pulsables desde su panel, que no pasan por el modelo |
 | Seguridad del agente | Lo que el agente lee nunca es una orden; solo cuentan tus mensajes |
-| Agente, además | Pulsar para hablar, ayuda en la terminal y avisos discretos |
+| Agente, además | Pulsar para hablar, isla de voz con subtítulos, ayuda en la terminal y avisos discretos |
 | Fondos de pantalla | Imagen por defecto o vídeo con mpvpaper, elegibles desde Noctalia |
 | Pruebas | Cada ISO se arranca e instala en una máquina virtual; las puertas del roadmap son esas pruebas |
 | Compilación reproducible | ISO con versiones fijadas por fecha y presupuestos de rendimiento medidos |
