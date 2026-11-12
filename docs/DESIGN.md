@@ -177,6 +177,8 @@ Atajos: 19 heredados de Endgame tal cual y 11 nuevos para lo que antes no exist�
 - **Hoja de atajos según contexto.** `Super+/` muestra los atajos de la app que tiene el foco, además de los del sistema.
 - **Captura con texto.** Al capturar una zona de la pantalla se puede copiar su texto, con reconocimiento local.
 
+**Calculadora en la paleta.** Escribir una cuenta o una conversión de unidades en `Super+D` da el resultado, calculado en la máquina, y Enter lo copia.
+
 **Regla para todos los forks.** Cada fork lleva un `PATCHES.md` con qué cambia y por qué, y una tarea automática que avisa cuando upstream publica versión y si los parches aplican limpio.
 
 ## Modos del sistema
@@ -216,10 +218,12 @@ Al entrar en Incognito, las ventanas normales del navegador ya abiertas se ocult
 
 El equipo es un escritorio con una Radeon RX 6800, y el sistema lo trata como tal.
 
-- **Perfil por juego**: en modo Gamer, cada juego puede tener su monitor de rendimiento, su límite de fotogramas y su perfil de GPU.
+- **Perfil por juego**: en modo Gamer, cada juego puede tener su monitor de rendimiento, su límite de fotogramas y su perfil de GPU. El monitor y el límite son de MangoHud, y gamescope fija la resolución y el escalado de cada juego; los dos van en el perfil de juegos del instalador.
 - **Página de GPU**: curvas de ventilador, límites de potencia y sensores en la barra.
 - **Las luces siguen al tema**: con OpenRGB, teclado y torre toman el color de acento, cambian con el modo y laten con la voz de Kavat.
 - **Supresión de ruido del micrófono**: activa de serie, para la voz del agente y para directos.
+- **Discos extraíbles**: al enchufar un USB se monta solo y sale un aviso con «Abrir en Yazi» y «Expulsar».
+- **Red y Bluetooth**: una página del panel reúne el cable, el Wi-Fi, las VPN guardadas y los dispositivos Bluetooth, como mandos y auriculares, con su batería.
 
 **Pantallas.** Se admite cualquier número de pantallas, y se colocan desde la página Displays del panel.
 
@@ -243,7 +247,8 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | Displays | Disposición de las pantallas arrastrando, una por cada conjunto de pantallas; pantalla principal; resolución, frecuencia, escala, rotación, sincronización adaptativa y espacios de trabajo de cada una; luz nocturna | No: lo aplica Hyprland |
 | GPU | Curvas de ventilador, límite de potencia, sensores en la barra, perfiles por juego | No |
 | Sound | Salida, entrada, volumen por app, supresión de ruido del micrófono | No |
-| Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial; logo y líneas de la información del sistema; agrupación y tecla del agente en el monitor del sistema | No previsto: admite recarga en vivo |
+| Network & Bluetooth | Cable, Wi-Fi, VPN guardadas, dispositivos Bluetooth y su batería, y si arrancan encendidos | No |
+| Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial; logo, líneas y saludo de la información del sistema; agrupación, historial, aviso y tecla del agente en el monitor del sistema | No previsto: admite recarga en vivo |
 | Editor (Neovim) | Preset de atajos, numeración, tabulación, formateo y guardado automáticos, paquetes de lenguaje, plugins, paneles laterales | No: es configuración propia (`kavat-nvim`) |
 | Files (Yazi) | Preset de atajos, arrastrar y soltar, copiador con pop-up, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
 | Notes (nb) | Carpeta de notas, cuaderno por defecto, nota rápida, recordatorios y cuánto posponen, vistas de tareas, qué cuadernos lee el agente, cifrado y sincronización | Fork de nb (kavat-notes) |
@@ -256,7 +261,7 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | Skills | Skills de serie y propias, sus pasos, atajo, frase de voz, dónde se fijan y cuándo se lanzan solas | Propio |
 | Packages (kav) | Fuentes, actualizaciones y su comprobación, snapshots, allowlist del AUR y solicitudes | Propio |
 | Backup & sync | Snapshots de `/home`, copias externas, historial de la configuración y su sincronización | Propio |
-| Privacy & network | Qué app usó micrófono, cámara o pantalla; reglas del cortafuegos por aplicación | No |
+| Privacy & network | Qué app usó micrófono, cámara o pantalla; reglas del cortafuegos por aplicación; llavero y llaves SSH y GPG | No |
 | Boot | Menú de GRUB (espera, entrada por defecto, entradas visibles, aspecto) y pantalla de carga (estilo, mensajes) | No: temas generados para GRUB y Plymouth |
 | Login & lock | Fondo, reloj, usuarios, idioma del login, tiempos de bloqueo | El fork de web-greeter ya previsto |
 | Language & region | Idioma del sistema (inglés o español), distribuciones de teclado, formatos | Propio |
@@ -538,10 +543,12 @@ Dos herramientas de terminal pasan a ser piezas del sistema, cada una con su for
 
 **Información del sistema (`kavat-fetch`).** Es un fork de fastfetch. Se parte de fastfetch y no de neofetch porque neofetch está archivado desde 2024 y fastfetch es el que se mantiene.
 
-- **Logo propio**: el gato de Kavat va dentro del programa y se pinta con el color de acento. Hay una versión pequeña y se puede quitar.
-- **La información que tú eliges**: las líneas y su orden se eligen en el panel o en el archivo. De serie: sistema, kernel, gestor de ventanas, shell, tema, modo, paquetes, GPU y agente.
+- **Logo propio**: el gato de Kavat va dentro del programa. En Kitty se pinta como imagen, con su protocolo gráfico; fuera de Kitty sale el de caracteres, con el color de acento. Hay una versión pequeña y se puede quitar.
+- **La información que tú eliges**: las líneas y su orden se eligen en el panel o en el archivo. De serie: sistema, kernel, gestor de ventanas, shell, tema, modo, paquetes, GPU, agente y salud.
 - **Líneas del propio sistema**: el tema y el modo activos, los paquetes contados por `kav` con los que vienen del AUR, y el estado del agente. Son módulos nuevos, y es lo que justifica el fork.
+- **Línea de salud**: las actualizaciones pendientes y los avisos de `kav doctor`, leídos de lo último que `kav` guardó para no frenar.
 - **Colores del tema**: toma los tokens del sistema de temas y cambia con él, como el resto.
+- **Saludo opcional**: una versión de tres líneas al abrir la primera terminal de la sesión. Viene apagado.
 - **Cómo se lanza**: con `kavat fetch`. Su configuración vive en `~/.config/fastfetch/config.jsonc` y se ajusta en la página Terminal del panel.
 
 **Monitor del sistema (`kavat-top`).** Es un fork de btop, que ya usabas en Endgame. Se bifurca porque lo que se le pide no cabe en su configuración: preguntar al agente por un proceso y agrupar los procesos por lo que son.
@@ -551,6 +558,10 @@ Dos herramientas de terminal pasan a ser piezas del sistema, cada una con su for
 - **Procesos agrupados**: cada proceso dice de qué forma parte: el navegador con sus pestañas, los contenedores, el proyecto abierto, el escritorio o el agente.
 - **La GPU y el agente a la vista**: una caja para la RX 6800 con uso, memoria, temperatura y ventilador, y en ella cuánto ocupa el agente de sus 4 GB.
 - **Conoce el resto del sistema**: muestra el modo activo y, en la red, que `kavatd` sigue sin salida.
+- **Pestaña de servicios**: los servicios de systemd, con los que fallaron arriba y su log al lado; Kavat explica el error y propone el arreglo.
+- **Historial de 24 horas**: CPU, memoria, GPU y temperatura del último día, para preguntarle «qué pasó a las tres». Lo guarda un recolector ligero que se detiene en modo Gamer.
+- **Del proceso a sus reglas**: con `r` se salta a la regla del cortafuegos de ese proceso y a cuándo usó el micrófono, la cámara o la pantalla.
+- **Aviso cuando algo se desboca**: si un proceso lleva minutos comiéndose la CPU o la memoria, sale un aviso discreto que abre el monitor en ese proceso. Calla en modo Gamer.
 - **Cómo se lanza**: con `kavat top` o desde el lanzador. Su configuración vive en `~/.config/btop/btop.conf` y se ajusta en la página Terminal del panel.
 
 Los dos forks siguen la regla de los demás: son pequeños y llevan su `PATCHES.md`.
@@ -610,6 +621,8 @@ Tres reglas de la TUI:
 - **Intervenciones guiadas** (de Garuda y EndeavourOS): cada «intervención manual» que publica Arch se convierte en un paso de `kav update` que explica qué pasa, enseña el comando, pide confirmación y anota que ya se aplicó. El primer caso es volver a inscribir el TPM2 tras mkinitcpio 42.
 - **Dos guardas de transacción** (de Omarchy): si un archivo sin dueño choca con un paquete, se aparta, se reintenta una vez y se devuelve lo que el paquete no reclamó; y Hyprland no recarga su configuración mientras pacman la está cambiando, sino una sola vez al final.
 - **Comprobación de salud con memoria** (de openSUSE): tras cada actualización y en cada arranque se comprueba que el sistema está sano, y se guarda cuál fue la última instantánea buena. Si falla justo después de actualizar, vuelve a esa instantánea; si falla un sistema que ya funcionaba, reinicia una vez y, si sigue mal, se queda encendido con los servicios parados. Es también el mecanismo del modo seguro automático.
+
+**Firmware.** `kav update` consulta fwupd y ofrece el firmware de la placa, del SSD y de los periféricos como un paso más de la actualización, con su aviso de reinicio.
 
 ## Sistema de temas
 
@@ -719,7 +732,7 @@ Límite deliberado: el agente puede resumir un diff de `kav review`, pero no pue
 
 - **Pulsar para hablar**: por defecto la voz se activa manteniendo una tecla, no escuchando siempre; la palabra de activación queda como opción.
 - **Ayuda en la terminal**: una tecla en Kitty explica el último error o propone el comando correcto, sin salir de la terminal.
-- **Avisos discretos**: el agente avisa de lo que importa (disco casi lleno, una revisión del AUR pendiente, una copia que falló) y propone la skill que lo arregla. No interrumpe en modo Gamer.
+- **Avisos discretos**: el agente avisa de lo que importa (disco casi lleno, una revisión del AUR pendiente, una copia que falló, un proceso desbocado) y propone la skill que lo arregla. No interrumpe en modo Gamer.
 
 **Isla de voz.** Cuando le hablas por voz, una isla baja de la barra con la cara de Kavat y se queda mientras escucha, piensa y contesta. Como preguntaste mientras trabajabas, la respuesta llega sobre lo que estabas haciendo.
 
@@ -772,6 +785,13 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
 | Portapapeles | cliphist con historial en el lanzador | Integrado en `kavat-shell` |
 | Desarrollo | git, docker o podman, mise para versiones de lenguajes | Perfil opcional del instalador |
+| Visores | imv para imágenes, mpv para vídeo y audio, zathura para PDF; los comprimidos se abren en Yazi como carpetas | Solo plantilla de tema |
+| Juego | MangoHud y gamescope | Perfil de juegos del instalador |
+| Red y Bluetooth | NetworkManager y BlueZ | Página en `kavat-shell` |
+| Llavero y llaves | gnome-keyring, ssh-agent y gpg-agent | Configuración en `kavat-desktop` |
+| Discos extraíbles | udisks2 | Integrado en `kavat-shell` |
+| Firmware | fwupd | Integrado en `kav` |
+| Impresión y escáner | CUPS y SANE | Perfil opcional del instalador |
 | Fuentes | Inter, JetBrains Mono Nerd Font, Noto para emoji y CJK | `kavat-fonts` |
 | Agente | Ollama + `kavatd` + modelo | `kavat-agent` |
 
@@ -823,6 +843,8 @@ El sistema asume que algo se va a romper y que algún paquete será malicioso, y
 - **Modo rescate**: la ISO incluye `kavat-rescue`, que monta la instalación, entra por chroot y restaura un snapshot.
 - **`kav doctor`**: comprueba servicios fallidos, paquetes huérfanos, archivos `.pacnew` sin resolver, espacio en disco y estado de los snapshots.
 - **Permisos del agente**: los cuatro niveles de la sección anterior, aplicados por `kavatd` y polkit, no por el modelo.
+- **Diálogo de contraseña propio**: cuando polkit pide la contraseña, el diálogo lo dibuja el shell, con el tema del sistema, y dice qué programa pide permiso y para qué.
+- **Llavero y llaves**: un llavero que se abre al iniciar sesión guarda las contraseñas del navegador y los tokens de git y de `gh`; un agente guarda las llaves SSH y GPG, que piden su contraseña una vez por sesión.
 
 * **Comprobación tras actualizar**: después de `kav update`, una prueba automática comprueba el arranque gráfico, la GPU y los servicios; si algo falla, ofrece volver al snapshot anterior.
 * **Snapshots de `/home`**: cada hora, ligeros; desde Yazi se ven las versiones anteriores de una carpeta y se recupera un archivo borrado. La biblioteca de Steam vive en su propio subvolumen y queda fuera de ellos.
@@ -946,8 +968,16 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Ajustes | Todo el núcleo se configura desde un panel dentro del shell, con páginas nativas |
 | Shell | Fork de Noctalia 5, empaquetado como kavat-shell: es nuestra app desde ahora, con nuestros cambios y con el panel de ajustes dentro |
 | Notas | nb como componente del sistema, con fork propio (kavat-notes): recordatorios, fechas de tareas, enlaces a carpetas que se abren en Yazi y el agente tomando notas; además, resumen de la mañana, recordatorios por situación, plantillas y búsqueda por significado. En Neovim se ven con formato y color |
-| Información del sistema | Fork de fastfetch (`kavat-fetch`) con el logo de Kavat, las líneas que elijas y los colores del tema |
-| Monitor del sistema | Fork de btop (`kavat-top`) con el tema del sistema, procesos agrupados y el agente explicando cada proceso |
+| Información del sistema | Fork de fastfetch (`kavat-fetch`) con el logo de Kavat, como imagen en Kitty, las líneas que elijas, una línea de salud y los colores del tema |
+| Monitor del sistema | Fork de btop (`kavat-top`) con el tema del sistema, procesos agrupados, servicios con su log, historial de 24 horas, aviso de procesos desbocados y el agente explicando cada cosa |
+| Red y Bluetooth | Página propia en el panel |
+| Llavero y llaves | Llavero abierto al iniciar sesión y agente para las llaves SSH y GPG |
+| Apps por defecto | imv, mpv y zathura; los comprimidos, en Yazi |
+| Capa de juego | MangoHud y gamescope en el perfil de juegos; sin tiendas fuera de Steam |
+| Discos extraíbles y firmware | Los USB se montan solos con aviso; el firmware se actualiza dentro de `kav update` |
+| Calculadora | Cuentas y conversiones de unidades en la paleta |
+| Impresión y escáner | Perfil opcional del instalador |
+| Diálogo de contraseña | Lo dibuja el shell, con el tema, diciendo quién pide permiso y para qué |
 | Modelo del agente | Qwen3.5 4B como punto de partida, en la GPU y configurable; queda cargado en Coder y se confirma con una prueba propia |
 | Cómo acierta el agente | Ve de cinco a ocho herramientas por petición, con nombres en inglés, y cada skill es una sola llamada |
 | Idioma del agente | Se le habla en inglés; el sistema sigue en inglés o español |

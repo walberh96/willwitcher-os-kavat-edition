@@ -58,6 +58,10 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![Windows settings](docs/screenshots/settings-windows.png) **Two-way settings.** Change a value in the panel or in the file; each follows the other. | ![Config in Neovim](docs/screenshots/config-in-neovim.png) **One click to the file.** Every page opens its config in Neovim. |
 | ![Kavat speaking](docs/screenshots/agent-voice.png) **Kavat speaking.** An island under the bar: its whiskers move with its voice, and captions follow word by word. | ![Displays](docs/screenshots/settings-displays.png) **Displays.** One, two side by side, or landscape next to portrait: placed by dragging, remembered for each set of displays. |
 | ![System monitor](docs/screenshots/system-monitor.png) **System monitor.** A fork of btop: processes grouped by what they belong to, and Kavat explains any of them. | ![Terminal settings](docs/screenshots/settings-terminal.png) **Terminal settings.** Kitty, plus the system info and the monitor. |
+| ![Services](docs/screenshots/system-monitor-services.png) **Services.** What failed, its log, and Kavat explaining the error. | ![History](docs/screenshots/system-monitor-history.png) **History.** The last 24 hours, to ask what happened at three. |
+| ![Network settings](docs/screenshots/settings-network.png) **Network and Bluetooth.** Connections, VPNs and devices on one page. | ![Password dialog](docs/screenshots/password-dialog.png) **Password dialog.** Drawn by the shell: who asks, and what for. |
+| ![Notices](docs/screenshots/notices.png) **Notices.** A process running hot, a disk just plugged in. | ![Calculator](docs/screenshots/launcher-calc.png) **Calculator.** Sums and unit conversions in the palette. |
+| ![Updates](docs/screenshots/kav-updates.png) **Updates.** Packages and firmware in one pass. | ![Shell settings](docs/screenshots/settings-shell.png) **Shell settings.** Prompt, plugins and the default apps. |
 
 ## Talk to it
 
@@ -159,7 +163,7 @@ Light mode is designed, not inverted. Profiles have names (`work`, `night`, `pre
 
 ## Everything is set in one place
 
-A settings panel inside the shell configures the whole core, on twenty-five pages: from appearance, windows and keybindings to GPU, sound, notes, projects, backups, privacy and boot.
+A settings panel inside the shell configures the whole core, on twenty-six pages: from appearance, windows and keybindings to GPU, sound, notes, projects, backups, privacy and boot.
 
 - **One place per setting.** Each setting lives in its app's own config file, or in `~/.config/kavat/` for the system's own.
 - **Live and reversible.** Every change shows instantly, has undo and lands in a history.
@@ -175,10 +179,10 @@ A settings panel inside the shell configures the whole core, on twenty-five page
 - **Noctalia**, in its own fork: bar, launcher, notifications, control centre, plus the agent's panel, the mode selector and the settings panel.
 - **LightDM + web-greeter**, with a login screen that uses your theme and your wallpaper. Entering the desktop has no visual cut.
 - **Kitty and zsh**, with a starship prompt cut down to what costs no time: opening a terminal goes unnoticed.
-- **One command palette.** `Super+D` searches apps, files, settings, skills, packages, windows and browser tabs, with the same commands as the browser console and Neovim.
+- **One command palette.** `Super+D` searches apps, files, settings, skills, packages, windows and browser tabs, works out sums and unit conversions, with the same commands as the browser console and Neovim.
 - **Projects.** A project saves a whole workspace (folder, terminals, editor, browser profile, window layout) and brings it back as you left it.
-- **System info with its own face.** `kavat fetch` is a fork of fastfetch: the Kavat cat as its logo, the lines you choose, the colours of your theme.
-- **A monitor that knows the system.** `kavat top` is a fork of btop: processes grouped by what they belong to, the agent's share of the GPU in sight, and `K` asks Kavat what a process is and why it is busy.
+- **System info with its own face.** `kavat fetch` is a fork of fastfetch: the Kavat cat as its logo, the lines you choose, the colours of your theme. In Kitty the logo is an image, and a health line shows pending updates and `kav doctor` notices.
+- **A monitor that knows the system.** `kavat top` is a fork of btop: processes grouped by what they belong to, the agent's share of the GPU in sight, and `K` asks Kavat what a process is and why it is busy. It also lists failed services with their log, keeps 24 hours of history, and warns when a process runs away.
 - **One `kavat` command.** `kavat theme`, `mode`, `wallpaper`, `project`, `ask`, `fetch`, `top`, `doctor`: everything the panel does, from the terminal.
 - **The shortcuts you already know**, inherited from Willwitcher-OS Endgame, plus `Super+Space` for Kavat.
 
@@ -232,6 +236,9 @@ A Chromium of its own, with seven changes.
 ## Built for a gaming desktop
 
 - **A GPU page.** Fan curve, power limit and sensors in the bar for the Radeon RX 6800.
+- **A game layer.** MangoHud draws the per-game overlay and frame cap, and gamescope sets each game's resolution and scaling.
+- **Network and Bluetooth on one page.** Wired, Wi-Fi, saved VPNs, and controllers and headphones with their battery.
+- **Disks that mount themselves.** Plug in a USB disk and a notice offers to open it in Yazi or eject it.
 - **Any number of displays.** Place them by dragging in the settings panel, landscape or portrait. Each set of displays keeps its own layout, so one synced configuration fits a PC with one screen and another with two.
 - **Lights follow the theme.** Keyboard and case take the accent colour, change with the mode and pulse with Kavat's voice.
 - **A clean microphone.** Noise suppression is on out of the box, for the agent's voice and for streams.
@@ -249,6 +256,9 @@ A Chromium of its own, with seven changes.
 - **A health check after every update**, with an offer to roll back if it fails.
 - **Your files too.** Hourly snapshots of `/home`, browsable from Yazi, and an encrypted copy to an external disk. The Steam library has its own subvolume and stays out of the snapshots.
 - **Configuration history.** Every change, from the panel or by hand, is a commit; the history can sync to a private repository.
+- **Secrets kept by the system.** A keyring that opens when you log in holds browser passwords and git tokens, and an agent holds your SSH and GPG keys.
+- **A password dialog of its own.** When something needs your password, the shell draws the dialog and says who is asking and what for.
+- **Firmware too.** `kav update` offers firmware for the board, the SSD and peripherals as one more step.
 - **Privacy in plain sight.** The bar shows when an app uses the microphone, camera or screen, and a per-app firewall asks the first time an app reaches for the network. Games launched by Steam use Steam's rule.
 
 ## From power button to desktop
