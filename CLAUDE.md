@@ -21,7 +21,7 @@ Los dos diagramas del documento de diseño son imágenes en `docs/img/` y no tie
 
 ## Cómo se cambia el diseño
 
-1. Lo que el usuario tiene que decidir va a `docs/PENDING.md`, no al documento de diseño. Cada punto lleva un número (D1 a D31 ya se usaron; se sigue en D32), una recomendación y qué pasa si dice que no.
+1. Lo que el usuario tiene que decidir va a `docs/PENDING.md`, no al documento de diseño. Cada punto lleva un número (D1 a D32 ya se usaron; se sigue en D33), una recomendación y qué pasa si dice que no.
 2. Antes de trabajar, se mira ese archivo: el usuario contesta por chat o escribiendo en él.
 3. Lo aprobado pasa a `docs/DESIGN.md`, al mockup y, si toca, al README, y sale de pendientes. El documento y el mockup cambian en el mismo commit: no se deja uno para después.
 4. Lo rechazado se borra de pendientes y no se vuelve a preguntar. Si el usuario aprueba una parte y dice «lo otro no», ese no cubre todo lo demás que estuviera sobre la mesa.

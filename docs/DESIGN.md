@@ -85,8 +85,11 @@ La categoría Development trae lo que hace falta para trabajar en lanequarters, 
 | --- | --- | --- |
 | Esenciales | git, github-cli, mise, pnpm, docker con compose, claude-code | Los proyectos piden Node 22 o superior y pnpm; mise pone la versión de Node de cada uno |
 | Web | supabase, postgresql (cliente `psql`), stripe-cli | `supabase start` levanta la base local en Docker; `stripe listen` recibe los webhooks |
+| Rust | rustup con rustc, cargo, rustfmt, clippy y rust-analyzer; lldb, gcc y pkg-config | `kav` y `kavatd` se escriben en Rust |
 | Móvil, Android | jdk17-openjdk, SDK de Android con emulador, android-tools, watchman, maestro | Compilar la app de Expo para Android y probarla en el emulador o en un teléfono |
 | Al primer arranque, con pnpm | Navegadores de Playwright, vercel, eas-cli | No son paquetes de pacman: los instala pnpm y `kav` no los gestiona |
+
+En la categoría de oficina, OnlyOffice sale como casilla sin marcar; viene del AUR.
 
 La extensión de navegador se prueba en `kavat-browser`, que es un fork de Chromium y admite las extensiones de Chrome. Seis de la lista vienen del AUR (claude-code, supabase, stripe-cli, el SDK de Android, watchman y maestro) y necesitan su entrada en la allowlist; en qué repositorio está cada paquete se comprueba al escribirla.
 
@@ -241,7 +244,9 @@ El equipo es un escritorio con una Radeon RX 6800, y el sistema lo trata como ta
 - **Página de GPU**: curvas de ventilador, límites de potencia y sensores en la barra.
 - **Las luces siguen al tema**: con OpenRGB, teclado y torre toman el color de acento, cambian con el modo y laten con la voz de Kavat.
 - **Supresión de ruido del micrófono**: activa de serie, para la voz del agente y para directos.
-- **Discos extraíbles**: al enchufar un USB se monta solo y sale un aviso con «Abrir en Yazi» y «Expulsar».
+- **Discos extraíbles**: al enchufar un USB se monta solo y sale un aviso con «Abrir en Yazi» y «Expulsar». Los discos con NTFS se montan igual.
+- **Teclado Keychron**: se configura con la versión web de VIA desde `kavat-browser`. El sistema solo trae la regla de udev que da acceso al teclado; qmk y la app de VIA no se instalan.
+- **Auriculares**: headsetcontrol lee la batería de los auriculares USB, que sale en la página Network & Bluetooth junto a los demás dispositivos.
 - **Red y Bluetooth**: una página del panel reúne el cable, el Wi-Fi, las VPN guardadas y los dispositivos Bluetooth, como mandos y auriculares, con su batería.
 
 **Pantallas.** Se admite cualquier número de pantallas, y se colocan desde la página Displays del panel.
@@ -368,7 +373,7 @@ Neovim es el editor del núcleo y llega como `kavat-nvim`: útil nada más abrir
 - Dos límites: el multicursor va por plugin (multicursor.nvim) y no es idéntico al de VS Code, y las ventanas internas de algunos plugins siguen usando teclas de Vim (`j`, `k`, `q`).
 - Tus atajos de `<leader>` de Endgame siguen disponibles en modo normal.
 
-**Preinstalado.** Con lazy.nvim como gestor: explorador de archivos, buscador difuso, paleta de comandos, pestañas de buffers, barra de estado, resaltado con treesitter, LSP con autocompletado, formateo al guardar, integración con git, terminal flotante, ayuda de atajos y multicursor. El tema sigue al del sistema.
+**Preinstalado.** Con lazy.nvim como gestor: explorador de archivos, buscador difuso, paleta de comandos, pestañas de buffers, barra de estado, resaltado con treesitter, LSP con autocompletado, formateo al guardar, integración con git, terminal flotante, ayuda de atajos y multicursor. El tema sigue al del sistema. Para Markdown trae Marksman como servidor de lenguaje, que completa y sigue los enlaces entre notas.
 
 **Marketplace.** `Ctrl+Shift+X` abre una TUI dentro de Neovim para buscar, ver e instalar plugins por categorías, como la pestaña de extensiones de VS Code.
 
@@ -803,7 +808,10 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Monitor del sistema | btop | `kavat-top` (fork) |
 | Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
 | Portapapeles | cliphist con historial en el lanzador | Integrado en `kavat-shell` |
-| Desarrollo | git, github-cli, mise, pnpm, docker, claude-code, supabase, postgresql y stripe-cli; para Android, JDK 17, el SDK con emulador, android-tools, watchman y maestro | Categoría Development del instalador |
+| Desarrollo | git, github-cli, mise, pnpm, docker, claude-code, supabase, postgresql y stripe-cli; Rust con rustup; para Android, JDK 17, el SDK con emulador, android-tools, watchman y maestro | Categoría Development del instalador |
+| Utilidades de terminal | zoxide, lsd, ripgrep, fd, fzf, bat y jq | En el sistema base |
+| Comprimidos y discos | 7zip, para que Yazi abra los comprimidos de serie; ntfs-3g, para montar discos NTFS | En el sistema base |
+| Auriculares | headsetcontrol | En el sistema base |
 | Visores | imv para imágenes, mpv para vídeo y audio, zathura para PDF; los comprimidos se abren en Yazi como carpetas | Solo plantilla de tema |
 | Juego | MangoHud y gamescope | Categoría de juegos del instalador |
 | Red y Bluetooth | NetworkManager y BlueZ | Página en `kavat-shell` |
@@ -996,6 +1004,9 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Capa de juego | MangoHud y gamescope en la categoría de juegos del instalador; sin tiendas fuera de Steam |
 | Discos extraíbles y firmware | Los USB se montan solos con aviso; el firmware se actualiza dentro de `kav update` |
 | Calculadora | Cuentas y conversiones de unidades en la paleta |
+| Herramientas de base | zoxide, lsd, ripgrep, fd, fzf, bat y jq; 7zip para los comprimidos de Yazi y ntfs-3g para discos NTFS |
+| Teclado y auriculares | El Keychron se configura con VIA web desde el navegador, con solo su regla de udev; headsetcontrol para la batería de los auriculares |
+| Oficina | OnlyOffice, como casilla sin marcar del instalador |
 | Impresión y escáner | Opcional, en el instalador |
 | Diálogo de contraseña | Lo dibuja el shell, con el tema, diciendo quién pide permiso y para qué |
 | Modelo del agente | Qwen3.5 4B como punto de partida, en la GPU y configurable; queda cargado en Coder y se confirma con una prueba propia |
@@ -1039,6 +1050,7 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 | Yazi acepta archivos soltados sobre su ventana, recarga el tema en vivo y muestra el progreso real de una copia en un pop-up, por plugin o por fork | 3 |
 | Un proyecto restaura ventanas, terminales y editor tal como estaban | 3 |
 | OpenRGB controla las luces de tu teclado y de tu torre | 3 |
+| La versión web de VIA configura el teclado Keychron desde `kavat-browser` con solo la regla de udev | 3 |
 | Las curvas de ventilador y el límite de potencia de la RX 6800 se pueden fijar desde el panel | 3 |
 | El cortafuegos por aplicación no estorba a Steam ni a los juegos | 3 |
 | Los snapshots horarios de `/home` no degradan el disco ni la CPU | 3 |
