@@ -50,6 +50,8 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![Claude panel](docs/screenshots/claude-panel.png) **Claude beside the code.** A Kitty split next to Neovim; edits arrive as diffs. | ![Copy pop-up](docs/screenshots/files-copy.png) **Copying you can see.** Progress and name conflicts, in a pop-up. |
 | ![Files](docs/screenshots/files.png) **Files.** Yazi, with previews and a drag-and-drop shelf. | ![File picker](docs/screenshots/files-picker.png) **File picker.** The browser asks for a file and Yazi answers. |
 | ![Notes](docs/screenshots/notes.png) **Notes.** To-dos with dates, reminders and links to folders, on top of `nb`. | ![Quick note](docs/screenshots/notes-quick.png) **Quick note and reminders.** `Super+N` from anywhere; a reminder arrives as a notification. |
+| ![A note in Neovim](docs/screenshots/note-rendered.png) **A note in Neovim.** Rendered in place: headings, checkboxes, tables and captures. | ![Clip to notes](docs/screenshots/browser-clip.png) **Clip to notes.** The page, your selection and a capture, from the browser. |
+| ![Albums](docs/screenshots/browser-albums.png) **Albums.** Favourite sites as a grid of thumbnails. | ![Notes settings](docs/screenshots/settings-notes.png) **Notes settings.** Reminders, links, what the agent may read, and sync. |
 | ![Launcher](docs/screenshots/launcher.png) **One palette.** Apps, files, settings, skills, packages and windows from one place. | ![Boot settings](docs/screenshots/settings-boot.png) **Boot settings.** The menu and the loading screen, from the panel. |
 | ![GPU settings](docs/screenshots/settings-gpu.png) **GPU.** Fan curve, limits and per-game profiles. | ![Projects](docs/screenshots/settings-projects.png) **Projects.** A whole workspace, saved and reopened. |
 | ![Backup and sync](docs/screenshots/settings-backup.png) **Backup and sync.** Home snapshots, external copies and configuration history. | ![Privacy and network](docs/screenshots/settings-privacy.png) **Privacy.** Who used the microphone, camera or screen, and the per-app firewall. |
@@ -206,12 +208,13 @@ Notes are part of the system, built on a fork of [`nb`](https://github.com/xwmx/
 - **Links to folders.** A link to a folder opens it in Yazi, and a link to `file:line` opens Neovim on that line. From Yazi, one key opens the note of the folder you are in.
 - **Kavat takes notes.** "Note that…", "remind me on Friday…", "what did I write about the TPM?". What it writes is marked as its own, every change is a commit you can undo, and private notebooks stay closed to it.
 - **Quick note.** `Super+N` from anywhere: one line, read for tags and dates as you type, saved to the inbox.
+- **Rendered in Neovim.** A note opens with its headings, checkboxes, tables, callouts and captures drawn in place. The line under the cursor stays raw Markdown, so you edit where you read.
 - **Indexed.** Titles, tags, links and dates are indexed as you save, so the palette, the to-do views and the agent all search the same thing, by words or by meaning.
 - **And more.** A morning summary, reminders tied to a situation ("when I open the kav project"), system notices turned into to-dos with one click, the last terminal command saved with one key, templates, and a note pinned to the desktop.
 
 ## The browser
 
-A Chromium of its own, with six changes.
+A Chromium of its own, with seven changes.
 
 - **It follows the modes.** In Incognito it opens private windows; in Gamer it suspends tabs.
 - **It follows the theme.** It changes colour with the rest of the system, internal pages included.
@@ -219,6 +222,7 @@ A Chromium of its own, with six changes.
 - **It has Kavat beside it.** A panel that reads the page and acts in the browser, with the same permissions as in the system.
 - **It has a console.** A palette of its own commands: `hide-tabs`, `hide-sidebar`, `zen`, and the ones you define.
 - **It uses Yazi.** Uploading, "Save as" and clicking a download all go through the system's file manager.
+- **It clips into your notes.** A page goes into a note with your selection as a quote and a capture. Favourite sites gather in albums with thumbnails, your open tabs become an album in one step, and a panel shows the notes you already have about the site you are on.
 
 ## Built for a gaming desktop
 

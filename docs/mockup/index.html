@@ -359,6 +359,44 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
 .cprow>:last-child{width:9em;flex:none;text-align:right}
 .cbar{flex:1;height:.5em;border-radius:1em;background:var(--surface2);overflow:hidden}
 .cbar i{display:block;height:100%;background:var(--accent);border-radius:1em}
+.screen:not([data-note=true]) .js-mdview,.screen:not([data-note=true]) .js-mdnote{display:none}
+.screen[data-note=true] .mk,.screen[data-note=true] .js-maincode,.screen[data-note=true] .etree,.screen[data-note=true] .js-edother{display:none}
+.mdv{flex:1;display:flex;min-width:0}
+.mtree{width:19em;border-right:.1em solid var(--border);padding:.8em .7em;display:flex;flex-direction:column;gap:.15em;color:var(--muted);white-space:pre;font-family:var(--mono);font-size:.82em}
+.mtree b{font-size:.85em;letter-spacing:.08em;margin-bottom:.5em;font-weight:400}
+.mtree .on{color:var(--text);background:var(--surface2);border-radius:.3em}
+.md{flex:1;position:relative;font-family:var(--mono);font-size:.86em;line-height:1.62;padding:.9em 1.4em;overflow:hidden}
+.ml{white-space:pre;min-height:1.62em}
+.ml.h1{font-weight:700;color:var(--accent-text);background:color-mix(in srgb,var(--accent) 20%,transparent);border-radius:.3em;padding:.12em .6em;margin-bottom:.35em}
+.ml.h2{font-weight:700;color:var(--info);background:color-mix(in srgb,var(--info) 14%,transparent);border-radius:.3em;padding:0 .6em;margin:.55em 0 .2em}
+.ml.chips{display:flex;gap:.6em;white-space:normal;margin-bottom:.2em}
+.chip{padding:0 .7em;border-radius:1em;background:var(--surface2);border:.1em solid var(--border)}
+.chip.tag{color:var(--info);border-color:color-mix(in srgb,var(--info) 50%,transparent)}
+.ml.mdone{opacity:.6}
+.ml.raw{background:var(--surface2);border-radius:.25em}
+.ml.call{background:color-mix(in srgb,var(--info) 10%,transparent)}
+.ml.tb{color:var(--muted);line-height:1.28;min-height:1.28em}.ml.tb b,.ml.tb span{color:var(--text)}.ml.tb .ok{color:var(--ok)}.ml.tb .warn{color:var(--warn)}
+.ml.cb{background:var(--surface2)}.ml.cb.first{margin-top:.5em;text-align:right;padding-right:.8em;border-radius:.3em .3em 0 0}
+.lang{color:var(--muted);font-size:.9em}
+.code1{background:var(--surface2);border-radius:.25em;padding:0 .35em;color:var(--warn)}
+.mimg{margin:.7em 0 0 2ch;width:19em;display:flex;flex-direction:column;gap:.35em;font-size:.9em}
+.shot{--h:var(--accent);height:8.2em;border-radius:.4em;border:.1em solid var(--border);background:linear-gradient(160deg,color-mix(in srgb,var(--h) 34%,var(--surface)),var(--surface2));display:flex;flex-direction:column;gap:.5em;padding:.9em;overflow:hidden}
+.shot i{display:block;height:.5em;border-radius:1em;background:color-mix(in srgb,var(--text) 26%,transparent)}
+.shot i:nth-child(1){width:46%;height:.8em;background:color-mix(in srgb,var(--h) 75%,transparent)}.shot i:nth-child(2){width:88%}.shot i:nth-child(3){width:72%}.shot i:nth-child(4){width:80%}
+.clip{display:none;position:absolute;left:39%;top:5%;transform:translateX(-50%);width:44em;padding:1.1em 1.2em;flex-direction:column;gap:.9em;box-shadow:0 1.5em 4em #000a;border-color:var(--accent);z-index:3}
+.screen[data-clip=true] .clip{display:flex}.screen[data-clip=true] .cmd{display:none}
+.screen[data-clip=true] .bpage .sk.pick{background:color-mix(in srgb,var(--accent) 60%,transparent)}
+.cliprow{display:flex;gap:1.1em}.clipshot{width:15em;display:flex;flex-direction:column;gap:.6em}.clipshot .seg{font-size:.82em}
+.clipcol{flex:1;display:flex;flex-direction:column;gap:.5em;min-width:0}.clip .sel{flex:none;white-space:nowrap}.clip .chips{flex-wrap:nowrap}
+.quote{border-left:.25em solid var(--accent);padding:.35em .8em;background:var(--surface);border-radius:0 .4em .4em 0;font-size:.95em}
+.nside{display:none}.screen[data-clip=true] .nside{display:flex}.screen[data-clip=true] .bside:not(.nside){display:none}
+.nitem{display:flex;flex-direction:column;padding:.5em .7em;border-radius:calc(var(--r)*.6);background:var(--surface);border:.1em solid var(--border)}
+.apage{display:none;gap:1.1em}
+.screen[data-albums=true] .apage{display:flex}
+.screen[data-albums=true] .bpage:not(.apage),.screen[data-albums=true] .bside,.screen[data-albums=true] .cmd{display:none}
+.arow{display:flex;align-items:center;gap:.7em}
+.agrid{display:grid;grid-template-columns:repeat(4,1fr);gap:1.1em}
+.acard{display:flex;flex-direction:column;gap:.25em;font-size:.92em}.acard .shot{height:7.4em;margin-bottom:.3em}
 #ov-notes{left:7%;right:7%;top:10%;bottom:6%;flex-direction:column;border-width:.14em;border-color:var(--accent);box-shadow:0 2em 5em #0006}
 .screen[data-ov=notes] .dim{display:block}.screen[data-ov=notes] #ov-notes{display:flex}
 .ttabs span.nt{padding:.1em .8em;border-radius:.3em;color:var(--muted)}
@@ -426,10 +464,12 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
     <button data-scene="themes">Themes</button>
     <button data-scene="settings">Settings</button>
     <button data-scene="browser">Browser</button>
+    <button data-scene="albums">Albums</button>
     <button data-scene="editor">Editor</button>
     <button data-scene="claude">Claude panel</button>
     <button data-scene="files">Files</button>
     <button data-scene="notes">Notes</button>
+    <button data-scene="note">Note in Neovim</button>
     <button data-scene="kav">kav</button>
     <button data-scene="install">Installer</button>
   </div>
@@ -683,8 +723,8 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
 
     <!-- browser -->
     <div class="ov glass win" id="ov-browser">
-      <div class="tabstrip"><span class="tab on">Hyprland - ArchWiki</span><span class="tab">GitHub</span><span class="tab">+</span><span style="flex:1"></span><span class="pill" style="margin-bottom:.35em" data-cfg="browser">Config ›</span><span class="pill" style="margin-bottom:.35em">Shield · 14 blocked</span></div>
-      <div class="url"><span class="muted">← → ⟳</span><div>wiki.archlinux.org/title/Hyprland</div><span class="pill">Profile · <span class="js-bprofile">Coder</span></span><span class="pill accent">Kavat</span></div>
+      <div class="tabstrip"><span class="tab on js-btab">Hyprland - ArchWiki</span><span class="tab">GitHub</span><span class="tab">+</span><span style="flex:1"></span><span class="pill" style="margin-bottom:.35em" data-cfg="browser">Config ›</span><span class="pill" style="margin-bottom:.35em">Shield · 14 blocked</span></div>
+      <div class="url"><span class="muted">← → ⟳</span><div class="js-burl">wiki.archlinux.org/title/Hyprland</div><span class="pill">Profile · <span class="js-bprofile">Coder</span></span><span class="pill" data-act="clip" style="cursor:pointer">Clip</span><span class="pill" data-scene="albums" style="cursor:pointer">Albums</span><span class="pill accent">Kavat</span></div>
       <div class="bw">
         <div class="bpage">
           <h3>Hyprland</h3>
@@ -692,9 +732,10 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
           <h4>Installation</h4>
           <div class="sk" style="width:88%"></div><div class="sk" style="width:79%"></div><div class="sk" style="width:83%"></div><div class="sk" style="width:41%"></div>
           <h4>Configuration</h4>
-          <div class="sk" style="width:90%"></div><div class="sk" style="width:72%"></div><div class="sk" style="width:85%"></div>
+          <div class="sk pick" style="width:90%"></div><div class="sk pick" style="width:72%"></div><div class="sk" style="width:85%"></div>
           <div class="dlshelf"><span class="muted">↓</span><span class="fchip" data-act="dl"><span>archlinux-2026.11.01-x86_64.iso</span><span class="muted">1.2 GB · click to show in Yazi</span></span><span class="sp"></span><span class="btn" data-act="pick">Upload a file…</span></div>
         </div>
+        <div class="bpage apage"><div class="arow"><h3 style="margin:0">Albums</h3><span class="sp"></span><span class="btn">Open all in tabs</span><span class="btn">Save open tabs as an album</span><span class="btn pri">New tab page ✓</span></div><div class="chips"><span class="pill accent">Hyprland rices · 8</span><span class="pill">Read later · 5</span><span class="pill">Docs · 14</span><span class="pill">Recipes · 8</span><span class="pill">Images · 23</span><span class="pill">+ New album</span></div><div class="agrid"><div class="acard"><div class="shot" style="--h:var(--accent)"><i></i><i></i><i></i><i></i></div><b>Hyprland</b><span class="muted">wiki.archlinux.org</span></div><div class="acard"><div class="shot" style="--h:var(--info)"><i></i><i></i><i></i><i></i></div><b>Noctalia docs</b><span class="muted">docs.noctalia.dev</span></div><div class="acard"><div class="shot" style="--h:var(--danger)"><i></i><i></i><i></i><i></i></div><b>r/unixporn · top of the month</b><span class="muted">reddit.com</span></div><div class="acard"><div class="shot" style="--h:var(--ok)"><i></i><i></i><i></i><i></i></div><b>Catppuccin ports</b><span class="muted">github.com</span></div><div class="acard"><div class="shot" style="--h:var(--warn)"><i></i><i></i><i></i><i></i></div><b>Kitty graphics protocol</b><span class="muted">sw.kovidgoyal.net</span></div><div class="acard"><div class="shot" style="--h:var(--info)"><i></i><i></i><i></i><i></i></div><b>Yazi plugins</b><span class="muted">yazi-rs.github.io</span></div><div class="acard"><div class="shot" style="--h:var(--accent)"><i></i><i></i><i></i><i></i></div><b>Dotfiles worth reading</b><span class="muted">github.com</span></div><div class="acard"><div class="shot" style="--h:var(--ok)"><i></i><i></i><i></i><i></i></div><b>Plymouth themes</b><span class="muted">gitlab.freedesktop.org</span></div></div></div>
         <div class="bside">
           <div class="row"><b>Kavat</b><span class="muted" style="width:auto;margin-left:auto">this page</span></div>
           <div class="msg me">summarize this page for me</div>
@@ -704,6 +745,16 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
           <div class="tool">⚙ browser.run("hide-tabs") <span class="badge ok">reversible</span></div>
           <div style="margin-top:auto" class="pw glass"><span style="letter-spacing:0" class="muted">Ask about this page…</span></div>
         </div>
+        <div class="bside nside">
+          <div class="row"><b>Notes</b><span class="muted" style="width:auto;margin-left:auto">this site · 3</span></div>
+          <div class="nitem"><b>Monitors and scaling</b><span class="muted">clip · 2 Nov · 1 capture</span></div>
+          <div class="nitem"><b>Moving the config to Lua</b><span class="muted">note · yesterday</span></div>
+          <div class="nitem"><b>Try the new animations</b><span class="muted">to-do · due Fri 13</span></div>
+          <div class="sec" style="margin:.4em 0 0">In albums</div>
+          <div class="chips"><span class="pill" data-scene="albums" style="cursor:pointer">Hyprland rices</span><span class="pill">Docs</span></div>
+          <div style="margin-top:auto" class="chips"><span class="btn" data-act="clip" style="cursor:pointer">Clip this page</span><span class="btn">Add to album</span><span class="btn">Read later</span></div>
+        </div>
+        <div class="clip glass"><div class="skh"><b>Clip to notes</b><span class="muted">wiki.archlinux.org/title/Hyprland</span><span class="sp"></span><span class="muted mono">:clip</span></div><div class="cliprow"><div class="clipshot"><div class="shot"><i></i><i></i><i></i><i></i></div><div class="seg local"><button class="on">Visible</button><button>Region</button><button>Full page</button></div></div><div class="clipcol"><div class="sec" style="margin:0">Quote · your selection</div><div class="quote">Configuration lives in ~/.config/hypr/ and is reloaded when you save it.</div><div class="sec" style="margin:0">Comment</div><div class="qin" style="font-size:.95em">check this against our values.lua<span class="muted">▏</span></div><div class="chips"><span class="pill">#hyprland</span><span class="pill">#config</span><span class="sp"></span><div class="sel"><span>Album · Hyprland rices</span><span class="muted">▾</span></div></div></div></div><div class="btns" style="margin:0"><span class="btn pri">Save</span><span class="btn" data-scene="note" style="cursor:pointer">Save and open the note</span><span class="sp"></span><span class="btn" data-act="clipoff" style="cursor:pointer">Cancel</span></div></div>
         <div class="cmd glass">
           <div class="in"><span class="acc">:</span> hide<span class="muted">▏</span></div>
           <div class="it on"><span>hide-tabs</span><span>Hide the tab strip</span></div>
@@ -749,9 +800,9 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
     <!-- notes TUI -->
     <div class="ov glass win" id="ov-notes">
       <div class="tui">
-        <div class="ttabs"><b class="acc">notes</b><span class="nt on"><u>1</u>Today</span><span class="nt"><u>2</u>Inbox</span><span class="nt"><u>3</u>Notes</span><span class="nt"><u>4</u>To-do</span><span class="nt"><u>5</u>Reminders</span><span class="nt"><u>6</u>Bookmarks</span><span class="sp"></span><span class="muted">~/Notes · 214 notes · synced 2 min ago</span></div>
+        <div class="ttabs"><b class="acc">notes</b><span class="nt on"><u>1</u>Today</span><span class="nt"><u>2</u>Inbox</span><span class="nt"><u>3</u>Notes</span><span class="nt"><u>4</u>To-do</span><span class="nt"><u>5</u>Reminders</span><span class="nt"><u>6</u>Albums</span><span class="sp"></span><span class="muted">~/Notes · 214 notes · synced 2 min ago</span></div>
         <div class="krow" style="flex:1"><div class="pane" style="flex:.5"><span class="pt">Notebooks</span><div class="tl"><span>home</span><span class="r muted">86</span></div><div class="tl"><span>kav</span><span class="r muted">41</span></div><div class="tl"><span>willwitcher-os</span><span class="r muted">52</span></div><div class="tl"><span>journal</span><span class="r muted">31</span></div><div class="tl"><span>inbox</span><span class="r acc">4</span></div><div class="tl"><span>private</span><span class="r muted">locked</span></div><div class="ngrp">TAGS</div><div class="tl"><span class="info">#kav</span><span class="info">#os</span><span class="info">#pc</span></div><div class="tl"><span class="info">#ideas</span><span class="info">#review</span></div></div><div class="pane focus" style="flex:1.3"><span class="pt">Today · Wed 11 Nov</span><div class="ngrp bad">OVERDUE</div><div class="tl"><span>[ ]</span><span>Renew the domain</span><span class="r"><span class="bad">Mon 9 Nov</span></span></div><div class="ngrp">TODAY</div><div class="tl cur"><span>[ ]</span><span>Review the kav PR</span><span class="r"><span>⏰ 09:00</span><span>↻ weekly</span><span>▸ folder</span></span></div><div class="tl"><span>[ ]</span><span>Call the ISP about the static IP</span><span class="r"><span class="muted">⏰ 16:30</span></span></div><div class="tl done "><span class="ok">[x]</span><span>Back up /home to the external disk</span><span class="r"><span class="muted">done 08:12</span></span></div><div class="ngrp">UPCOMING</div><div class="tl"><span>[ ]</span><span>Order thermal paste</span><span class="r"><span class="acc">by Kavat</span><span class="muted">Fri 13</span></span></div><div class="tl"><span>[ ]</span><span>Re-enrol the TPM after mkinitcpio 42</span><span class="r"><span class="muted">Mon 16</span></span></div><div class="tl"><span>[ ]</span><span>Plan the phase 1 ISO build</span><span class="r"><span class="muted">Sat 21</span></span></div><div class="ngrp">RECENT NOTES</div><div class="tl"><span class="muted">  ·</span><span>Noctalia fork: where to start</span><span class="r muted">yesterday</span></div><div class="tl"><span class="muted">  ·</span><span>Ideas for the greeter</span><span class="r muted">Mon</span></div></div><div class="pane" style="flex:1.25"><span class="pt">Review the kav PR</span><div class="tl"><span class="muted" style="width:9ch;flex:none">Due</span><span>Fri 13 Nov</span></div><div class="tl"><span class="muted" style="width:9ch;flex:none">Remind</span><span>today 09:00 · repeats weekly</span></div><div class="tl"><span class="muted" style="width:9ch;flex:none">Notebook</span><span>kav</span><span class="info">#kav</span><span class="info">#review</span></div><div class="tl"><span class="muted" style="width:9ch;flex:none">Folder</span><span class="acc" data-act="files" style="cursor:pointer">~/Projects/kav</span><span class="muted">↵ opens in Yazi</span></div><div class="ngrp">TASKS</div><div class="tl done"><span class="ok">[x]</span><span>Read the diff of mpvpaper</span></div><div class="tl"><span>[ ]</span><span>Test the migration in the virtual machine</span></div><div class="tl"><span>[ ]</span><span>Merge and tag 0.4</span></div><div class="ngrp">RELATED</div><div class="tl"><span class="info">[[Allowlist policy]]</span><span class="info">[[kav: migrations]]</span></div><div class="tl"><span class="acc" data-act="editor" style="cursor:pointer">resolve.rs:42</span><span class="muted">opens in Neovim at that line</span></div><div class="tl"><span class="acc">settings: Packages</span><span class="muted">opens that settings page</span></div><span class="sp"></span><div class="tl"><span class="muted">Added by Kavat · yesterday 18:02 · 3 changes in history</span></div></div></div>
-        <div class="tkeys"><span><b>↵</b>open in Neovim</span><span><b>a</b>add</span><span><b>t</b>to-do</span><span><b>r</b>remind</span><span><b>d</b>due date</span><span><b>Space</b>done</span><span data-act="files" style="cursor:pointer"><b>o</b>open folder in Yazi</span><span><b>/</b>search</span><span data-act="cap" style="cursor:pointer"><b>Super+N</b>quick note</span></div>
+        <div class="tkeys"><span data-scene="note" style="cursor:pointer"><b>↵</b>open in Neovim</span><span><b>a</b>add</span><span><b>t</b>to-do</span><span><b>r</b>remind</span><span><b>d</b>due date</span><span><b>Space</b>done</span><span data-act="files" style="cursor:pointer"><b>o</b>open folder in Yazi</span><span><b>/</b>search</span><span data-act="cap" style="cursor:pointer"><b>Super+N</b>quick note</span></div>
       </div>
       <div class="status"><span class="mode">nb</span><span>kav:12</span><span class="sp"></span><span class="acc" data-cfg="notes">e  edit notes.toml</span><span class="muted">3 open · 1 overdue</span></div>
     </div>
@@ -770,6 +821,7 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
 <span class="ln">15</span>    }
 <span class="ln">16</span>}</div>
         <div class="code js-cfgcode"></div>
+        <div class="mdv js-mdview"><div class="mtree"><b>NOTES</b><span>▾ kav</span><span class="on">    review-the-kav-pr.todo.md</span><span>    allowlist-policy.md</span><span>    migrations.md</span><span>    release-0.4.todo.md</span><span>  ▸ clips</span><span>▸ home</span><span>▸ willwitcher-os</span><span>▸ journal</span><span>▸ inbox</span></div><div class="md"><div class="ml h1">◉ Review the kav PR</div><div class="ml chips"><span class="chip">Due Fri 13 Nov</span><span class="chip">⏰ today 09:00</span><span class="chip">↻ weekly</span><span class="chip tag">#kav</span><span class="chip tag">#review</span></div><div class="ml h2">○ Tasks</div><div class="ml mdone">  <span class="ok">✔</span> <s>Read the diff of mpvpaper</s></div><div class="ml">  <span class="acc">☐</span> Test the migration in the virtual machine</div><div class="ml raw"><span class="muted">  - [ ] </span>Merge and tag 0.4<span class="acc">▏</span></div><div class="ml h2">○ Notes</div><div class="ml">  The resolver should say <i>why</i> a package was rejected, <b>not only that it was</b>. See <span class="code1">Source::Rejected</span>.</div><div class="ml call">  <span class="info">┃ ⓘ Note</span></div><div class="ml call">  <span class="info">┃</span> mpvpaper is pinned to commit <span class="code1">a1b2c3</span> in the allowlist.</div><div class="ml tb">  ┌──────────┬──────────────┬──────────┐</div><div class="ml tb">  │ <b>Package</b>  │ <b>Source</b>       │ <b>Status</b>   │</div><div class="ml tb">  ├──────────┼──────────────┼──────────┤</div><div class="ml tb">  │ mpvpaper │ AUR · a1b2c3 │ <span class="ok">reviewed</span> │</div><div class="ml tb">  │ ripdrag  │ AUR · 9f8e7d │ <span class="warn">pending</span>  │</div><div class="ml tb">  └──────────┴──────────────┴──────────┘</div><div class="ml cb first"><span class="lang">rust</span></div><div class="ml cb">  <span class="info">None</span> =&gt; Source::Rejected { reason: Reason::NotAllowlisted },</div><div class="ml h2">○ Related</div><div class="ml">  <span class="acc" data-act="files" style="cursor:pointer">▸ ~/Projects/kav</span>  <span class="muted">folder · ↵ opens in Yazi</span></div><div class="ml">  <span class="acc" data-act="editor" style="cursor:pointer">▸ resolve.rs:42</span>  <span class="muted">file · ↵ opens at that line</span></div><div class="ml">  <span class="info">↗ Allowlist policy</span>   <span class="info">↗ kav: migrations</span>  <span class="muted">notes</span></div><div class="mimg"><div class="shot"><i></i><i></i><i></i><i></i></div><span class="muted">clip · wiki.archlinux.org/title/AUR</span></div></div></div>
         <div class="dview js-diffcode"><div class="dbar"><b class="acc">Claude proposes 2 changes to resolve.rs</b><span class="sp"></span><span><span class="kbd">Ctrl+Enter</span> accept</span><span><span class="kbd">Ctrl+Backspace</span> reject</span></div><div class="code"><span class="ln">4</span><span class="acc">pub enum</span> <span class="info">Source</span> {
 <span class="ln">5</span>    Arch,
 <span class="ln">6</span>    Kavat,
@@ -793,7 +845,7 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
           <div class="tkeys mkf"><span><b>/</b>search</span><span><b>↵</b>install</span><span><b>Space</b>preview</span><span><b>Tab</b>switch pane</span><span><b>u</b>update</span><span><b>x</b>remove</span><span><b>Esc</b>close</span></div>
         </div>
       </div>
-      <div class="status"><span class="mode">INSERT</span><span>main</span><span>0 errors</span><span class="acc js-cfgnote">two-way with Settings · saved changes apply live</span><span class="sp"></span><span class="muted">Keymap: VS Code</span><span class="muted">Spaces: 4</span><span class="muted js-ft">rust</span><span>Ln 12, Col 5</span></div>
+      <div class="status"><span class="mode">INSERT</span><span>main</span><span>0 errors</span><span class="acc js-cfgnote">two-way with Settings · saved changes apply live</span><span class="acc js-mdnote">rendered · the cursor line stays raw · Ctrl+K V toggles</span><span class="sp"></span><span class="muted">Keymap: VS Code</span><span class="muted">Spaces: 4</span><span class="muted js-ft">rust</span><span>Ln 12, Col 5</span></div>
       <div class="cl">
         <div class="clh"><b>Claude Code</b><span class="sp"></span><span class="muted">kitty split · ~/Projects/kav</span></div>
         <div class="clb"><span class="acc">›</span> make resolve() say why a package was rejected
@@ -857,7 +909,7 @@ const P = {
   rose:{n:'Rosé Pine',d:['#191724','#1f1d2e','#26233a','#e0def4','#908caa','#403d52'],l:['#ede3d9','#faf4ed','#f2e9e1','#575279','#797593','#dfdad9'],a:['#ebbcba','#c4a7e7','#9ccfd8','#f6c177','#eb6f92']},
   everforest:{n:'Everforest',d:['#232a2e','#2d353b','#3d484d','#d3c6aa','#9da9a0','#475258'],l:['#efebd4','#fdf6e3','#e6e2cc','#5c6a72','#829181','#d5d0b8'],a:['#a7c080','#7fbbb3','#dbbc7f','#e69875','#d699b6']},
 };
-const S = {cap:false,rem:false,copy:false,gsel:'main',ps:'logo',cfg:'',pick:false,fsel:'img',wall:'theme',bare:false,ktab:'dash',spage:'windows',sys:'coder',scene:'desk',pal:'kavat',mode:'dark',acc:0,rad:.9,gap:.7,blur:true,oled:false};
+const S = {clip:false,cap:false,rem:false,copy:false,gsel:'main',ps:'logo',cfg:'',pick:false,fsel:'img',wall:'theme',bare:false,ktab:'dash',spage:'windows',sys:'coder',scene:'desk',pal:'kavat',mode:'dark',acc:0,rad:.9,gap:.7,blur:true,oled:false};
 location.hash.slice(1).split('&').forEach(kv=>{const [k,v]=kv.split('=');if(k in S)S[k]=isNaN(v)?(v==='true'?true:v==='false'?false:v):+v});
 
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -901,7 +953,7 @@ function apply(){
   root.style.setProperty('--blur',S.blur?'18px':'0px');root.style.setProperty('--alpha',S.blur?'86%':'100%');
   root.dataset.mode=m;
 
-  const ov={agent:'agent',themes:'themes',kav:'kav',browser:'browser',settings:'settings',editor:'editor',claude:'editor',files:'files',notes:'notes',launcher:'launcher'}[S.scene]||'';
+  const ov={agent:'agent',themes:'themes',kav:'kav',browser:'browser',settings:'settings',editor:'editor',claude:'editor',files:'files',notes:'notes',note:'editor',albums:'browser',launcher:'launcher'}[S.scene]||'';
   screen_.dataset.ov=ov;
   const sc=['login','install','grub','boot'].includes(S.scene)?S.scene:'desk';
   $$('.scene').forEach(s=>s.classList.toggle('on',s.id===sc));
@@ -938,8 +990,11 @@ function apply(){
   if(cf){const cm=cf[0].endsWith('.lua')?'--':'#';
     const ls=[cm+' This file is the source of truth.',cm+' Change it here or in Settings: each side follows the other.','',...cf[1]()];
     $$('.js-cfgcode').forEach(e=>e.innerHTML=ls.map((l,i)=>`<span class="ln">${i+1}</span>`+(l.trim().startsWith(cm)?`<span class="muted">${esc(l)}</span>`:esc(l))).join('\n'));}
-  $$('.js-edname').forEach(e=>e.textContent=cf?cf[0].split('/').pop():'resolve.rs');
-  $$('.js-ft').forEach(e=>e.textContent=cf?(n=>n.includes('.')?n.split('.').pop().replace('zshrc','zsh'):'conf')(cf[0].split('/').pop()):'rust');
+  $$('.js-edname').forEach(e=>e.textContent=cf?cf[0].split('/').pop():S.scene==='note'?'review-the-kav-pr.todo.md':'resolve.rs');
+  $$('.js-ft').forEach(e=>e.textContent=cf?(n=>n.includes('.')?n.split('.').pop().replace('zshrc','zsh'):'conf')(cf[0].split('/').pop()):S.scene==='note'?'markdown':'rust');
+  screen_.dataset.note=S.scene==='note';screen_.dataset.clip=!!S.clip&&S.scene==='browser';screen_.dataset.albums=S.scene==='albums';
+  $$('.js-btab').forEach(e=>e.textContent=S.scene==='albums'?'Albums · Hyprland rices':'Hyprland - ArchWiki');
+  $$('.js-burl').forEach(e=>e.textContent=S.scene==='albums'?'kavat://albums/hyprland-rices':'wiki.archlinux.org/title/Hyprland');
   screen_.dataset.cap=!!S.cap;screen_.dataset.rem=!!S.rem;
   screen_.dataset.pick=!!S.pick;screen_.dataset.cpanel=S.scene==='claude';screen_.dataset.copy=!!S.copy&&S.scene==='files';
   $$('[data-y]').forEach(e=>e.classList.toggle(e.classList.contains('yprev')?'on':'cur',e.dataset.y===S.fsel));
@@ -956,7 +1011,7 @@ function apply(){
   $('#rRad').value=S.rad;$('#rGap').value=S.gap;
   $('#tBlur').classList.toggle('on',S.blur);$('#tOled').classList.toggle('on',S.oled);
   $$('.js-theme').forEach(e=>e.textContent=`${p.n} · ${m==='dark'?'dark':'light'}`);
-  $$('.js-title').forEach(e=>e.textContent=cf?'kitty — nvim '+cf[0]:{agent:'Kavat',themes:'Appearance',kav:'kitty — kav',browser:'Kavat Browser',settings:'Settings',files:'kitty — yazi',notes:'kitty — nb',launcher:'Launcher',claude:'kitty — nvim + claude'}[S.scene]||'kitty — nvim kav/src/resolve.rs');
+  $$('.js-title').forEach(e=>e.textContent=cf?'kitty — nvim '+cf[0]:{agent:'Kavat',themes:'Appearance',kav:'kitty — kav',browser:'Kavat Browser',settings:'Settings',files:'kitty — yazi',notes:'kitty — nb',note:'kitty — nvim ~/Notes/kav/review-the-kav-pr.todo.md',albums:'Kavat Browser',launcher:'Launcher',claude:'kitty — nvim + claude'}[S.scene]||'kitty — nvim kav/src/resolve.rs');
 }
 function tick(){const d=new Date();
   $$('.js-time').forEach(e=>e.textContent=d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}));
@@ -971,7 +1026,7 @@ document.addEventListener('input',e=>{const b=e.target.dataset&&e.target.dataset
 document.addEventListener('click',e=>{
   const tg=e.target.closest('[data-tog]');if(tg){S[tg.dataset.tog]=!S[tg.dataset.tog];apply();return}
   const cb=e.target.closest('[data-cfg]');if(cb){S.cfg=cb.dataset.cfg==='@page'?S.spage:cb.dataset.cfg;S.scene='editor';apply();return}
-  const ac=e.target.closest('[data-act]');if(ac){const a=ac.dataset.act;S.cfg='';S.copy=false;S.cap=false;S.rem=false;
+  const ac=e.target.closest('[data-act]');if(ac){const a=ac.dataset.act;S.cfg='';S.copy=false;S.cap=false;S.rem=false;S.clip=false;
     if(a==='browser'||a==='editor'||a==='settings')S.scene=a;
     else if(a==='skills'){S.scene='settings';S.spage='skills'}
     else if(a==='files'){S.scene='files';S.pick=false;S.fsel='img'}
@@ -983,7 +1038,8 @@ document.addEventListener('click',e=>{
     else if(a==='copy'){S.scene='files';S.pick=false;S.copy=true}
     else if(a==='copyoff')S.copy=false;
     else if(a==='cap'){S.scene='desk';S.cap=true;S.rem=true}
-    else if(a==='capoff'){}
+    else if(a==='capoff'||a==='clipoff'){}
+    else if(a==='clip'){S.scene='browser';S.clip=true}
     else if(a==='grub')S.scene='grub';
     else if(a==='plymouth'||a==='boot')S.scene='boot';
     else if(a==='gowall'){S.scene='settings';S.spage='wallpaper'}
@@ -999,7 +1055,7 @@ document.addEventListener('click',e=>{
   else if(t.dataset.ktab)S.ktab=t.dataset.ktab;
   else if(t.dataset.spage)S.spage=t.dataset.spage;
   else if(t.dataset.sys)S.sys=t.dataset.sys;
-  else if(t.dataset.scene){S.scene=t.dataset.scene;S.pick=false;S.cfg='';S.copy=false;S.cap=false;S.rem=false}
+  else if(t.dataset.scene){S.scene=t.dataset.scene;S.pick=false;S.cfg='';S.copy=false;S.cap=false;S.rem=false;S.clip=false}
   else if(t.dataset.mode)S.mode=t.dataset.mode;
   else if(t.dataset.pal){S.pal=t.dataset.pal;S.acc=0}
   else if(t.dataset.acc)S.acc=+t.dataset.acc;

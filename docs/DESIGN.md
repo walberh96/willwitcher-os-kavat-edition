@@ -240,7 +240,7 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | Files (Yazi) | Preset de atajos, arrastrar y soltar, copiador con pop-up, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
 | Notes (nb) | Carpeta de notas, cuaderno por defecto, nota rápida, recordatorios y cuánto posponen, vistas de tareas, qué cuadernos lee el agente, cifrado y sincronización | Fork de nb (kavat-notes) |
 | Shell (zsh) | Prompt, plugins, historial, alias, apps por defecto | No |
-| Browser | Bloqueador, apariencia, perfil por modo, comandos de la consola | El fork de Chromium ya previsto |
+| Browser | Bloqueador, apariencia, perfil por modo, comandos de la consola, recortes y álbumes | El fork de Chromium ya previsto |
 | Bar & widgets | Posición y densidad de la barra, widgets y su orden, lanzador, notificaciones | El fork de Noctalia ya previsto |
 | Modes | Qué hace cada modo, automatización con Steam, VPN de Incognito, modos nuevos | Propio |
 | Projects | Proyectos guardados: carpeta, terminales, editor, perfil del navegador y ventanas de cada uno | Propio |
@@ -282,7 +282,7 @@ Regla para los forks: una app se bifurca cuando no deja cambiar su configuració
 
 ## Navegador
 
-`kavat-browser` es un fork de Chromium con seis cambios: sigue los modos del sistema, cambia de tema con el sistema, bloquea anuncios de serie, habla con el agente, tiene una consola de comandos y usa Yazi como explorador de archivos.
+`kavat-browser` es un fork de Chromium con siete cambios: sigue los modos del sistema, cambia de tema con el sistema, bloquea anuncios de serie, habla con el agente, tiene una consola de comandos, usa Yazi como explorador de archivos y guarda recortes y álbumes en las notas.
 
 | Cambio | Qué hace |
 | --- | --- |
@@ -292,6 +292,7 @@ Regla para los forks: una app se bifurca cuando no deja cambiar su configuració
 | Agente integrado | Panel lateral de Kavat: resume la página, responde sobre ella, busca entre pestañas y actúa en el navegador con los mismos niveles de permiso que en el sistema |
 | Consola de comandos | Una paleta con comandos propios que cambian el navegador: ocultar o mostrar paneles, barra de pestañas, modo zen, y los que definas tú |
 | Yazi como explorador | Subir un archivo y «guardar como» abren Yazi; pulsar una descarga abre Yazi en la carpeta de descargas con el archivo seleccionado |
+| Recortes y álbumes | Guarda en las notas la página con la selección como cita y una captura; reúne sitios favoritos en álbumes con miniatura, y enseña en un panel las notas que ya tienes del sitio. El detalle está en la sección Notas |
 
 Cómo mantenerlo barato:
 
@@ -436,6 +437,14 @@ repeat: weekly
 - [[~/Projects/kav]]
 ```
 
+**Cómo se ven.** Las notas se leen y se editan en Neovim, y allí se ven con formato y color, no como texto plano.
+
+- **Con formato**: títulos en bandas de color, casillas marcables, tablas con bordes, bloques de código con fondo, avisos destacados y enlaces con icono. Lo hace render-markdown.nvim, un plugin que ya existe, así que no hay que escribirlo. Si se queda corto, la alternativa es markview.nvim.
+- **Editar sin salir**: la línea donde está el cursor se ve en Markdown tal cual, para tocarla; el resto sigue con formato. `Ctrl+K V` alterna entre con formato y texto plano, como la vista previa de VS Code.
+- **Lo propio**: la fecha límite, el recordatorio, la repetición y las etiquetas se pintan como fichas arriba de la nota, y los enlaces a carpetas y a `archivo:línea` se abren con Enter. Va en `kavat-nvim`, sobre el punto de extensión del plugin.
+- **Imágenes dentro de la nota**: las capturas de los recortes se ven en la propia nota, con image.nvim y el protocolo gráfico de Kitty.
+- **Colores del tema**, como todo lo demás.
+
 **Recordatorios.**
 
 - Se ponen con `nb remind`, desde la TUI, en la nota rápida («tomorrow 9:00») o pidiéndoselo al agente.
@@ -474,7 +483,7 @@ repeat: weekly
 - **Nota rápida**: `Super+N` abre una línea para escribir y Enter la guarda en la bandeja de entrada. Entiende etiquetas y fechas escritas a mano en inglés, sin pasar por el modelo. `Super+Shift+N` abre la TUI.
 - **Paleta**: `Super+D` encuentra notas y tareas, y crea una nota.
 - **Neovim**: las notas se editan ahí, con autocompletado de enlaces y etiquetas, salto al enlace y casillas que se marcan con una tecla.
-- **Navegador**: guarda la página en las notas, con su texto, para buscarla sin red. En Incognito no guarda.
+- **Navegador**: recortes de páginas y álbumes de sitios, descritos más abajo. En Incognito no guarda.
 - **Yazi**: vista previa de las notas y la tecla que abre la nota de una carpeta.
 - **Voz y capturas**: dictar una nota manteniendo la tecla de hablar, y mandar a una nota el texto de una captura.
 - **Proyectos**: cada proyecto tiene su cuaderno, y al abrir el proyecto ves sus tareas pendientes.
@@ -490,6 +499,28 @@ repeat: weekly
 - **Selección a nota**: con texto seleccionado en cualquier app, la nota rápida se abre con ese texto y su origen ya puestos.
 - **Nota fijada en el escritorio**, como un widget.
 - **Búsqueda por significado**, y no solo por palabras. Usa el mismo modelo de búsqueda pequeño que elige las herramientas del agente, así que no carga otro.
+
+**El navegador y las notas.** El navegador guarda en las notas de dos formas: recortes de una página y álbumes de sitios. Las dos usan el formato de marcador que `nb` ya tiene, así que siguen siendo archivos Markdown en tus cuadernos.
+
+Un recorte guarda en una nota lo que estás viendo:
+
+| Qué guarda | De dónde sale |
+| --- | --- |
+| Título, dirección y fecha | De la página |
+| Cita | El texto que tengas seleccionado. Si recortas otra selección de la misma página, se añade a la misma nota |
+| Captura | La zona visible, una región que marcas o la página entera |
+| Comentario y etiquetas | Los escribes al guardar, o los dejas en blanco |
+| Texto de la página | Lo guarda `nb`, para encontrarla después sin red |
+
+- **Cómo se lanza**: un atajo en el navegador, `clip` en su consola de comandos, el botón derecho sobre una selección, o pidiéndoselo al agente.
+- **Dónde cae**: en la bandeja de entrada, o en el cuaderno o álbum que elijas al guardar.
+- **Álbumes**: un álbum es una colección de sitios favoritos, cada uno con su miniatura. Es una carpeta de marcadores dentro de un cuaderno. Se ve como una cuadrícula de miniaturas en una página del navegador, y como lista con vista previa en la TUI de notas y en Yazi. Se abre entero en pestañas.
+- **Panel de notas**: al entrar en un sitio, un panel del navegador enseña las notas y recortes que ya tienes de él, y se añade desde ahí.
+- **Pestañas a álbum**: las pestañas abiertas se guardan como un álbum de una vez.
+- **Álbum como página de inicio**: la pestaña nueva enseña el álbum que elijas.
+- **Leer más tarde**: un álbum fijo con su propio atajo; lo que ya leíste se archiva solo.
+- **Imágenes a álbum**: el botón derecho sobre una imagen la guarda en un álbum, con la página de la que salió.
+- **Peso**: las capturas hacen crecer el repositorio de notas, así que se guardan comprimidas y la de página entera queda como opción.
 
 **Qué va en el fork y qué va fuera.** El fork de `nb` es pequeño: entiende los campos nuevos, añade los comandos `nb remind` y `nb due`, abre los enlaces a carpetas y avisa al índice en cada cambio. La TUI, el índice y los recordatorios son piezas nuevas en Rust, como `kav`, que leen los mismos archivos. Las notas entran en la fase 3 y las herramientas del agente en la fase 4. Queda por comprobar que `nb` de serie siga leyendo bien una tarea que lleva cabecera.
 
@@ -866,14 +897,14 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Editor | Neovim en el núcleo, híbrido: modos de Vim con navegación y atajos de VS Code; panel lateral de Claude y otros paneles, abiertos como divisiones de Kitty |
 | Marketplace de plugins | Partiendo de store.nvim, con catálogo verificado y presets encima |
 | Gestor de archivos | Yazi integrado: tema, arrastrar y soltar, copiar y mover con pop-up de progreso, y explorador de archivos del sistema y del navegador |
-| Fork de Chromium | Modos, tema automático, bloqueador, agente integrado, consola de comandos y Yazi como explorador |
+| Fork de Chromium | Modos, tema automático, bloqueador, agente integrado, consola de comandos, Yazi como explorador, y recortes y álbumes en las notas |
 | Perfiles del navegador | Uno por modo, por ahora |
 | Modos del sistema | Coder, Gamer e Incognito, seleccionables desde Noctalia |
 | Ventanas al entrar en Incognito | Las normales se ocultan y vuelven al salir |
 | Juego y hardware | Perfil por juego, página de GPU, luces que siguen al tema y supresión de ruido del micrófono |
 | Ajustes | Todo el núcleo se configura desde un panel dentro del shell, con páginas nativas |
 | Shell | Fork de Noctalia 5, empaquetado como kavat-shell: es nuestra app desde ahora, con nuestros cambios y con el panel de ajustes dentro |
-| Notas | nb como componente del sistema, con fork propio (kavat-notes): recordatorios, fechas de tareas, enlaces a carpetas que se abren en Yazi y el agente tomando notas; además, resumen de la mañana, recordatorios por situación, plantillas y búsqueda por significado |
+| Notas | nb como componente del sistema, con fork propio (kavat-notes): recordatorios, fechas de tareas, enlaces a carpetas que se abren en Yazi y el agente tomando notas; además, resumen de la mañana, recordatorios por situación, plantillas y búsqueda por significado. En Neovim se ven con formato y color |
 | Modelo del agente | Qwen3.5 4B como punto de partida, en la GPU y configurable; queda cargado en Coder y se confirma con una prueba propia |
 | Cómo acierta el agente | Ve de cinco a ocho herramientas por petición, con nombres en inglés, y cada skill es una sola llamada |
 | Idioma del agente | Se le habla en inglés; el sistema sigue en inglés o español |
