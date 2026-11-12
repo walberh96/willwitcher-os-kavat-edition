@@ -37,6 +37,7 @@ shots=(
   "files-copy|scene=files&copy=true"
   "files-picker|scene=files&pick=true"
   "installer|scene=install&pal=tokyo"
+  "installer-software|scene=install&istep=software"
   "kav-aur-review|scene=kav&ktab=aur"
   "kav-dashboard|scene=kav&ktab=dash"
   "kav-updates|scene=kav&ktab=updates"
