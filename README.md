@@ -298,7 +298,7 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 
 ## The repository
 
-Today the repository holds this README and the `docs/` folder. The rest arrives with each phase:
+Today the repository holds this README, the `docs/` folder, the research reports in `reports/` and two maintenance scripts in `tools/`, which regenerate the design document and the screenshots. The rest arrives with each phase:
 
 | Folder | Contents | Phase |
 | --- | --- | --- |
@@ -333,10 +333,10 @@ This README describes the finished system. Today the project is in **phase 0, de
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
-| 0 | Design documented | Done; eight decisions under review |
+| 0 | Design documented | Done |
 | 1 | ISO that boots to Hyprland + Noctalia | Pending |
 | 2 | Calamares installer with Btrfs and snapshots | Pending |
-| 3 | Themes, settings, greeter, Noctalia fork, `kav` and editor | Pending |
+| 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | Pending |
 | 4 | Local agent, skills and voice | Pending |
 
 A study of Omarchy and other distributions reopened eight of those decisions. All are now answered. The current Noctalia was read against what this shell needs: plugins could host almost all of it, but not the settings panel, so the shell is a fork of Noctalia 5 and from that point on it is this system's own application. They are listed, with their status, in the design document under «Decisiones en revisión».
