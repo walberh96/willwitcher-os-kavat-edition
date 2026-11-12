@@ -55,8 +55,10 @@ shots=(
   "settings-privacy|scene=settings&spage=privacy"
   "settings-projects|scene=settings&spage=projects"
   "settings-skills|scene=settings&spage=skills"
+  "settings-terminal|scene=settings&spage=terminal"
   "settings-wallpaper|scene=settings&spage=wallpaper&wall=aurora"
   "settings-windows|scene=settings&spage=windows"
+  "system-monitor|scene=top"
   "themes-light|scene=themes&pal=rose&mode=light"
 )
 

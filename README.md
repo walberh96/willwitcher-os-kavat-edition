@@ -57,6 +57,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | ![Backup and sync](docs/screenshots/settings-backup.png) **Backup and sync.** Home snapshots, external copies and configuration history. | ![Privacy and network](docs/screenshots/settings-privacy.png) **Privacy.** Who used the microphone, camera or screen, and the per-app firewall. |
 | ![Windows settings](docs/screenshots/settings-windows.png) **Two-way settings.** Change a value in the panel or in the file; each follows the other. | ![Config in Neovim](docs/screenshots/config-in-neovim.png) **One click to the file.** Every page opens its config in Neovim. |
 | ![Kavat speaking](docs/screenshots/agent-voice.png) **Kavat speaking.** An island under the bar: its whiskers move with its voice, and captions follow word by word. | ![Displays](docs/screenshots/settings-displays.png) **Displays.** One, two side by side, or landscape next to portrait: placed by dragging, remembered for each set of displays. |
+| ![System monitor](docs/screenshots/system-monitor.png) **System monitor.** A fork of btop: processes grouped by what they belong to, and Kavat explains any of them. | ![Terminal settings](docs/screenshots/settings-terminal.png) **Terminal settings.** Kitty, plus the system info and the monitor. |
 
 ## Talk to it
 
@@ -176,7 +177,9 @@ A settings panel inside the shell configures the whole core, on twenty-five page
 - **Kitty and zsh**, with a starship prompt cut down to what costs no time: opening a terminal goes unnoticed.
 - **One command palette.** `Super+D` searches apps, files, settings, skills, packages, windows and browser tabs, with the same commands as the browser console and Neovim.
 - **Projects.** A project saves a whole workspace (folder, terminals, editor, browser profile, window layout) and brings it back as you left it.
-- **One `kavat` command.** `kavat theme`, `mode`, `wallpaper`, `project`, `ask`, `doctor`: everything the panel does, from the terminal.
+- **System info with its own face.** `kavat fetch` is a fork of fastfetch: the Kavat cat as its logo, the lines you choose, the colours of your theme.
+- **A monitor that knows the system.** `kavat top` is a fork of btop: processes grouped by what they belong to, the agent's share of the GPU in sight, and `K` asks Kavat what a process is and why it is busy.
+- **One `kavat` command.** `kavat theme`, `mode`, `wallpaper`, `project`, `ask`, `fetch`, `top`, `doctor`: everything the panel does, from the terminal.
 - **The shortcuts you already know**, inherited from Willwitcher-OS Endgame, plus `Super+Space` for Kavat.
 
 ## The editor

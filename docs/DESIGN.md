@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition — Documento de diseño
 
-Actualizado el 11 de noviembre de 2026 · [Mockup interactivo](mockup/index.html) · [Capturas](screenshots/) · [README](../README.md)
+Actualizado el 12 de noviembre de 2026 · [Mockup interactivo](mockup/index.html) · [Capturas](screenshots/) · [README](../README.md)
 
 ## Visión
 
@@ -173,7 +173,7 @@ Atajos: 19 heredados de Endgame tal cual y 11 nuevos para lo que antes no exist�
 **Paleta de comandos.** `Super+D` abre una sola paleta para todo el sistema: apps, archivos, ajustes, skills, paquetes, ventanas abiertas y pestañas del navegador. Usa la misma gramática y los mismos nombres de comando que la consola del navegador y la paleta de Neovim, y lo que no encuentra se lo puede pasar al agente.
 
 - **Proyectos.** Un proyecto guarda un espacio de trabajo entero: carpeta, terminales, editor, perfil del navegador y disposición de ventanas. Se abre desde la paleta o desde la barra, y vuelve tal como lo dejaste.
-- **Un comando `kavat` para todo.** `kavat theme`, `mode`, `wallpaper`, `project`, `ask` y `doctor` comparten verbos y autocompletado; todo lo que hace el panel se puede hacer desde la terminal.
+- **Un comando `kavat` para todo.** `kavat theme`, `mode`, `wallpaper`, `project`, `ask`, `fetch`, `top` y `doctor` comparten verbos y autocompletado; todo lo que hace el panel se puede hacer desde la terminal.
 - **Hoja de atajos según contexto.** `Super+/` muestra los atajos de la app que tiene el foco, además de los del sistema.
 - **Captura con texto.** Al capturar una zona de la pantalla se puede copiar su texto, con reconocimiento local.
 
@@ -243,7 +243,7 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | Displays | Disposición de las pantallas arrastrando, una por cada conjunto de pantallas; pantalla principal; resolución, frecuencia, escala, rotación, sincronización adaptativa y espacios de trabajo de cada una; luz nocturna | No: lo aplica Hyprland |
 | GPU | Curvas de ventilador, límite de potencia, sensores en la barra, perfiles por juego | No |
 | Sound | Salida, entrada, volumen por app, supresión de ruido del micrófono | No |
-| Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial | No previsto: admite recarga en vivo |
+| Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial; logo y líneas de la información del sistema; agrupación y tecla del agente en el monitor del sistema | No previsto: admite recarga en vivo |
 | Editor (Neovim) | Preset de atajos, numeración, tabulación, formateo y guardado automáticos, paquetes de lenguaje, plugins, paneles laterales | No: es configuración propia (`kavat-nvim`) |
 | Files (Yazi) | Preset de atajos, arrastrar y soltar, copiador con pop-up, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
 | Notes (nb) | Carpeta de notas, cuaderno por defecto, nota rápida, recordatorios y cuánto posponen, vistas de tareas, qué cuadernos lee el agente, cifrado y sincronización | Fork de nb (kavat-notes) |
@@ -532,6 +532,29 @@ Un recorte guarda en una nota lo que estás viendo:
 
 **Qué va en el fork y qué va fuera.** El fork de `nb` es pequeño: entiende los campos nuevos, añade los comandos `nb remind` y `nb due`, abre los enlaces a carpetas y avisa al índice en cada cambio. La TUI, el índice y los recordatorios son piezas nuevas en Rust, como `kav`, que leen los mismos archivos. Las notas entran en la fase 3 y las herramientas del agente en la fase 4. Queda por comprobar que `nb` de serie siga leyendo bien una tarea que lleva cabecera.
 
+## Información y monitor del sistema
+
+Dos herramientas de terminal pasan a ser piezas del sistema, cada una con su fork: la que enseña qué máquina es esta y la que enseña qué está corriendo.
+
+**Información del sistema (`kavat-fetch`).** Es un fork de fastfetch. Se parte de fastfetch y no de neofetch porque neofetch está archivado desde 2024 y fastfetch es el que se mantiene.
+
+- **Logo propio**: el gato de Kavat va dentro del programa y se pinta con el color de acento. Hay una versión pequeña y se puede quitar.
+- **La información que tú eliges**: las líneas y su orden se eligen en el panel o en el archivo. De serie: sistema, kernel, gestor de ventanas, shell, tema, modo, paquetes, GPU y agente.
+- **Líneas del propio sistema**: el tema y el modo activos, los paquetes contados por `kav` con los que vienen del AUR, y el estado del agente. Son módulos nuevos, y es lo que justifica el fork.
+- **Colores del tema**: toma los tokens del sistema de temas y cambia con él, como el resto.
+- **Cómo se lanza**: con `kavat fetch`. Su configuración vive en `~/.config/fastfetch/config.jsonc` y se ajusta en la página Terminal del panel.
+
+**Monitor del sistema (`kavat-top`).** Es un fork de btop, que ya usabas en Endgame. Se bifurca porque lo que se le pide no cabe en su configuración: preguntar al agente por un proceso y agrupar los procesos por lo que son.
+
+- **Tema del sistema**: sus colores salen de los tokens y cambian en vivo con el tema.
+- **Pregunta a Kavat**: con `K` sobre un proceso, el agente explica qué es, quién lo arrancó y por qué gasta lo que gasta, y propone qué hacer. Usa la herramienta de lectura `system.processes`; si lo que propone cambia algo, pasa por los permisos de siempre.
+- **Procesos agrupados**: cada proceso dice de qué forma parte: el navegador con sus pestañas, los contenedores, el proyecto abierto, el escritorio o el agente.
+- **La GPU y el agente a la vista**: una caja para la RX 6800 con uso, memoria, temperatura y ventilador, y en ella cuánto ocupa el agente de sus 4 GB.
+- **Conoce el resto del sistema**: muestra el modo activo y, en la red, que `kavatd` sigue sin salida.
+- **Cómo se lanza**: con `kavat top` o desde el lanzador. Su configuración vive en `~/.config/btop/btop.conf` y se ajusta en la página Terminal del panel.
+
+Los dos forks siguen la regla de los demás: son pequeños y llevan su `PATCHES.md`.
+
 ## Gestor de paquetes
 
 `kav` es un solo comando sobre pacman que resuelve cada paquete en tres niveles y rechaza todo AUR que no esté en la lista revisada.
@@ -609,7 +632,7 @@ Cómo funciona:
 
 1. `~/.config/kavat/theme.toml` guarda la combinación activa. Es lo único que editas.
 2. `kavat-theme apply` resuelve los tokens (unos 40 colores semánticos: `surface`, `text`, `accent`, `danger`, etc.) y rellena las plantillas.
-3. Cada app recibe su archivo y una señal de recarga: Hyprland, Noctalia, terminal, GTK, Qt, Neovim, btop, el greeter, hyprlock, Plymouth, el instalador y las apps Electron que lo permitan.
+3. Cada app recibe su archivo y una señal de recarga: Hyprland, Noctalia, terminal, GTK, Qt, Neovim, el monitor y la información del sistema, el greeter, hyprlock, Plymouth, el instalador y las apps Electron que lo permitan.
 4. El cambio es atómico: se genera todo en un directorio nuevo y se cambia un enlace. Si una plantilla falla, no se aplica nada.
 
 Ideas propias:
@@ -744,6 +767,8 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Archivos | Yazi | `kavat-files` (configuración, plugins y portal) |
 | Notas | nb | kavat-notes (fork, TUI e índice) |
 | Navegador | Chromium | kavat-browser (fork) |
+| Información del sistema | fastfetch | `kavat-fetch` (fork) |
+| Monitor del sistema | btop | `kavat-top` (fork) |
 | Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
 | Portapapeles | cliphist con historial en el lanzador | Integrado en `kavat-shell` |
 | Desarrollo | git, docker o podman, mise para versiones de lenguajes | Perfil opcional del instalador |
@@ -780,7 +805,7 @@ De tu repo anterior se conservan tal cual los atajos de Hyprland y tus preferenc
 | Asistentes de primer inicio (git y gh, tema GTK, fondo, apps por defecto) | Un solo asistente de primer arranque; tema, fondo y apps por defecto ya vienen puestos |
 | Catppuccin Mocha con acento azul, fijo | Una paleta más del sistema de temas, con ese azul como acento inicial |
 | Wi-Fi y Bluetooth apagados al iniciar | Se conserva como ajuste por defecto en escritorio |
-| Steam y Vesktop al iniciar; Yazi, zathura, btop, cliphist, hyprpicker | Se conservan; Steam y Vesktop entran en el perfil de juegos del instalador |
+| Steam y Vesktop al iniciar; Yazi, zathura, btop, cliphist, hyprpicker | Se conservan, btop como base de `kavat-top`; Steam y Vesktop entran en el perfil de juegos del instalador |
 | WezTerm | Kitty |
 | NixOS con flake | Arch con paquetes `kavat-*` |
 
@@ -921,6 +946,8 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Ajustes | Todo el núcleo se configura desde un panel dentro del shell, con páginas nativas |
 | Shell | Fork de Noctalia 5, empaquetado como kavat-shell: es nuestra app desde ahora, con nuestros cambios y con el panel de ajustes dentro |
 | Notas | nb como componente del sistema, con fork propio (kavat-notes): recordatorios, fechas de tareas, enlaces a carpetas que se abren en Yazi y el agente tomando notas; además, resumen de la mañana, recordatorios por situación, plantillas y búsqueda por significado. En Neovim se ven con formato y color |
+| Información del sistema | Fork de fastfetch (`kavat-fetch`) con el logo de Kavat, las líneas que elijas y los colores del tema |
+| Monitor del sistema | Fork de btop (`kavat-top`) con el tema del sistema, procesos agrupados y el agente explicando cada proceso |
 | Modelo del agente | Qwen3.5 4B como punto de partida, en la GPU y configurable; queda cargado en Coder y se confirma con una prueba propia |
 | Cómo acierta el agente | Ve de cinco a ocho herramientas por petición, con nombres en inglés, y cada skill es una sola llamada |
 | Idioma del agente | Se le habla en inglés; el sistema sigue en inglés o español |
