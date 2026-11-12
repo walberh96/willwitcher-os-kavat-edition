@@ -71,9 +71,10 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
    Install? [y/N]
 ```
 
-**Kavat**, the agent, runs on your machine. No cloud, no account, no telemetry. It is a compact model on Ollama, tuned for this system and only this system: it knows your shortcuts, your packages, your configuration and the OS documentation. It understands English and Spanish. Its job is running the system, not writing code: that is what Claude in the editor is for. The model can be swapped for another from the settings panel.
+**Kavat**, the agent, runs on your machine. No cloud, no account, no telemetry. It is a compact model on Ollama, tuned for this system and only this system: it knows your shortcuts, your packages, your configuration and the OS documentation. You talk to it in English. Its job is running the system, not writing code: that is what Claude in the editor is for. The model can be swapped for another from the settings panel.
 
-- **It fits next to a game.** The agent takes at most 4 GB of the GPU's memory and unloads when you are not using it. Its voice runs on the CPU.
+- **It fits next to a game.** The agent takes at most 4 GB of the GPU's memory. It stays loaded while you work, so it answers at once, and leaves memory in Gamer mode. Its voice runs on the CPU.
+- **Small model, made reliable.** It starts on Qwen3.5 4B. For each request it sees only the five to eight tools that fit, a skill with several steps is a single call, and an exact phrase never reaches the model.
 - **It has a voice.** It listens and speaks through VoiceStudio, also locally.
 - **It has no shell.** It talks to `kavatd`, a daemon of typed tools with four permission levels. Reading is free. Changing a theme is free and logged. Installing something asks first and takes a snapshot. Touching disks, users or the network asks for your password.
 - **It cannot grant itself permissions**, and everything it does can be undone.
@@ -205,7 +206,8 @@ Notes are part of the system, built on a fork of [`nb`](https://github.com/xwmx/
 - **Links to folders.** A link to a folder opens it in Yazi, and a link to `file:line` opens Neovim on that line. From Yazi, one key opens the note of the folder you are in.
 - **Kavat takes notes.** "Note that…", "remind me on Friday…", "what did I write about the TPM?". What it writes is marked as its own, every change is a commit you can undo, and private notebooks stay closed to it.
 - **Quick note.** `Super+N` from anywhere: one line, read for tags and dates as you type, saved to the inbox.
-- **Indexed.** Titles, tags, links and dates are indexed as you save, so the palette, the to-do views and the agent all search the same thing.
+- **Indexed.** Titles, tags, links and dates are indexed as you save, so the palette, the to-do views and the agent all search the same thing, by words or by meaning.
+- **And more.** A morning summary, reminders tied to a situation ("when I open the kav project"), system notices turned into to-dos with one click, the last terminal command saved with one key, templates, and a note pinned to the desktop.
 
 ## The browser
 

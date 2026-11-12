@@ -238,7 +238,7 @@ Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema des
 | Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial | No previsto: admite recarga en vivo |
 | Editor (Neovim) | Preset de atajos, numeración, tabulación, formateo y guardado automáticos, paquetes de lenguaje, plugins, paneles laterales | No: es configuración propia (`kavat-nvim`) |
 | Files (Yazi) | Preset de atajos, arrastrar y soltar, copiador con pop-up, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
-| Notes (nb) | Carpeta de notas, cuaderno por defecto, nota rápida, recordatorios y cuánto posponen, vistas de tareas, qué cuadernos lee el agente, cifrado y sincronización | Fork de nb (kavat-notes), en propuesta |
+| Notes (nb) | Carpeta de notas, cuaderno por defecto, nota rápida, recordatorios y cuánto posponen, vistas de tareas, qué cuadernos lee el agente, cifrado y sincronización | Fork de nb (kavat-notes) |
 | Shell (zsh) | Prompt, plugins, historial, alias, apps por defecto | No |
 | Browser | Bloqueador, apariencia, perfil por modo, comandos de la consola | El fork de Chromium ya previsto |
 | Bar & widgets | Posición y densidad de la barra, widgets y su orden, lanzador, notificaciones | El fork de Noctalia ya previsto |
@@ -399,7 +399,7 @@ Yazi está en los repos oficiales de Arch. ripdrag y el backend del portal está
 
 ## Notas
 
-Las notas son un componente más del sistema, hecho sobre un fork de `nb` que se empaqueta como `kavat-notes`. Una nota es un archivo Markdown en `~/Notes`, y cada cuaderno es un repositorio git, así que cada cambio queda en el historial y se sincroniza como el resto de tu configuración. El comando sigue siendo `nb`. Todo lo de esta sección es una propuesta, y se decide en el documento «Decisiones pendientes», puntos D6 y D7.
+Las notas son un componente más del sistema, hecho sobre un fork de `nb` que se empaqueta como `kavat-notes`. Una nota es un archivo Markdown en `~/Notes`, y cada cuaderno es un repositorio git, así que cada cambio queda en el historial y se sincroniza como el resto de tu configuración. El comando sigue siendo `nb`.
 
 `nb` es un solo script de Bash (versión 7.25.6, licencia AGPL-3.0) y está en el AUR, así que entra por `[kavat]`. Esto es lo que ya trae y lo que añade el fork:
 
@@ -438,7 +438,7 @@ repeat: weekly
 
 **Recordatorios.**
 
-- Se ponen con `nb remind`, desde la TUI, en la nota rápida («mañana 9:00») o pidiéndoselo al agente.
+- Se ponen con `nb remind`, desde la TUI, en la nota rápida («tomorrow 9:00») o pidiéndoselo al agente.
 - Cada recordatorio es un temporizador del sistema, así que suena aunque el agente esté descargado.
 - El aviso es una notificación con tres botones: abrir la nota, posponer (10 minutos, 1 hora o mañana) y hecho.
 - Los que vencieron con el equipo apagado salen al iniciar sesión.
@@ -459,7 +459,7 @@ repeat: weekly
 
 **El agente toma notas.**
 
-- «Anota que…» guarda la nota con título y etiquetas. «Recuérdame el viernes…» crea el recordatorio. «¿Qué anoté sobre el TPM?» busca en el índice y contesta con la nota delante.
+- «Note that…» guarda la nota con título y etiquetas. «Remind me on Friday…» crea el recordatorio. «What did I write about the TPM?» busca en el índice y contesta con la nota delante.
 - Herramientas de `kavatd`: anotar, añadir a una nota, buscar, crear tarea, poner recordatorio y marcar como hecha.
 - Leer y buscar es nivel Leer. Crear y editar es nivel Reversible, porque cada cambio es un commit que se deshace. Borrar un cuaderno pide confirmación.
 - Organiza sin mover nada a tus espaldas: lo que anota él lo archiva él; para las notas de tu bandeja de entrada propone cuaderno y etiquetas, y tú aceptas.
@@ -471,7 +471,7 @@ repeat: weekly
 
 **Dentro del sistema.**
 
-- **Nota rápida**: `Super+N` abre una línea para escribir y Enter la guarda en la bandeja de entrada. Entiende etiquetas y fechas escritas a mano, sin pasar por el modelo. `Super+Shift+N` abre la TUI.
+- **Nota rápida**: `Super+N` abre una línea para escribir y Enter la guarda en la bandeja de entrada. Entiende etiquetas y fechas escritas a mano en inglés, sin pasar por el modelo. `Super+Shift+N` abre la TUI.
 - **Paleta**: `Super+D` encuentra notas y tareas, y crea una nota.
 - **Neovim**: las notas se editan ahí, con autocompletado de enlaces y etiquetas, salto al enlace y casillas que se marcan con una tecla.
 - **Navegador**: guarda la página en las notas, con su texto, para buscarla sin red. En Incognito no guarda.
@@ -479,6 +479,17 @@ repeat: weekly
 - **Voz y capturas**: dictar una nota manteniendo la tecla de hablar, y mandar a una nota el texto de una captura.
 - **Proyectos**: cada proyecto tiene su cuaderno, y al abrir el proyecto ves sus tareas pendientes.
 - **Ajustes, tema y copias**: una página Notes en el panel, los colores del tema, y los cuadernos dentro de la sincronización con tu repositorio privado. Las dependencias las garantiza `kav`.
+
+**Además.**
+
+- **Resumen de la mañana**: un aviso discreto con las tareas y los recordatorios del día.
+- **Recordatorios por situación**, y no solo por hora: al abrir un proyecto, al iniciar sesión o al salir del modo Gamer.
+- **De aviso a tarea**: el disco casi lleno o una revisión del AUR pendiente pasan a tu lista con un clic.
+- **De la terminal a una nota**: una tecla en Kitty guarda el último comando y su salida.
+- **Plantillas**: reunión, bug, idea y nota del día, con las plantillas que `nb` ya admite.
+- **Selección a nota**: con texto seleccionado en cualquier app, la nota rápida se abre con ese texto y su origen ya puestos.
+- **Nota fijada en el escritorio**, como un widget.
+- **Búsqueda por significado**, y no solo por palabras. Usa el mismo modelo de búsqueda pequeño que elige las herramientas del agente, así que no carga otro.
 
 **Qué va en el fork y qué va fuera.** El fork de `nb` es pequeño: entiende los campos nuevos, añade los comandos `nb remind` y `nb due`, abre los enlaces a carpetas y avisa al índice en cada cambio. La TUI, el índice y los recordatorios son piezas nuevas en Rust, como `kav`, que leen los mismos archivos. Las notas entran en la fase 3 y las herramientas del agente en la fase 4. Queda por comprobar que `nb` de serie siga leyendo bien una tarea que lleva cabecera.
 
@@ -610,17 +621,17 @@ El agente es un modelo pequeño servido por Ollama que no toca el sistema direct
 Piezas:
 
 - **`kavatd`**: daemon que expone las herramientas (por D-Bus o MCP). `kav`, `kavat-theme` y `hyprctl` son las primeras. El modelo nunca recibe una shell libre.
-- **Modelo**: un Modelfile sobre un modelo base de Ollama elegido por pruebas, no por nombre. Se mide contra un conjunto de tareas reales del sistema («pon modo oscuro», «qué está usando la RAM», «instala X») y gana el más pequeño que las acierta. El ajuste fino queda para una segunda vuelta. No tiene que programar ni hacer tareas pesadas: para eso está Claude en el editor. Su trabajo es manejar el sistema. El modelo es configurable: se puede cambiar por otro desde el panel.
-- **Límite de 4 GB**: el agente ocupa como máximo 4 GB de la memoria de la GPU, para que conviva con un juego sin tener que cerrarlo. El modelo de lenguaje corre en la GPU, que es donde se nota la velocidad. La voz corre en la CPU: sus motores ligeros son de CPU, y ahí ya reconocen varias veces más rápido que el tiempo real. Usa entre 1 y 2,5 GB de RAM, que no cuentan en el límite, y sus modelos solo se cargan cuando la voz está activa. Se descarga de memoria tras unos minutos sin uso.
+- **Modelo**: un Modelfile sobre Qwen3.5 4B, servido por Ollama en la GPU. Es el punto de partida, no una elección cerrada: se confirma o se cambia con una prueba propia contra tareas reales del sistema, y el ajuste fino queda para una segunda vuelta. Se le habla en inglés. No tiene que programar ni hacer tareas pesadas: para eso está Claude en el editor. Su trabajo es manejar el sistema. El modelo es configurable: se puede cambiar por otro desde el panel.
+- **Límite de 4 GB**: el agente ocupa como máximo 4 GB de la memoria de la GPU, para que conviva con un juego sin tener que cerrarlo. El modelo de lenguaje corre en la GPU, que es donde se nota la velocidad. La voz corre en la CPU: sus motores ligeros son de CPU, y ahí ya reconocen varias veces más rápido que el tiempo real. Usa entre 1 y 2,5 GB de RAM, que no cuentan en el límite, y sus modelos solo se cargan cuando la voz está activa. El modelo queda cargado mientras estás en Coder, para que conteste al instante, y sale de memoria en Gamer; el ajuste se puede cambiar en el panel.
 - **Voz con VoiceStudio**: el agente escucha y habla a través de VoiceStudio, que corre en local y ofrece dictado, transcripción, síntesis y clonación de voz por una API local y por MCP. kavatd lo usa como servicio: lo que dices se transcribe, pasa al modelo y la respuesta se sintetiza con una voz propia de Kavat. Se empaqueta como kavat-voice; su licencia es AGPL-3.0, sin problema para uso personal. Sus motores corren en la CPU y no gastan memoria de la GPU; aun así se eligen los más ligeros que den buena calidad.
 - **Interfaz**: panel en Noctalia con `Super+Space`, y `kavat ask "..."` en el terminal.
 - **Contexto del sistema**: el agente conoce la documentación de Willwitcher-OS, tus atajos y tu configuración, así que contesta sobre tu máquina, no sobre Linux en general.
 - **Registro**: cada llamada a una herramienta queda en un log legible con qué pidió, qué hizo y cómo deshacerlo.
 - **Sin red**: el agente funciona sin conexión y no envía nada fuera. Cualquier herramienta que use red se activa aparte.
 
-**Análisis del modelo.** En noviembre de 2026 se compararon los modelos pequeños de Ollama para este trabajo. Lo que sigue es una propuesta, que se decide en el documento «Decisiones pendientes», puntos D1 a D5; ningún modelo se ha ejecutado todavía en la máquina real. El informe completo, con sus fuentes, está en [`reports/Modelo local para el agente Kavat.md`](../reports/Modelo%20local%20para%20el%20agente%20Kavat.md); como el límite es de memoria de la GPU, vale su apartado «Si el límite contara solo la VRAM».
+**Modelo y memoria.** Decidido en noviembre de 2026, tras comparar los modelos pequeños de Ollama para este trabajo. Ningún modelo se ha ejecutado todavía en la máquina real, así que las cifras de memoria son estimaciones. El informe completo, con sus fuentes, está en [`reports/Modelo local para el agente Kavat.md`](../reports/Modelo%20local%20para%20el%20agente%20Kavat.md); como el límite es de memoria de la GPU, vale su apartado «Si el límite contara solo la VRAM».
 
-| Pieza | Propuesta | Dónde corre | Memoria |
+| Pieza | Elección | Dónde corre | Memoria |
 | --- | --- | --- | --- |
 | Modelo de lenguaje | Qwen3.5 4B (`qwen3.5:4b-q4_K_M`) | GPU | 3,3 GB de descarga; cargado, cerca de 4 GB de VRAM, sin medir |
 | Reconocimiento de voz | Parakeet TDT v3, dentro de VoiceStudio | CPU | 1 a 1,5 GB de RAM, estimado |
@@ -630,8 +641,15 @@ Piezas:
 - **Por qué Qwen3.5 4B**: es el modelo pequeño con mejores pruebas independientes: 87 % en el banco de pruebas de Home Assistant, que es el proyecto más parecido a este, y 97,5 % en otra prueba de 40 casos.
 - **Cabe justo**: su memoria cargada no está medida. De sus 3,3 GB, 0,7 son un proyector de visión que el agente no usa, y no se sabe si Ollama lo carga. Si no entra en 4 GB, se acorta el contexto o se pasa a una alternativa.
 - **Alternativas, por orden**: Ministral 3 3B (80 % en el mismo banco), Qwen3 4B Instruct (75 %; es el que Home Assistant usa por defecto) y LFM3 1.7B, que ocupa 1,5 GB pero solo tiene notas del fabricante.
-- **Cómo se confirma**: con la prueba que este documento ya pedía, ahora con números: unos 240 casos propios en inglés y español, cuatro veces por candidato, midiendo aciertos, latencia y memoria con un juego abierto.
-- **El modelo pequeño necesita ayuda del diseño**: el informe propone enseñarle de cinco a ocho herramientas por petición en lugar de todas, usar nombres en inglés por dentro, y que una skill de varios pasos sea una sola llamada que ejecuta `kavatd`. Las frases exactas que no pasan por el modelo ya están en el diseño.
+- **Solo en inglés**: al agente se le habla en inglés. Eso acorta la prueba y permite motores de voz solo de inglés, más ligeros que los de la tabla; se eligen midiendo.
+- **Cómo se confirma**: con una prueba propia de unos 160 casos en inglés, cuatro veces por candidato, midiendo aciertos, latencia y memoria con un juego abierto.
+
+**Cómo se le ayuda a acertar.** Un modelo pequeño no es fiable por sí solo con muchas herramientas, así que el diseño le quita trabajo:
+
+- **Pocas herramientas a la vez**: antes de cada petición se eligen por parecido las cinco a ocho que vienen al caso, y el modelo solo ve esas. Si ninguna encaja, se amplía la lista o contesta que no hay herramienta para eso. Las elige un modelo de búsqueda pequeño, que corre en la CPU.
+- **Inglés por dentro**: los nombres de las herramientas, sus descripciones y sus valores van en inglés, igual que lo que tú le dices.
+- **Un paso por orden**: una skill de varios pasos es una sola herramienta, y los pasos los ejecuta `kavatd`, no el modelo.
+- **Frases exactas primero**: lo que coincide con la frase de una skill no pasa por el modelo.
 
 Límite deliberado: el agente puede resumir un diff de `kav review`, pero no puede aprobar un paquete AUR ni ampliar sus propios permisos.
 
@@ -855,7 +873,10 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Juego y hardware | Perfil por juego, página de GPU, luces que siguen al tema y supresión de ruido del micrófono |
 | Ajustes | Todo el núcleo se configura desde un panel dentro del shell, con páginas nativas |
 | Shell | Fork de Noctalia 5, empaquetado como kavat-shell: es nuestra app desde ahora, con nuestros cambios y con el panel de ajustes dentro |
-| Notas | nb como componente del sistema, con fork propio (kavat-notes): recordatorios, fechas de tareas, enlaces a carpetas que se abren en Yazi y el agente tomando notas. El detalle es una propuesta por aprobar |
+| Notas | nb como componente del sistema, con fork propio (kavat-notes): recordatorios, fechas de tareas, enlaces a carpetas que se abren en Yazi y el agente tomando notas; además, resumen de la mañana, recordatorios por situación, plantillas y búsqueda por significado |
+| Modelo del agente | Qwen3.5 4B como punto de partida, en la GPU y configurable; queda cargado en Coder y se confirma con una prueba propia |
+| Cómo acierta el agente | Ve de cinco a ocho herramientas por petición, con nombres en inglés, y cada skill es una sola llamada |
+| Idioma del agente | Se le habla en inglés; el sistema sigue en inglés o español |
 | Configuración | El archivo de configuración es la verdad y la calle es de doble sentido: el panel lo lee y lo edita, y un botón lo abre en Neovim desde cualquier parte |
 | Validación | Todo cambio de configuración se comprueba antes de aplicarse y vuelve atrás solo si falla |
 | Robustez | Comprobación tras actualizar, snapshots de `/home`, copias externas, e historial y sincronización de la configuración |
