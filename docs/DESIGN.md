@@ -89,7 +89,7 @@ La categoría Development trae lo que hace falta para trabajar en lanequarters, 
 | Móvil, Android | jdk17-openjdk, SDK de Android con emulador, android-tools, watchman, maestro | Compilar la app de Expo para Android y probarla en el emulador o en un teléfono |
 | Al primer arranque, con pnpm | Navegadores de Playwright, vercel, eas-cli | No son paquetes de pacman: los instala pnpm y `kav` no los gestiona |
 
-En la categoría de oficina, OnlyOffice sale como casilla sin marcar; viene del AUR. En la de navegadores, el vídeo protegido con Widevine sale marcado.
+En la categoría de oficina, OnlyOffice sale como casilla sin marcar; viene del AUR.
 
 La extensión de navegador se prueba en `kavat-browser`, que es un fork de Chromium y admite las extensiones de Chrome. Seis de la lista vienen del AUR (claude-code, supabase, stripe-cli, el SDK de Android, watchman y maestro) y necesitan su entrada en la allowlist; en qué repositorio está cada paquete se comprueba al escribirla.
 
@@ -342,7 +342,9 @@ Ideas añadidas:
 - **Los comandos de la consola son también herramientas del agente**: lo que puedes escribir en la consola, se lo puedes pedir a Kavat, y `kavatd` puede dispararlo desde fuera (por ejemplo, al cambiar de modo).
 - **Comandos en un archivo**: los comandos propios se definen en un TOML en `~/.config/kavat/browser/`, con nombre, atajo y acción.
 - **En Incognito el agente no guarda** nada de lo que lee en el navegador.
-- **Vídeo protegido (DRM)**: el navegador se compila con soporte para Widevine, para ver Netflix, Prime Video, Disney+ o Spotify web. El módulo de Widevine es propietario de Google y no se puede redistribuir, así que no va en `[kavat]` ni en la ISO: lo instala `kav` desde la allowlist del AUR, que lo descarga de Google. En el instalador es una casilla del paso Software, marcada de serie, y como el resto de ese paso necesita red.
+- **Vídeo protegido (DRM)**: el navegador se compila con soporte para Widevine, para ver Netflix, Prime Video, Disney+ o Spotify web. El módulo de Widevine viene de serie: un paquete `kavat-widevine` en `[kavat]`, del que `kavat-browser` depende, lo descarga de Google al compilarse en tu PC. Va en la ISO, así que funciona también en una instalación sin red.
+- **Condición del vídeo protegido**: Widevine es propietario de Google y no se puede repartir a otros. El repo del código solo guarda el PKGBUILD, sin el binario; el repo binario `[kavat]` y la ISO que lo llevan dentro no se publican. Vale porque el sistema es solo para ti; si algún día se publica, el paquete sale y Widevine pasa a descargarse al instalar.
+- **Mantenimiento**: Google retira versiones antiguas del módulo, así que `kavat-widevine` se recompila cuando deja de funcionar; `kav doctor` lo comprueba.
 - **Límite del vídeo protegido**: en Linux Widevine corre por software, y los servicios limitan la calidad en ese caso; lo habitual es 720p, sin 4K ni HDR. Pasa igual en cualquier navegador de Linux.
 - **Bloqueador**: empezar con uBlock Origin incluido de fábrica y pasar a un bloqueador nativo solo si hace falta, porque Chromium limita cada vez más lo que las extensiones de bloqueo pueden hacer.
 
@@ -817,7 +819,7 @@ Terminal, shell, editor y navegador ya están decididos; el resto son valores ha
 | Archivos | Yazi | `kavat-files` (configuración, plugins y portal) |
 | Notas | nb | kavat-notes (fork, TUI e índice) |
 | Navegador | Chromium | kavat-browser (fork) |
-| Vídeo protegido | Widevine, desde el AUR | Casilla del instalador, marcada de serie |
+| Vídeo protegido | Widevine | `kavat-widevine`, descargado de Google al compilar; no se publica |
 | Información del sistema | fastfetch | `kavat-fetch` (fork) |
 | Monitor del sistema | btop | `kavat-top` (fork) |
 | Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
@@ -1005,7 +1007,7 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 | Gestor de archivos | Yazi integrado: tema, arrastrar y soltar, copiar y mover con pop-up de progreso, y explorador de archivos del sistema y del navegador |
 | Fork de Chromium | Modos, tema automático, bloqueador, agente integrado, consola de comandos, Yazi como explorador, recortes y álbumes en las notas, y vídeo protegido |
 | Perfiles del navegador | Uno por modo, por ahora |
-| Vídeo protegido | `kavat-browser` reproduce contenido con DRM mediante Widevine, instalado por `kav` desde el AUR; la calidad queda en lo que los servicios dan a Linux |
+| Vídeo protegido | `kavat-browser` reproduce contenido con DRM mediante Widevine, que viene de serie en un paquete propio compilado en tu PC; ese paquete y la ISO no se publican. La calidad queda en lo que los servicios dan a Linux |
 | Modos del sistema | Coder, Gamer e Incognito, seleccionables desde Noctalia |
 | Ventanas al entrar en Incognito | Las normales se ocultan y vuelven al salir |
 | Juego y hardware | Perfil por juego, página de GPU, varias pantallas colocadas desde el panel, luces que siguen al tema y a la voz de Kavat, y supresión de ruido del micrófono |

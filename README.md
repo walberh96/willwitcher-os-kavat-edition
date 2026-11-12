@@ -230,7 +230,7 @@ A Chromium of its own, with eight changes.
 - **It follows the modes.** In Incognito it opens private windows; in Gamer it suspends tabs.
 - **It follows the theme.** It changes colour with the rest of the system, internal pages included.
 - **It blocks out of the box.** Ads and trackers, from the first start.
-- **It plays protected video.** Netflix, Prime Video and the rest work through Widevine, which `kav` installs; on Linux the services cap the quality, usually at 720p.
+- **It plays protected video.** Netflix, Prime Video and the rest work through Widevine, built into a package of its own on your machine and never published; on Linux the services cap the quality, usually at 720p.
 - **It has Kavat beside it.** A panel that reads the page and acts in the browser, with the same permissions as in the system.
 - **It has a console.** A palette of its own commands: `hide-tabs`, `hide-sidebar`, `zen`, and the ones you define.
 - **It uses Yazi.** Uploading, "Save as" and clicking a download all go through the system's file manager.
