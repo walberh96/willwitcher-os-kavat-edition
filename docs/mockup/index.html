@@ -441,7 +441,8 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
 .vmeta{display:flex;align-items:center;gap:.7em;font-size:.8em;color:var(--muted)}
 .vmeta b{color:var(--text);font-weight:600}
 /* outside the OS: the glow around the monitor stands for the keyboard and case lights */
-#voxTabs,.hint-vox{display:none}
+#voxTabs,.hint-vox,#instTabs{display:none}
+body.iscene #instTabs{display:flex}
 body.vscene #voxTabs{display:flex}body.vscene:not(.bare) .hint-vox{display:block}
 body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
 @keyframes lit{from{box-shadow:0 0 0 1px #24262d,0 30px 80px #000a,0 0 50px -8px color-mix(in srgb,var(--accent) 30%,transparent)}to{box-shadow:0 0 0 1px #24262d,0 30px 80px #000a,0 0 120px 6px color-mix(in srgb,var(--accent) 60%,transparent)}}
@@ -564,6 +565,7 @@ body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
   </div>
   <label>Palette <select id="selPal"></select></label>
   <div class="tabs" id="modeTabs"><button data-mode="dark">Dark</button><button data-mode="light">Light</button></div>
+  <div class="tabs" id="instTabs"><button data-inst="software">Software · online</button><button data-inst="offline">Software · offline</button><button data-inst="appearance">Appearance</button></div>
   <div class="tabs" id="voxTabs"><button data-voice="auto">Whole exchange</button><button data-voice="listen">Listening</button><button data-voice="think">Thinking</button><button data-voice="speak">Speaking</button></div>
 </div>
 <div class="hint">Everything inside the monitor is the OS, shown in its default language (English; Spanish ships preinstalled). In “Themes” the controls are the system’s own and they work.</div>
@@ -1167,6 +1169,7 @@ function apply(){
   $$('.tpage').forEach(x=>x.classList.toggle('on',x.dataset.t===S.ttab));$$('[data-ttab]').forEach(b=>b.classList.toggle('on',b.dataset.ttab===S.ttab));
   screen_.dataset.notices=!!S.notices&&S.scene==='desk';screen_.dataset.calc=!!S.calc;
   screen_.dataset.ico=S.ico;$$('[data-ico]').forEach(b=>b.classList.toggle('on',b.dataset.ico===S.ico));
+  document.body.classList.toggle('iscene',S.scene==='install');{const cur=S.istep!=='software'?'appearance':S.inet?'software':'offline';$$('[data-inst]').forEach(b=>b.classList.toggle('on',b.dataset.inst===cur))}
   screen_.dataset.istep=S.istep;{const sw=S.istep==='software',cur=sw?4:5;$$('#cal .step').forEach((e,i)=>{e.className='step'+(i<cur?' done':i===cur?' on':'');e.firstElementChild.textContent=i<cur?'✓':i+1;});screen_.dataset.inet=S.inet;$$('.js-inet').forEach(e=>e.textContent=sw&&S.inet?'Online · packages download while installing':'No network · offline install')}
   $$('.js-fmode').forEach(e=>e.textContent=inc?'Incognito':g?'Gamer':'Coder');
   $$('.js-bprofile').forEach(e=>e.textContent=inc?'Incognito':g?'Gamer':'Coder');
@@ -1248,9 +1251,10 @@ document.addEventListener('click',e=>{
     apply();return}
   const lt=e.target.closest('.tog:not([data-tog]):not([id]):not(.lock)');if(lt){lt.classList.toggle('on');return}
   const sb=e.target.closest('.seg.local button');if(sb){[...sb.parentNode.children].forEach(x=>x.classList.toggle('on',x===sb));return}
-  const t=e.target.closest('[data-g],[data-ps],[data-wall],[data-ktab],[data-spage],[data-sys],[data-scene],[data-mode],[data-pal],[data-acc],[data-voice],[data-dsel],[data-dlay],[data-ttab],[data-ico],#tBlur,#tOled');if(!t)return;
+  const t=e.target.closest('[data-g],[data-ps],[data-wall],[data-ktab],[data-spage],[data-sys],[data-scene],[data-mode],[data-pal],[data-acc],[data-voice],[data-dsel],[data-dlay],[data-ttab],[data-ico],[data-inst],#tBlur,#tOled');if(!t)return;
   if(t.dataset.g)S.gsel=t.dataset.g;
   else if(t.dataset.voice){S.voice=t.dataset.voice;vt=0}
+  else if(t.dataset.inst){S.istep=t.dataset.inst==='appearance'?'':'software';S.inet=t.dataset.inst!=='offline'}
   else if(t.dataset.ttab)S.ttab=t.dataset.ttab;
   else if(t.dataset.ico)S.ico=t.dataset.ico;
   else if(t.dataset.dsel)S.dsel=+t.dataset.dsel;
