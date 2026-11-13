@@ -350,7 +350,11 @@ A kavat is a companion feline: fast, quiet, and always beside whoever raised it.
 
 ## Real project status
 
-This README describes the finished system. Today the project is in **phase 2**, the installer. Phase 1 is done: there is an ISO that boots, in a virtual machine, to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts. Nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
+This README describes the finished system. Today the project is in **phase 2**, the installer, and nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
+
+- **Phase 1 is done.** The ISO boots to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts.
+- **Phase 2 works in a virtual machine.** The installer puts the system on a disk with no network: Btrfs with its subvolumes, zram, the zen kernel with the LTS one as fallback, GRUB and a login screen. Every package change takes a snapshot, a snapshot boots from the menu with its own kernel, and the system can go back to it. A boot that fails opens the next one in safe mode, which ignores your settings without deleting them. GRUB and the kernels are signed with the system's own keys.
+- **Phase 2 still needs** two decisions, on disk encryption and on Secure Boot (D33 and D34 in [`docs/PENDING.md`](docs/PENDING.md)), and the install on real hardware.
 
 To build and try it on an Arch-based machine with `devtools`, `qemu-desktop` and `edk2-ovmf`:
 
@@ -359,13 +363,15 @@ tools/build-repo.sh   # the kavat-* packages, into the local [kavat] repository
 tools/build-iso.sh    # the ISO, into out/
 tests/boot.py         # boots it in a virtual machine and checks it reaches the desktop
 tests/install.py      # installs it on a virtual disk, boots the disk and logs in
+tests/snapshots.py    # changes that system, boots the snapshot from before and goes back to it
+tests/safemode.py     # breaks its desktop on purpose and checks the next boot opens in safe mode
 ```
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | 0 | Design documented | Done |
 | 1 | ISO that boots to Hyprland + Noctalia | Done |
-| 2 | Calamares installer with Btrfs and snapshots | In progress |
+| 2 | Calamares installer with Btrfs and snapshots | Works in a virtual machine; waits for D33, D34 and real hardware |
 | 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | Pending |
 | 4 | Local agent, skills and voice | Pending |
 

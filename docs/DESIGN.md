@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition — Documento de diseño
 
-Actualizado el 12 de noviembre de 2026 · [Mockup interactivo](mockup/index.html) · [Capturas](screenshots/) · [README](../README.md)
+Actualizado el 13 de noviembre de 2026 · [Mockup interactivo](mockup/index.html) · [Capturas](screenshots/) · [README](../README.md)
 
 ## Visión
 
@@ -130,6 +130,14 @@ Del botón de encendido al escritorio hay tres pantallas con la misma identidad:
 **Cómo se aplican los cambios.** El menú y la pantalla de carga son archivos del sistema, y cambiar la pantalla de carga obliga a regenerar la imagen de arranque, que tarda. Por eso el cambio de tema del escritorio sigue siendo instantáneo y el arranque se actualiza después, en segundo plano, con una sola petición de contraseña. Si la regeneración falla, se queda la versión anterior.
 
 Dos límites: GRUB muestra una imagen fija, no reproduce vídeo ni desenfoca; y sus fuentes hay que convertirlas a su propio formato, cosa que hace el generador de temas. GRUB, grub-btrfs (la base del submenú de snapshots) y Plymouth están en los repos oficiales de Arch.
+
+**Cómo está hecho.** Desde la fase 2, y probado en máquina virtual con `tests/snapshots.py` y `tests/safemode.py`:
+
+- **GRUB vive en la partición EFI.** Sus archivos, su configuración y su bloque de entorno van en `/efi/grub`, porque GRUB no sabe escribir en Btrfs, y tanto «Reiniciar hacia» como el arranque fallido necesitan que escriba. `/boot/grub` apunta ahí. Los kernels siguen en `/boot`, dentro del sistema, así que cada snapshot lleva el suyo.
+- **Arrancar un snapshot.** El snapshot es de solo lectura y arranca con una capa en memoria encima, que recibe lo que el sistema escribe; nada llega al snapshot. `kavat-boot-once <n>` pide arrancar un snapshot solo en el siguiente arranque, y `kavat-rollback <n>` lo convierte en el sistema: el de antes queda aparte, como `@.old-<fecha>`. Son la base de «Reiniciar hacia» y de `kav undo`.
+- **Arranque fallido.** Cada arranque deja una marca en el bloque de entorno de GRUB, y el sistema la avanza: pantalla de login, sesión iniciada, escritorio. Si el arranque anterior no llegó al login, o alguien inició sesión y el escritorio no apareció, GRUB abre el menú con Modo seguro elegido y lo arranca solo a los 30 segundos. Si nadie inició sesión, no cuenta como fallo.
+- **Modo seguro.** La sesión arranca con las carpetas de configuración, estado y datos vacías, así que cada programa usa la configuración del sistema. Tus archivos no se tocan.
+- **El menú, por ahora.** Hoy muestra las entradas de GRUB (el sistema, sus opciones avanzadas con `linux-lts`, Modo seguro, Ajustes del firmware y Snapshots) con su aspecto de serie. Los nombres y el orden de la tabla, la entrada de Recuperación y el tema llegan en la fase 3.
 
 ## Login
 
@@ -885,7 +893,7 @@ De tu repo anterior se conservan tal cual los atajos de Hyprland y tus preferenc
 El sistema asume que algo se va a romper y que algún paquete será malicioso, y limita el daño en ambos casos.
 
 - **Cadena de paquetes**: `[kavat]` firmado con una llave propia guardada fuera de la máquina de compilación; el AUR solo por allowlist fijada a commit.
-- **Secure Boot**: llaves propias con `sbctl`, activable desde el instalador.
+- **Secure Boot**: llaves propias con `sbctl`. El instalador crea las llaves y firma GRUB y los kernels, y `sbctl` los vuelve a firmar en cada actualización. Activarlo queda pendiente de D34: con Secure Boot, GRUB sin shim no arranca ningún kernel.
 - **Disco**: LUKS2 con desbloqueo TPM2 y contraseña de recuperación.
 - **Red**: cortafuegos nftables activo por defecto, todo lo entrante cerrado; DNS cifrado opcional.
 - **Aislamiento**: perfiles de sandbox para navegador y apps Electron; Flatpak disponible para software que no quieres en el sistema base.
@@ -1089,5 +1097,12 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 | El agente distingue de forma fiable lo que lee de lo que tú le pides | 4 |
 
 En la RX 6800, si la aceleración va por ROCm o por Vulkan sale de esa misma prueba.
+
+Cómo van los de la fase 2, a 13 de noviembre de 2026:
+
+- **Comprobados en máquina virtual**: el modo seguro arranca el escritorio sin leer la configuración del usuario; el modo seguro automático tras un arranque fallido funciona con GRUB sobre Btrfs, porque el bloque de entorno de GRUB vive en la partición EFI; y GRUB arranca cada snapshot con su kernel, sin cifrado y sin Secure Boot.
+- **Esperan una decisión**: con cifrado, los dos sobre el TPM2 y el de la contraseña, esperan a D33; firmado para Secure Boot, a D34.
+- **Esperan al hardware real**: que GRUB, Plymouth y el login enlacen sin parpadeo en la RX 6800.
+- **Pasa a la fase 3**: la prueba tras actualizar. Detectar el arranque roto ya funciona, porque es el mismo mecanismo del modo seguro; ofrecer volver atrás le corresponde a `kav`.
 
 De Omarchy se tomó la idea del selector de temas que cambia todo el sistema. Sus atajos y sus valores por defecto no se siguen; sus mecanismos solo entran uno a uno y con tu aprobación, y los aprobados están en «Ideas de otras distros».

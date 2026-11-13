@@ -1,0 +1,22 @@
+pkgname=kavat-boot
+pkgver=0.1.0
+pkgrel=4
+pkgdesc="Willwitcher-OS Kavat Edition: safe mode, and the boot that remembers whether the last one failed"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+depends=('grub' 'hyprland' 'systemd')
+source=('11_kavat-safe-mode' '02_kavat-boot-check' 'boot-state' 'kavat-session' 'kavat.desktop'
+        'kavat-boot-state@.service' 'kavat-boot-greeter.service' 'kavat-boot-session.path'
+        'kavat-boot-desktop.path' 'tmpfiles.conf')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm755 -t "$pkgdir/etc/grub.d" 02_kavat-boot-check 11_kavat-safe-mode
+  install -Dm755 boot-state "$pkgdir/usr/lib/kavat/boot-state"
+  install -Dm755 kavat-session "$pkgdir/usr/bin/kavat-session"
+  install -Dm644 kavat.desktop "$pkgdir/usr/share/wayland-sessions/kavat.desktop"
+  install -Dm644 -t "$pkgdir/usr/lib/systemd/system" kavat-boot-state@.service \
+    kavat-boot-greeter.service kavat-boot-session.path kavat-boot-desktop.path
+  install -Dm644 tmpfiles.conf "$pkgdir/usr/lib/tmpfiles.d/kavat-boot.conf"
+}

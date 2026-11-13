@@ -1,0 +1,11 @@
+[Unit]
+Description=Record that this boot reached the login screen
+After=display-manager.service
+Requires=display-manager.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/kavat/boot-state greeter
+
+[Install]
+WantedBy=graphical.target

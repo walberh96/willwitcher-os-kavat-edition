@@ -3,7 +3,6 @@
 # belongs to the live medium and puts in what the live medium does not carry.
 set -euo pipefail
 
-# All of it is read before any of it runs: the last step removes this very file.
 main() {
   # the live medium's boot image settings, console login, sudo rule and tweaks
   rm -f /etc/mkinitcpio.conf.d/archiso.conf
@@ -31,9 +30,6 @@ main() {
   # pacman's keys are made on each machine
   pacman-key --init
   pacman-key --populate archlinux
-
-  # the installer itself, this script included
-  pacman -Rns --noconfirm kavat-installer kavat-calamares mkinitcpio-archiso
 }
 
 main

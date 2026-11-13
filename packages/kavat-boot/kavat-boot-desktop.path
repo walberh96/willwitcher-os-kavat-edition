@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for the desktop coming up, to record it for the next boot
+
+[Path]
+PathExists=/run/kavat/desktop
+Unit=kavat-boot-state@desktop.service
+
+[Install]
+WantedBy=multi-user.target

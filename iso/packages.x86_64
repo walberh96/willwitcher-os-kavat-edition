@@ -3,6 +3,8 @@
 # Base and boot
 base
 kavat-base
+kavat-boot
+kavat-snapshots
 linux-zen
 linux-lts
 linux-firmware
@@ -11,11 +13,15 @@ intel-ucode
 mkinitcpio
 mkinitcpio-archiso
 sudo
+# the installer looks for systemd with which; without it, the boot image is not systemd's
+which
 
 # What the installed system boots and lives on
 grub
 efibootmgr
 os-prober
+# Secure Boot with the system's own keys
+sbctl
 btrfs-progs
 dosfstools
 
@@ -23,6 +29,10 @@ dosfstools
 networkmanager
 iwd
 wireless-regdb
+
+# Loading screen of the installed system, with Plymouth's own theme until the system's
+# theme exists
+plymouth
 
 # Sound
 pipewire

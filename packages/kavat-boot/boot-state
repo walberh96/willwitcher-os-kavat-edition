@@ -1,0 +1,16 @@
+#!/bin/bash
+# usage: boot-state greeter|session|desktop
+# Part of kavat-boot. Moves on, in GRUB's environment block, how far this boot got; GRUB
+# reads it at the next boot. Run by kavat-boot-state@.service, as root.
+set -euo pipefail
+
+env=/boot/grub/grubenv
+[[ -f $env ]] || exit 0
+now=$(grub-editenv "$env" list | sed -n 's/^kavat_boot=//p')
+
+case ${1:-} in
+  greeter) if [[ $now == started ]]; then grub-editenv "$env" set kavat_boot=greeter; fi ;;
+  session) grub-editenv "$env" set kavat_boot=session ;;
+  desktop) grub-editenv "$env" unset kavat_boot ;;
+  *) sed -n '2,4p' "$0" | sed 's/^# \{0,1\}//' >&2; exit 2 ;;
+esac

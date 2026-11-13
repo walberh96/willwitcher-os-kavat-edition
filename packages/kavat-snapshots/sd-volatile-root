@@ -1,0 +1,16 @@
+#!/bin/bash
+
+build() {
+    add_module overlay
+    add_binary /usr/lib/systemd/systemd-volatile-root
+    add_systemd_unit systemd-volatile-root.service
+}
+
+help() {
+    cat <<HELPEOF
+Lets a read-only snapshot boot. With systemd.volatile=overlay on the kernel command line,
+which the boot menu puts on its snapshot entries, systemd lays a layer in memory over the
+root: the system writes as usual, and nothing it writes reaches the snapshot.
+Needs the systemd hook.
+HELPEOF
+}

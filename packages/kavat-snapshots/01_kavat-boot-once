@@ -1,0 +1,30 @@
+#!/bin/sh
+# Part of kavat-snapshots. Writes into grub.cfg, ahead of every menu, the step that boots a
+# snapshot once: kavat-boot-once leaves the snapshot's number in GRUB's environment block,
+# and GRUB clears it before booting, so the boot after that one is a normal boot again.
+set -e
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+. "$pkgdatadir/grub-mkconfig_lib"
+
+# only for a system on Btrfs, whose snapshots live in /.snapshots
+[ "x${GRUB_FS}" = xbtrfs ] || exit 0
+[ -d /.snapshots ] || exit 0
+snapshots="$(make_system_path_relative_to_its_root /.snapshots)"
+
+cat << EOF2
+if [ -n "\${kavat_once_snapshot}" ]; then
+  set kavat_snapshot="\${kavat_once_snapshot}"
+  set kavat_once_snapshot=
+  save_env kavat_once_snapshot
+EOF2
+prepare_grub_to_access_device "${GRUB_DEVICE}" | sed -e 's/^/  /'
+cat << EOF2
+  echo "Booting snapshot \${kavat_snapshot}..."
+  linux ${snapshots}/\${kavat_snapshot}/snapshot/boot/vmlinuz-linux-zen root=UUID=${GRUB_DEVICE_UUID} rw rootflags=subvol=${snapshots#/}/\${kavat_snapshot}/snapshot ${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT} systemd.volatile=overlay systemd.mask=systemd-remount-fs.service
+  initrd ${snapshots}/\${kavat_snapshot}/snapshot/boot/initramfs-linux-zen.img
+  boot
+fi
+EOF2

@@ -1,0 +1,10 @@
+[Unit]
+Description=Record that this boot reached the %i stage
+Documentation=file:///usr/lib/kavat/boot-state
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+# stays active, so that its .path unit, which sees the file still there, does not start it again
+RemainAfterExit=yes
+ExecStart=/usr/lib/kavat/boot-state %i

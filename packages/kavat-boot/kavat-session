@@ -1,0 +1,48 @@
+#!/bin/bash
+# The desktop session, as the login screen starts it: Hyprland, with two things around it.
+#
+# In safe mode, chosen in the boot menu, the session ignores the user's files: every program
+# looks for its settings, state and data in empty folders, and falls back to the system's.
+# Nothing is deleted, and the next normal boot finds everything where it was.
+#
+# The session also tells the system how far it got, so that the next boot knows whether this
+# one failed: someone logged in, and later, the desktop is up.
+
+hyprland=()
+if grep -qw 'kavat.safe=1' /proc/cmdline; then
+  safe="$XDG_RUNTIME_DIR/kavat-safe-mode"
+  mkdir -p "$safe"/{config,state,data,cache}
+  export XDG_CONFIG_HOME="$safe/config" XDG_STATE_HOME="$safe/state"
+  export XDG_DATA_HOME="$safe/data" XDG_CACHE_HOME="$safe/cache"
+  # the shell would greet a new user; this is not one
+  mkdir -p "$XDG_CONFIG_HOME/noctalia"
+  printf '[shell]\nsetup_wizard_enabled = false\n' > "$XDG_CONFIG_HOME/noctalia/config.toml"
+  # Hyprland, finding no file in the empty folder, would still try ~/.config/hypr on its
+  # own: it gets the system's file instead
+  hyprland=(-- --config /usr/share/kavat/hypr/hyprland.lua)
+fi
+
+touch /run/kavat/session
+
+# The desktop is up when Hyprland answers, and still does a few seconds later: a
+# configuration that ends the session as it starts does not count. Neither does Hyprland's
+# own safe mode, which start-hyprland falls back to after a crash, without the user's
+# configuration. The watch runs on its own, detached from the session, which is about to
+# become Hyprland.
+hyprland_up() {
+  hyprctl --instance 0 version > /dev/null 2>&1 &&
+    ! pgrep -u "$USER" -f -- 'Hyprland.*--safe-mode' > /dev/null
+}
+watch_desktop() {
+  for _ in $(seq 60); do
+    sleep 2
+    if hyprland_up; then
+      sleep 5
+      hyprland_up && touch /run/kavat/desktop
+      return
+    fi
+  done
+}
+( watch_desktop & )
+
+exec start-hyprland "${hyprland[@]}"

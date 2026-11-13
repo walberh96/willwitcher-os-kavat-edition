@@ -198,10 +198,11 @@ class Machine:
     """A QEMU machine booting from an ISO, from a disk, or from the ISO with the disk attached.
 
     firmware is where the machine keeps its UEFI settings; give the same file to a later
-    machine and it boots as the same computer.
+    machine and it boots as the same computer. With secure_boot, the firmware does Secure
+    Boot, and a new settings file starts in setup mode, waiting for keys.
     """
 
-    def __init__(self, iso=None, disk=None, firmware=None):
+    def __init__(self, iso=None, disk=None, firmware=None, secure_boot=False):
         self.dir = tempfile.mkdtemp(prefix='kavat-test-')
         if firmware is None:
             firmware = f'{self.dir}/vars.fd'
@@ -221,10 +222,15 @@ class Machine:
             print('no GPU render node on this host: the desktop may not start', file=sys.stderr)
             display = ['-device', 'virtio-vga,xres=1920,yres=1080', '-display', 'none']
         self.log = open(f'{self.dir}/qemu.log', 'w')
+        if secure_boot:
+            board = ['-machine', 'q35,smm=on,accel=kvm', '-global', 'driver=cfi.pflash01,property=secure,value=on']
+            code = f'{OVMF}/OVMF_CODE.secboot.4m.fd'
+        else:
+            board, code = ['-machine', 'q35,accel=kvm'], f'{OVMF}/OVMF_CODE.4m.fd'
         self.proc = subprocess.Popen([
-            'qemu-system-x86_64', '-name', 'kavat-test',
-            '-machine', 'q35,accel=kvm', '-cpu', 'host', '-smp', '4', '-m', '4G',
-            '-drive', f'if=pflash,format=raw,readonly=on,file={OVMF}/OVMF_CODE.4m.fd',
+            'qemu-system-x86_64', '-name', 'kavat-test', *board,
+            '-cpu', 'host', '-smp', '4', '-m', '4G',
+            '-drive', f'if=pflash,format=raw,readonly=on,file={code}',
             '-drive', f'if=pflash,format=raw,file={firmware}',
             *drives,
             '-vga', 'none', *display,

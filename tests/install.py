@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Install the system from the ISO onto a virtual disk, then boot the disk and log in.
 
-usage: tests/install.py [iso]
-  iso   the image to install from; the newest one in out/ when not given
+usage: tests/install.py [--secure-boot] [iso]
+  --secure-boot   the machine's firmware does Secure Boot and waits for keys (setup mode):
+                  the installer must leave it that way and the system must still boot; the
+                  disk and the pictures then go in out/test/secure-boot/
+  iso             the image to install from; the newest one in out/ when not given
 
 The machine boots from the ISO with an empty 60 GB disk and no network. The installer is
 driven as a person would drive it, with the keyboard; then the machine is switched off and
@@ -55,10 +58,13 @@ def install(machine, checks, pictures):
     screen.press('alt', 'n')
     time.sleep(3)
     screen.picture(f'{pictures}/install-summary.png')
-    screen.press('alt', 'i')  # Install
-    time.sleep(2)
-    screen.press('alt', 'i')  # Install now
-    status, output = machine.wait_until(f"grep -q 'Starting job' {LOG}", 60)
+    screen.press('alt', 'i')  # Install, which asks to confirm, with Install now chosen
+    for _ in range(5):
+        time.sleep(4)
+        status, output = machine.run(f"grep -q 'Starting job' {LOG}")
+        if status == 0:
+            break
+        screen.press('enter')
     if not checks.report(status == 0, 'the installation starts'):
         screen.picture(f'{pictures}/install-stuck.png')
         return False
@@ -70,8 +76,15 @@ def install(machine, checks, pictures):
     return checks.report(status == 0 and done == 0, 'the installation finishes without errors', errors)
 
 
-def check_installed(machine, checks):
+def check_installed(machine, checks, secure_boot):
     """Check the system that booted from the disk, before anybody logs in."""
+    status, output = machine.run("sbctl verify 2>&1 | grep -E 'grubx64|BOOTX64|vmlinuz'")
+    checks.report(status == 0 and 'not signed' not in output and output.count('is signed') >= 4,
+                  "the system's own keys sign GRUB and the kernels", output)
+    status, output = machine.run('f=$(ls /sys/firmware/efi/efivars/SecureBoot-* 2>/dev/null); '
+                                 'if [ -n "$f" ]; then od -An -t u1 -j4 -N1 "$f" | tr -d " "; else echo 0; fi; '
+                                 'find /var/lib/sbctl -name db.key')
+    checks.report(output.startswith('0\n') and output.endswith('db.key'), 'Secure Boot stays off, with the keys ready', output)
     for where, subvolume in SUBVOLUMES.items():
         status, output = machine.run(f'findmnt -n -o FSTYPE,OPTIONS --mountpoint {where}')
         ok = status == 0 and output.startswith('btrfs') and f'subvol={subvolume}' in output.split(',')
@@ -87,6 +100,16 @@ def check_installed(machine, checks):
     entries = output.split()
     checks.report(len(entries) == 3 and int(entries[1]) > 0 and entries[2] == '0',
                   "GRUB's menu offers the fallback kernel and none of the firmware's entries", output)
+    status, output = machine.run('readlink /boot/grub; ls /efi/grub/grub.cfg /efi/grub/grubenv')
+    checks.report(status == 0 and output.startswith('/efi/grub\n'),
+                  "GRUB's files are on the EFI partition, where GRUB can write", output)
+    status, output = machine.run('snapper --no-dbus -c root list && systemctl is-active grub-btrfsd')
+    checks.report(status == 0, 'snapper keeps the system snapshots and the boot menu follows them', output)
+    status, output = machine.run('grep ^HOOKS /etc/mkinitcpio.conf; lsinitcpio /boot/initramfs-linux-zen.img | grep systemd-volatile-root.service')
+    checks.report(status == 0 and '(systemd ' in output, "the boot image is systemd's, and can boot a read-only snapshot", output)
+    status, output = machine.run('grep -o splash /proc/cmdline; grep ^HOOKS /etc/mkinitcpio.conf')
+    checks.report(output.startswith('splash') and ' plymouth' in output,
+                  'the loading screen is in the boot image and on the kernel line', output)
     status, output = machine.run('find /etc -name "*.pacnew"')
     checks.report(not output, 'no settings file waits to be merged', output)
 
@@ -104,10 +127,13 @@ def check_installed(machine, checks):
 
 
 def main():
-    if len(sys.argv) > 2 or (len(sys.argv) == 2 and sys.argv[1].startswith('-')):
+    args = sys.argv[1:]
+    secure_boot = '--secure-boot' in args
+    args = [arg for arg in args if arg != '--secure-boot']
+    if len(args) > 1 or any(arg.startswith('-') for arg in args):
         sys.exit(__doc__)
-    iso = sys.argv[1] if len(sys.argv) == 2 else newest_iso()
-    pictures = f'{ROOT}/out/test'
+    iso = args[0] if args else newest_iso()
+    pictures = f'{ROOT}/out/test' + ('/secure-boot' if secure_boot else '')
     disk, firmware = f'{pictures}/disk.qcow2', f'{pictures}/disk-firmware.fd'
     os.makedirs(pictures, exist_ok=True)
     for old in (disk, firmware):
@@ -117,7 +143,7 @@ def main():
 
     checks = Checks()
     print(f'installing from {os.path.relpath(iso)}', flush=True)
-    machine = Machine(iso=iso, disk=disk, firmware=firmware)
+    machine = Machine(iso=iso, disk=disk, firmware=firmware, secure_boot=secure_boot)
     try:
         installed = checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the ISO boots') and install(machine, checks, pictures)
         if installed:
@@ -127,16 +153,20 @@ def main():
 
     if installed:
         print('booting the installed disk', flush=True)
-        machine = Machine(disk=disk, firmware=firmware)
+        machine = Machine(disk=disk, firmware=firmware, secure_boot=secure_boot)
         try:
             if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the installed system boots'):
-                check_installed(machine, checks)
+                check_installed(machine, checks, secure_boot)
                 check_packages(machine, checks)
                 time.sleep(5)  # the login screen takes a moment to listen
                 machine.screen.picture(f'{pictures}/login.png')
                 machine.screen.type(PASSWORD)
                 machine.screen.press('enter')
                 check_desktop(machine, checks, USER)
+                # later tests start from this disk, and expect its last boot to have gone well
+                status, output = machine.wait_until("! grub-editenv /boot/grub/grubenv list | grep -q '^kavat_boot='", 60)
+                checks.report(status == 0, 'the next boot is told this one reached the desktop',
+                              machine.run('grub-editenv /boot/grub/grubenv list')[1])
                 if checks.failed:
                     print_journal(machine)
                 else:

@@ -1,0 +1,17 @@
+#!/bin/bash
+# usage: kavat-boot-once <snapshot>
+#
+# The next boot, and only that one, starts from a snapshot: read-only, with a layer in memory
+# over it that takes every write. The number is the one snapper list and the boot menu show.
+# To keep that state for good, run kavat-rollback from it.
+set -euo pipefail
+
+if [[ $# -ne 1 || ! $1 =~ ^[0-9]+$ ]]; then
+  sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//' >&2
+  exit 2
+fi
+(( EUID == 0 )) || { echo 'kavat-boot-once: needs root' >&2; exit 1; }
+[[ -f /.snapshots/$1/snapshot/boot/vmlinuz-linux-zen ]] || { echo "kavat-boot-once: there is no snapshot $1 to boot" >&2; exit 1; }
+
+grub-editenv /boot/grub/grubenv set kavat_once_snapshot="$1"
+echo "The next boot starts from snapshot $1, once."

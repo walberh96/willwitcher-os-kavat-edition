@@ -1,0 +1,27 @@
+#!/bin/sh
+# Part of kavat-boot. Writes the boot menu's Safe mode entry: the normal kernel, with
+# kavat.safe=1, which makes the desktop session start with the system's own settings and
+# none of the user's. The entry cannot be hidden.
+set -e
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+. "$pkgdatadir/grub-mkconfig_lib"
+
+[ -f /boot/vmlinuz-linux-zen ] || exit 0
+boot="$(make_system_path_relative_to_its_root /boot)"
+root="$(make_system_path_relative_to_its_root /)"
+case "${GRUB_FS}" in
+  btrfs) rootflags="rootflags=subvol=${root#/}" ;;
+  *) rootflags="" ;;
+esac
+
+echo "menuentry 'Safe mode' --class kavat --id kavat-safe-mode {"
+prepare_grub_to_access_device "${GRUB_DEVICE_BOOT}" | sed -e 's/^/\t/'
+cat << EOF2
+	echo 'Starting in safe mode...'
+	linux ${boot}/vmlinuz-linux-zen root=UUID=${GRUB_DEVICE_UUID} rw ${rootflags} ${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT} kavat.safe=1
+	initrd ${boot}/initramfs-linux-zen.img
+}
+EOF2

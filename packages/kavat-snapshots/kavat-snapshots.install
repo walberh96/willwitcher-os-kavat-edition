@@ -1,0 +1,26 @@
+# Two settings live in files of other packages: snapper's list of configurations, and the
+# boot menu's snapshot entries.
+
+post_install() {
+  # snapper keeps the system's snapshots, under the configuration this package brings
+  if ! grep -q '^SNAPPER_CONFIGS=.*\<root\>' etc/conf.d/snapper; then
+    sed -i 's/^SNAPPER_CONFIGS="\(.*\)"$/SNAPPER_CONFIGS="root \1"/; s/^SNAPPER_CONFIGS="root "$/SNAPPER_CONFIGS="root"/' \
+      etc/conf.d/snapper
+  fi
+
+  # the boot menu: ten snapshots, each one booting with a layer in memory over it, where
+  # there is no root to remount; the system that kavat-rollback sets aside is not one of them
+  local config=etc/default/grub-btrfs/config
+  sed -i '/^# kavat-snapshots$/,$d' "$config"
+  grep -q '("@.old" ' "$config" || sed -i 's/^GRUB_BTRFS_IGNORE_PREFIX_PATH=(/&"@.old" /' "$config"
+  cat >> "$config" <<'END'
+# kavat-snapshots
+GRUB_BTRFS_SUBMENUNAME="Snapshots"
+GRUB_BTRFS_LIMIT="10"
+GRUB_BTRFS_SNAPSHOT_KERNEL_PARAMETERS="systemd.volatile=overlay systemd.mask=systemd-remount-fs.service"
+END
+}
+
+post_upgrade() {
+  post_install
+}

@@ -1,0 +1,9 @@
+[Unit]
+Description=Watch for someone logging in, to record it for the next boot
+
+[Path]
+PathExists=/run/kavat/session
+Unit=kavat-boot-state@session.service
+
+[Install]
+WantedBy=multi-user.target

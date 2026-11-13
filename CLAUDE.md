@@ -43,12 +43,16 @@ Los dos diagramas del documento de diseño son imágenes en `docs/img/` y no tie
 
 ## Compilar y probar
 
-Tras tocar `iso/`, `packages/` o `installer/` se pasan los cuatro, en este orden. Los dos primeros piden `devtools` y sudo; la prueba no pide root. El PC se suspende solo si nadie lo toca, así que lo que tarde se lanza con `systemd-inhibit --what=sleep:idle`.
+Tras tocar `iso/`, `packages/` o `installer/` se pasan, en este orden. Los dos primeros piden `devtools` y sudo; la prueba no pide root. El PC se suspende solo si nadie lo toca, así que lo que tarde se lanza con `systemd-inhibit --what=sleep:idle`.
 
 - `tools/build-repo.sh [carpeta ...]`: compila en un chroot limpio de Arch los paquetes de `packages/` y los de las piezas que llevan su propio PKGBUILD, como `installer/`, y los reúne en `out/repo/`, el repo `[kavat]` local. Con nombres, solo esos: `tools/build-repo.sh installer`.
 - `tools/build-iso.sh`: construye la ISO desde `iso/`, con `mkarchiso` dentro de otro chroot limpio de Arch, y la deja en `out/`.
 - `tests/boot.py [iso]`: arranca la ISO en QEMU, comprueba desde dentro que llega al escritorio y deja una captura en `out/test/desktop.png`. Es la puerta de la fase 1 y tiene que seguir pasando. Pide `qemu-desktop` y `edk2-ovmf`.
-- `tests/install.py [iso]`: instala la ISO en un disco virtual manejando el instalador con el teclado, arranca desde ese disco e inicia sesión. Tarda unos diez minutos y deja capturas en `out/test/`. Lo que comparten las dos pruebas está en `tests/machine.py`.
+- `tests/install.py [--secure-boot] [iso]`: instala la ISO en un disco virtual manejando el instalador con el teclado, arranca desde ese disco e inicia sesión. Con `--secure-boot`, el firmware hace Secure Boot y espera llaves, y todo va a `out/test/secure-boot/`. Tarda unos seis minutos y deja capturas en `out/test/`.
+- `tests/snapshots.py`: sobre el disco que deja la prueba anterior, cambia un paquete, arranca el snapshot de antes y vuelve a él con `kavat-rollback`.
+- `tests/safemode.py`: sobre el mismo disco, rompe a propósito la configuración de Hyprland del usuario y comprueba que el siguiente arranque abre en modo seguro y que en él sí aparece el escritorio.
+
+Lo que comparten las pruebas está en `tests/machine.py`. Las dos últimas trabajan sobre una capa encima del disco instalado, así que no lo cambian.
 
 Los repos de Arch se usan tal como estaban el día que dice `iso/arch-snapshot`; cambiar esa fecha es actualizar el sistema. `out/`, `work/` y `vendor/` no entran en git: son resultados, trabajo temporal y descargas.
 

@@ -1,0 +1,22 @@
+pkgname=kavat-snapshots
+pkgver=0.1.0
+pkgrel=2
+pkgdesc="Willwitcher-OS Kavat Edition: bootable snapshots of the system"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+# snapper keeps the snapshots, snap-pac takes them around each package change, grub-btrfs
+# lists them in the boot menu and grub-btrfsd, with inotify-tools, keeps that list current
+depends=('snapper' 'snap-pac' 'grub-btrfs' 'inotify-tools' 'btrfs-progs' 'systemd')
+backup=('etc/snapper/configs/root')
+install=kavat-snapshots.install
+source=('snapper-root.conf' 'sd-volatile-root' 'kavat-rollback' 'kavat-boot-once' '01_kavat-boot-once')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm640 snapper-root.conf "$pkgdir/etc/snapper/configs/root"
+  install -Dm644 sd-volatile-root "$pkgdir/usr/lib/initcpio/install/sd-volatile-root"
+  install -Dm755 kavat-rollback "$pkgdir/usr/bin/kavat-rollback"
+  install -Dm755 kavat-boot-once "$pkgdir/usr/bin/kavat-boot-once"
+  install -Dm755 01_kavat-boot-once "$pkgdir/etc/grub.d/01_kavat-boot-once"
+}

@@ -1,0 +1,30 @@
+#!/bin/bash
+# usage: kavat-rollback <snapshot>
+#
+# Makes a snapshot the system: the next boot starts from it. The number is the one that
+# snapper list and the boot menu show. The system as it was until now is kept beside it, as
+# @.old-<date>; /home and the other subvolumes do not change.
+set -euo pipefail
+
+if [[ $# -ne 1 || ! $1 =~ ^[0-9]+$ ]]; then
+  sed -n '2,7p' "$0" | sed 's/^# \{0,1\}//' >&2
+  exit 2
+fi
+(( EUID == 0 )) || { echo 'kavat-rollback: needs root' >&2; exit 1; }
+
+number=$1
+device=$(findmnt -n -o SOURCE --mountpoint /.snapshots | sed 's/\[.*\]$//')
+[[ -n $device ]] || { echo 'kavat-rollback: /.snapshots is not mounted' >&2; exit 1; }
+
+# The top of the filesystem, where @ and @snapshots live side by side
+top=$(mktemp -d)
+mount -o subvolid=5 "$device" "$top"
+trap 'umount "$top" && rmdir "$top"' EXIT
+
+snapshot="$top/@snapshots/$number/snapshot"
+[[ -d $snapshot ]] || { echo "kavat-rollback: there is no snapshot $number" >&2; exit 1; }
+
+old="@.old-$(date +%Y%m%d-%H%M%S)"
+mv "$top/@" "$top/$old"
+btrfs subvolume snapshot "$snapshot" "$top/@" > /dev/null
+echo "From the next boot on, the system is snapshot $number. What it was until now is kept as $old."

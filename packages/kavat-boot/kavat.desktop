@@ -1,0 +1,6 @@
+[Desktop Entry]
+Name=Willwitcher-OS Kavat Edition
+Comment=Hyprland and the Kavat shell
+Exec=kavat-session
+Type=Application
+DesktopNames=Hyprland

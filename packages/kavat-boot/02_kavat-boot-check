@@ -1,0 +1,19 @@
+#!/bin/sh
+# Part of kavat-boot. Writes into grub.cfg, ahead of every menu, the check of how the last
+# boot went. Each boot leaves kavat_boot=started in GRUB's environment block, and the system
+# moves it on as it gets further: to greeter when the login screen is up, to session when
+# someone logs in, and away once the desktop is up. If the last boot stopped at started or
+# at session, it failed: the menu shows, with Safe mode chosen.
+set -e
+
+cat << 'EOF2'
+if [ "${kavat_boot}" = started ]; then set kavat_last_failed=1; fi
+if [ "${kavat_boot}" = session ]; then set kavat_last_failed=1; fi
+if [ -n "${kavat_last_failed}" ]; then
+  set default=kavat-safe-mode
+  set timeout_style=menu
+  set timeout=30
+fi
+set kavat_boot=started
+save_env kavat_boot
+EOF2
