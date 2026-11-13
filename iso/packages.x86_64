@@ -2,7 +2,9 @@
 
 # Base and boot
 base
+kavat-base
 linux-zen
+linux-lts
 linux-firmware
 amd-ucode
 intel-ucode
@@ -13,6 +15,7 @@ sudo
 # What the installed system boots and lives on
 grub
 efibootmgr
+os-prober
 btrfs-progs
 dosfstools
 

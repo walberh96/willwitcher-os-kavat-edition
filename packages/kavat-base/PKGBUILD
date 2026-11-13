@@ -1,0 +1,14 @@
+pkgname=kavat-base
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: settings of the base system"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+depends=('zram-generator')
+source=('zram.conf')
+sha256sums=('SKIP')
+
+package() {
+  install -Dm644 zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/kavat.conf"
+}

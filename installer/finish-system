@@ -13,6 +13,9 @@ main() {
   rm -f /etc/systemd/logind.conf.d/do-not-suspend.conf
   rm -f /etc/systemd/system-generators/systemd-gpt-auto-generator
 
+  # what packages left beside the files the live medium brought its own version of
+  rm -f /etc/passwd.pacnew /etc/shadow.pacnew /etc/group.pacnew /etc/gshadow.pacnew /etc/pacman.d/mirrorlist.pacnew
+
   # The live medium keeps its kernels outside the system: put each one in /boot.
   # The installer copied the system with holes for runs of zeros, and a kernel ends in
   # zeros. GRUB cannot read a hole at the end of a file on Btrfs, so the copy in /boot is

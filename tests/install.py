@@ -79,6 +79,17 @@ def check_installed(machine, checks):
     status, output = machine.run('findmnt -n -o FSTYPE /efi')
     checks.report(output == 'vfat', 'the EFI partition is mounted on /efi', output)
 
+    status, output = machine.run('swapon --show=NAME --noheadings')
+    checks.report(output == '/dev/zram0', 'memory is compressed in memory, with no swap on the disk', output)
+    status, output = machine.run('uname -r; ls /boot | grep -c -E "^(vmlinuz|initramfs)-linux-(zen|lts)"')
+    checks.report(output.endswith('-zen\n4'), 'it runs the zen kernel and the fallback kernel is in /boot', output)
+    status, output = machine.run('grep -c -E "^(menuentry|submenu)" /boot/grub/grub.cfg; grep -c "vmlinuz-linux-lts" /boot/grub/grub.cfg; grep -c "EFI BootNext" /boot/grub/grub.cfg')
+    entries = output.split()
+    checks.report(len(entries) == 3 and int(entries[1]) > 0 and entries[2] == '0',
+                  "GRUB's menu offers the fallback kernel and none of the firmware's entries", output)
+    status, output = machine.run('find /etc -name "*.pacnew"')
+    checks.report(not output, 'no settings file waits to be merged', output)
+
     status, output = machine.run('pacman -Qq kavat-installer kavat-calamares mkinitcpio-archiso 2>/dev/null; '
                                  'id live 2>/dev/null; ls /etc/sudoers.d/live /etc/mkinitcpio.conf.d/archiso.conf 2>/dev/null')
     checks.report(not output, 'nothing of the live medium is left', output)
