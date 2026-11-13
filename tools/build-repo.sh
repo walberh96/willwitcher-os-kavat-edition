@@ -9,13 +9,9 @@
 # the day in iso/arch-snapshot. Nothing comes from the machine that runs this: not its
 # repositories, not its makepkg.conf. Needs devtools, and asks for sudo.
 set -euo pipefail
+. "$(dirname "$0")/lib.sh"
 
-root="$(cd "$(dirname "$0")/.." && pwd)"
-snapshot="$(<"$root/iso/arch-snapshot")"
-repo="$root/out/repo"
-cache="$root/vendor/pacman-cache"
 chroot="$root/work/chroot"
-conf="$root/work/chroot-pacman.conf"
 
 names=("$@")
 if (( ${#names[@]} == 0 )); then
@@ -25,20 +21,9 @@ for name in "${names[@]}"; do
   [[ -f $root/packages/$name/PKGBUILD ]] || { echo "packages/$name has no PKGBUILD" >&2; exit 1; }
 done
 
-mkdir -p "$repo" "$cache" "$chroot" "$root/work/logs"
+arch_chroot "$chroot/root" base-devel
 
-# The chroot sees Arch only: [kavat] is what is being built.
-sed -e "s|@SNAPSHOT@|$snapshot|g" -e "s|@CACHE@|$cache|g" -e '/^\[kavat\]/,$d' \
-  "$root/iso/pacman.conf" > "$conf"
-
-if [[ ! -d $chroot/root ]]; then
-  mkarchroot -C "$conf" -M /usr/share/devtools/makepkg.conf.d/x86_64.conf -c "$cache" \
-    "$chroot/root" base-devel
-else
-  # -uu also goes back, so the chroot follows the snapshot whichever way the date moved
-  arch-nspawn -C "$conf" -c "$cache" "$chroot/root" pacman -Syuu --noconfirm
-fi
-
+mkdir -p "$root/work/logs"
 for name in "${names[@]}"; do
   rm -f "$repo/$name"-[0-9]*.pkg.tar.zst
   (cd "$root/packages/$name" && PKGDEST="$repo" LOGDEST="$root/work/logs" makechrootpkg -c -r "$chroot")

@@ -22,7 +22,7 @@ Fast like a tiling WM. Curated like one person's system. And with someone inside
 
 ![The Willwitcher-OS Kavat Edition desktop](docs/screenshots/desktop.png)
 
-> **Status: phase 1, an ISO that boots.** This README describes the finished system. The images come from an interactive mockup, not from a running system: what runs today is a live session with Hyprland and Noctalia as Arch ships them. Details in [Real project status](#real-project-status).
+> **Status: phase 2, the installer.** This README describes the finished system. The images come from an interactive mockup, not from a running system: what runs today is a live session with Hyprland and Noctalia as Arch ships them. Details in [Real project status](#real-project-status).
 
 ---
 
@@ -350,9 +350,9 @@ A kavat is a companion feline: fast, quiet, and always beside whoever raised it.
 
 ## Real project status
 
-This README describes the finished system. Today the project is in **phase 1**: there is an ISO that boots, in a virtual machine, to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts. Nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
+This README describes the finished system. Today the project is in **phase 2**, the installer. Phase 1 is done: there is an ISO that boots, in a virtual machine, to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts. Nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
 
-To build and try it on an Arch-based machine with `archiso`, `devtools`, `qemu-desktop` and `edk2-ovmf`:
+To build and try it on an Arch-based machine with `devtools`, `qemu-desktop` and `edk2-ovmf`:
 
 ```
 tools/build-repo.sh   # the kavat-* packages, into the local [kavat] repository
@@ -363,8 +363,8 @@ tests/boot.py         # boots it in a virtual machine and checks it reaches the 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | 0 | Design documented | Done |
-| 1 | ISO that boots to Hyprland + Noctalia | In progress: it builds, and boots to the desktop in a virtual machine |
-| 2 | Calamares installer with Btrfs and snapshots | Pending |
+| 1 | ISO that boots to Hyprland + Noctalia | Done |
+| 2 | Calamares installer with Btrfs and snapshots | In progress |
 | 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | Pending |
 | 4 | Local agent, skills and voice | Pending |
 

@@ -13,11 +13,13 @@ sudo
 # Network
 networkmanager
 iwd
+wireless-regdb
 
 # Sound
 pipewire
 pipewire-pulse
 wireplumber
+rtkit
 
 # Graphics: Mesa comes with Hyprland; this is the Vulkan driver of the target machine
 vulkan-radeon

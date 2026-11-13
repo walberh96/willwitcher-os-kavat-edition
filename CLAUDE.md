@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition
 
-Distribución personal basada en Arch Linux. Está en **fase 1**: hay un perfil de archiso en `iso/`, un primer paquete en `packages/` y una ISO que arranca en una máquina virtual hasta un Hyprland y un Noctalia sin modificar. Lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO usa un `pacman.conf` propio con solo los repos de Arch y `[kavat]`, y los paquetes se compilan en un chroot limpio de Arch, nunca con el `makepkg` del anfitrión.
+Distribución personal basada en Arch Linux. Está en **fase 2, el instalador**. La fase 1 está cerrada: hay un perfil de archiso en `iso/`, un primer paquete en `packages/` y una ISO que arranca en una máquina virtual hasta un Hyprland y un Noctalia sin modificar. Lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
 
 ## Idiomas
 
@@ -43,11 +43,11 @@ Los dos diagramas del documento de diseño son imágenes en `docs/img/` y no tie
 
 ## Compilar y probar
 
-Tras tocar `iso/` o `packages/` se pasan los tres, en este orden. Los dos primeros piden sudo; la prueba no.
+Tras tocar `iso/` o `packages/` se pasan los tres, en este orden. Los dos primeros piden `devtools` y sudo; la prueba no pide root. El PC se suspende solo si nadie lo toca, así que lo que tarde se lanza con `systemd-inhibit --what=sleep:idle`.
 
-- `tools/build-repo.sh [paquete ...]`: compila los paquetes de `packages/` en un chroot limpio de Arch y los reúne en `out/repo/`, el repo `[kavat]` local. Pide `devtools`.
-- `tools/build-iso.sh`: construye la ISO desde `iso/` y la deja en `out/`. Pide `archiso`.
-- `tests/boot.py [iso]`: arranca la ISO en QEMU, comprueba desde dentro que llega al escritorio y deja una captura en `out/test/desktop.png`. Es la puerta de la fase 1. Pide `qemu-desktop` y `edk2-ovmf`.
+- `tools/build-repo.sh [paquete ...]`: compila los paquetes de `packages/` en un chroot limpio de Arch y los reúne en `out/repo/`, el repo `[kavat]` local.
+- `tools/build-iso.sh`: construye la ISO desde `iso/`, con `mkarchiso` dentro de otro chroot limpio de Arch, y la deja en `out/`.
+- `tests/boot.py [iso]`: arranca la ISO en QEMU, comprueba desde dentro que llega al escritorio y deja una captura en `out/test/desktop.png`. Es la puerta de la fase 1 y tiene que seguir pasando. Pide `qemu-desktop` y `edk2-ovmf`.
 
 Los repos de Arch se usan tal como estaban el día que dice `iso/arch-snapshot`; cambiar esa fecha es actualizar el sistema. `out/`, `work/` y `vendor/` no entran en git: son resultados, trabajo temporal y descargas.
 

@@ -36,7 +36,7 @@ La ISO se construye con `archiso` a partir del perfil `releng`, y todo lo propio
 | Audio y red | PipeWire + WirePlumber; NetworkManager con iwd | wpa\_supplicant | Es lo que Noctalia y Hyprland esperan |
 | Arranque visual | Plymouth con tema generado por el sistema de temas | Texto | Misma identidad desde el primer fotograma |
 
-**Dónde se compila.** El PC de escritorio lleva CachyOS, instalado solo para este proyecto. De CachyOS no entra nada en el sistema: la ISO se construye con un `pacman.conf` propio, que solo tiene los repos de Arch y `[kavat]`, y los paquetes `kavat-*` se compilan en un chroot limpio de Arch, sin las opciones de compilación del anfitrión.
+**Dónde se compila.** El PC de escritorio lleva CachyOS, instalado solo para este proyecto. De CachyOS no entra nada en el sistema: la ISO y los paquetes `kavat-*` se construyen dentro de chroots limpios de Arch, con el `pacman` y las herramientas de Arch, y con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Tiene que ser así porque el `pacman` de CachyOS deja marcas propias en la base de datos de paquetes de lo que instala.
 
 El repositorio es un monorepo con una carpeta por pieza:
 
@@ -988,7 +988,7 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 
 | Decidido | Decisión |
 | --- | --- |
-| Compilación de la ISO | En tu PC de escritorio, que lleva CachyOS; la ISO y los paquetes se compilan solo contra los repos de Arch |
+| Compilación de la ISO | En tu PC de escritorio, que lleva CachyOS; la ISO y los paquetes se construyen dentro de chroots limpios de Arch, solo contra los repos de Arch |
 | Máquina objetivo | Escritorio con AMD Radeon RX 6800 de 16 GB de VRAM |
 | Límite del agente | El agente ocupa como máximo 4 GB de VRAM; quedan 12 GB para juegos aun con él cargado. La voz corre en la CPU y usa RAM aparte |
 | Alcance | Solo para ti |

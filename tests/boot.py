@@ -274,6 +274,11 @@ def main():
             status, output = machine.run(f'{HYPRCTL} configerrors')
             report(status == 0 and not output, "Hyprland's configuration loads without errors", output)
 
+            # a pacman that is not Arch's leaves fields of its own in the package database,
+            # and Arch's pacman complains about them every time it reads it
+            _, output = machine.run("pacman -Q 2>&1 >/dev/null | grep 'local database' | head -n 5")
+            report(not output, 'the package database is clean', output)
+
             if failed:
                 _, journal = machine.run('journalctl -b --no-pager -p warning | tail -n 40')
                 print('\nlast warnings of the machine:\n' + journal)
