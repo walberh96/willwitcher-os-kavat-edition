@@ -73,6 +73,8 @@ Ideas propias sobre el Calamares de serie:
 - **Módulo `kavat-theme`**: lo elegido en la pantalla 6 queda aplicado al greeter, a Plymouth y al escritorio antes del primer arranque.
 - **Módulo `kavat-hardware`**: escribe la configuración de Hyprland según monitores y GPU detectados.
 - **Instalación sin red**: la ISO lleva los paquetes del sistema base; con red se actualiza al final y se añade el software elegido.
+
+Pendiente para la fase 3, visto en la instalación real: al elegir la partición en «Replace a partition», toda la ventana del instalador se oscurece y no se aclara hasta empezar la instalación. No impide instalar. Se reproduce en máquina virtual; la sospecha es que Hyprland oscurece la ventana porque Calamares deja abierto un diálogo modal invisible.
 - **Archivo de respuestas**: un `kavat-install.toml` en el USB reinstala tu máquina sin tocar nada.
 - **Primer arranque**: un asistente dentro de Noctalia termina lo que no pertenece al instalador (cuentas, llaves SSH, descarga del modelo).
 
@@ -207,6 +209,7 @@ Atajos: 19 heredados de Endgame tal cual y 12 nuevos para lo que antes no exist�
 - Parte de Noctalia 5.4.1, escrito en C++ y con licencia MIT. No se sigue cada versión de upstream: lo que interese de ellas se trae a mano, así que la regla de reaplicar parches no vale para este fork.
 - Añadidos propios: panel de ajustes con páginas nativas, panel del agente, selector de temas con vista previa, panel de `kav` (actualizaciones, snapshots, solicitudes de AUR) y el asistente de primer arranque.
 - El motor de colores de Noctalia se sustituye o se alimenta desde los tokens del sistema, para que haya una sola fuente de verdad.
+- Se quita el «Anonymous Startup Ping» de Noctalia, el aviso que manda a sus servidores la versión, el sistema, el compositor, las resoluciones, la RAM y la escala en cada arranque, y su casilla en el asistente de primer arranque. Lo pediste el 13 de noviembre de 2026, tras verlo en el asistente.
 
 **Paleta de comandos.** `Super+D` abre una sola paleta para todo el sistema: apps, archivos, ajustes, skills, paquetes, ventanas abiertas y pestañas del navegador. Usa la misma gramática y los mismos nombres de comando que la consola del navegador y la paleta de Neovim, y lo que no encuentra se lo puede pasar al agente.
 
@@ -1104,7 +1107,8 @@ Cómo van los de la fase 2, a 13 de noviembre de 2026:
 
 - **Comprobados en máquina virtual**: el modo seguro arranca el escritorio sin leer la configuración del usuario; el modo seguro automático tras un arranque fallido funciona con GRUB sobre Btrfs, porque el bloque de entorno de GRUB vive en la partición EFI; GRUB arranca cada snapshot con su kernel, con y sin cifrado; y con el disco cifrado no se pide ninguna contraseña.
 - **Resuelto por diseño**: el desbloqueo por TPM2 no depende de mkinitcpio, porque la llave está atada al PCR 7, que mide el firmware.
-- **Esperan al hardware real**: que GRUB, Plymouth y el login enlacen sin parpadeo en la RX 6800.
+- **Comprobado en hardware real** (13 de noviembre de 2026, en el PC de escritorio, junto a CachyOS y Windows): la instalación compartiendo la partición EFI de CachyOS, el arranque, arrancar un snapshot con `kavat-boot-once` y volver a él con `kavat-rollback`.
+- **Pasa a la fase 3**: que GRUB, Plymouth y el login enlacen sin parpadeo en la RX 6800. Se mira cuando tengan su tema, que hoy no tienen.
 - **Pasa a la fase 3**: la prueba tras actualizar. Detectar el arranque roto ya funciona, porque es el mismo mecanismo del modo seguro; ofrecer volver atrás le corresponde a `kav`.
 
 De Omarchy se tomó la idea del selector de temas que cambia todo el sistema. Sus atajos y sus valores por defecto no se siguen; sus mecanismos solo entran uno a uno y con tu aprobación, y los aprobados están en «Ideas de otras distros».

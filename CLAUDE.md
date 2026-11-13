@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition
 
-Distribución personal basada en Arch Linux. Está en **fase 2, el instalador**. La fase 1 está cerrada: hay un perfil de archiso en `iso/`, un primer paquete en `packages/` y una ISO que arranca en una máquina virtual hasta un Hyprland y un Noctalia sin modificar. Lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
+Distribución personal basada en Arch Linux. Las fases 1 y 2 están cerradas: hay un perfil de archiso en `iso/`, paquetes `kavat-*` en `packages/` y un instalador en `installer/`, y el sistema instalado arranca, hace snapshots y vuelve a ellos, también en el PC de escritorio. Hyprland y Noctalia van sin modificar, y lo demás del diseño no está implementado. Lo siguiente es la fase 3. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
 
 ## Idiomas
 

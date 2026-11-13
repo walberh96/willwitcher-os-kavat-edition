@@ -22,7 +22,7 @@ Fast like a tiling WM. Curated like one person's system. And with someone inside
 
 ![The Willwitcher-OS Kavat Edition desktop](docs/screenshots/desktop.png)
 
-> **Status: phase 2, the installer.** This README describes the finished system. The images come from an interactive mockup, not from a running system: what runs today is a live session with Hyprland and Noctalia as Arch ships them. Details in [Real project status](#real-project-status).
+> **Status: phase 2, the installer, is done; phase 3 is next.** This README describes the finished system. The images come from an interactive mockup, not from a running system: what runs today is a live session with Hyprland and Noctalia as Arch ships them. Details in [Real project status](#real-project-status).
 
 ---
 
@@ -350,11 +350,11 @@ A kavat is a companion feline: fast, quiet, and always beside whoever raised it.
 
 ## Real project status
 
-This README describes the finished system. Today the project is in **phase 2**, the installer, and nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
+This README describes the finished system. Today phases 1 and 2 are done, the live ISO and the installer, and nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
 
 - **Phase 1 is done.** The ISO boots to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts.
-- **Phase 2 works in a virtual machine.** The installer puts the system on a disk with no network: Btrfs with its subvolumes, zram, the zen kernel with the LTS one as fallback, GRUB and a login screen. Every package change takes a snapshot, a snapshot boots from the menu with its own kernel, and the system can go back to it. A boot that fails opens the next one in safe mode, which ignores your settings without deleting them. The disk can be encrypted, off by default: GRUB opens it with a key sealed in the TPM2, and asks for the recovery password only when the TPM2 does not give it. Secure Boot is not used and has to be off.
-- **Phase 2 still needs** the install on real hardware.
+- **Phase 2 is done.** The installer puts the system on a disk with no network: Btrfs with its subvolumes, zram, the zen kernel with the LTS one as fallback, GRUB and a login screen. Every package change takes a snapshot, a snapshot boots from the menu with its own kernel, and the system can go back to it. A boot that fails opens the next one in safe mode, which ignores your settings without deleting them. The disk can be encrypted, off by default: GRUB opens it with a key sealed in the TPM2, and asks for the recovery password only when the TPM2 does not give it. Secure Boot is not used and has to be off.
+- **Phase 2 was checked on real hardware**: installed next to CachyOS and Windows, sharing CachyOS's EFI partition, booted, and taken back to a snapshot.
 
 To build and try it on an Arch-based machine with `devtools`, `qemu-desktop` and `edk2-ovmf`:
 
@@ -371,7 +371,7 @@ tests/safemode.py     # breaks its desktop on purpose and checks the next boot o
 | --- | --- | --- |
 | 0 | Design documented | Done |
 | 1 | ISO that boots to Hyprland + Noctalia | Done |
-| 2 | Calamares installer with Btrfs and snapshots | Works in a virtual machine; waits for real hardware |
+| 2 | Calamares installer with Btrfs and snapshots | Done |
 | 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | Pending |
 | 4 | Local agent, skills and voice | Pending |
 
