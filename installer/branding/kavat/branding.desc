@@ -1,0 +1,39 @@
+# How the installer looks and what it calls the system. The colours are the Kavat palette,
+# dark; the theme system takes this over in phase 3.
+---
+componentName: kavat
+welcomeStyleCalamares: false
+welcomeExpandingLogo: true
+windowExpanding: normal
+windowSize: 1100px,720px
+windowPlacement: center
+sidebar: widget
+navigation: widget
+
+strings:
+    productName:         "Willwitcher-OS Kavat Edition"
+    shortProductName:    "Kavat Edition"
+    version:             ""
+    shortVersion:        ""
+    versionedName:       "Willwitcher-OS Kavat Edition"
+    shortVersionedName:  "Kavat Edition"
+    bootloaderEntryName: "Kavat"
+    productUrl:          "https://github.com/walberh96/willwitcher-os-kavat-edition"
+    supportUrl:          "https://github.com/walberh96/willwitcher-os-kavat-edition"
+    knownIssuesUrl:      "https://github.com/walberh96/willwitcher-os-kavat-edition"
+    releaseNotesUrl:     "https://github.com/walberh96/willwitcher-os-kavat-edition"
+    donateUrl:           ""
+
+images:
+    productIcon:    "kavat.svg"
+    productLogo:    "kavat.svg"
+    productWelcome: "kavat.svg"
+
+style:
+    SidebarBackground:        "#151821"
+    SidebarText:              "#e8e6df"
+    SidebarTextCurrent:       "#0d0f14"
+    SidebarBackgroundCurrent: "#f2a93b"
+
+slideshow: "show.qml"
+slideshowAPI: 2

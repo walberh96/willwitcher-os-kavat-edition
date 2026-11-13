@@ -10,6 +10,12 @@ mkinitcpio
 mkinitcpio-archiso
 sudo
 
+# What the installed system boots and lives on
+grub
+efibootmgr
+btrfs-progs
+dosfstools
+
 # Network
 networkmanager
 iwd
@@ -29,6 +35,15 @@ vulkan-radeon
 hyprland
 noctalia
 kavat-hyprland
+
+# Login screen of the installed system. The live session does not use it.
+# lightdm-gtk-greeter stands in until the system's own greeter exists.
+lightdm
+lightdm-gtk-greeter
+xorg-server
+
+# The installer. It takes itself out of the system it installs.
+kavat-installer
 
 # Fonts
 inter-font

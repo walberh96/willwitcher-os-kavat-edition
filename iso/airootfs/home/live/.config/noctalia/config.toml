@@ -1,0 +1,4 @@
+# The live session is there to install from: the shell's first-run dialog would open over
+# the installer and take the keyboard.
+[shell]
+setup_wizard_enabled = false

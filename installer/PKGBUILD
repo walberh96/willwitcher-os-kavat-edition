@@ -1,0 +1,20 @@
+pkgname=kavat-installer
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: the installer's configuration and looks"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+# Calamares, and what its steps run on the new system's disk
+depends=('kavat-calamares' 'btrfs-progs' 'dosfstools' 'efibootmgr' 'grub' 'qt6-wayland' 'rsync' 'squashfs-tools' 'sudo')
+source=('settings.conf' 'kavat-installer' 'kavat-installer.desktop' 'finish-system')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm644 settings.conf "$pkgdir/etc/calamares/settings.conf"
+  install -Dm644 -t "$pkgdir/etc/calamares/modules" "$startdir"/modules/*.conf
+  install -Dm644 -t "$pkgdir/etc/calamares/branding/kavat" "$startdir"/branding/kavat/*
+  install -Dm755 kavat-installer "$pkgdir/usr/bin/kavat-installer"
+  install -Dm755 finish-system "$pkgdir/usr/lib/kavat-installer/finish-system"
+  install -Dm644 kavat-installer.desktop "$pkgdir/usr/share/applications/kavat-installer.desktop"
+}

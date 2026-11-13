@@ -7,6 +7,11 @@ work/
 *.pkg.tar.zst
 *.pkg.tar.zst.sig
 
+# Lo que makepkg descarga o deja junto a un PKGBUILD
+packages/*/*.tar.*
+packages/*/src/
+packages/*/pkg/
+
 # Sistema
 .DS_Store
 

@@ -1,0 +1,43 @@
+# Calamares, the installer framework. Arch has no package for it.
+#
+# The release tarball is signed by Calamares' maintainer, Adriaan de Groot. The checksum
+# below is of the tarball whose signature was checked against his key,
+# 00ACD15E25A79FEE028B0EE57FEA3DA6169C77D6.
+pkgname=kavat-calamares
+pkgver=3.4.3
+pkgrel=1
+pkgdesc='Calamares, the installer framework, as Willwitcher-OS Kavat Edition builds it'
+arch=('x86_64')
+url='https://codeberg.org/Calamares/calamares'
+license=('GPL-3.0-or-later')
+depends=('icu' 'kcoreaddons' 'kpmcore' 'libpwquality' 'libxcrypt' 'parted' 'polkit-qt6' 'python'
+         'qt6-declarative' 'qt6-svg' 'yaml-cpp')
+makedepends=('cmake' 'extra-cmake-modules' 'ninja' 'qt6-tools')
+provides=("calamares=$pkgver")
+conflicts=('calamares')
+options=('!debug')
+source=("calamares-$pkgver.tar.gz::$url/releases/download/v$pkgver/calamares-$pkgver.tar.gz")
+sha256sums=('144cbbf6bdcebfb21685950db4f0777218519df095f62f4aa392f28348110d18')
+
+build() {
+  # Modules for other init systems and initramfs tools, the samples, and the ones that
+  # would pull in KDE's terminal or Plasma or send install statistics.
+  local skip='dracut dracutlukscfg dummycpp dummyprocess dummypython initramfs initramfscfg
+              interactiveterminal mkinitfs openrcdmcryptcfg plasmalnf services-openrc tracking
+              zfs zfshostid'
+
+  cmake -B build -S "calamares-$pkgver" -G Ninja -Wno-dev \
+    -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INSTALL_PREFIX=/usr \
+    -DCMAKE_INSTALL_LIBDIR=lib \
+    -DWITH_QT6=ON \
+    -DINSTALL_CONFIG=ON \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_CRASH_REPORTING=OFF \
+    -DSKIP_MODULES="$(echo $skip)"
+  cmake --build build
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

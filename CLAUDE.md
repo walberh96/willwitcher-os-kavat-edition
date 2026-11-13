@@ -43,11 +43,12 @@ Los dos diagramas del documento de diseño son imágenes en `docs/img/` y no tie
 
 ## Compilar y probar
 
-Tras tocar `iso/` o `packages/` se pasan los tres, en este orden. Los dos primeros piden `devtools` y sudo; la prueba no pide root. El PC se suspende solo si nadie lo toca, así que lo que tarde se lanza con `systemd-inhibit --what=sleep:idle`.
+Tras tocar `iso/`, `packages/` o `installer/` se pasan los cuatro, en este orden. Los dos primeros piden `devtools` y sudo; la prueba no pide root. El PC se suspende solo si nadie lo toca, así que lo que tarde se lanza con `systemd-inhibit --what=sleep:idle`.
 
-- `tools/build-repo.sh [paquete ...]`: compila los paquetes de `packages/` en un chroot limpio de Arch y los reúne en `out/repo/`, el repo `[kavat]` local.
+- `tools/build-repo.sh [carpeta ...]`: compila en un chroot limpio de Arch los paquetes de `packages/` y los de las piezas que llevan su propio PKGBUILD, como `installer/`, y los reúne en `out/repo/`, el repo `[kavat]` local. Con nombres, solo esos: `tools/build-repo.sh installer`.
 - `tools/build-iso.sh`: construye la ISO desde `iso/`, con `mkarchiso` dentro de otro chroot limpio de Arch, y la deja en `out/`.
 - `tests/boot.py [iso]`: arranca la ISO en QEMU, comprueba desde dentro que llega al escritorio y deja una captura en `out/test/desktop.png`. Es la puerta de la fase 1 y tiene que seguir pasando. Pide `qemu-desktop` y `edk2-ovmf`.
+- `tests/install.py [iso]`: instala la ISO en un disco virtual manejando el instalador con el teclado, arranca desde ese disco e inicia sesión. Tarda unos diez minutos y deja capturas en `out/test/`. Lo que comparten las dos pruebas está en `tests/machine.py`.
 
 Los repos de Arch se usan tal como estaban el día que dice `iso/arch-snapshot`; cambiar esa fecha es actualizar el sistema. `out/`, `work/` y `vendor/` no entran en git: son resultados, trabajo temporal y descargas.
 

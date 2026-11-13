@@ -1,0 +1,4 @@
+#!/bin/sh
+# Start the installer from the live session. It needs root to touch the disks, and the
+# session's Wayland socket to draw; the live user's sudo asks for no password.
+exec sudo -E calamares "$@"

@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Install Willwitcher-OS Kavat Edition
+Name[es]=Instalar Willwitcher-OS Kavat Edition
+Comment=Install the system on this machine
+Comment[es]=Instala el sistema en este equipo
+Exec=kavat-installer
+Icon=calamares
+Terminal=false
+Categories=System;

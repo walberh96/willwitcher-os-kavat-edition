@@ -12,14 +12,10 @@ set -euo pipefail
 
 chroot="$root/work/iso-chroot"
 work="$root/work/iso"
-conf="$root/work/iso-pacman.conf"
 
-[[ -e $repo/kavat.db ]] || { echo "out/repo/ holds no [kavat] repository yet: run tools/build-repo.sh first" >&2; exit 1; }
+compgen -G "$repo/*.pkg.tar.zst" > /dev/null || { echo "out/repo/ holds no [kavat] repository yet: run tools/build-repo.sh first" >&2; exit 1; }
 
-sed -e "s|@SNAPSHOT@|$snapshot|g" -e "s|@CACHE@|$cache|g" -e "s|@KAVAT_REPO@|$repo|g" \
-  "$root/iso/pacman.conf" > "$conf"
-
-arch_chroot "$chroot" base archiso
+arch_chroot "$chroot" "$arch_conf" base archiso
 
 # mkarchiso skips the steps a previous run finished, so a changed profile needs a clean start.
 sudo rm -rf "$work"
@@ -28,7 +24,7 @@ mkdir -p "$work"
 # The chroot sees the profile, the pacman.conf, the work folder and out/, at the same paths
 # they have here. The ISO carries the snapshot's date, not today's.
 arch-nspawn -C "$arch_conf" -c "$cache" "$chroot" \
-  --bind-ro="$root/iso" --bind-ro="$conf" --bind="$work" --bind="$root/out" \
+  --bind-ro="$root/iso" --bind-ro="$kavat_conf" --bind="$work" --bind="$root/out" \
   --setenv=TZ=UTC --setenv=SOURCE_DATE_EPOCH="$(date -u -d "${snapshot//\//-}" +%s)" \
-  mkarchiso -v -C "$conf" -w "$work" -o "$root/out" "$root/iso"
+  mkarchiso -v -C "$kavat_conf" -w "$work" -o "$root/out" "$root/iso"
 sudo chown "$(id -u):$(id -g)" "$root"/out/*.iso

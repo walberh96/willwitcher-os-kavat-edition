@@ -1,0 +1,36 @@
+#!/bin/bash
+# Runs inside the new system right after it is copied from the live medium: takes out what
+# belongs to the live medium and puts in what the live medium does not carry.
+set -euo pipefail
+
+# All of it is read before any of it runs: the last step removes this very file.
+main() {
+  # the live medium's boot image settings, console login, sudo rule and tweaks
+  rm -f /etc/mkinitcpio.conf.d/archiso.conf
+  rm -rf '/etc/systemd/system/getty@tty1.service.d'
+  rm -f /etc/sudoers.d/live
+  rm -f /etc/systemd/journald.conf.d/volatile-storage.conf
+  rm -f /etc/systemd/logind.conf.d/do-not-suspend.conf
+  rm -f /etc/systemd/system-generators/systemd-gpt-auto-generator
+
+  # The live medium keeps its kernels outside the system: put each one in /boot.
+  # The installer copied the system with holes for runs of zeros, and a kernel ends in
+  # zeros. GRUB cannot read a hole at the end of a file on Btrfs, so the copy in /boot is
+  # written out in full, without sharing the original's blocks.
+  local dir
+  for dir in /usr/lib/modules/*/; do
+    cp --reflink=never --sparse=never "${dir}vmlinuz" "/boot/vmlinuz-$(<"${dir}pkgbase")"
+  done
+
+  # root has no password on the live medium; here nobody logs in as root
+  passwd -l root
+
+  # pacman's keys are made on each machine
+  pacman-key --init
+  pacman-key --populate archlinux
+
+  # the installer itself, this script included
+  pacman -Rns --noconfirm kavat-installer kavat-calamares mkinitcpio-archiso
+}
+
+main

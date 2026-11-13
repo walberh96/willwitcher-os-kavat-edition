@@ -319,7 +319,7 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 
 ## The repository
 
-Today the repository holds this README, the `docs/` folder, the research reports in `reports/` and the first pieces of phase 1: the archiso profile in `iso/`, the first package in `packages/` and the boot test in `tests/`. `tools/` holds five scripts: two build the `[kavat]` repository and the ISO, and three look after the documents by checking their links, retaking the screenshots and rendering the tour video. The rest arrives with each phase:
+Today the repository holds this README, the `docs/` folder, the research reports in `reports/` and what phases 1 and 2 have built so far: the archiso profile in `iso/`, the packages in `packages/`, the installer's configuration in `installer/` and the tests in `tests/`. `tools/` holds five scripts: two build the `[kavat]` repository and the ISO, and three look after the documents by checking their links, retaking the screenshots and rendering the tour video. The rest arrives with each phase:
 
 | Folder | Contents | Phase |
 | --- | --- | --- |
@@ -358,6 +358,7 @@ To build and try it on an Arch-based machine with `devtools`, `qemu-desktop` and
 tools/build-repo.sh   # the kavat-* packages, into the local [kavat] repository
 tools/build-iso.sh    # the ISO, into out/
 tests/boot.py         # boots it in a virtual machine and checks it reaches the desktop
+tests/install.py      # installs it on a virtual disk, boots the disk and logs in
 ```
 
 | Phase | Deliverable | Status |

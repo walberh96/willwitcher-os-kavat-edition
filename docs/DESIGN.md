@@ -36,17 +36,20 @@ La ISO se construye con `archiso` a partir del perfil `releng`, y todo lo propio
 | Audio y red | PipeWire + WirePlumber; NetworkManager con iwd | wpa\_supplicant | Es lo que Noctalia y Hyprland esperan |
 | Arranque visual | Plymouth con tema generado por el sistema de temas | Texto | Misma identidad desde el primer fotograma |
 
+**Dónde se monta cada cosa.** Los subvolúmenes van en `/`, `/home`, `/games`, `/var/log`, `/var/cache/pacman/pkg` y `/.snapshots`, y la partición EFI en `/efi`. El kernel vive en `/boot`, dentro de `@`, así que cada snapshot lleva el suyo.
+
 **Dónde se compila.** El PC de escritorio lleva CachyOS, instalado solo para este proyecto. De CachyOS no entra nada en el sistema: la ISO y los paquetes `kavat-*` se construyen dentro de chroots limpios de Arch, con el `pacman` y las herramientas de Arch, y con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Tiene que ser así porque el `pacman` de CachyOS deja marcas propias en la base de datos de paquetes de lo que instala.
 
 El repositorio es un monorepo con una carpeta por pieza:
 
 - `iso/`: perfil de archiso, lista de paquetes y overlay del sistema vivo.
 - `installer/`: configuración, módulos y branding de Calamares.
-- `packages/`: un PKGBUILD por paquete `kavat-*`, incluidos los forks.
+- `packages/`: un PKGBUILD por paquete `kavat-*` que no tiene carpeta propia, incluidos los forks. Las piezas con carpeta propia, como `installer/`, llevan su PKGBUILD dentro.
 - `kav/`: el gestor de paquetes y su allowlist.
 - `themes/`: tokens, plantillas y temas incluidos.
 - `greeter/`: tema de web-greeter.
 - `agent/`: daemon, herramientas y Modelfile del agente.
+- `tests/`: arranca e instala cada ISO en una máquina virtual.
 - `docs/`: decisiones de diseño.
 
 Los forks (Hyprland, Noctalia) viven en repos aparte y aquí solo está su PKGBUILD apuntando a un tag.
@@ -138,7 +141,7 @@ LightDM con web-greeter muestra un tema propio en HTML/CSS/JS que lee los mismos
 - **Varios usuarios**: selector por avatar; cada usuario ve el login con su propio tema.
 - **Bloqueo de pantalla**: mismo diseño que el login, hecho con hyprlock, para que bloquear y entrar se vean iguales.
 
-Decidido: LightDM + web-greeter con tema propio. Riesgo a vigilar: web-greeter vive en el AUR, depende de Qt WebEngine y su mantenimiento es irregular. La propuesta es hacer fork y empaquetarlo como `kavat-greeter`. El plan B es greetd con el greeter del propio Noctalia, que corre en Wayland nativo.
+Decidido: LightDM + web-greeter con tema propio. Riesgo a vigilar: web-greeter vive en el AUR, depende de Qt WebEngine y su mantenimiento es irregular. La propuesta es hacer fork y empaquetarlo como `kavat-greeter`. El plan B es greetd con el greeter del propio Noctalia, que corre en Wayland nativo. Hasta que exista `kavat-greeter`, en la fase 3, el sistema instalado entra por el greeter GTK de LightDM.
 
 ## Escritorio
 
