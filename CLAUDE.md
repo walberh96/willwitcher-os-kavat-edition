@@ -17,7 +17,7 @@ Todo el diseño vive en el repo, para que llegue igual a cualquier equipo. Son t
 
 El usuario llama «artifact» tanto a los dos documentos como al mockup. Hasta el 11 de noviembre de 2026 los dos documentos vivían en claude.ai y `docs/DESIGN.md` era una exportación; esas copias de claude.ai ya no se usan ni se actualizan.
 
-Los dos diagramas del documento de diseño son imágenes en `docs/img/` y no tienen fuente en el repo: si cambian, se redibujan.
+Los dos diagramas del documento de diseño son imágenes en `docs/img/`. El del roadmap sale de `docs/img/roadmap.html`: se edita ese archivo y se captura con Chromium sin ventana, a 672×466 y escala 2. El de la arquitectura no tiene fuente en el repo: si cambia, se redibuja.
 
 ## Cómo se cambia el diseño
 

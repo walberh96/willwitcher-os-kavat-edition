@@ -1,6 +1,6 @@
 pkgname=kavat-hyprland
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Willwitcher-OS Kavat Edition: the system's Hyprland configuration"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

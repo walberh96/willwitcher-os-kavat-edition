@@ -30,6 +30,10 @@ hl.config({
     },
     decoration = {
         rounding = 10,
+        -- Hyprland darkens a window while one of its dialogs is open, and leaves it dark
+        -- when the dialog closes without the window being touched: the installer stayed
+        -- dimmed after a partition was picked.
+        dim_modal = false,
     },
     dwindle = {
         preserve_split = true,

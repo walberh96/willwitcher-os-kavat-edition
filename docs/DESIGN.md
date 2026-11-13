@@ -74,7 +74,6 @@ Ideas propias sobre el Calamares de serie:
 - **Módulo `kavat-hardware`**: escribe la configuración de Hyprland según monitores y GPU detectados.
 - **Instalación sin red**: la ISO lleva los paquetes del sistema base; con red se actualiza al final y se añade el software elegido.
 
-Pendiente para la fase 3, visto en la instalación real: al elegir la partición en «Replace a partition», toda la ventana del instalador se oscurece y no se aclara hasta empezar la instalación. No impide instalar. Se reproduce en máquina virtual; la sospecha es que Hyprland oscurece la ventana porque Calamares deja abierto un diálogo modal invisible.
 - **Archivo de respuestas**: un `kavat-install.toml` en el USB reinstala tu máquina sin tocar nada.
 - **Primer arranque**: un asistente dentro de Noctalia termina lo que no pertenece al instalador (cuentas, llaves SSH, descarga del modelo).
 
