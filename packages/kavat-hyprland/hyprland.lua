@@ -20,16 +20,33 @@ end)
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
--- Look: the values of Endgame. Colours arrive with the theme system.
+-- Look: gaps, borders, corners, colours and effects come from the theme, as a table of
+-- values that kavat-theme writes. It is asked to write them first, so that they are there
+-- on a first login and still match the settings after an update; when they already do,
+-- that changes nothing.
+local function look()
+    os.execute("kavat-theme apply --no-reload")
+    local state = os.getenv("XDG_STATE_HOME")
+    if not state or state == "" then
+        state = os.getenv("HOME") .. "/.local/state"
+    end
+    local found, values = pcall(dofile, state .. "/kavat/theme/current/hyprland/look.lua")
+    if found and type(values) == "table" then
+        return values
+    end
+    -- no theme to be had: the values of Endgame, with Hyprland's own colours
+    return {
+        general    = { gaps_in = 5, gaps_out = 20, border_size = 2 },
+        decoration = { rounding = 10 },
+    }
+end
+hl.config(look())
+
 hl.config({
     general = {
-        gaps_in     = 5,
-        gaps_out    = 20,
-        border_size = 2,
-        layout      = "dwindle",
+        layout = "dwindle",
     },
     decoration = {
-        rounding = 10,
         -- Hyprland darkens a window while one of its dialogs is open, and leaves it dark
         -- when the dialog closes without the window being touched: the installer stayed
         -- dimmed after a partition was picked.
@@ -42,6 +59,12 @@ hl.config({
         -- the wallpaper belongs to the shell
         force_default_wallpaper = 0,
         disable_hyprland_logo   = true,
+    },
+    ecosystem = {
+        -- Hyprland greets each new version with a window of news, and asks for donations
+        -- now and then; updates here come through the system, not through Hyprland
+        no_update_news  = true,
+        no_donation_nag = true,
     },
 })
 

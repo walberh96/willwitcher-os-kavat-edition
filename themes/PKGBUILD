@@ -1,0 +1,30 @@
+pkgname=kavat-theme
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: the theme system, with its palettes and its templates"
+arch=('x86_64')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+# the two fonts the default theme names
+depends=('gcc-libs' 'inter-font' 'ttf-jetbrains-mono')
+makedepends=('cargo')
+# no separate package of debugging symbols
+options=('!debug')
+
+# The program is built where it is, from the versions Cargo.lock fixes.
+build() {
+  cd "$startdir"
+  CARGO_HOME="$srcdir/cargo" CARGO_TARGET_DIR="$srcdir/target" cargo build --release --locked
+}
+
+check() {
+  cd "$startdir"
+  CARGO_HOME="$srcdir/cargo" CARGO_TARGET_DIR="$srcdir/target" cargo test --release --locked
+}
+
+package() {
+  install -Dm755 "$srcdir/target/release/kavat-theme" "$pkgdir/usr/bin/kavat-theme"
+  install -Dm644 "$startdir/theme.toml" "$pkgdir/usr/share/kavat/themes/theme.toml"
+  cp -r "$startdir/palettes" "$startdir/templates" "$pkgdir/usr/share/kavat/themes/"
+  chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat"
+}

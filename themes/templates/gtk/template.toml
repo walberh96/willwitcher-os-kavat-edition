@@ -1,0 +1,12 @@
+# GTK apps: their colours, and whether they are asked for their dark or their light side.
+#
+# GTK reads gtk.css from the user's folder, so each file is reached through a link there.
+reload = [["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", "prefer-{{ mode }}"]]
+
+[[file]]
+from = "gtk-4.0.css"
+link = "config:gtk-4.0/gtk.css"
+
+[[file]]
+from = "gtk-3.0.css"
+link = "config:gtk-3.0/gtk.css"

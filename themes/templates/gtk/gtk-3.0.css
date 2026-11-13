@@ -1,0 +1,23 @@
+/* Made by kavat-theme from the theme's settings; what is changed here is lost.
+   The settings are in ~/.config/kavat/theme.toml. */
+
+@define-color theme_bg_color {{ surface }};
+@define-color theme_fg_color {{ text }};
+@define-color theme_base_color {{ surface }};
+@define-color theme_text_color {{ text }};
+@define-color theme_selected_bg_color {{ accent }};
+@define-color theme_selected_fg_color {{ on_accent }};
+@define-color insensitive_bg_color {{ surface }};
+@define-color insensitive_fg_color {{ muted }};
+@define-color insensitive_base_color {{ surface }};
+@define-color theme_unfocused_bg_color {{ surface }};
+@define-color theme_unfocused_fg_color {{ text }};
+@define-color theme_unfocused_base_color {{ surface }};
+@define-color theme_unfocused_text_color {{ text }};
+@define-color theme_unfocused_selected_bg_color {{ accent }};
+@define-color theme_unfocused_selected_fg_color {{ on_accent }};
+@define-color borders {{ border }};
+@define-color unfocused_borders {{ border }};
+@define-color warning_color {{ warn }};
+@define-color error_color {{ danger }};
+@define-color success_color {{ ok }};

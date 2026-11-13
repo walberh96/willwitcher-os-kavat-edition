@@ -1,0 +1,27 @@
+# The look of the system. Each line is one axis, and they combine freely.
+#
+# This file holds the defaults. Yours is ~/.config/kavat/theme.toml: put there only the
+# lines you change, by hand or with `kavat-theme set mode light`.
+
+palette  = "kavat"     # one of `kavat-theme list`
+mode     = "dark"      # dark, light
+accent   = "default"   # one of the palette's accents by name, or a colour like "#f2a93b"
+tone     = "neutral"   # neutral, warm, cool, oled (pure black, in dark mode)
+contrast = "normal"    # normal, high
+
+[shape]
+radius = 10            # of the corners, in pixels
+border = 2             # around each window
+gap    = 5             # between windows
+edge   = 20            # between the windows and the edge of the screen
+
+[effects]
+blur         = true
+transparency = true
+shadows      = true
+animations   = 1.0     # their speed; 0 turns them off
+
+[fonts]
+ui    = "Inter"
+mono  = "JetBrains Mono"
+scale = 1.0

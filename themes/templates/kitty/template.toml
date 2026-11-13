@@ -1,0 +1,7 @@
+# Kitty: colours, fonts and how much its background lets through.
+#
+# The system's kitty.conf includes theme.conf. Kitty reads its files again on SIGUSR1.
+reload = [["sh", "-c", "pkill -USR1 -U \"$(id -u)\" -x kitty"]]
+
+[[file]]
+from = "theme.conf"

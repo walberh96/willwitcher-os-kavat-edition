@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition
 
-Distribución personal basada en Arch Linux. Las fases 1 y 2 están cerradas: hay un perfil de archiso en `iso/`, paquetes `kavat-*` en `packages/` y un instalador en `installer/`, y el sistema instalado arranca, hace snapshots y vuelve a ellos, también en el PC de escritorio. Hyprland y Noctalia van sin modificar, y lo demás del diseño no está implementado. Lo siguiente es la fase 3. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
+Distribución personal basada en Arch Linux. Las fases 1 y 2 están cerradas: hay un perfil de archiso en `iso/`, paquetes `kavat-*` en `packages/` y un instalador en `installer/`, y el sistema instalado arranca, hace snapshots y vuelve a ellos, también en el PC de escritorio. Está en **fase 3, la identidad**: ya existe el sistema de temas, `kavat-theme`, y Hyprland y Noctalia van sin modificar; lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
 
 ## Idiomas
 
@@ -52,7 +52,11 @@ Tras tocar `iso/`, `packages/` o `installer/` se pasan, en este orden. Los dos p
 - `tests/snapshots.py [--encrypted]`: sobre el disco que deja la prueba anterior, o el cifrado con `--encrypted`, cambia un paquete, arranca el snapshot de antes y vuelve a él con `kavat-rollback`.
 - `tests/safemode.py [--encrypted]`: sobre el mismo disco, rompe a propósito la configuración de Hyprland del usuario y comprueba que el siguiente arranque abre en modo seguro y que en él sí aparece el escritorio.
 
-Lo que comparten las pruebas está en `tests/machine.py`. Las dos últimas trabajan sobre una capa encima del disco instalado, así que no lo cambian.
+- `tests/theme.py [--encrypted]`: sobre el mismo disco, inicia sesión, cambia el modo, la paleta y el acento con `kavat-theme` y comprueba que Hyprland, Kitty y Noctalia siguen el cambio en menos de un segundo y sin reiniciarse. Es media puerta de la fase 3.
+
+Lo que comparten las pruebas está en `tests/machine.py`. Las tres últimas trabajan sobre una capa encima del disco instalado, así que no lo cambian.
+
+`kavat-theme` está en `themes/` y es Rust: sus pruebas unitarias se pasan con `cargo test` dentro de esa carpeta, y `tools/build-repo.sh themes` las vuelve a pasar al empaquetar. Su código está en `themes/engine/` y no en `src/`, que es la carpeta que `makepkg` usa junto a un PKGBUILD.
 
 Los repos de Arch se usan tal como estaban el día que dice `iso/arch-snapshot`; cambiar esa fecha es actualizar el sistema. `out/`, `work/` y `vendor/` no entran en git: son resultados, trabajo temporal y descargas.
 

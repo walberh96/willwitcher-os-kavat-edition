@@ -34,6 +34,27 @@ SUBVOLUMES = {'/': '/@', '/home': '/@home', '/games': '/@games', '/var/log': '/@
               '/var/cache/pacman/pkg': '/@pkg', '/.snapshots': '/@snapshots'}
 
 
+# where the installer's side bar names each step, on a 1920x1080 screen; the one it is on
+# is painted in the accent colour
+STEPS = {'location': 195, 'keyboard': 234, 'partitions': 273, 'users': 312, 'summary': 351}
+
+
+def next_page(screen, step, timeout=60):
+    """Press Next and wait until the installer shows that step. True when it does.
+
+    Some pages take a while to come up, and keys typed before they do are lost.
+    """
+    screen.press('alt', 'n')
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        time.sleep(1)
+        red, green, blue = screen.pixel(30, STEPS[step])
+        if red > 200 and green > 130 and blue < 110:
+            time.sleep(1)
+            return True
+    return False
+
+
 def install(machine, checks, pictures, encrypt):
     """Run the installer on the live session. True when it says it finished well."""
     live = 'runuser -u live -- env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1'
@@ -48,9 +69,7 @@ def install(machine, checks, pictures, encrypt):
     time.sleep(3)
 
     screen = machine.screen
-    for _ in ('welcome', 'location', 'keyboard'):  # each one as it comes
-        screen.press('alt', 'n')
-        time.sleep(3)
+    shown = all(next_page(screen, step) for step in ('location', 'keyboard', 'partitions'))
     # the disk page, where erasing the disk is already chosen
     if encrypt:
         # Encrypt system, then the recovery password twice. The box is clicked: its letter, C,
@@ -63,8 +82,7 @@ def install(machine, checks, pictures, encrypt):
         screen.type(DISK_PASSWORD)
         time.sleep(1)
     screen.picture(f'{pictures}/install-disk.png')
-    screen.press('alt', 'n')
-    time.sleep(3)
+    shown = shown and next_page(screen, 'users')
     # the users page: name, then login name and computer name already filled in, then the password twice
     screen.type(USER)
     for _ in range(3):
@@ -73,9 +91,10 @@ def install(machine, checks, pictures, encrypt):
     screen.press('tab')
     screen.type(PASSWORD)
     time.sleep(1)
-    screen.press('alt', 'n')
-    time.sleep(3)
+    shown = shown and next_page(screen, 'summary')
     screen.picture(f'{pictures}/install-summary.png')
+    if not checks.report(shown, 'the installer goes through its pages'):
+        return False
     # Install, which asks to confirm, with Install now chosen. A busy machine can lose either
     # key, so both are pressed again until the work starts.
     for _ in range(5):

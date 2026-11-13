@@ -1,0 +1,20 @@
+[package]
+name = "kavat-theme"
+version = "0.1.0"
+edition = "2024"
+description = "Willwitcher-OS Kavat Edition: the look of the whole system, from one file"
+license = "LicenseRef-AllRightsReserved"
+publish = false
+
+# Not in src/: that is the folder makepkg takes for itself next to a PKGBUILD.
+[[bin]]
+name = "kavat-theme"
+path = "engine/main.rs"
+
+[dependencies]
+toml_edit = "0.25.19"
+
+[profile.release]
+lto = true
+strip = true
+panic = "abort"

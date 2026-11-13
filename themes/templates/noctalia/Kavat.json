@@ -1,0 +1,94 @@
+{
+  "dark": {
+    "mPrimary": "{{ accent }}",
+    "mOnPrimary": "{{ on_accent }}",
+    "mSecondary": "{{ accent2 }}",
+    "mOnSecondary": "{{ on_accent2 }}",
+    "mTertiary": "{{ accent3 }}",
+    "mOnTertiary": "{{ on_accent3 }}",
+    "mError": "{{ danger }}",
+    "mOnError": "{{ on_danger }}",
+    "mSurface": "{{ surface }}",
+    "mOnSurface": "{{ text }}",
+    "mSurfaceVariant": "{{ surface2 }}",
+    "mOnSurfaceVariant": "{{ muted }}",
+    "mOutline": "{{ border }}",
+    "mShadow": "{{ shadow }}",
+    "mHover": "{{ hover }}",
+    "mOnHover": "{{ text }}",
+    "terminal": {
+      "background": "{{ term_bg }}",
+      "foreground": "{{ term_fg }}",
+      "cursor": "{{ cursor }}",
+      "cursorText": "{{ cursor_text }}",
+      "selectionBg": "{{ selection }}",
+      "selectionFg": "{{ term_fg }}",
+      "normal": {
+        "black": "{{ term0 }}",
+        "red": "{{ term1 }}",
+        "green": "{{ term2 }}",
+        "yellow": "{{ term3 }}",
+        "blue": "{{ term4 }}",
+        "magenta": "{{ term5 }}",
+        "cyan": "{{ term6 }}",
+        "white": "{{ term7 }}"
+      },
+      "bright": {
+        "black": "{{ term8 }}",
+        "red": "{{ term9 }}",
+        "green": "{{ term10 }}",
+        "yellow": "{{ term11 }}",
+        "blue": "{{ term12 }}",
+        "magenta": "{{ term13 }}",
+        "cyan": "{{ term14 }}",
+        "white": "{{ term15 }}"
+      }
+    }
+  },
+  "light": {
+    "mPrimary": "{{ accent }}",
+    "mOnPrimary": "{{ on_accent }}",
+    "mSecondary": "{{ accent2 }}",
+    "mOnSecondary": "{{ on_accent2 }}",
+    "mTertiary": "{{ accent3 }}",
+    "mOnTertiary": "{{ on_accent3 }}",
+    "mError": "{{ danger }}",
+    "mOnError": "{{ on_danger }}",
+    "mSurface": "{{ surface }}",
+    "mOnSurface": "{{ text }}",
+    "mSurfaceVariant": "{{ surface2 }}",
+    "mOnSurfaceVariant": "{{ muted }}",
+    "mOutline": "{{ border }}",
+    "mShadow": "{{ shadow }}",
+    "mHover": "{{ hover }}",
+    "mOnHover": "{{ text }}",
+    "terminal": {
+      "background": "{{ term_bg }}",
+      "foreground": "{{ term_fg }}",
+      "cursor": "{{ cursor }}",
+      "cursorText": "{{ cursor_text }}",
+      "selectionBg": "{{ selection }}",
+      "selectionFg": "{{ term_fg }}",
+      "normal": {
+        "black": "{{ term0 }}",
+        "red": "{{ term1 }}",
+        "green": "{{ term2 }}",
+        "yellow": "{{ term3 }}",
+        "blue": "{{ term4 }}",
+        "magenta": "{{ term5 }}",
+        "cyan": "{{ term6 }}",
+        "white": "{{ term7 }}"
+      },
+      "bright": {
+        "black": "{{ term8 }}",
+        "red": "{{ term9 }}",
+        "green": "{{ term10 }}",
+        "yellow": "{{ term11 }}",
+        "blue": "{{ term12 }}",
+        "magenta": "{{ term13 }}",
+        "cyan": "{{ term14 }}",
+        "white": "{{ term15 }}"
+      }
+    }
+  }
+}

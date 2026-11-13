@@ -1,0 +1,44 @@
+# Rosé Pine in the dark, Rosé Pine Dawn in the light.
+#
+# A palette is this one file. Colours that do not read well enough where they are used
+# are adjusted when the theme is applied, so the file can hold the family's own.
+
+name = "Rosé Pine"
+
+# The first accent is the one the palette uses when none is chosen.
+[accents]
+rose = "#ebbcba"
+iris = "#c4a7e7"
+foam = "#9ccfd8"
+gold = "#f6c177"
+love = "#eb6f92"
+
+[dark]
+bg       = "#191724"
+surface  = "#1f1d2e"
+surface2 = "#26233a"
+text     = "#e0def4"
+muted    = "#908caa"
+border   = "#403d52"
+
+red      = "#eb6f92"
+green    = "#31748f"
+yellow   = "#f6c177"
+blue     = "#9ccfd8"
+magenta  = "#c4a7e7"
+cyan     = "#ebbcba"
+
+[light]
+bg       = "#ede3d9"
+surface  = "#faf4ed"
+surface2 = "#f2e9e1"
+text     = "#575279"
+muted    = "#797593"
+border   = "#dfdad9"
+
+red      = "#b4637a"
+green    = "#286983"
+yellow   = "#ea9d34"
+blue     = "#56949f"
+magenta  = "#907aa9"
+cyan     = "#d7827e"

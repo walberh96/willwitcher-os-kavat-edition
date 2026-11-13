@@ -1,0 +1,14 @@
+# Noctalia, the shell: its palette, its mode, its corners and its font.
+#
+# Noctalia has no system-wide file, so both of these are reached through links in its own
+# folder: it reads every .toml there, and takes palettes from palettes/. Its own templates
+# for other apps are turned off: this is the only place a colour comes from.
+reload = [["noctalia", "msg", "config-reload"]]
+
+[[file]]
+from = "kavat-theme.toml"
+link = "config:noctalia/kavat-theme.toml"
+
+[[file]]
+from = "Kavat.json"
+link = "config:noctalia/palettes/Kavat.json"

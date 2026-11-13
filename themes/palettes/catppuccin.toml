@@ -1,0 +1,44 @@
+# Catppuccin: Mocha in the dark, Latte in the light.
+#
+# A palette is this one file. Colours that do not read well enough where they are used
+# are adjusted when the theme is applied, so the file can hold the family's own.
+
+name = "Catppuccin"
+
+# The first accent is the one the palette uses when none is chosen.
+[accents]
+blue  = "#89b4fa"
+mauve = "#cba6f7"
+green = "#a6e3a1"
+peach = "#fab387"
+pink  = "#f5c2e7"
+
+[dark]
+bg       = "#11111b"
+surface  = "#1e1e2e"
+surface2 = "#313244"
+text     = "#cdd6f4"
+muted    = "#a6adc8"
+border   = "#45475a"
+
+red      = "#f38ba8"
+green    = "#a6e3a1"
+yellow   = "#f9e2af"
+blue     = "#89b4fa"
+magenta  = "#f5c2e7"
+cyan     = "#94e2d5"
+
+[light]
+bg       = "#dce0e8"
+surface  = "#eff1f5"
+surface2 = "#ccd0da"
+text     = "#4c4f69"
+muted    = "#6c6f85"
+border   = "#bcc0cc"
+
+red      = "#d20f39"
+green    = "#40a02b"
+yellow   = "#df8e1d"
+blue     = "#1e66f5"
+magenta  = "#ea76cb"
+cyan     = "#179299"

@@ -22,7 +22,7 @@ Fast like a tiling WM. Curated like one person's system. And with someone inside
 
 ![The Willwitcher-OS Kavat Edition desktop](docs/screenshots/desktop.png)
 
-> **Status: phase 2, the installer, is done; phase 3 is next.** This README describes the finished system. The images come from an interactive mockup, not from a running system: what runs today is a live session with Hyprland and Noctalia as Arch ships them. Details in [Real project status](#real-project-status).
+> **Status: phase 3, the identity, has started.** This README describes the finished system. The images come from an interactive mockup, not from a running system: what runs today is an installable system with Hyprland and Noctalia as Arch ships them, in this system's colours. Details in [Real project status](#real-project-status).
 
 ---
 
@@ -350,11 +350,12 @@ A kavat is a companion feline: fast, quiet, and always beside whoever raised it.
 
 ## Real project status
 
-This README describes the finished system. Today phases 1 and 2 are done, the live ISO and the installer, and nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
+This README describes the finished system. Today phases 1 and 2 are done, the live ISO and the installer, and phase 3 has its first piece; nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
 
 - **Phase 1 is done.** The ISO boots to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts.
 - **Phase 2 is done.** The installer puts the system on a disk with no network: Btrfs with its subvolumes, zram, the zen kernel with the LTS one as fallback, GRUB and a login screen. Every package change takes a snapshot, a snapshot boots from the menu with its own kernel, and the system can go back to it. A boot that fails opens the next one in safe mode, which ignores your settings without deleting them. The disk can be encrypted, off by default: GRUB opens it with a key sealed in the TPM2, and asks for the recovery password only when the TPM2 does not give it. Secure Boot is not used and has to be off.
 - **Phase 2 was checked on real hardware**: installed next to CachyOS and Windows, sharing CachyOS's EFI partition, booted, and taken back to a snapshot.
+- **Phase 3 has started.** The theme system works: `kavat-theme set mode light` changes Hyprland, Kitty, the shell and GTK apps at once, without restarting any of them. Seven palettes come with it, each with a dark and a light side. Icons, the cursor, the boot screens, the login and the rest of the apps do not follow it yet.
 
 To build and try it on an Arch-based machine with `devtools`, `qemu-desktop` and `edk2-ovmf`:
 
@@ -365,6 +366,7 @@ tests/boot.py         # boots it in a virtual machine and checks it reaches the 
 tests/install.py      # installs it on a virtual disk, boots the disk and logs in; --encrypt for an encrypted disk
 tests/snapshots.py    # changes that system, boots the snapshot from before and goes back to it
 tests/safemode.py     # breaks its desktop on purpose and checks the next boot opens in safe mode
+tests/theme.py        # changes mode, palette and accent on the running desktop and checks every app follows
 ```
 
 | Phase | Deliverable | Status |
@@ -372,7 +374,7 @@ tests/safemode.py     # breaks its desktop on purpose and checks the next boot o
 | 0 | Design documented | Done |
 | 1 | ISO that boots to Hyprland + Noctalia | Done |
 | 2 | Calamares installer with Btrfs and snapshots | Done |
-| 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | Pending |
+| 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | In progress: the theme system works |
 | 4 | Local agent, skills and voice | Pending |
 
 A study of Omarchy and other distributions reopened eight of those decisions. All are now answered. The current Noctalia was read against what this shell needs: plugins could host almost all of it, but not the settings panel, so the shell is a fork of Noctalia 5 and from that point on it is this system's own application. They are listed, with their status, in the design document under «Decisiones en revisión».

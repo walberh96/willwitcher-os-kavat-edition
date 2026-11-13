@@ -208,6 +208,7 @@ Atajos: 19 heredados de Endgame tal cual y 12 nuevos para lo que antes no exist�
 - Parte de Noctalia 5.4.1, escrito en C++ y con licencia MIT. No se sigue cada versión de upstream: lo que interese de ellas se trae a mano, así que la regla de reaplicar parches no vale para este fork.
 - Añadidos propios: panel de ajustes con páginas nativas, panel del agente, selector de temas con vista previa, panel de `kav` (actualizaciones, snapshots, solicitudes de AUR) y el asistente de primer arranque.
 - El motor de colores de Noctalia se sustituye o se alimenta desde los tokens del sistema, para que haya una sola fuente de verdad.
+- Hasta que exista el fork, el asistente de primer arranque de Noctalia está apagado: elige paleta y modo por su cuenta, que es cosa del tema del sistema, y es donde se ofrece el ping. Quien cambie el tema desde los ajustes de Noctalia lo deja fuera de sincronía con el resto; con el fork esa página desaparece.
 - Se quita el «Anonymous Startup Ping» de Noctalia, el aviso que manda a sus servidores la versión, el sistema, el compositor, las resoluciones, la RAM y la escala en cada arranque, y su casilla en el asistente de primer arranque. Lo pediste el 13 de noviembre de 2026, tras verlo en el asistente.
 
 **Paleta de comandos.** `Super+D` abre una sola paleta para todo el sistema: apps, archivos, ajustes, skills, paquetes, ventanas abiertas y pestañas del navegador. Usa la misma gramática y los mismos nombres de comando que la consola del navegador y la paleta de Neovim, y lo que no encuentra se lo puede pasar al agente.
@@ -695,6 +696,18 @@ Cómo funciona:
 2. `kavat-theme apply` resuelve los tokens (unos 40 colores semánticos: `surface`, `text`, `accent`, `danger`, etc.) y rellena las plantillas.
 3. Cada app recibe su archivo y una señal de recarga: Hyprland, Noctalia, terminal, GTK, Qt, Neovim, el monitor y la información del sistema, los iconos, el cursor, el greeter, hyprlock, Plymouth, el instalador y las apps Electron que lo permitan.
 4. El cambio es atómico: se genera todo en un directorio nuevo y se cambia un enlace. Si una plantilla falla, no se aplica nada.
+
+**Cómo está hecho.** Desde la fase 3, y probado en máquina virtual con `tests/theme.py`:
+
+- **`kavat-theme`** es un programa en Rust, en `themes/`, con sus paletas y sus plantillas. `kavat-theme set mode light` cambia esa línea de tu archivo y la aplica; `set` admite varios ajustes a la vez, y `apply`, `get`, `list` y `tokens` completan los comandos.
+- **Tres capas de ajustes**: los valores de fábrica, `/etc/kavat/theme.toml` para la máquina y `~/.config/kavat/theme.toml`, donde solo están las líneas que cambiaste; tus comentarios se conservan. Un ajuste o un valor que no existe se rechaza diciendo qué se admite.
+- **Una paleta es un archivo TOML** con sus acentos por nombre y, para claro y para oscuro, seis neutros y seis tonos: rojo, verde, amarillo, azul, magenta y cian. Vienen siete: Kavat, Catppuccin, Gruvbox, Tokyo Night, Nord, Rosé Pine y Everforest. Las tuyas van en `~/.config/kavat/palettes/`.
+- **Contraste comprobado al resolver**: el texto, el texto secundario, el acento usado como texto y los seis tonos se ajustan lo justo para llegar a 4,5:1 sobre el fondo de las ventanas, o 7:1 con contraste alto. Así una paleta puede traer los colores originales de su familia. De ahí salen 47 colores y 17 valores.
+- **Una plantilla es una carpeta** con los archivos de una app y un `template.toml` que dice dónde va cada uno y con qué orden se avisa a la app. Las tuyas van en `~/.config/kavat/templates/` y pueden sustituir a una del sistema.
+- **Dónde quedan los archivos**: en `~/.local/state/kavat/theme/`, una carpeta por generación, y el enlace `current` apunta a la que está en uso. Aplicar dos veces lo mismo no cambia nada.
+- **Hoy siguen el tema** Hyprland (bordes, esquinas, separación, desenfoque, sombras y animaciones), Kitty (colores, fuente y opacidad), Noctalia (paleta, modo, esquinas y fuente; sus plantillas para otras apps y su asistente de primer arranque quedan apagados) y GTK (colores y preferencia de claro u oscuro). Hyprland pide el tema al cargar su configuración, así que el primer inicio de sesión y el modo seguro ya salen con él.
+- **Los textos no llegan a ser código**: un nombre de fuente o de paleta solo admite letras, dígitos, espacios y `- _ . #`, porque acaba dentro de los archivos de configuración de otras apps.
+- **Queda para más adelante en esta fase**: el modo automático por hora, los perfiles y las reglas, el tema desde el fondo, la sobrescritura por app, `kavat-theme add`, los iconos y el cursor, y las plantillas del resto: Qt, Neovim, Yazi, el greeter, hyprlock, Plymouth, GRUB y el instalador.
 
 **Iconos y cursor.** También salen de los tokens, así que cambian con la paleta, el modo y el acento.
 

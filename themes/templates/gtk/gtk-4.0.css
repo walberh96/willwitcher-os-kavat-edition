@@ -1,0 +1,32 @@
+/* Made by kavat-theme from the theme's settings; what is changed here is lost.
+   The settings are in ~/.config/kavat/theme.toml. */
+
+@define-color accent_color {{ accent_text }};
+@define-color accent_bg_color {{ accent }};
+@define-color accent_fg_color {{ on_accent }};
+
+@define-color destructive_color {{ danger }};
+@define-color destructive_bg_color {{ danger }};
+@define-color destructive_fg_color {{ on_danger }};
+@define-color success_color {{ ok }};
+@define-color warning_color {{ warn }};
+@define-color error_color {{ danger }};
+
+@define-color window_bg_color {{ surface }};
+@define-color window_fg_color {{ text }};
+@define-color view_bg_color {{ surface }};
+@define-color view_fg_color {{ text }};
+@define-color headerbar_bg_color {{ surface }};
+@define-color headerbar_fg_color {{ text }};
+@define-color headerbar_backdrop_color @window_bg_color;
+@define-color sidebar_bg_color {{ bg }};
+@define-color sidebar_fg_color {{ text }};
+@define-color sidebar_backdrop_color @sidebar_bg_color;
+@define-color secondary_sidebar_bg_color {{ bg }};
+@define-color secondary_sidebar_fg_color {{ text }};
+@define-color card_bg_color {{ surface2 }};
+@define-color card_fg_color {{ text }};
+@define-color popover_bg_color {{ surface2 }};
+@define-color popover_fg_color {{ text }};
+@define-color dialog_bg_color {{ surface }};
+@define-color dialog_fg_color {{ text }};

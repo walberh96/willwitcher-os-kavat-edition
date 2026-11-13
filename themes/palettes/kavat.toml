@@ -1,0 +1,44 @@
+# The system's own palette: night blue and warm paper, with amber on top.
+#
+# A palette is this one file. Colours that do not read well enough where they are used
+# are adjusted when the theme is applied, so the file can hold the family's own.
+
+name = "Kavat"
+
+# The first accent is the one the palette uses when none is chosen.
+[accents]
+amber  = "#f2a93b"
+teal   = "#3ecfb2"
+violet = "#9d7bff"
+rose   = "#ff6b8a"
+lime   = "#a6d94a"
+
+[dark]
+bg       = "#0d0f14"
+surface  = "#151821"
+surface2 = "#1e2230"
+text     = "#e8e6df"
+muted    = "#8b90a0"
+border   = "#2a2f3f"
+
+red      = "#ef6b73"
+green    = "#7ec77a"
+yellow   = "#e6b450"
+blue     = "#6cb6ff"
+magenta  = "#b79cff"
+cyan     = "#5fd0c3"
+
+[light]
+bg       = "#ece8de"
+surface  = "#fbf9f4"
+surface2 = "#e6e0d2"
+text     = "#1d1f26"
+muted    = "#646873"
+border   = "#d2cbba"
+
+red      = "#c7384a"
+green    = "#3d8b40"
+yellow   = "#a86f00"
+blue     = "#2468c4"
+magenta  = "#7a52cc"
+cyan     = "#177f76"

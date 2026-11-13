@@ -1,0 +1,7 @@
+# Hyprland: gaps, borders, corners, blur, shadows and animations.
+#
+# look.lua is a table of values, and the system's hyprland.lua loads it.
+reload = [["sh", "-c", "hyprctl reload || hyprctl --instance 0 reload"]]
+
+[[file]]
+from = "look.lua"

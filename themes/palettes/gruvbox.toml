@@ -1,0 +1,44 @@
+# Gruvbox, dark and light.
+#
+# A palette is this one file. Colours that do not read well enough where they are used
+# are adjusted when the theme is applied, so the file can hold the family's own.
+
+name = "Gruvbox"
+
+# The first accent is the one the palette uses when none is chosen.
+[accents]
+yellow = "#fabd2f"
+orange = "#fe8019"
+green  = "#b8bb26"
+blue   = "#83a598"
+purple = "#d3869b"
+
+[dark]
+bg       = "#1d2021"
+surface  = "#282828"
+surface2 = "#3c3836"
+text     = "#ebdbb2"
+muted    = "#a89984"
+border   = "#504945"
+
+red      = "#fb4934"
+green    = "#b8bb26"
+yellow   = "#fabd2f"
+blue     = "#83a598"
+magenta  = "#d3869b"
+cyan     = "#8ec07c"
+
+[light]
+bg       = "#f2e5bc"
+surface  = "#fbf1c7"
+surface2 = "#ebdbb2"
+text     = "#3c3836"
+muted    = "#7c6f64"
+border   = "#d5c4a1"
+
+red      = "#9d0006"
+green    = "#79740e"
+yellow   = "#b57614"
+blue     = "#076678"
+magenta  = "#8f3f71"
+cyan     = "#427b58"

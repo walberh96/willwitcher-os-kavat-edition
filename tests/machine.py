@@ -124,8 +124,8 @@ class Screen:
         read(struct.unpack('>I', read(4))[0])       # the machine's name
         return sock, read, width, height
 
-    def picture(self, path):
-        """Save what the screen shows as a PNG."""
+    def _frame(self):
+        """What the screen shows: its width, its height, and four bytes for each pixel."""
         sock, read, width, height = self._connect()
         # pixels as red, green, blue and a spare byte; uncompressed; one full frame
         sock.sendall(struct.pack('>B3xBBBBHHHBBB3x', 0, 32, 24, 0, 1, 255, 255, 255, 0, 8, 16))
@@ -152,7 +152,16 @@ class Screen:
                 at = ((y + row) * width + x) * 4
                 frame[at:at + w * 4] = pixels[row * w * 4:(row + 1) * w * 4]
         sock.close()
+        return width, height, frame
 
+    def pixel(self, x, y):
+        """The colour of one point of the screen, as (red, green, blue)."""
+        width, _, frame = self._frame()
+        return tuple(frame[(y * width + x) * 4:(y * width + x) * 4 + 3])
+
+    def picture(self, path):
+        """Save what the screen shows as a PNG."""
+        width, height, frame = self._frame()
         rgb = bytearray(width * height * 3)
         rgb[0::3], rgb[1::3], rgb[2::3] = frame[0::4], frame[1::4], frame[2::4]
         rows = b''.join(b'\x00' + rgb[i:i + width * 3] for i in range(0, len(rgb), width * 3))

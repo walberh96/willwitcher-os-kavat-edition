@@ -1,0 +1,44 @@
+# Tokyo Night: Night in the dark, Day in the light.
+#
+# A palette is this one file. Colours that do not read well enough where they are used
+# are adjusted when the theme is applied, so the file can hold the family's own.
+
+name = "Tokyo Night"
+
+# The first accent is the one the palette uses when none is chosen.
+[accents]
+blue   = "#7aa2f7"
+purple = "#bb9af7"
+cyan   = "#7dcfff"
+green  = "#9ece6a"
+orange = "#ff9e64"
+
+[dark]
+bg       = "#16161e"
+surface  = "#1a1b26"
+surface2 = "#292e42"
+text     = "#c0caf5"
+muted    = "#7982a9"
+border   = "#3b4261"
+
+red      = "#f7768e"
+green    = "#9ece6a"
+yellow   = "#e0af68"
+blue     = "#7aa2f7"
+magenta  = "#bb9af7"
+cyan     = "#7dcfff"
+
+[light]
+bg       = "#d0d5e3"
+surface  = "#e1e2e7"
+surface2 = "#c4c8da"
+text     = "#343b58"
+muted    = "#6172b0"
+border   = "#a8aecb"
+
+red      = "#f52a65"
+green    = "#587539"
+yellow   = "#8c6c3e"
+blue     = "#2e7de9"
+magenta  = "#9854f1"
+cyan     = "#007197"

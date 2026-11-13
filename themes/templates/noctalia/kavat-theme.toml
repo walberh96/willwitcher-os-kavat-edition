@@ -1,0 +1,22 @@
+# Made by kavat-theme from the theme's settings; what is changed here is lost.
+# The settings are in ~/.config/kavat/theme.toml.
+
+[theme]
+source         = "custom"
+custom_palette = "Kavat"
+mode           = "{{ mode }}"
+
+[theme.templates]
+enable_builtin_templates   = false
+enable_community_templates = false
+
+[shell]
+corner_radius_scale = {{ radius_scale }}
+font_family         = "{{ font_ui }}"
+# Noctalia's first-run dialog picks a palette and a mode of its own, which would take the
+# theme away from the system's; it also offers Noctalia's anonymous startup ping.
+setup_wizard_enabled = false
+
+[shell.animation]
+enabled = {{ animations }}
+speed   = {{ animation_speed }}

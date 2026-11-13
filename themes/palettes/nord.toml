@@ -1,0 +1,44 @@
+# Nord. Its light side is not an official one: the same hues, darkened until they read on snow.
+#
+# A palette is this one file. Colours that do not read well enough where they are used
+# are adjusted when the theme is applied, so the file can hold the family's own.
+
+name = "Nord"
+
+# The first accent is the one the palette uses when none is chosen.
+[accents]
+frost  = "#88c0d0"
+blue   = "#81a1c1"
+green  = "#a3be8c"
+yellow = "#ebcb8b"
+purple = "#b48ead"
+
+[dark]
+bg       = "#242933"
+surface  = "#2e3440"
+surface2 = "#3b4252"
+text     = "#eceff4"
+muted    = "#a3adc2"
+border   = "#4c566a"
+
+red      = "#bf616a"
+green    = "#a3be8c"
+yellow   = "#ebcb8b"
+blue     = "#81a1c1"
+magenta  = "#b48ead"
+cyan     = "#88c0d0"
+
+[light]
+bg       = "#d8dee9"
+surface  = "#eceff4"
+surface2 = "#dfe4ee"
+text     = "#2e3440"
+muted    = "#5c677d"
+border   = "#c2cad9"
+
+red      = "#bf616a"
+green    = "#a3be8c"
+yellow   = "#ebcb8b"
+blue     = "#5e81ac"
+magenta  = "#b48ead"
+cyan     = "#88c0d0"
