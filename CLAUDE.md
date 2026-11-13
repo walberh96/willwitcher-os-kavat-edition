@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition
 
-Distribución personal basada en Arch Linux. Está en **fase 0, diseño**: no hay nada implementado. El siguiente paso es la fase 1, el perfil de archiso y el repo `[kavat]`, que se compilan en el PC con Arch.
+Distribución personal basada en Arch Linux. Está en **fase 0, diseño**: no hay nada implementado. El siguiente paso es la fase 1, el perfil de archiso y el repo `[kavat]`, que se compilan en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO usa un `pacman.conf` propio con solo los repos de Arch y `[kavat]`, y los paquetes se compilan en un chroot limpio de Arch, nunca con el `makepkg` del anfitrión.
 
 ## Idiomas
 

@@ -26,7 +26,7 @@ La ISO se construye con `archiso` a partir del perfil `releng`, y todo lo propio
 
 | Pieza | Propuesta | Alternativa | Por qué |
 | --- | --- | --- | --- |
-| Construcción de la ISO | `archiso` con perfil propio en `iso/` | Partir de EndeavourOS o CachyOS | Control total y sin heredar decisiones ajenas; se compila en tu PC de escritorio con Arch |
+| Construcción de la ISO | `archiso` con perfil propio en `iso/` | Partir de EndeavourOS o CachyOS | Control total y sin heredar decisiones ajenas; se compila en tu PC de escritorio |
 | Kernel | `linux-zen` + `linux-lts` de respaldo | `linux` estándar | Zen responde mejor en escritorio; LTS salva un arranque roto |
 | Gestor de arranque | GRUB con menú propio (decidido) | systemd-boot | Admite tema gráfico y submenús: fondo, entradas propias, modo seguro y lista de snapshots, cada uno con su kernel |
 | Sistema de archivos | Btrfs con subvolúmenes `@`, `@home`, `@games`, `@log`, `@pkg`, `@snapshots` | ext4 | Snapshots baratos y compresión zstd |
@@ -35,6 +35,8 @@ La ISO se construye con `archiso` a partir del perfil `releng`, y todo lo propio
 | Memoria | zram con zstd, sin partición swap | Swapfile | Menos escrituras a disco; la hibernación queda como opción del instalador |
 | Audio y red | PipeWire + WirePlumber; NetworkManager con iwd | wpa\_supplicant | Es lo que Noctalia y Hyprland esperan |
 | Arranque visual | Plymouth con tema generado por el sistema de temas | Texto | Misma identidad desde el primer fotograma |
+
+**Dónde se compila.** El PC de escritorio lleva CachyOS, instalado solo para este proyecto. De CachyOS no entra nada en el sistema: la ISO se construye con un `pacman.conf` propio, que solo tiene los repos de Arch y `[kavat]`, y los paquetes `kavat-*` se compilan en un chroot limpio de Arch, sin las opciones de compilación del anfitrión.
 
 El repositorio es un monorepo con una carpeta por pieza:
 
@@ -151,7 +153,7 @@ Hyprland compone las ventanas y un fork de Noctalia 5 pone la barra, el lanzador
 
 Desde Hyprland 0.55 la configuración es Lua, y así se usa. El panel de ajustes y el agente no generan Lua: escriben una tabla de valores, que son datos, y el Lua del sistema la carga. Así ningún texto que venga de fuera llega a ejecutarse.
 
-Atajos: 19 heredados de Endgame tal cual y 11 nuevos para lo que antes no existía.
+Atajos: 19 heredados de Endgame tal cual y 12 nuevos para lo que antes no existía.
 
 | Acción | Atajo | Origen |
 | --- | --- | --- |
@@ -180,6 +182,7 @@ Atajos: 19 heredados de Endgame tal cual y 11 nuevos para lo que antes no exist�
 | Mover la ventana | `Super+Shift` + flechas | Nuevo |
 | Redimensionar | `Super+Ctrl` + flechas | Nuevo |
 | Selector de temas | `Super+T` | Nuevo |
+| Cambiar de modo | `Super+Shift+M` | Nuevo |
 | Panel de `kav` | `Super+U` | Nuevo |
 | Menú de energía | `Super+Escape` | Nuevo |
 | Hoja de atajos | `Super+/` | Nuevo |
@@ -330,6 +333,7 @@ Regla para los forks: una app se bifurca cuando no deja cambiar su configuració
 | Consola de comandos | Una paleta con comandos propios que cambian el navegador: ocultar o mostrar paneles, barra de pestañas, modo zen, y los que definas tú |
 | Yazi como explorador | Subir un archivo y «guardar como» abren Yazi; pulsar una descarga abre Yazi en la carpeta de descargas con el archivo seleccionado |
 | Recortes y álbumes | Guarda en las notas la página con la selección como cita y una captura; reúne sitios favoritos en álbumes con miniatura, y enseña en un panel las notas que ya tienes del sitio. El detalle está en la sección Notas |
+| Vídeo protegido | Reproduce contenido con DRM mediante Widevine, que viene de serie. Sus condiciones y sus límites están más abajo |
 
 Cómo mantenerlo barato:
 
@@ -623,7 +627,7 @@ Lo que hace distinta la capa de un `yay` con filtro:
 - **Snapshot en cada transacción.** `kav undo` devuelve el sistema al estado anterior.
 - **Sin escape accidental.** `yay` y `paru` no vienen instalados; pacman sigue ahí y funciona normal.
 
-Comandos previstos: `kav install`, `remove`, `update`, `search`, `info`, `review`, `request`, `undo`, `list --aur`, `doctor`. Lenguaje propuesto: Rust o Go, un binario sin dependencias.
+Comandos previstos: `kav install`, `remove`, `update`, `search`, `info`, `review`, `request`, `undo`, `list --aur`, `doctor`. Se escribe en Rust, como un solo binario sin dependencias.
 
 **Interfaz de terminal.** `kav` sin argumentos abre una TUI de pantalla completa. Los comandos siguen existiendo para scripts y para el agente; TUI y comandos comparten el mismo núcleo en Rust (la TUI con ratatui).
 
@@ -984,7 +988,7 @@ Las decisiones de esta tabla están tomadas; las que el análisis de otras distr
 
 | Decidido | Decisión |
 | --- | --- |
-| Compilación de la ISO | En tu PC de escritorio con Arch |
+| Compilación de la ISO | En tu PC de escritorio, que lleva CachyOS; la ISO y los paquetes se compilan solo contra los repos de Arch |
 | Máquina objetivo | Escritorio con AMD Radeon RX 6800 de 16 GB de VRAM |
 | Límite del agente | El agente ocupa como máximo 4 GB de VRAM; quedan 12 GB para juegos aun con él cargado. La voz corre en la CPU y usa RAM aparte |
 | Alcance | Solo para ti |
@@ -1083,4 +1087,4 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 
 En la RX 6800, si la aceleración va por ROCm o por Vulkan sale de esa misma prueba.
 
-De Omarchy se tomó la idea del selector de temas que cambia todo el sistema. Sus atajos y sus valores por defecto no se siguen; sus mecanismos se evalúan uno a uno en «Ideas por evaluar».
+De Omarchy se tomó la idea del selector de temas que cambia todo el sistema. Sus atajos y sus valores por defecto no se siguen; sus mecanismos solo entran uno a uno y con tu aprobación, y los aprobados están en «Ideas de otras distros».
