@@ -89,8 +89,9 @@ class Screen:
     """The machine's screen and keyboard, through QEMU's VNC server.
 
     QEMU's own screendump cannot read a screen that the GPU draws, so this speaks just enough
-    of the VNC protocol: no password, uncompressed frames, key presses. Every call makes its
-    own connection, because the screen changes size between the boot menu and the desktop.
+    of the VNC protocol: no password, uncompressed frames, key presses and clicks. Every call
+    makes its own connection, because the screen changes size between the boot menu and the
+    desktop.
     """
 
     def __init__(self, path):
@@ -180,6 +181,18 @@ class Screen:
         time.sleep(0.2)
         sock.close()
 
+    def click(self, x, y):
+        """Click with the left button at a point of the screen."""
+        sock = self._connect()[0]
+        # Telling the server which encodings we take is also when QEMU checks that the
+        # machine has an absolute pointer; until then it moves the mouse by differences.
+        sock.sendall(struct.pack('>BxHi', 2, 1, 0))
+        for buttons in (0, 1, 0):                   # move there, press, let go
+            sock.sendall(struct.pack('>BBHH', 5, buttons, x, y))
+            time.sleep(0.1)
+        time.sleep(0.2)
+        sock.close()
+
     def type(self, text):
         """Type text as a US keyboard would."""
         sock = self._connect()[0]
@@ -198,12 +211,25 @@ class Machine:
     """A QEMU machine booting from an ISO, from a disk, or from the ISO with the disk attached.
 
     firmware is where the machine keeps its UEFI settings; give the same file to a later
-    machine and it boots as the same computer. With secure_boot, the firmware does Secure
-    Boot, and a new settings file starts in setup mode, waiting for keys.
+    machine and it boots as the same computer. tpm is a folder: when given, the machine has a
+    TPM2, a software one that keeps its state there, and the same folder is the same chip.
     """
 
-    def __init__(self, iso=None, disk=None, firmware=None, secure_boot=False):
+    def __init__(self, iso=None, disk=None, firmware=None, tpm=None):
         self.dir = tempfile.mkdtemp(prefix='kavat-test-')
+        self.tpm = None
+        chip = []
+        if tpm:
+            os.makedirs(tpm, exist_ok=True)
+            self.tpm = subprocess.Popen(['swtpm', 'socket', '--tpm2', '--tpmstate', f'dir={tpm}',
+                                         '--ctrl', f'type=unixio,path={self.dir}/tpm.sock'],
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            for _ in range(50):
+                if os.path.exists(f'{self.dir}/tpm.sock'):
+                    break
+                time.sleep(0.1)
+            chip = ['-chardev', f'socket,id=tpm,path={self.dir}/tpm.sock',
+                    '-tpmdev', 'emulator,id=tpm0,chardev=tpm', '-device', 'tpm-tis,tpmdev=tpm0']
         if firmware is None:
             firmware = f'{self.dir}/vars.fd'
         if not os.path.exists(firmware):
@@ -222,18 +248,14 @@ class Machine:
             print('no GPU render node on this host: the desktop may not start', file=sys.stderr)
             display = ['-device', 'virtio-vga,xres=1920,yres=1080', '-display', 'none']
         self.log = open(f'{self.dir}/qemu.log', 'w')
-        if secure_boot:
-            board = ['-machine', 'q35,smm=on,accel=kvm', '-global', 'driver=cfi.pflash01,property=secure,value=on']
-            code = f'{OVMF}/OVMF_CODE.secboot.4m.fd'
-        else:
-            board, code = ['-machine', 'q35,accel=kvm'], f'{OVMF}/OVMF_CODE.4m.fd'
         self.proc = subprocess.Popen([
-            'qemu-system-x86_64', '-name', 'kavat-test', *board,
+            'qemu-system-x86_64', '-name', 'kavat-test', '-machine', 'q35,accel=kvm',
             '-cpu', 'host', '-smp', '4', '-m', '4G',
-            '-drive', f'if=pflash,format=raw,readonly=on,file={code}',
+            '-drive', f'if=pflash,format=raw,readonly=on,file={OVMF}/OVMF_CODE.4m.fd',
             '-drive', f'if=pflash,format=raw,file={firmware}',
-            *drives,
+            *drives, *chip,
             '-vga', 'none', *display,
+            '-device', 'virtio-tablet-pci',  # a pointer that goes where the tests click
             '-device', 'virtio-serial-pci',
             '-chardev', f'socket,id=agent,path={self.dir}/agent.sock,server=on,wait=off',
             '-device', 'virtserialport,chardev=agent,name=org.qemu.guest_agent.0',
@@ -299,6 +321,9 @@ class Machine:
                 self.proc.wait(10)
             except subprocess.TimeoutExpired:
                 self.proc.kill()
+        if self.tpm and self.tpm.poll() is None:
+            self.tpm.terminate()
+            self.tpm.wait(10)
         self.log.close()
         shutil.rmtree(self.dir, ignore_errors=True)
 
@@ -315,6 +340,32 @@ class Checks:
         if detail and not ok:
             print('      ' + detail.replace('\n', '\n      '), flush=True)
         return ok
+
+
+def over_installed(name, encrypted=False):
+    """Machine settings for a test that works on the disk that tests/install.py left.
+
+    The machine gets a copy-on-write layer over that disk, and copies of its firmware settings
+    and of its TPM2, all named after the test, so the installed disk does not change. With
+    encrypted, the disk is the one from tests/install.py --encrypt. Returns the folder they
+    are in and the settings for Machine.
+    """
+    folder = f'{ROOT}/out/test' + ('/encrypted' if encrypted else '')
+    installed = f'{folder}/disk.qcow2'
+    if not os.path.exists(installed):
+        sys.exit(f'{os.path.relpath(folder)}/ holds no installed disk: run tests/install.py'
+                 + (' --encrypt' if encrypted else '') + ' first')
+    disk, firmware = f'{folder}/{name}.qcow2', f'{folder}/{name}-firmware.fd'
+    if os.path.exists(disk):
+        os.remove(disk)
+    subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow2', '-b', installed, '-F', 'qcow2', disk], check=True)
+    shutil.copy(f'{folder}/disk-firmware.fd', firmware)
+    settings = {'disk': disk, 'firmware': firmware}
+    if encrypted:
+        settings['tpm'] = f'{folder}/{name}-tpm'
+        shutil.rmtree(settings['tpm'], ignore_errors=True)
+        shutil.copytree(f'{folder}/tpm', settings['tpm'])
+    return folder, settings
 
 
 def newest_iso():

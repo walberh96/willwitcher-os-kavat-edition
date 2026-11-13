@@ -31,7 +31,7 @@ La ISO se construye con `archiso` a partir del perfil `releng`, y todo lo propio
 | Gestor de arranque | GRUB con menú propio (decidido) | systemd-boot | Admite tema gráfico y submenús: fondo, entradas propias, modo seguro y lista de snapshots, cada uno con su kernel |
 | Sistema de archivos | Btrfs con subvolúmenes `@`, `@home`, `@games`, `@log`, `@pkg`, `@snapshots` | ext4 | Snapshots baratos y compresión zstd |
 | Snapshots | Snapper + hook de pacman antes y después de cada transacción | Timeshift | Se integra con el arranque y con `kav` |
-| Cifrado | LUKS2 opcional, desbloqueo por TPM2 | Solo contraseña | Disco cifrado sin teclear dos contraseñas |
+| Cifrado | LUKS2 opcional y apagado por defecto; lo abre GRUB con el TPM2 | Solo contraseña | Disco cifrado sin teclear ninguna contraseña |
 | Memoria | zram con zstd, sin partición swap | Swapfile | Menos escrituras a disco; la hibernación queda como opción del instalador |
 | Audio y red | PipeWire + WirePlumber; NetworkManager con iwd | wpa\_supplicant | Es lo que Noctalia y Hyprland esperan |
 | Arranque visual | Plymouth con tema generado por el sistema de temas | Texto | Misma identidad desde el primer fotograma |
@@ -61,7 +61,7 @@ Calamares con branding propio hace la instalación en 7 pantallas, y el sistema 
 El idioma por defecto es inglés, con español como segunda opción del selector. Los dos vienen ya instalados en la ISO y en el sistema, con teclado US por defecto. Todo lo propio (instalador, greeter, shell, `kav` y agente) trae sus textos en ambos idiomas.
 
 1. **Bienvenida**: idioma, teclado y comprobación de requisitos (UEFI, RAM, disco).
-2. **Disco**: borrar todo, junto a otro sistema, o manual. Btrfs y subvolúmenes ya decididos; cifrado como un interruptor.
+2. **Disco**: borrar todo, junto a otro sistema, o manual. Btrfs y subvolúmenes ya decididos; cifrado como un interruptor, apagado por defecto.
 3. **Usuario**: nombre, contraseña, nombre del equipo.
 4. **Hardware**: detecta GPU y propone controladores (NVIDIA, AMD, Intel) en vez de preguntar a ciegas. En tu equipo, AMD con los controladores libres de Mesa, que ya vienen en la ISO.
 5. **Software**: programas que se añaden al sistema base, marcados uno a uno por categorías, y si se instala el agente con su modelo. Necesita red; el detalle está debajo.
@@ -125,18 +125,20 @@ Del botón de encendido al escritorio hay tres pantallas con la misma identidad:
 - **Cuatro estilos**: logo con pulso, anillo giratorio, barra de progreso, o texto con los mensajes de arranque.
 - **Sigue al tema**, con la misma imagen de fondo que el menú y el login, para que no haya salto entre las tres pantallas.
 - **`Esc` muestra los mensajes de arranque.** La pantalla aparece también al apagar y al reiniciar.
-- **Disco cifrado**: la petición de contraseña sale en esta pantalla, con el mismo tema.
+- **Disco cifrado**: esta pantalla no pide nada. El disco ya llega abierto: lo abre GRUB, antes del menú.
 
 **Cómo se aplican los cambios.** El menú y la pantalla de carga son archivos del sistema, y cambiar la pantalla de carga obliga a regenerar la imagen de arranque, que tarda. Por eso el cambio de tema del escritorio sigue siendo instantáneo y el arranque se actualiza después, en segundo plano, con una sola petición de contraseña. Si la regeneración falla, se queda la versión anterior.
 
 Dos límites: GRUB muestra una imagen fija, no reproduce vídeo ni desenfoca; y sus fuentes hay que convertirlas a su propio formato, cosa que hace el generador de temas. GRUB, grub-btrfs (la base del submenú de snapshots) y Plymouth están en los repos oficiales de Arch.
 
-**Cómo está hecho.** Desde la fase 2, y probado en máquina virtual con `tests/snapshots.py` y `tests/safemode.py`:
+**Cómo está hecho.** Desde la fase 2, y probado en máquina virtual con `tests/snapshots.py`, `tests/safemode.py` y `tests/install.py --encrypt`, este último con un TPM2 simulado:
 
 - **GRUB vive en la partición EFI.** Sus archivos, su configuración y su bloque de entorno van en `/efi/grub`, porque GRUB no sabe escribir en Btrfs, y tanto «Reiniciar hacia» como el arranque fallido necesitan que escriba. `/boot/grub` apunta ahí. Los kernels siguen en `/boot`, dentro del sistema, así que cada snapshot lleva el suyo.
 - **Arrancar un snapshot.** El snapshot es de solo lectura y arranca con una capa en memoria encima, que recibe lo que el sistema escribe; nada llega al snapshot. `kavat-boot-once <n>` pide arrancar un snapshot solo en el siguiente arranque, y `kavat-rollback <n>` lo convierte en el sistema: el de antes queda aparte, como `@.old-<fecha>`. Son la base de «Reiniciar hacia» y de `kav undo`.
 - **Arranque fallido.** Cada arranque deja una marca en el bloque de entorno de GRUB, y el sistema la avanza: pantalla de login, sesión iniciada, escritorio. Si el arranque anterior no llegó al login, o alguien inició sesión y el escritorio no apareció, GRUB abre el menú con Modo seguro elegido y lo arranca solo a los 30 segundos. Si nadie inició sesión, no cuenta como fallo.
 - **Modo seguro.** La sesión arranca con las carpetas de configuración, estado y datos vacías, así que cada programa usa la configuración del sistema. Tus archivos no se tocan.
+- **Disco cifrado.** Decidido el 13 de noviembre de 2026 (D33). GRUB abre el disco antes del menú, con una llave que el instalador sella en el TPM2. Esa llave está atada al PCR 7, el estado de Secure Boot que mide el firmware, como hace systemd por defecto, así que una actualización del kernel o de mkinitcpio no obliga a volver a sellarla. Después, el sistema abre el disco otra vez con la misma llave, guardada dentro de su imagen de arranque, que vive en el disco cifrado: nadie teclea nada. Si el TPM2 no da la llave, GRUB pide la contraseña de recuperación, en texto. Como GRUB prueba las llaves del disco en el orden en que están escritas, la llave del TPM2 va primero y la contraseña, que es lenta de probar a propósito, después. Todo esto vale igual para los snapshots y el modo seguro, porque el disco ya está abierto cuando sale el menú.
+- **Sin Secure Boot.** Decidido el 13 de noviembre de 2026 (D34). GRUB sin shim no arranca ningún kernel con Secure Boot activo, y shim solo llega por el AUR: no compensa una pieza de fuera más. Secure Boot tiene que estar apagado en el firmware; con él encendido no arranca ni la ISO.
 - **El menú, por ahora.** Hoy muestra las entradas de GRUB (el sistema, sus opciones avanzadas con `linux-lts`, Modo seguro, Ajustes del firmware y Snapshots) con su aspecto de serie. Los nombres y el orden de la tabla, la entrada de Recuperación y el tema llegan en la fase 3.
 
 ## Login
@@ -661,7 +663,7 @@ Tres reglas de la TUI:
 **Actualizaciones que no te dejan a medias.** Cuatro mecanismos tomados de otras distros, aprobados tras el análisis:
 
 - **Migraciones** (de Omarchy): cuando una versión nueva necesita cambiar algo que pacman no gestiona, como tu configuración o un servicio de usuario, lo hace un script que corre una sola vez, después de pacman y en orden. Si uno falla, la cola se detiene y te avisa; nunca migra en silencio. Su estado se guarda dentro de la raíz, así que volver a un snapshot también deshace las migraciones.
-- **Intervenciones guiadas** (de Garuda y EndeavourOS): cada «intervención manual» que publica Arch se convierte en un paso de `kav update` que explica qué pasa, enseña el comando, pide confirmación y anota que ya se aplicó. El primer caso es volver a inscribir el TPM2 tras mkinitcpio 42.
+- **Intervenciones guiadas** (de Garuda y EndeavourOS): cada «intervención manual» que publica Arch se convierte en un paso de `kav update` que explica qué pasa, enseña el comando, pide confirmación y anota que ya se aplicó.
 - **Dos guardas de transacción** (de Omarchy): si un archivo sin dueño choca con un paquete, se aparta, se reintenta una vez y se devuelve lo que el paquete no reclamó; y Hyprland no recarga su configuración mientras pacman la está cambiando, sino una sola vez al final.
 - **Comprobación de salud con memoria** (de openSUSE): tras cada actualización y en cada arranque se comprueba que el sistema está sano, y se guarda cuál fue la última instantánea buena. Si falla justo después de actualizar, vuelve a esa instantánea; si falla un sistema que ya funcionaba, reinicia una vez y, si sigue mal, se queda encendido con los servicios parados. Es también el mecanismo del modo seguro automático.
 
@@ -893,8 +895,8 @@ De tu repo anterior se conservan tal cual los atajos de Hyprland y tus preferenc
 El sistema asume que algo se va a romper y que algún paquete será malicioso, y limita el daño en ambos casos.
 
 - **Cadena de paquetes**: `[kavat]` firmado con una llave propia guardada fuera de la máquina de compilación; el AUR solo por allowlist fijada a commit.
-- **Secure Boot**: llaves propias con `sbctl`. El instalador crea las llaves y firma GRUB y los kernels, y `sbctl` los vuelve a firmar en cada actualización. Activarlo queda pendiente de D34: con Secure Boot, GRUB sin shim no arranca ningún kernel.
-- **Disco**: LUKS2 con desbloqueo TPM2 y contraseña de recuperación.
+- **Sin Secure Boot**: tiene que estar apagado en el firmware. GRUB sin shim no arranca ningún kernel con él, y shim no está en los repos de Arch.
+- **Disco**: LUKS2 opcional, apagado por defecto, con desbloqueo TPM2 y contraseña de recuperación. Sin Secure Boot, el TPM2 protege el disco si lo sacan del equipo, no si se llevan el equipo entero: quien lo arranque llega al menú con el disco ya abierto.
 - **Red**: cortafuegos nftables activo por defecto, todo lo entrante cerrado; DNS cifrado opcional.
 - **Aislamiento**: perfiles de sandbox para navegador y apps Electron; Flatpak disponible para software que no quieres en el sistema base.
 - **Snapshots arrancables**: los últimos 10 estados del sistema aparecen en el menú de arranque.
@@ -945,8 +947,8 @@ El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que toc
 | --- | --- | --- | --- |
 | 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt, con plugins en Luau | Decidido: fork de Noctalia 5, empaquetado como kavat-shell; desde ese punto es nuestra app. La evaluación mostró que casi todo cabía con plugins, pero el panel de ajustes no; con el fork queda dentro. El detalle está debajo de la tabla |
 | 2 | Configuración de Hyprland en archivos que el panel edita línea a línea | Desde Hyprland 0.55 la configuración es Lua y el formato anterior está obsoleto | Decidido: se usa Lua; el panel escribe una tabla de valores que el Lua del sistema carga |
-| 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2 | En parte: la reinscripción será una intervención guiada de `kav update`. Dónde vive el kernel de cada snapshot se ve en la fase 2 |
-| 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca. Es fuente secundaria y aún no está desplegado | Cerrado sin cambios: se mantienen las llaves propias y no se añade nada. Un juego que exija ese anti-cheat no funcionará |
+| 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2 | Resuelto en la fase 2 (D33): abre el disco GRUB, con la llave atada al PCR 7, que mkinitcpio no toca, así que no hay nada que reinscribir. El GRUB de Arch de hoy, el 2.16, ya descifra LUKS2 con Argon2. El kernel de cada snapshot sigue dentro del disco cifrado |
+| 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca. Es fuente secundaria y aún no está desplegado | Cerrado: Secure Boot se quitó en la fase 2 (D34). Un juego que exija ese anti-cheat no funcionará, como ya se había aceptado |
 | 5 | Modo seguro automático tras un arranque fallido | GRUB no cuenta arranques fallidos por sí solo | Resuelto con la comprobación de salud con memoria. Un kernel que no llega a arrancar sigue sin detectarse |
 | 6 | `kav review` marca lo sospechoso por patrones de texto | Dos oleadas de malware en el AUR en 2026 burlaron justo ese tipo de detección. La allowlist fijada a commit sí las habría parado | Cerrado sin cambios: no se añaden señales. La protección es la allowlist fijada a commit y tu lectura del diff; las marcas automáticas son una ayuda, no una garantía |
 | 7 | Snapshots de `/home` cada hora | Omarchy los retiró en su versión 3.6 por uso de disco y por el coste de CPU de las cuotas de Btrfs | Cerrado sin cambios: se quedan como estaban. Si en la fase 3 pesan en disco o CPU, se quitan |
@@ -1064,9 +1066,9 @@ Estos supuestos del diseño no son decisiones: se confirman al implementar, y si
 
 | Supuesto por comprobar | Fase |
 | --- | --- |
-| GRUB arranca cada snapshot con su kernel, con y sin cifrado de disco, y firmado para Secure Boot | 2 |
+| GRUB arranca cada snapshot con su kernel, con y sin cifrado de disco | 2 |
 | Con el disco cifrado, GRUB no pide la contraseña dos veces | 2 |
-| El desbloqueo por TPM2 sobrevive a una actualización de mkinitcpio, o `kav` guía la reinscripción | 2 |
+| El desbloqueo por TPM2 sobrevive a una actualización de mkinitcpio | 2 |
 | El modo seguro arranca el escritorio sin leer la configuración del usuario | 2 |
 | El modo seguro automático tras un arranque fallido tiene un mecanismo real con GRUB sobre Btrfs | 2 |
 | GRUB, Plymouth y el login enlazan sin parpadeo en la RX 6800 | 2 |
@@ -1100,8 +1102,8 @@ En la RX 6800, si la aceleración va por ROCm o por Vulkan sale de esa misma pru
 
 Cómo van los de la fase 2, a 13 de noviembre de 2026:
 
-- **Comprobados en máquina virtual**: el modo seguro arranca el escritorio sin leer la configuración del usuario; el modo seguro automático tras un arranque fallido funciona con GRUB sobre Btrfs, porque el bloque de entorno de GRUB vive en la partición EFI; y GRUB arranca cada snapshot con su kernel, sin cifrado y sin Secure Boot.
-- **Esperan una decisión**: con cifrado, los dos sobre el TPM2 y el de la contraseña, esperan a D33; firmado para Secure Boot, a D34.
+- **Comprobados en máquina virtual**: el modo seguro arranca el escritorio sin leer la configuración del usuario; el modo seguro automático tras un arranque fallido funciona con GRUB sobre Btrfs, porque el bloque de entorno de GRUB vive en la partición EFI; GRUB arranca cada snapshot con su kernel, con y sin cifrado; y con el disco cifrado no se pide ninguna contraseña.
+- **Resuelto por diseño**: el desbloqueo por TPM2 no depende de mkinitcpio, porque la llave está atada al PCR 7, que mide el firmware.
 - **Esperan al hardware real**: que GRUB, Plymouth y el login enlacen sin parpadeo en la RX 6800.
 - **Pasa a la fase 3**: la prueba tras actualizar. Detectar el arranque roto ya funciona, porque es el mismo mecanismo del modo seguro; ofrecer volver atrás le corresponde a `kav`.
 

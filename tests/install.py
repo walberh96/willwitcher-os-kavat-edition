@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
 """Install the system from the ISO onto a virtual disk, then boot the disk and log in.
 
-usage: tests/install.py [--secure-boot] [iso]
-  --secure-boot   the machine's firmware does Secure Boot and waits for keys (setup mode):
-                  the installer must leave it that way and the system must still boot; the
-                  disk and the pictures then go in out/test/secure-boot/
-  iso             the image to install from; the newest one in out/ when not given
+usage: tests/install.py [--encrypt] [iso]
+  --encrypt   the machine has a TPM2, and the installer is told to encrypt the disk: the
+              system must boot without asking for a password, and, once the TPM2 is gone,
+              open with the recovery password typed at GRUB; the disk, the TPM2's state and
+              the pictures then go in out/test/encrypted/
+  iso         the image to install from; the newest one in out/ when not given
 
 The machine boots from the ISO with an empty 60 GB disk and no network. The installer is
 driven as a person would drive it, with the keyboard; then the machine is switched off and
@@ -15,6 +16,7 @@ the screen are left in out/test/. The exit status is 0 only when every check pas
 Needs qemu-desktop and edk2-ovmf. It runs as a normal user and takes about ten minutes.
 """
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -23,6 +25,8 @@ from machine import BOOT_TIMEOUT, ROOT, Checks, Machine, check_desktop, check_pa
 
 USER = 'tester'
 PASSWORD = 'kavat-123'
+DISK_PASSWORD = 'kavat-disk-456'  # the recovery password of the encrypted disk
+ENCRYPT_BOX = (282, 854)  # where the disk page shows Encrypt system, on a 1920x1080 screen
 INSTALL_TIMEOUT = 900  # seconds for the installer to do its work
 LOG = '/tmp/installer.log'
 # what the installed system's root and its other subvolumes are mounted on
@@ -30,7 +34,7 @@ SUBVOLUMES = {'/': '/@', '/home': '/@home', '/games': '/@games', '/var/log': '/@
               '/var/cache/pacman/pkg': '/@pkg', '/.snapshots': '/@snapshots'}
 
 
-def install(machine, checks, pictures):
+def install(machine, checks, pictures, encrypt):
     """Run the installer on the live session. True when it says it finished well."""
     live = 'runuser -u live -- env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1'
     status, output = machine.wait_until('pgrep -u live -x noctalia', 120)
@@ -44,9 +48,23 @@ def install(machine, checks, pictures):
     time.sleep(3)
 
     screen = machine.screen
-    for _ in ('welcome', 'location', 'keyboard', 'partitions'):  # each one as it comes
+    for _ in ('welcome', 'location', 'keyboard'):  # each one as it comes
         screen.press('alt', 'n')
         time.sleep(3)
+    # the disk page, where erasing the disk is already chosen
+    if encrypt:
+        # Encrypt system, then the recovery password twice. The box is clicked: its letter, C,
+        # is also Cancel's, so Alt+C sometimes lands on Cancel.
+        screen.click(*ENCRYPT_BOX)
+        time.sleep(1)
+        screen.press('tab')
+        screen.type(DISK_PASSWORD)
+        screen.press('tab')
+        screen.type(DISK_PASSWORD)
+        time.sleep(1)
+    screen.picture(f'{pictures}/install-disk.png')
+    screen.press('alt', 'n')
+    time.sleep(3)
     # the users page: name, then login name and computer name already filled in, then the password twice
     screen.type(USER)
     for _ in range(3):
@@ -58,13 +76,17 @@ def install(machine, checks, pictures):
     screen.press('alt', 'n')
     time.sleep(3)
     screen.picture(f'{pictures}/install-summary.png')
-    screen.press('alt', 'i')  # Install, which asks to confirm, with Install now chosen
+    # Install, which asks to confirm, with Install now chosen. A busy machine can lose either
+    # key, so both are pressed again until the work starts.
     for _ in range(5):
-        time.sleep(4)
-        status, output = machine.run(f"grep -q 'Starting job' {LOG}")
+        for keys in (('alt', 'i'), ('enter',)):
+            screen.press(*keys)
+            time.sleep(4)
+            status, output = machine.run(f"grep -q 'Starting job' {LOG}")
+            if status == 0:
+                break
         if status == 0:
             break
-        screen.press('enter')
     if not checks.report(status == 0, 'the installation starts'):
         screen.picture(f'{pictures}/install-stuck.png')
         return False
@@ -76,15 +98,26 @@ def install(machine, checks, pictures):
     return checks.report(status == 0 and done == 0, 'the installation finishes without errors', errors)
 
 
-def check_installed(machine, checks, secure_boot):
+def check_encrypted(machine, checks):
+    """Check that the system is on an encrypted disk, and how it opens."""
+    root = 'r=$(findmnt -n -o SOURCE / | sed "s/\\[.*//"); '
+    status, output = machine.run(root + 'echo "$r"; lsblk -n -s -o TYPE "$r"')
+    checks.report(status == 0 and output.startswith('/dev/mapper/luks-') and 'crypt' in output.split(),
+                  'the system is on an encrypted disk', output)
+    # the order the keys are written in, which is the order GRUB tries them in
+    status, output = machine.run(root + 'd=$(cryptsetup status "$r" | awk \'$1 == "device:" {print $2}\'); '
+                                 'cryptsetup luksDump --dump-json-metadata "$d" | grep -A1 \'"kdf":{\' | grep -o \'"type":"[a-z0-9]*"\' | cut -d\'"\' -f4')
+    checks.report(output.split() == ['pbkdf2', 'argon2id'], 'two keys open it, and GRUB tries the quick one first', output)
+    status, output = machine.run('stat -c %a /crypto_keyfile.bin; lsinitcpio /boot/initramfs-linux-zen.img | grep -x crypto_keyfile.bin; '
+                                 'grep -o "rd.luks.key=[^ ]*" /proc/cmdline')
+    checks.report(output == '600\ncrypto_keyfile.bin\nrd.luks.key=/crypto_keyfile.bin',
+                  'the boot image opens the disk again with its own key, so nobody is asked twice', output)
+    status, output = machine.run('test -s /efi/grub/kavat-root.tpm && grep -c tpm2_key_protector_init /boot/grub/grub.cfg')
+    checks.report(status == 0, 'GRUB opens the disk with the key sealed in the TPM2', output)
+
+
+def check_installed(machine, checks):
     """Check the system that booted from the disk, before anybody logs in."""
-    status, output = machine.run("sbctl verify 2>&1 | grep -E 'grubx64|BOOTX64|vmlinuz'")
-    checks.report(status == 0 and 'not signed' not in output and output.count('is signed') >= 4,
-                  "the system's own keys sign GRUB and the kernels", output)
-    status, output = machine.run('f=$(ls /sys/firmware/efi/efivars/SecureBoot-* 2>/dev/null); '
-                                 'if [ -n "$f" ]; then od -An -t u1 -j4 -N1 "$f" | tr -d " "; else echo 0; fi; '
-                                 'find /var/lib/sbctl -name db.key')
-    checks.report(output.startswith('0\n') and output.endswith('db.key'), 'Secure Boot stays off, with the keys ready', output)
     for where, subvolume in SUBVOLUMES.items():
         status, output = machine.run(f'findmnt -n -o FSTYPE,OPTIONS --mountpoint {where}')
         ok = status == 0 and output.startswith('btrfs') and f'subvol={subvolume}' in output.split(',')
@@ -126,26 +159,50 @@ def check_installed(machine, checks, secure_boot):
     checks.report(not output, 'no service failed', output)
 
 
+def boot_with_password(disk, firmware, checks, pictures):
+    """Boot the encrypted disk with no TPM2: GRUB has to ask for the recovery password."""
+    print('booting the encrypted disk without its TPM2', flush=True)
+    machine = Machine(disk=disk, firmware=firmware)
+    try:
+        time.sleep(25)  # firmware, then GRUB, which tries the TPM2 and then asks
+        machine.screen.picture(f'{pictures}/password.png')
+        machine.screen.type(DISK_PASSWORD)
+        machine.screen.press('enter')
+        if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'without the TPM2, the recovery password typed at GRUB opens the disk'):
+            status, output = machine.run('cat /proc/cmdline')
+            checks.report('kavat.safe' not in output and '@snapshots' not in output, 'it is a normal boot', output)
+            status, output = machine.wait_until('systemctl is-active lightdm', 60)
+            checks.report(status == 0, 'the login screen is up', output)
+        else:
+            machine.screen.picture(f'{pictures}/password-stuck.png')
+    finally:
+        machine.stop()
+
+
 def main():
     args = sys.argv[1:]
-    secure_boot = '--secure-boot' in args
-    args = [arg for arg in args if arg != '--secure-boot']
+    encrypt = '--encrypt' in args
+    args = [arg for arg in args if arg != '--encrypt']
     if len(args) > 1 or any(arg.startswith('-') for arg in args):
         sys.exit(__doc__)
     iso = args[0] if args else newest_iso()
-    pictures = f'{ROOT}/out/test' + ('/secure-boot' if secure_boot else '')
+    pictures = f'{ROOT}/out/test' + ('/encrypted' if encrypt else '')
     disk, firmware = f'{pictures}/disk.qcow2', f'{pictures}/disk-firmware.fd'
+    tpm = f'{pictures}/tpm' if encrypt else None
     os.makedirs(pictures, exist_ok=True)
     for old in (disk, firmware):
         if os.path.exists(old):
             os.remove(old)
+    if tpm:
+        shutil.rmtree(tpm, ignore_errors=True)
     subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow2', disk, '60G'], check=True)
 
     checks = Checks()
     print(f'installing from {os.path.relpath(iso)}', flush=True)
-    machine = Machine(iso=iso, disk=disk, firmware=firmware, secure_boot=secure_boot)
+    machine = Machine(iso=iso, disk=disk, firmware=firmware, tpm=tpm)
     try:
-        installed = checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the ISO boots') and install(machine, checks, pictures)
+        installed = (checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the ISO boots')
+                     and install(machine, checks, pictures, encrypt))
         if installed:
             checks.report(machine.power_off(), 'the machine switches off')
     finally:
@@ -153,10 +210,13 @@ def main():
 
     if installed:
         print('booting the installed disk', flush=True)
-        machine = Machine(disk=disk, firmware=firmware, secure_boot=secure_boot)
+        machine = Machine(disk=disk, firmware=firmware, tpm=tpm)
         try:
-            if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the installed system boots'):
-                check_installed(machine, checks, secure_boot)
+            if checks.report(machine.wait_for_agent(BOOT_TIMEOUT),
+                             'the installed system boots' + (', asking for no password' if encrypt else '')):
+                if encrypt:
+                    check_encrypted(machine, checks)
+                check_installed(machine, checks)
                 check_packages(machine, checks)
                 time.sleep(5)  # the login screen takes a moment to listen
                 machine.screen.picture(f'{pictures}/login.png')
@@ -174,6 +234,8 @@ def main():
             machine.screen.picture(f'{pictures}/installed.png')
         finally:
             machine.stop()
+        if encrypt and not checks.failed:
+            boot_with_password(disk, firmware, checks, pictures)
     print(f'pictures of the screen: {os.path.relpath(pictures)}/')
     sys.exit(1 if checks.failed else 0)
 

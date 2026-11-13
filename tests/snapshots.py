@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Change the installed system, boot the snapshot from before the change, and go back to it.
 
-usage: tests/snapshots.py
+usage: tests/snapshots.py [--encrypted]
+  --encrypted   on the encrypted disk that tests/install.py --encrypt leaves
 
 Works on the disk that tests/install.py leaves in out/test/, through a copy-on-write layer,
 so that disk does not change. On the installed system it removes a package, and snap-pac
@@ -15,31 +16,21 @@ and takes about three minutes.
 """
 import os
 import re
-import shutil
-import subprocess
 import sys
 
-from machine import BOOT_TIMEOUT, ROOT, Checks, Machine, print_journal
+from machine import BOOT_TIMEOUT, Checks, Machine, over_installed, print_journal
 
 PACKAGE = 'os-prober'  # removed and brought back; nothing else needs it
 
 
 def main():
-    if len(sys.argv) > 1:
+    if sys.argv[1:] not in ([], ['--encrypted']):
         sys.exit(__doc__)
-    pictures = f'{ROOT}/out/test'
-    installed, installed_firmware = f'{pictures}/disk.qcow2', f'{pictures}/disk-firmware.fd'
-    if not os.path.exists(installed):
-        sys.exit('out/test/ holds no installed disk: run tests/install.py first')
-    disk, firmware = f'{pictures}/snapshots.qcow2', f'{pictures}/snapshots-firmware.fd'
-    if os.path.exists(disk):
-        os.remove(disk)
-    subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow2', '-b', installed, '-F', 'qcow2', disk], check=True)
-    shutil.copy(installed_firmware, firmware)
+    pictures, machine_settings = over_installed('snapshots', encrypted=len(sys.argv) > 1)
 
     checks = Checks()
     print('changing the installed system', flush=True)
-    machine = Machine(disk=disk, firmware=firmware)
+    machine = Machine(**machine_settings)
     try:
         if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the installed system boots'):
             status, output = machine.run(f'pacman -Rns --noconfirm {PACKAGE}', 120)
@@ -61,7 +52,7 @@ def main():
         sys.exit(1)
 
     print(f'booting snapshot {number}', flush=True)
-    machine = Machine(disk=disk, firmware=firmware)
+    machine = Machine(**machine_settings)
     try:
         if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the snapshot boots'):
             status, output = machine.run('cat /proc/cmdline')
@@ -90,7 +81,7 @@ def main():
         sys.exit(1)
 
     print('booting the system after going back', flush=True)
-    machine = Machine(disk=disk, firmware=firmware)
+    machine = Machine(**machine_settings)
     try:
         if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the system boots'):
             _, cmdline = machine.run('cat /proc/cmdline')

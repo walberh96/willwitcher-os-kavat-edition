@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Break the user's desktop on purpose, and check that the next boot opens in safe mode.
 
-usage: tests/safemode.py
+usage: tests/safemode.py [--encrypted]
+  --encrypted   on the encrypted disk that tests/install.py --encrypt leaves
 
 Works on the disk that tests/install.py leaves in out/test/, through a copy-on-write layer,
 so that disk does not change. It gives the user a Hyprland configuration that makes
@@ -14,12 +15,10 @@ Needs qemu-desktop and edk2-ovmf, and tests/install.py run first. It runs as a n
 and takes about four minutes.
 """
 import os
-import shutil
-import subprocess
 import sys
 import time
 
-from machine import BOOT_TIMEOUT, ROOT, Checks, Machine, check_desktop, print_journal
+from machine import BOOT_TIMEOUT, Checks, Machine, check_desktop, over_installed, print_journal
 
 USER, PASSWORD = 'tester', 'kavat-123'  # as tests/install.py made them
 BROKEN = f'/home/{USER}/.config/hypr/hyprland.lua'
@@ -34,21 +33,13 @@ def log_in(machine):
 
 
 def main():
-    if len(sys.argv) > 1:
+    if sys.argv[1:] not in ([], ['--encrypted']):
         sys.exit(__doc__)
-    pictures = f'{ROOT}/out/test'
-    installed = f'{pictures}/disk.qcow2'
-    if not os.path.exists(installed):
-        sys.exit('out/test/ holds no installed disk: run tests/install.py first')
-    disk, firmware = f'{pictures}/safemode.qcow2', f'{pictures}/safemode-firmware.fd'
-    if os.path.exists(disk):
-        os.remove(disk)
-    subprocess.run(['qemu-img', 'create', '-q', '-f', 'qcow2', '-b', installed, '-F', 'qcow2', disk], check=True)
-    shutil.copy(f'{pictures}/disk-firmware.fd', firmware)
+    pictures, machine_settings = over_installed('safemode', encrypted=len(sys.argv) > 1)
     checks = Checks()
 
     print('breaking the desktop', flush=True)
-    machine = Machine(disk=disk, firmware=firmware)
+    machine = Machine(**machine_settings)
     try:
         if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the installed system boots'):
             status, output = machine.run('cat /proc/cmdline')
@@ -73,7 +64,7 @@ def main():
         sys.exit(1)
 
     print('booting after the failure', flush=True)
-    machine = Machine(disk=disk, firmware=firmware)
+    machine = Machine(**machine_settings)
     try:
         if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the system boots on its own'):
             status, output = machine.run('cat /proc/cmdline')
@@ -94,7 +85,7 @@ def main():
         machine.stop()
 
     print('booting again', flush=True)
-    machine = Machine(disk=disk, firmware=firmware)
+    machine = Machine(**machine_settings)
     try:
         if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the system boots'):
             status, output = machine.run('cat /proc/cmdline')

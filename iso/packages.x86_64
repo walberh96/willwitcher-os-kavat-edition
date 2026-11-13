@@ -20,8 +20,6 @@ which
 grub
 efibootmgr
 os-prober
-# Secure Boot with the system's own keys
-sbctl
 btrfs-progs
 dosfstools
 

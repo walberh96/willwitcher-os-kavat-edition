@@ -252,7 +252,7 @@ A Chromium of its own, with eight changes.
 - **Btrfs + snapshots** before every package transaction.
 - **Bootable snapshots**: the latest system states are in the boot menu.
 - **Fallback kernel**: `linux-zen` for every day, `linux-lts` for when something breaks.
-- **LUKS2 encryption** with TPM2 unlock, **Secure Boot** with its own keys, firewall closed by default.
+- **Optional LUKS2 encryption** that the TPM2 unlocks, so no password is typed; firewall closed by default.
 - **`kav update` reads the Arch news** and stops if an update needs manual intervention.
 - **Config is checked before it is applied.** A bad edit rolls back to the last good version and tells you which line failed.
 - **`kav doctor`** tells you what is wrong before you notice.
@@ -353,8 +353,8 @@ A kavat is a companion feline: fast, quiet, and always beside whoever raised it.
 This README describes the finished system. Today the project is in **phase 2**, the installer, and nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
 
 - **Phase 1 is done.** The ISO boots to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts.
-- **Phase 2 works in a virtual machine.** The installer puts the system on a disk with no network: Btrfs with its subvolumes, zram, the zen kernel with the LTS one as fallback, GRUB and a login screen. Every package change takes a snapshot, a snapshot boots from the menu with its own kernel, and the system can go back to it. A boot that fails opens the next one in safe mode, which ignores your settings without deleting them. GRUB and the kernels are signed with the system's own keys.
-- **Phase 2 still needs** two decisions, on disk encryption and on Secure Boot (D33 and D34 in [`docs/PENDING.md`](docs/PENDING.md)), and the install on real hardware.
+- **Phase 2 works in a virtual machine.** The installer puts the system on a disk with no network: Btrfs with its subvolumes, zram, the zen kernel with the LTS one as fallback, GRUB and a login screen. Every package change takes a snapshot, a snapshot boots from the menu with its own kernel, and the system can go back to it. A boot that fails opens the next one in safe mode, which ignores your settings without deleting them. The disk can be encrypted, off by default: GRUB opens it with a key sealed in the TPM2, and asks for the recovery password only when the TPM2 does not give it. Secure Boot is not used and has to be off.
+- **Phase 2 still needs** the install on real hardware.
 
 To build and try it on an Arch-based machine with `devtools`, `qemu-desktop` and `edk2-ovmf`:
 
@@ -362,7 +362,7 @@ To build and try it on an Arch-based machine with `devtools`, `qemu-desktop` and
 tools/build-repo.sh   # the kavat-* packages, into the local [kavat] repository
 tools/build-iso.sh    # the ISO, into out/
 tests/boot.py         # boots it in a virtual machine and checks it reaches the desktop
-tests/install.py      # installs it on a virtual disk, boots the disk and logs in
+tests/install.py      # installs it on a virtual disk, boots the disk and logs in; --encrypt for an encrypted disk
 tests/snapshots.py    # changes that system, boots the snapshot from before and goes back to it
 tests/safemode.py     # breaks its desktop on purpose and checks the next boot opens in safe mode
 ```
@@ -371,7 +371,7 @@ tests/safemode.py     # breaks its desktop on purpose and checks the next boot o
 | --- | --- | --- |
 | 0 | Design documented | Done |
 | 1 | ISO that boots to Hyprland + Noctalia | Done |
-| 2 | Calamares installer with Btrfs and snapshots | Works in a virtual machine; waits for D33, D34 and real hardware |
+| 2 | Calamares installer with Btrfs and snapshots | Works in a virtual machine; waits for real hardware |
 | 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | Pending |
 | 4 | Local agent, skills and voice | Pending |
 

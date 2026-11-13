@@ -1,0 +1,30 @@
+#!/bin/sh
+# Part of kavat-boot. On an encrypted system, writes into grub.cfg, ahead of every menu, the
+# step that opens the disk: with the key that the installer sealed in the TPM2 and left on
+# the EFI partition, or, when that file is missing or the TPM2 refuses, by asking for the
+# recovery password. Every entry after it, snapshots and safe mode included, finds the disk
+# already open.
+set -e
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+. "$pkgdatadir/grub-mkconfig_lib"
+
+uuids="$("${grub_probe}" --device ${GRUB_DEVICE} --target=cryptodisk_uuid 2> /dev/null || true)"
+[ -n "${uuids}" ] || exit 0
+
+for module in $("${grub_probe}" --device ${GRUB_DEVICE} --target=abstraction); do
+  echo "insmod ${module}"
+done
+for uuid in ${uuids}; do
+  cat << EOF2
+if [ -f "\${prefix}/kavat-root.tpm" ]; then
+  insmod tpm2_key_protector
+  tpm2_key_protector_init --tpm2key="\${prefix}/kavat-root.tpm"
+  cryptomount -u ${uuid} --protector tpm2
+else
+  cryptomount -u ${uuid}
+fi
+EOF2
+done

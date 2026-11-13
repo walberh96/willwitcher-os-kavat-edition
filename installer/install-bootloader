@@ -1,37 +1,22 @@
 #!/bin/bash
-# Runs inside the new system: puts GRUB on the EFI partition, signed for Secure Boot.
+# Runs inside the new system: puts GRUB on the EFI partition.
 #
 # GRUB's own files, its settings and its environment block go on the EFI partition, where
 # GRUB can write: on Btrfs it cannot, and "boot this once" and the safe mode after a failed
 # boot both need it to. The kernels stay in /boot, inside the system, so that each snapshot
 # keeps its own. /boot/grub points to the EFI partition, where every tool expects it.
 #
-# Secure Boot: the system makes its own keys and signs GRUB and the kernels with them, and
-# sbctl signs the kernels again on every update. The keys are not enrolled: under Secure
-# Boot, GRUB without shim refuses to load any kernel, signed or not, so turning it on would
-# leave the machine unable to boot. See D34 in docs/PENDING.md.
+# There is no Secure Boot: GRUB without shim boots no kernel under it, and the system does
+# not take shim. It has to be off in the firmware.
 set -euo pipefail
 
-# Under Secure Boot GRUB loads no module from disk, so every one it needs goes inside it.
-modules=(
-  part_gpt part_msdos fat btrfs ext2
-  search search_fs_uuid search_fs_file search_label
-  normal linux echo test true configfile loadenv minicmd regexp probe sleep reboot halt
-  gzio xzio zstd
-  all_video efi_gop gfxterm gfxmenu font png jpeg
-  efifwsetup chain bli tpm
-  cryptodisk luks luks2 gcry_rijndael gcry_sha256 gcry_sha512 argon2 pbkdf2 password_pbkdf2
-)
-grub-install --target=x86_64-efi --efi-directory=/efi --boot-directory=/efi --bootloader-id=Kavat \
-  --modules="${modules[*]}" --disable-shim-lock --sbat /usr/share/grub/sbat.csv
-# the same loader where firmware looks when it has lost its boot entries
-install -Dm644 /efi/EFI/Kavat/grubx64.efi /efi/EFI/BOOT/BOOTX64.EFI
+grub-install --target=x86_64-efi --efi-directory=/efi --boot-directory=/efi --bootloader-id=Kavat
+# The same loader where firmware looks when it has lost its boot entries, unless another
+# system on a shared EFI partition already put its own there.
+if [[ ! -e /efi/EFI/BOOT/BOOTX64.EFI ]]; then
+  install -Dm644 /efi/EFI/Kavat/grubx64.efi /efi/EFI/BOOT/BOOTX64.EFI
+fi
 
 rm -rf /boot/grub
 ln -s /efi/grub /boot/grub
 grub-mkconfig -o /boot/grub/grub.cfg
-
-sbctl create-keys
-for file in /efi/EFI/Kavat/grubx64.efi /efi/EFI/BOOT/BOOTX64.EFI /boot/vmlinuz-*; do
-  sbctl sign -s "$file"
-done

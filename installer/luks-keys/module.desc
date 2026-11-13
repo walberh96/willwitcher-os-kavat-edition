@@ -1,0 +1,6 @@
+# The installer's own step: the keys that open an encrypted disk at boot. See main.py.
+---
+type: "job"
+name: "luks-keys"
+interface: "python"
+script: "main.py"

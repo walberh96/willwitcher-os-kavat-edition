@@ -21,7 +21,7 @@ Los dos diagramas del documento de diseño son imágenes en `docs/img/` y no tie
 
 ## Cómo se cambia el diseño
 
-1. Lo que el usuario tiene que decidir va a `docs/PENDING.md`, no al documento de diseño. Cada punto lleva un número (D1 a D32 ya se usaron; se sigue en D33), una recomendación y qué pasa si dice que no.
+1. Lo que el usuario tiene que decidir va a `docs/PENDING.md`, no al documento de diseño. Cada punto lleva un número (D1 a D34 ya se usaron; se sigue en D35), una recomendación y qué pasa si dice que no.
 2. Antes de trabajar, se mira ese archivo: el usuario contesta por chat o escribiendo en él.
 3. Lo aprobado pasa a `docs/DESIGN.md`, al mockup y, si toca, al README, y sale de pendientes. El documento y el mockup cambian en el mismo commit: no se deja uno para después.
 4. Lo rechazado se borra de pendientes y no se vuelve a preguntar. Si el usuario aprueba una parte y dice «lo otro no», ese no cubre todo lo demás que estuviera sobre la mesa.
@@ -48,9 +48,9 @@ Tras tocar `iso/`, `packages/` o `installer/` se pasan, en este orden. Los dos p
 - `tools/build-repo.sh [carpeta ...]`: compila en un chroot limpio de Arch los paquetes de `packages/` y los de las piezas que llevan su propio PKGBUILD, como `installer/`, y los reúne en `out/repo/`, el repo `[kavat]` local. Con nombres, solo esos: `tools/build-repo.sh installer`.
 - `tools/build-iso.sh`: construye la ISO desde `iso/`, con `mkarchiso` dentro de otro chroot limpio de Arch, y la deja en `out/`.
 - `tests/boot.py [iso]`: arranca la ISO en QEMU, comprueba desde dentro que llega al escritorio y deja una captura en `out/test/desktop.png`. Es la puerta de la fase 1 y tiene que seguir pasando. Pide `qemu-desktop` y `edk2-ovmf`.
-- `tests/install.py [--secure-boot] [iso]`: instala la ISO en un disco virtual manejando el instalador con el teclado, arranca desde ese disco e inicia sesión. Con `--secure-boot`, el firmware hace Secure Boot y espera llaves, y todo va a `out/test/secure-boot/`. Tarda unos seis minutos y deja capturas en `out/test/`.
-- `tests/snapshots.py`: sobre el disco que deja la prueba anterior, cambia un paquete, arranca el snapshot de antes y vuelve a él con `kavat-rollback`.
-- `tests/safemode.py`: sobre el mismo disco, rompe a propósito la configuración de Hyprland del usuario y comprueba que el siguiente arranque abre en modo seguro y que en él sí aparece el escritorio.
+- `tests/install.py [--encrypt] [iso]`: instala la ISO en un disco virtual manejando el instalador con el teclado, arranca desde ese disco e inicia sesión. Con `--encrypt`, la máquina tiene un TPM2 simulado con `swtpm` y el disco se cifra: arranca sin pedir contraseña y, sin el TPM2, con la de recuperación tecleada en GRUB; todo va a `out/test/encrypted/`. Tarda unos seis minutos y deja capturas en `out/test/`.
+- `tests/snapshots.py [--encrypted]`: sobre el disco que deja la prueba anterior, o el cifrado con `--encrypted`, cambia un paquete, arranca el snapshot de antes y vuelve a él con `kavat-rollback`.
+- `tests/safemode.py [--encrypted]`: sobre el mismo disco, rompe a propósito la configuración de Hyprland del usuario y comprueba que el siguiente arranque abre en modo seguro y que en él sí aparece el escritorio.
 
 Lo que comparten las pruebas está en `tests/machine.py`. Las dos últimas trabajan sobre una capa encima del disco instalado, así que no lo cambian.
 
