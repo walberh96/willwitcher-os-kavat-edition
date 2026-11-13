@@ -22,7 +22,7 @@ Fast like a tiling WM. Curated like one person's system. And with someone inside
 
 ![The Willwitcher-OS Kavat Edition desktop](docs/screenshots/desktop.png)
 
-> **Status: phase 0, design.** This README describes the finished system. The images come from an interactive mockup, not from a running system: nothing is implemented yet. Details in [Real project status](#real-project-status).
+> **Status: phase 1, an ISO that boots.** This README describes the finished system. The images come from an interactive mockup, not from a running system: what runs today is a live session with Hyprland and Noctalia as Arch ships them. Details in [Real project status](#real-project-status).
 
 ---
 
@@ -319,7 +319,7 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 
 ## The repository
 
-Today the repository holds this README, the `docs/` folder, the research reports in `reports/` and three maintenance scripts in `tools/`, which check the documents' links, retake the screenshots and render the tour video. The rest arrives with each phase:
+Today the repository holds this README, the `docs/` folder, the research reports in `reports/` and the first pieces of phase 1: the archiso profile in `iso/`, the first package in `packages/` and the boot test in `tests/`. `tools/` holds five scripts: two build the `[kavat]` repository and the ISO, and three look after the documents by checking their links, retaking the screenshots and rendering the tour video. The rest arrives with each phase:
 
 | Folder | Contents | Phase |
 | --- | --- | --- |
@@ -350,12 +350,20 @@ A kavat is a companion feline: fast, quiet, and always beside whoever raised it.
 
 ## Real project status
 
-This README describes the finished system. Today the project is in **phase 0, design**: none of the above is implemented yet. What exists is the [design document](docs/DESIGN.md), with the decisions made so far, and the [mockup](docs/mockup/index.html) of the interface.
+This README describes the finished system. Today the project is in **phase 1**: there is an ISO that boots, in a virtual machine, to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts. Nothing else above is implemented yet; it lives in the [design document](docs/DESIGN.md), with the decisions made so far, and in the [mockup](docs/mockup/index.html) of the interface.
+
+To build and try it on an Arch-based machine with `archiso`, `devtools`, `qemu-desktop` and `edk2-ovmf`:
+
+```
+tools/build-repo.sh   # the kavat-* packages, into the local [kavat] repository
+tools/build-iso.sh    # the ISO, into out/
+tests/boot.py         # boots it in a virtual machine and checks it reaches the desktop
+```
 
 | Phase | Deliverable | Status |
 | --- | --- | --- |
 | 0 | Design documented | Done |
-| 1 | ISO that boots to Hyprland + Noctalia | Pending |
+| 1 | ISO that boots to Hyprland + Noctalia | In progress: it builds, and boots to the desktop in a virtual machine |
 | 2 | Calamares installer with Btrfs and snapshots | Pending |
 | 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | Pending |
 | 4 | Local agent, skills and voice | Pending |

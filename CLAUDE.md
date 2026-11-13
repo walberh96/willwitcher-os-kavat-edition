@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition
 
-Distribución personal basada en Arch Linux. Está en **fase 0, diseño**: no hay nada implementado. El siguiente paso es la fase 1, el perfil de archiso y el repo `[kavat]`, que se compilan en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO usa un `pacman.conf` propio con solo los repos de Arch y `[kavat]`, y los paquetes se compilan en un chroot limpio de Arch, nunca con el `makepkg` del anfitrión.
+Distribución personal basada en Arch Linux. Está en **fase 1**: hay un perfil de archiso en `iso/`, un primer paquete en `packages/` y una ISO que arranca en una máquina virtual hasta un Hyprland y un Noctalia sin modificar. Lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO usa un `pacman.conf` propio con solo los repos de Arch y `[kavat]`, y los paquetes se compilan en un chroot limpio de Arch, nunca con el `makepkg` del anfitrión.
 
 ## Idiomas
 
@@ -38,5 +38,17 @@ Los dos diagramas del documento de diseño son imágenes en `docs/img/` y no tie
 ## Herramientas
 
 - `tools/check-links.py`: comprueba que los enlaces del README, de `docs/DESIGN.md` y de `docs/PENDING.md` apuntan a archivos que existen. Se pasa tras editar cualquiera de los tres.
-- `tools/make-video.cjs [segundos]`: rehace `docs/video/kavat-tour.mp4`, el recorrido narrado por Kavat, desde `docs/video/index.html`, que usa el mockup como imagen. La voz es Supertonic-3, el modelo que el diseño da a Kavat. Pide `puppeteer-core`, `ffmpeg-static` y `supertonic` instalados fuera del repo; el uso está en la cabecera del script. El vídeo va en inglés y presenta el sistema como terminado, por decisión del usuario; el README sigue diciendo que está en fase 0.
+- `tools/make-video.cjs [segundos]`: rehace `docs/video/kavat-tour.mp4`, el recorrido narrado por Kavat, desde `docs/video/index.html`, que usa el mockup como imagen. La voz es Supertonic-3, el modelo que el diseño da a Kavat. Pide `puppeteer-core`, `ffmpeg-static` y `supertonic` instalados fuera del repo; el uso está en la cabecera del script. El vídeo va en inglés y presenta el sistema como terminado, por decisión del usuario; el README sigue diciendo en qué fase está de verdad.
 - `tools/screenshots.sh [nombre ...]`: rehace las capturas de `docs/screenshots/` desde el mockup, con Chrome o Chromium sin ventana.
+
+## Compilar y probar
+
+Tras tocar `iso/` o `packages/` se pasan los tres, en este orden. Los dos primeros piden sudo; la prueba no.
+
+- `tools/build-repo.sh [paquete ...]`: compila los paquetes de `packages/` en un chroot limpio de Arch y los reúne en `out/repo/`, el repo `[kavat]` local. Pide `devtools`.
+- `tools/build-iso.sh`: construye la ISO desde `iso/` y la deja en `out/`. Pide `archiso`.
+- `tests/boot.py [iso]`: arranca la ISO en QEMU, comprueba desde dentro que llega al escritorio y deja una captura en `out/test/desktop.png`. Es la puerta de la fase 1. Pide `qemu-desktop` y `edk2-ovmf`.
+
+Los repos de Arch se usan tal como estaban el día que dice `iso/arch-snapshot`; cambiar esa fecha es actualizar el sistema. `out/`, `work/` y `vendor/` no entran en git: son resultados, trabajo temporal y descargas.
+
+La configuración de Hyprland es Lua y su API cambia: antes de usar una función nueva se comprueba en la máquina virtual, no se supone.

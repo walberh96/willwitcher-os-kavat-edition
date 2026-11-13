@@ -1,0 +1,18 @@
+pkgname=kavat-hyprland
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: the system's Hyprland configuration"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+# Hyprland, the shell it starts, and every program its shortcuts open
+depends=('hyprland' 'noctalia' 'kitty' 'yazi' 'hyprlock' 'hyprpicker' 'grim' 'slurp' 'wl-clipboard')
+source=('hyprland.lua')
+sha256sums=('SKIP')
+
+package() {
+  install -Dm644 hyprland.lua "$pkgdir/usr/share/kavat/hypr/hyprland.lua"
+  # Hyprland looks here when the user has no configuration of their own
+  install -d "$pkgdir/etc/xdg/hypr"
+  ln -s /usr/share/kavat/hypr/hyprland.lua "$pkgdir/etc/xdg/hypr/hyprland.lua"
+}

@@ -1,0 +1,2 @@
+# The live session has no password to type, so its user needs none for sudo.
+live ALL=(ALL:ALL) NOPASSWD: ALL

@@ -1,0 +1,38 @@
+# Packages of the live system, one per line.
+
+# Base and boot
+base
+linux-zen
+linux-firmware
+amd-ucode
+intel-ucode
+mkinitcpio
+mkinitcpio-archiso
+sudo
+
+# Network
+networkmanager
+iwd
+
+# Sound
+pipewire
+pipewire-pulse
+wireplumber
+
+# Graphics: Mesa comes with Hyprland; this is the Vulkan driver of the target machine
+vulkan-radeon
+
+# Desktop: Hyprland and Noctalia as Arch ships them, with the configuration from [kavat].
+# kavat-hyprland brings what its shortcuts open: Kitty, Yazi, hyprlock and the capture tools.
+hyprland
+noctalia
+kavat-hyprland
+
+# Fonts
+inter-font
+ttf-jetbrains-mono-nerd
+noto-fonts
+noto-fonts-emoji
+
+# Virtual machines: tests/boot.py checks the running system through this agent
+qemu-guest-agent
