@@ -1,0 +1,30 @@
+pkgname=kav
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: one command over pacman, with the AUR behind a reviewed list"
+arch=('x86_64')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+# git and curl reach the AUR; snapper and kavat-snapshots are what kav undo goes back with
+depends=('gcc-libs' 'pacman' 'sudo' 'git' 'curl' 'snapper' 'kavat-snapshots')
+# kav installs it itself the first time a package of the AUR is built
+optdepends=('devtools: builds the packages of the AUR in a clean system')
+makedepends=('cargo')
+# no separate package of debugging symbols
+options=('!debug')
+
+# The program is built where it is, from the versions Cargo.lock fixes.
+build() {
+  cd "$startdir"
+  CARGO_HOME="$srcdir/cargo" CARGO_TARGET_DIR="$srcdir/target" cargo build --release --locked
+}
+
+check() {
+  cd "$startdir"
+  CARGO_HOME="$srcdir/cargo" CARGO_TARGET_DIR="$srcdir/target" cargo test --release --locked
+}
+
+package() {
+  install -Dm755 "$srcdir/target/release/kav" "$pkgdir/usr/bin/kav"
+  install -Dm644 "$startdir/allowlist.toml" "$pkgdir/usr/share/kav/allowlist.toml"
+}

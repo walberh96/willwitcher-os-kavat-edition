@@ -644,7 +644,7 @@ La allowlist es un archivo en git, firmado, con una entrada por paquete:
 
 ```toml
 [packages.visual-studio-code-bin]
-commit   = "3f9c2ab"          # commit del PKGBUILD revisado
+commit   = "3f9c2ab41d0e5f6a7b8c9d0e1f2a3b4c5d6e7f80"   # commit del PKGBUILD revisado, entero
 reviewed = "2026-11-11"
 sources  = ["update.code.visualstudio.com"]
 notes    = "Binario oficial de Microsoft, sin scripts de instalación"
@@ -659,6 +659,21 @@ Lo que hace distinta la capa de un `yay` con filtro:
 - **Sin escape accidental.** `yay` y `paru` no vienen instalados; pacman sigue ahí y funciona normal.
 
 Comandos previstos: `kav install`, `remove`, `update`, `search`, `info`, `review`, `request`, `undo`, `list --aur`, `doctor`. Se escribe en Rust, como un solo binario sin dependencias.
+
+**Cómo está hecho.** Desde la fase 3, y probado en máquina virtual con `tests/kav.py`:
+
+- **`kav`** es un programa en Rust, en `kav/`, de un solo binario. Corre como tu usuario y pide root con `sudo` solo para lo que lo necesita: pacman, y escribir una aprobación.
+- **De dónde sale un paquete**: primero se mira en los repos de pacman, y solo si no está ahí, en la lista revisada. Así un paquete del AUR nunca suplanta a uno de Arch. Si uno de los paquetes pedidos se rechaza, no se instala ninguno.
+- **La lista revisada** son dos archivos con la misma forma: `/usr/share/kav/allowlist.toml`, que viene con el sistema, y `/etc/kav/allowlist.toml`, con lo aprobado en esta máquina, que manda. La que viene con el sistema está vacía: ningún paquete del AUR entra sin que una persona lo haya leído.
+- **El commit va entero**, con sus cuarenta caracteres: una forma corta la puede igualar otro commit hecho a propósito.
+- **`kav review <paquete>`** baja el repositorio del paquete en el AUR y lo enseña: entero la primera vez, y después solo lo que cambió desde el commit aprobado. Marca las líneas que merecen una segunda mirada, como descargar algo y ejecutarlo, pedir root, tocar tu carpeta personal, saltarse una suma de comprobación o traer un script de instalación, y dice de qué dominios descarga y cuáles son nuevos. Aprobar es teclear el nombre del paquete; la aprobación la escribe root.
+- **Compilar** un paquete aprobado es dejar su carpeta exactamente en el commit aprobado, compilarlo con las herramientas de Arch en un sistema limpio que no ve tu carpeta personal, e instalar el resultado con pacman. Si el AUR no tiene ese commit, no se compila nada. Esas herramientas, `devtools`, arrastran mucho y no vienen instaladas: `kav` las instala la primera vez que hacen falta.
+- **`kav update`** actualiza el sistema con pacman y recompila los paquetes del AUR cuyo commit aprobado cambió. Uno instalado que ya no está en la lista se queda como está.
+- **`kav undo`** vuelve al snapshot que quedó antes del último cambio de paquetes, y dice cuál fue ese cambio. Usa `kavat-rollback`, así que hay que reiniciar.
+- **`kav request`** apunta un paquete como pedido; `kav list --aur` enseña la lista, lo instalado y lo pedido.
+- **`kav doctor`** mira servicios fallidos, paquetes huérfanos, archivos `.pacnew` y `.pacsave`, espacio en disco, que los snapshots se sigan tomando y que la base de datos de pacman no quedó bloqueada.
+- **Recién instalado**, pacman aún no tiene sus listas de paquetes, y `kav` lo dice en vez de dar un paquete por inexistente: `kav update` las baja.
+- **Queda para más adelante en esta fase**: la TUI, la firma de la lista, que un paquete del AUR dependa de otro del AUR, las noticias de Arch con sus intervenciones guiadas, las migraciones, las guardas de transacción y el firmware. Compilar de verdad un paquete del AUR necesita red, y la máquina de pruebas no tiene: la prueba llega hasta comprobar qué commit se compilaría.
 
 **Interfaz de terminal.** `kav` sin argumentos abre una TUI de pantalla completa. Los comandos siguen existiendo para scripts y para el agente; TUI y comandos comparten el mismo núcleo en Rust (la TUI con ratatui).
 

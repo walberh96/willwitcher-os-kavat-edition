@@ -1,0 +1,16 @@
+# The reviewed list: the only packages of the AUR that kav installs.
+#
+# Each entry names the exact commit of the package's AUR repository that a person read and
+# approved. kav builds that commit and no other: when the package changes in the AUR,
+# nothing changes here until someone reads the new version and moves the commit.
+#
+#   [packages.some-package]
+#   commit   = "0123456789abcdef0123456789abcdef01234567"   # all forty characters
+#   reviewed = "2026-11-13"
+#   sources  = ["example.org"]            # where its files are downloaded from
+#   notes    = "What it is and what was looked at"
+#
+# This file comes with the system. What is approved on this machine, with kav review, goes
+# to /etc/kav/allowlist.toml, which has the same form and the last word.
+
+[packages]

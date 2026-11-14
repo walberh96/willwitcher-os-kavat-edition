@@ -5,6 +5,8 @@ base
 kavat-base
 kavat-boot
 kavat-snapshots
+# kav: the one command over pacman. The AUR is reached only through its reviewed list.
+kav
 linux-zen
 linux-lts
 linux-firmware

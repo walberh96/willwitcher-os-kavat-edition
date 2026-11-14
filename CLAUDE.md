@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition
 
-Distribución personal basada en Arch Linux. Las fases 1 y 2 están cerradas: hay un perfil de archiso en `iso/`, paquetes `kavat-*` en `packages/` y un instalador en `installer/`, y el sistema instalado arranca, hace snapshots y vuelve a ellos, también en el PC de escritorio. Está en **fase 3, la identidad**: ya existen el sistema de temas, `kavat-theme`, el menú de arranque, la pantalla de carga y el login propios, y Hyprland y Noctalia van sin modificar; lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
+Distribución personal basada en Arch Linux. Las fases 1 y 2 están cerradas: hay un perfil de archiso en `iso/`, paquetes `kavat-*` en `packages/` y un instalador en `installer/`, y el sistema instalado arranca, hace snapshots y vuelve a ellos, también en el PC de escritorio. Está en **fase 3, la identidad**: ya existen el sistema de temas, `kavat-theme`, el menú de arranque, la pantalla de carga y el login propios y `kav` en línea de órdenes, y Hyprland y Noctalia van sin modificar; lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
 
 ## Idiomas
 
@@ -55,9 +55,13 @@ Tras tocar `iso/`, `packages/` o `installer/` se pasan, en este orden. Los dos p
 - `tests/theme.py [--encrypted]`: sobre el mismo disco, inicia sesión, cambia el modo, la paleta y el acento con `kavat-theme` y comprueba que Hyprland, Kitty y Noctalia siguen el cambio en menos de un segundo y sin reiniciarse. Es media puerta de la fase 3.
 - `tests/startup.py [--encrypted]`: sobre el mismo disco, mira la pantalla mientras arranca y comprueba que el menú de GRUB, la pantalla de carga y el login llevan el tema, que el menú tiene las entradas del sistema, que `kavat-theme boot` les cambia el aspecto y que la entrada Recovery acaba en `kavat-rescue`.
 
-Lo que comparten las pruebas está en `tests/machine.py`. Las cuatro últimas trabajan sobre una capa encima del disco instalado, así que no lo cambian.
+- `tests/kav.py [--encrypted]`: sobre el mismo disco, pide a `kav` paquetes de dentro y de fuera de la lista revisada, con una carpeta que hace de AUR, y deshace un cambio con `kav undo`. Es la otra media puerta de la fase 3. Usa las listas de paquetes que `tools/build-repo.sh` deja en su chroot.
+
+Lo que comparten las pruebas está en `tests/machine.py`. Las cinco últimas trabajan sobre una capa encima del disco instalado, así que no lo cambian.
 
 `kavat-theme` está en `themes/` y es Rust: sus pruebas unitarias se pasan con `cargo test` dentro de esa carpeta, y `tools/build-repo.sh themes` las vuelve a pasar al empaquetar. Su código está en `themes/engine/` y no en `src/`, que es la carpeta que `makepkg` usa junto a un PKGBUILD. Las plantillas del escritorio están en `themes/templates/` y las del arranque y el login en `themes/boot/`; estas se aplican como root con `kavat-theme boot`.
+
+`kav` está en `kav/` y también es Rust, con su código en `kav/core/`; sus pruebas unitarias se pasan con `cargo test` dentro de esa carpeta. No se prueba `kav install` en el PC de compilación: allí los repos de CachyOS tienen paquetes, como `yay`, que en Kavat no existen.
 
 `kavat-greeter`, el login, está en `greeter/`: su PKGBUILD baja web-greeter 4.0.0 por su commit, le aplica `system-python.patch` y le pone la página de `greeter/theme/`. Esa página se puede abrir en un navegador, donde ella misma hace de LightDM con un usuario inventado cuya contraseña es `kavat`. Todo lo de esa carpeta es GPL-3, como web-greeter.
 
