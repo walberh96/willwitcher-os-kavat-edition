@@ -1,0 +1,58 @@
+#!/bin/bash
+# usage: kavat-rescue
+#
+# The recovery console: what the boot menu's Recovery entry puts on the screen. Goes back to
+# a snapshot, opens a console as root, or lets the system start as usual. Needs root.
+set -uo pipefail
+
+(( EUID == 0 )) || { echo 'kavat-rescue: needs root' >&2; exit 1; }
+
+snapshots() {
+  snapper --no-dbus -c root list --columns number,date,description 2> /dev/null | tail -n +3 | grep -v '^ *0 '
+}
+
+go_back() {
+  local list number
+  list=$(snapshots)
+  if [[ -z $list ]]; then
+    echo 'There are no snapshots to go back to.'
+    return
+  fi
+  echo
+  echo '    #  Date                      What it is'
+  echo "$list"
+  echo
+  read -r -p 'Snapshot to go back to (Enter to leave it): ' number
+  [[ -n $number ]] || return
+  if [[ ! $number =~ ^[0-9]+$ ]]; then
+    echo 'That is not the number of a snapshot.'
+    return
+  fi
+  if kavat-rollback "$number"; then
+    read -r -p 'Restart now? [Y/n] ' answer
+    [[ ${answer,,} == n* ]] || systemctl reboot
+  fi
+}
+
+while true; do
+  cat << 'EOF2'
+
+Willwitcher-OS Kavat Edition: recovery
+
+  1  Go back to a snapshot
+  2  Open a console, as root
+  3  Start the system as usual
+  4  Restart
+  5  Switch off
+
+EOF2
+  read -r -p 'Choose (1-5): ' choice || exit 0
+  case $choice in
+    1) go_back ;;
+    2) echo 'This console is root. Type exit to come back here.'; bash --login ;;
+    3) exit 0 ;;
+    4) systemctl reboot; sleep infinity ;;
+    5) systemctl poweroff; sleep infinity ;;
+    *) ;;
+  esac
+done

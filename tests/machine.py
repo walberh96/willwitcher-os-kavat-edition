@@ -156,8 +156,16 @@ class Screen:
 
     def pixel(self, x, y):
         """The colour of one point of the screen, as (red, green, blue)."""
-        width, _, frame = self._frame()
-        return tuple(frame[(y * width + x) * 4:(y * width + x) * 4 + 3])
+        return self.pixels((x, y))[1][0]
+
+    def pixels(self, *points):
+        """The screen's size, and the colour of each point at the same moment.
+
+        A point outside the screen is black."""
+        width, height, frame = self._frame()
+        colours = [tuple(frame[(y * width + x) * 4:(y * width + x) * 4 + 3]) if x < width and y < height else (0, 0, 0)
+                   for x, y in points]
+        return (width, height), colours
 
     def picture(self, path):
         """Save what the screen shows as a PNG."""
@@ -305,6 +313,14 @@ class Machine:
             time.sleep(0.3)
         return 124, 'timed out'
 
+    def put(self, path, folder):
+        """Copy a file of the host into a folder of the machine, under the same name."""
+        handle = self.agent.ask('guest-file-open', path=f'{folder}/{os.path.basename(path)}', mode='w')
+        with open(path, 'rb') as file:
+            while chunk := file.read(1 << 20):
+                self.agent.ask('guest-file-write', handle=handle, **{'buf-b64': base64.b64encode(chunk).decode()})
+        self.agent.ask('guest-file-close', handle=handle)
+
     def wait_until(self, command, timeout):
         """Run the command until it succeeds or time runs out: (exit status, output)."""
         deadline = time.time() + timeout
@@ -399,6 +415,39 @@ def check_desktop(machine, checks, user, timeout=DESKTOP_TIMEOUT):
         checks.report(status == 0, what, output)
     status, output = machine.run(f'{hyprctl} configerrors')
     checks.report(status == 0 and not output, "Hyprland's configuration loads without errors", output)
+
+
+AVATAR = (960, 553)  # on the login screen, a point of the circle around who logs in
+CORNER = (40, 40)    # one where there is only the picture behind
+GLOW = (1560, 130)   # and one where that picture has its light, which a plain background does not
+
+
+def near(colour, other, by=48):
+    """Whether two colours are the same to the eye, give or take the grain of a picture."""
+    return sum(abs(a - b) for a, b in zip(colour, other)) <= by
+
+
+def wait_for_login_screen(machine, timeout=90):
+    """True once the login screen has drawn who logs in, on a 1920x1080 screen."""
+    deadline = time.time() + timeout
+    while time.time() < deadline:
+        try:
+            size, (avatar, corner) = machine.screen.pixels(AVATAR, CORNER)
+        except OSError:
+            size, avatar, corner = None, None, None
+        if size == (1920, 1080) and not near(avatar, corner) and machine.run('pgrep -u lightdm -f kavat-greeter')[0] == 0:
+            time.sleep(1)  # the page takes the keyboard a moment after it draws
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def log_in(machine, password):
+    """Type the password at the login screen, once it is there to take it."""
+    shown = wait_for_login_screen(machine)
+    machine.screen.type(password)
+    machine.screen.press('enter')
+    return shown
 
 
 def check_packages(machine, checks):

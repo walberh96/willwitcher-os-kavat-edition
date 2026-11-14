@@ -1,0 +1,169 @@
+diff --git a/src/cli.py b/src/cli.py
+index 8128ad5..5666a44 100644
+--- a/src/cli.py
++++ b/src/cli.py
+@@ -39,7 +39,7 @@ def list_themes() -> List[str]:
+     """List available themes"""
+     themes_dir = config.web_greeter_config.app.theme_dir
+     themes_dir = (
+-        themes_dir if os.path.exists(themes_dir) else "/usr/share/web-greeter/themes"
++        themes_dir if os.path.exists(themes_dir) else "/usr/share/kavat-greeter/themes"
+     )
+     filenames = os.listdir(themes_dir)
+ 
+@@ -55,7 +55,7 @@ def print_themes():
+     """Print available themes"""
+     themes_dir = config.web_greeter_config.app.theme_dir
+     themes_dir = (
+-        themes_dir if os.path.exists(themes_dir) else "/usr/share/web-greeter/themes"
++        themes_dir if os.path.exists(themes_dir) else "/usr/share/kavat-greeter/themes"
+     )
+     themes = list_themes()
+     print(f"Themes are located in {themes_dir}\n")
+@@ -82,7 +82,7 @@ def parse(argv):
+     version = config.web_greeter_config.app.version
+     api_version = config.web_greeter_config.app.api_version
+ 
+-    parser = argparse.ArgumentParser(prog="web-greeter", add_help=False)
++    parser = argparse.ArgumentParser(prog="kavat-greeter", add_help=False)
+     parser.add_argument(
+         "-h", "--help", action="help", help="Show this help message and exit"
+     )
+diff --git a/src/config.py b/src/config.py
+index db12ecf..2c9c80b 100644
+--- a/src/config.py
++++ b/src/config.py
+@@ -32,7 +32,21 @@ import dataclasses
+ from dataclasses import dataclass, fields, field
+ 
+ from logger import logger
+-from dataclass_binder import Binder
++
++
++def bind(kind, values):
++    """Fills in a dataclass with what a TOML table holds. A key may use - or _."""
++    known = {item.name: item for item in fields(kind)}
++    filled = {}
++    for key, value in values.items():
++        name = key.replace("-", "_")
++        if name not in known:
++            raise ValueError(f'"{key}" is not a setting')
++        made = known[name].default_factory
++        if made is not dataclasses.MISSING and dataclasses.is_dataclass(made):
++            value = bind(made, value)
++        filled[name] = value
++    return kind(**filled)
+ 
+ 
+ @dataclass
+@@ -48,7 +62,7 @@ class ConfigGreeter:
+     detect_theme_errors: bool = True
+     screensaver_timeout: int = 300
+     secure_mode: bool = True
+-    theme: str = "gruvbox"
++    theme: str = "kavat"
+     icon_theme: str | None = None
+     time_language: str | None = None
+ 
+@@ -83,7 +97,7 @@ class AppConfig:
+     fullscreen: bool = True
+     frame: bool = False
+     debug_mode: bool = False
+-    theme_dir: str = "/usr/share/web-greeter/themes/"
++    theme_dir: str = "/usr/share/kavat-greeter/themes/"
+     version: str = "4.0.0"
+     api_version: str = "1.0.0"
+ 
+@@ -103,7 +117,7 @@ class WebGreeterConfig:
+ 
+ web_greeter_config = WebGreeterConfig()
+ 
+-PATH_TO_CONFIG = os.getenv("WEB_GREETER_CONFIG") or "/etc/lightdm/web-greeter.toml"
++PATH_TO_CONFIG = os.getenv("KAVAT_GREETER_CONFIG") or "/etc/lightdm/kavat-greeter.toml"
+ theme_dir = None
+ 
+ 
+@@ -111,7 +125,7 @@ def load_theme_dir() -> str:
+     """Loads the theme directory"""
+     theme: str = web_greeter_config.config.greeter.theme
+     directory: str = web_greeter_config.app.theme_dir
+-    def_theme = "gruvbox"
++    def_theme = "kavat"
+ 
+     theme_dir = os.path.join(directory, theme)
+ 
+@@ -141,7 +155,7 @@ def load_primary_theme_path() -> str:
+     abs_theme: str = web_greeter_config.config.greeter.theme
+     abs_theme_name = abs_theme.split("/").pop()
+     directory: str = web_greeter_config.app.theme_dir
+-    def_theme = "gruvbox"
++    def_theme = "kavat"
+ 
+     if abs_theme_name.endswith(".html"):
+         web_greeter_config.theme.primary_html = abs_theme_name
+@@ -201,7 +215,7 @@ def load_theme_config():
+ 
+         with open(path_to_theme_config, "rb") as file:
+             parsed = tomllib.load(file)
+-            web_greeter_config.theme = Binder(ThemeConfig).bind(parsed)
++            web_greeter_config.theme = bind(ThemeConfig, parsed)
+ 
+     except Exception as err:
+         logger.warn("Theme config was not loaded:\n\t%s", err)
+@@ -211,14 +225,14 @@ def load_theme_config():
+ def ensure_theme():
+     """
+     Ensures that the theme does exists
+-    If it doesn't, default theme (gruvbox) is used
++    If it doesn't, the default theme (kavat) is used
+     """
+     global theme_dir
+     if not theme_dir:
+         theme_dir = load_theme_dir()
+     primary = web_greeter_config.theme.primary_html
+     directory = web_greeter_config.app.theme_dir
+-    def_theme = "gruvbox"
++    def_theme = "kavat"
+ 
+     primary_exists = os.path.exists(os.path.join(theme_dir, primary))
+ 
+@@ -235,6 +249,6 @@ def load_config():
+ 
+         with open(PATH_TO_CONFIG, "rb") as file:
+             parsed = tomllib.load(file)
+-            web_greeter_config.config = Binder(Config).bind(parsed)
++            web_greeter_config.config = bind(Config, parsed)
+     except Exception as err:
+         logger.error("Config was not loaded:\n\t%s", err)
+diff --git a/src/utils/brightness.py b/src/utils/brightness.py
+index 8fdfa85..57d0b04 100644
+--- a/src/utils/brightness.py
++++ b/src/utils/brightness.py
+@@ -30,8 +30,6 @@ import stat
+ import time
+ from typing import List
+ from threading import Thread
+-import inotify.adapters
+-import inotify.constants
+ from logger import logger
+ from config import web_greeter_config
+ import globales
+@@ -89,10 +87,14 @@ class BrightnessController:
+         self.watch_brightness()
+ 
+     def _watch(self):
+-        i = inotify.adapters.Inotify()
+-        i.add_watch(self._brightness_path, inotify.constants.IN_MODIFY)
+-
+-        for event in i.event_gen(yield_nones=False):
++        # Looks once a second, which needs nothing from outside Python's own library.
++        last = self.real_brightness
++        while True:
++            time.sleep(1)
++            now = self.real_brightness
++            if now == last:
++                continue
++            last = now
+             if hasattr(globales, "greeter") and hasattr(globales, "LDMGreeter"):
+                 globales.LDMGreeter.brightness_update.emit()
+ 

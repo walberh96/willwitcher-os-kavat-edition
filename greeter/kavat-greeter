@@ -1,0 +1,3 @@
+#!/bin/sh
+# Starts the login screen. LightDM runs this as its own user, on the display it has made.
+exec /usr/bin/python3 /usr/lib/kavat-greeter/__main__.py "$@"

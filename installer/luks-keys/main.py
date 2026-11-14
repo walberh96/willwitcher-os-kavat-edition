@@ -42,7 +42,9 @@ def run():
     target = libcalamares.globalstorage.value('rootMountPoint')
     device, passphrase = root['device'], root['luksPassphrase'].encode()
     keyfile = target + KEYFILE
-    os.umask(0o077)
+    # Only root may read the keys. Calamares runs every step in one process, so the
+    # steps after this one get back the usual permissions for what they write.
+    usual = os.umask(0o077)
     try:
         with open(keyfile, 'wb') as f:
             f.write(secrets.token_bytes(64))
@@ -61,4 +63,6 @@ def run():
         libcalamares.utils.warning(f'{error.cmd}: {error.stderr.decode(errors="replace")}')
         return ('Could not set up the keys of the encrypted disk',
                 f'{error.cmd[0]} failed: {error.stderr.decode(errors="replace")}')
+    finally:
+        os.umask(usual)
     return None

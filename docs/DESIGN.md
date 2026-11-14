@@ -47,7 +47,7 @@ El repositorio es un monorepo con una carpeta por pieza:
 - `packages/`: un PKGBUILD por paquete `kavat-*` que no tiene carpeta propia, incluidos los forks. Las piezas con carpeta propia, como `installer/`, llevan su PKGBUILD dentro.
 - `kav/`: el gestor de paquetes y su allowlist.
 - `themes/`: tokens, plantillas y temas incluidos.
-- `greeter/`: tema de web-greeter.
+- `greeter/`: `kavat-greeter`, el fork de web-greeter, y la página del login.
 - `agent/`: daemon, herramientas y Modelfile del agente.
 - `tests/`: arranca e instala cada ISO en una máquina virtual.
 - `docs/`: decisiones de diseño.
@@ -140,7 +140,13 @@ Dos límites: GRUB muestra una imagen fija, no reproduce vídeo ni desenfoca; y 
 - **Modo seguro.** La sesión arranca con las carpetas de configuración, estado y datos vacías, así que cada programa usa la configuración del sistema. Tus archivos no se tocan.
 - **Disco cifrado.** Decidido el 13 de noviembre de 2026 (D33). GRUB abre el disco antes del menú, con una llave que el instalador sella en el TPM2. Esa llave está atada al PCR 7, el estado de Secure Boot que mide el firmware, como hace systemd por defecto, así que una actualización del kernel o de mkinitcpio no obliga a volver a sellarla. Después, el sistema abre el disco otra vez con la misma llave, guardada dentro de su imagen de arranque, que vive en el disco cifrado: nadie teclea nada. Si el TPM2 no da la llave, GRUB pide la contraseña de recuperación, en texto. Como GRUB prueba las llaves del disco en el orden en que están escritas, la llave del TPM2 va primero y la contraseña, que es lenta de probar a propósito, después. Todo esto vale igual para los snapshots y el modo seguro, porque el disco ya está abierto cuando sale el menú.
 - **Sin Secure Boot.** Decidido el 13 de noviembre de 2026 (D34). GRUB sin shim no arranca ningún kernel con Secure Boot activo, y shim solo llega por el AUR: no compensa una pieza de fuera más. Secure Boot tiene que estar apagado en el firmware; con él encendido no arranca ni la ISO.
-- **El menú, por ahora.** Hoy muestra las entradas de GRUB (el sistema, sus opciones avanzadas con `linux-lts`, Modo seguro, Ajustes del firmware y Snapshots) con su aspecto de serie. Los nombres y el orden de la tabla, la entrada de Recuperación y el tema llegan en la fase 3.
+- **El menú, con sus entradas.** Desde la fase 3 las escribe `kavat-boot`, con los nombres y el orden de la tabla: los guiones propios de GRUB para la lista de kernels, los otros sistemas y el firmware quedan apagados, y un hook de pacman los vuelve a apagar cuando `grub` se actualiza. «Otros sistemas» es un submenú con lo que encuentra `os-prober`, y solo sale si encuentra algo. Los textos del menú van en inglés; en español, más adelante.
+- **Recuperación.** Arranca el sistema hasta montar los discos y nada más, con el kernel de respaldo y los mensajes de arranque a la vista, y deja en pantalla `kavat-rescue`: volver a un snapshot, abrir una consola como root, seguir con el arranque normal, reiniciar o apagar. La consola no pide contraseña: quien llega al menú de arranque ya puede editar una entrada y conseguir lo mismo. Entrar aquí no cuenta como arranque fallido.
+- **El aspecto.** Lo genera `kavat-theme boot` para las tres pantallas a la vez, con las mismas paletas y los mismos ajustes que el escritorio. Es un paso de root: tu orden le pasa por `pkexec` los ajustes en vigor, y nada más, así que pide la contraseña una vez. Root recuerda los ajustes que recibió; mientras nadie le dé ninguno, usa los de la máquina, que es lo que hace el instalador. Probado en máquina virtual con `tests/startup.py`.
+- **Menú.** El tema va a `/efi/grub/themes/kavat`: el fondo y el logo como PNG, las fuentes del tema convertidas al formato de GRUB y la caja de la entrada elegida cortada en nueve piezas. Dos cosas del mockup no las sabe hacer GRUB y no están: un texto distinto bajo el menú según la entrada elegida, y una segunda línea más pequeña dentro de una entrada.
+- **Pantalla de carga.** Un tema de Plymouth con el logo y un anillo que crece y se desvanece, sobre el mismo fondo que el menú. Viaja dentro de la imagen de arranque, que se reconstruye solo cuando el aspecto cambió. De los cuatro estilos está el primero; el anillo giratorio, la barra y el texto llegan con la página Boot del panel.
+- **El fondo, por ahora**, es uno generado con los colores del tema, el mismo en las tres pantallas. El fondo de pantalla del escritorio ocupará su sitio cuando exista esa pieza.
+- **Sin corte entre menú y carga**: el kernel conserva la pantalla como la dejó el menú hasta que Plymouth dibuja. Entre la pantalla de carga y el login hay un instante en negro, el del servidor X al arrancar; cuánto se nota en la RX 6800 se mira en el PC.
 
 ## Login
 
@@ -152,7 +158,16 @@ LightDM con web-greeter muestra un tema propio en HTML/CSS/JS que lee los mismos
 - **Varios usuarios**: selector por avatar; cada usuario ve el login con su propio tema.
 - **Bloqueo de pantalla**: mismo diseño que el login, hecho con hyprlock, para que bloquear y entrar se vean iguales.
 
-Decidido: LightDM + web-greeter con tema propio. Riesgo a vigilar: web-greeter vive en el AUR, depende de Qt WebEngine y su mantenimiento es irregular. La propuesta es hacer fork y empaquetarlo como `kavat-greeter`. El plan B es greetd con el greeter del propio Noctalia, que corre en Wayland nativo. Hasta que exista `kavat-greeter`, en la fase 3, el sistema instalado entra por el greeter GTK de LightDM.
+Decidido: LightDM + web-greeter con tema propio. Riesgo a vigilar: web-greeter vive en el AUR, depende de Qt WebEngine y su mantenimiento es irregular. Por eso es un fork, `kavat-greeter`. El plan B es greetd con el greeter del propio Noctalia, que corre en Wayland nativo.
+
+**Cómo está hecho.** Desde la fase 3, y probado en máquina virtual con `tests/startup.py`:
+
+- **`kavat-greeter`** es web-greeter 4.0.0 con un parche pequeño, en `greeter/`. El original se compila bajando de PyPI su propio Python y su propio Qt; el fork corre con el Python y el Qt de Arch, así que nada llega de fuera de sus repos. El parche quita las dos librerías que solo están en PyPI y le da su nombre y sus rutas. Como web-greeter, es GPL-3.
+- **La página** es HTML, CSS y JavaScript, en `greeter/theme/`: reloj, avatar y contraseña. Sesión, teclado, suspender, reiniciar y apagar aparecen al bajar el ratón al borde inferior. Con varios usuarios, los demás salen como avatares pequeños. En las otras pantallas del equipo solo sale el reloj. Los textos van en inglés o en español según el idioma del sistema.
+- **Sigue al tema del sistema**: lee los colores, las esquinas y las fuentes que deja `kavat-theme boot`, y usa el mismo fondo que el menú y la pantalla de carga.
+- **Lo que pesa**: Qt WebEngine y lo que arrastra añaden unos 190 MB a la descarga y unos 800 MB al sistema instalado, que antes no llevaba Qt.
+- **Queda para más adelante**: el estado de la red y las actualizaciones pendientes, que necesitan a `kavatd`; el tema propio de cada usuario; elegir el idioma en el login; y el bloqueo de pantalla con hyprlock con este mismo diseño.
+- **El fork, por ahora, vive en este repo** como el commit de la versión 4.0.0 más el parche. Si hay que cambiarle más, pasa a un repo aparte, como los otros forks.
 
 ## Escritorio
 
@@ -697,17 +712,18 @@ Cómo funciona:
 3. Cada app recibe su archivo y una señal de recarga: Hyprland, Noctalia, terminal, GTK, Qt, Neovim, el monitor y la información del sistema, los iconos, el cursor, el greeter, hyprlock, Plymouth, el instalador y las apps Electron que lo permitan.
 4. El cambio es atómico: se genera todo en un directorio nuevo y se cambia un enlace. Si una plantilla falla, no se aplica nada.
 
-**Cómo está hecho.** Desde la fase 3, y probado en máquina virtual con `tests/theme.py`:
+**Cómo está hecho.** Desde la fase 3, y probado en máquina virtual con `tests/theme.py` y `tests/startup.py`:
 
-- **`kavat-theme`** es un programa en Rust, en `themes/`, con sus paletas y sus plantillas. `kavat-theme set mode light` cambia esa línea de tu archivo y la aplica; `set` admite varios ajustes a la vez, y `apply`, `get`, `list` y `tokens` completan los comandos.
+- **`kavat-theme`** es un programa en Rust, en `themes/`, con sus paletas y sus plantillas. `kavat-theme set mode light` cambia esa línea de tu archivo y la aplica; `set` admite varios ajustes a la vez, y `apply`, `get`, `list`, `tokens` y `boot` completan los comandos.
 - **Tres capas de ajustes**: los valores de fábrica, `/etc/kavat/theme.toml` para la máquina y `~/.config/kavat/theme.toml`, donde solo están las líneas que cambiaste; tus comentarios se conservan. Un ajuste o un valor que no existe se rechaza diciendo qué se admite.
 - **Una paleta es un archivo TOML** con sus acentos por nombre y, para claro y para oscuro, seis neutros y seis tonos: rojo, verde, amarillo, azul, magenta y cian. Vienen siete: Kavat, Catppuccin, Gruvbox, Tokyo Night, Nord, Rosé Pine y Everforest. Las tuyas van en `~/.config/kavat/palettes/`.
 - **Contraste comprobado al resolver**: el texto, el texto secundario, el acento usado como texto y los seis tonos se ajustan lo justo para llegar a 4,5:1 sobre el fondo de las ventanas, o 7:1 con contraste alto. Así una paleta puede traer los colores originales de su familia. De ahí salen 47 colores y 17 valores.
 - **Una plantilla es una carpeta** con los archivos de una app y un `template.toml` que dice dónde va cada uno y con qué orden se avisa a la app. Las tuyas van en `~/.config/kavat/templates/` y pueden sustituir a una del sistema.
 - **Dónde quedan los archivos**: en `~/.local/state/kavat/theme/`, una carpeta por generación, y el enlace `current` apunta a la que está en uso. Aplicar dos veces lo mismo no cambia nada.
-- **Hoy siguen el tema** Hyprland (bordes, esquinas, separación, desenfoque, sombras y animaciones), Kitty (colores, fuente y opacidad), Noctalia (paleta, modo, esquinas y fuente; sus plantillas para otras apps y su asistente de primer arranque quedan apagados) y GTK (colores y preferencia de claro u oscuro). Hyprland pide el tema al cargar su configuración, así que el primer inicio de sesión y el modo seguro ya salen con él.
+- **El arranque y el login** tienen sus propias plantillas, en `themes/boot/`, y se aplican aparte con `kavat-theme boot`, porque son archivos del sistema: lo cuenta la sección «Arranque».
+- **Hoy siguen el tema** Hyprland (bordes, esquinas, separación, desenfoque, sombras y animaciones), Kitty (colores, fuente y opacidad; en claro deja pasar menos el fondo, para no agrisarse), Noctalia (paleta, modo, esquinas y fuente; sus plantillas para otras apps y su asistente de primer arranque quedan apagados) y GTK (colores y preferencia de claro u oscuro). Hyprland pide el tema al cargar su configuración, así que el primer inicio de sesión y el modo seguro ya salen con él.
 - **Los textos no llegan a ser código**: un nombre de fuente o de paleta solo admite letras, dígitos, espacios y `- _ . #`, porque acaba dentro de los archivos de configuración de otras apps.
-- **Queda para más adelante en esta fase**: el modo automático por hora, los perfiles y las reglas, el tema desde el fondo, la sobrescritura por app, `kavat-theme add`, los iconos y el cursor, y las plantillas del resto: Qt, Neovim, Yazi, el greeter, hyprlock, Plymouth, GRUB y el instalador.
+- **Queda para más adelante en esta fase**: el modo automático por hora, los perfiles y las reglas, el tema desde el fondo, la sobrescritura por app, `kavat-theme add`, los iconos y el cursor, que el arranque siga solo al tema del escritorio, y las plantillas del resto: Qt, Neovim, Yazi, hyprlock y el instalador.
 
 **Iconos y cursor.** También salen de los tokens, así que cambian con la paleta, el modo y el acento.
 
@@ -1120,7 +1136,7 @@ Cómo van los de la fase 2, a 13 de noviembre de 2026:
 - **Comprobados en máquina virtual**: el modo seguro arranca el escritorio sin leer la configuración del usuario; el modo seguro automático tras un arranque fallido funciona con GRUB sobre Btrfs, porque el bloque de entorno de GRUB vive en la partición EFI; GRUB arranca cada snapshot con su kernel, con y sin cifrado; y con el disco cifrado no se pide ninguna contraseña.
 - **Resuelto por diseño**: el desbloqueo por TPM2 no depende de mkinitcpio, porque la llave está atada al PCR 7, que mide el firmware.
 - **Comprobado en hardware real** (13 de noviembre de 2026, en el PC de escritorio, junto a CachyOS y Windows): la instalación compartiendo la partición EFI de CachyOS, el arranque, arrancar un snapshot con `kavat-boot-once` y volver a él con `kavat-rollback`.
-- **Pasa a la fase 3**: que GRUB, Plymouth y el login enlacen sin parpadeo en la RX 6800. Se mira cuando tengan su tema, que hoy no tienen.
+- **Pasa a la fase 3**: que GRUB, Plymouth y el login enlacen sin parpadeo en la RX 6800. Ya tienen su tema; en máquina virtual el menú y la pantalla de carga enlazan sin corte, y falta mirarlo en el PC.
 - **Pasa a la fase 3**: la prueba tras actualizar. Detectar el arranque roto ya funciona, porque es el mismo mecanismo del modo seguro; ofrecer volver atrás le corresponde a `kav`.
 
 De Omarchy se tomó la idea del selector de temas que cambia todo el sistema. Sus atajos y sus valores por defecto no se siguen; sus mecanismos solo entran uno a uno y con tu aprobación, y los aprobados están en «Ideas de otras distros».

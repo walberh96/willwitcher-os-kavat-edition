@@ -467,7 +467,9 @@ pub fn resolve(settings: &Settings, palette: &Palette) -> Result<Tokens, String>
     value("shadows", Token::Flag(settings.flag("effects.shadows")));
     let transparency = settings.flag("effects.transparency");
     value("transparency", Token::Flag(transparency));
-    value("opacity", Token::Number(if transparency { 0.9 } else { 1.0 }));
+    // What is behind a window is usually darker than a light theme: it shows through less,
+    // so that a light window stays light.
+    value("opacity", Token::Number(if !transparency { 1.0 } else if dark { 0.9 } else { 0.96 }));
     let speed = settings.number("effects.animations");
     value("animations", Token::Flag(speed > 0.0));
     value("animation_speed", Token::Number(if speed > 0.0 { speed } else { 1.0 }));

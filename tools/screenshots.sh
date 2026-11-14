@@ -5,8 +5,9 @@
 #   no names     retake all of them
 #   with names   retake only those, e.g. tools/screenshots.sh notes settings-agent
 #
-# Needs Chrome or Chromium; it runs without a window. The mockup shows the current
-# time in its bar, so a retaken screenshot always differs from the committed one.
+# Needs Chrome or Chromium; it runs without a window. On Linux it also needs the fonts
+# the system uses, Inter and JetBrains Mono. The mockup shows the current time in its
+# bar, so a retaken screenshot always differs from the committed one.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -83,7 +84,10 @@ for spec in "${shots[@]}"; do
   if [ "$#" -gt 0 ]; then
     case " $* " in *" $name "*) ;; *) continue ;; esac
   fi
+  # The mockup asks for the font of the system it runs on. On Linux that is told to be
+  # Inter, the system's own font, so that a screenshot does not depend on the machine's.
   "$browser" --headless=new --disable-gpu --hide-scrollbars --window-size=1600,1000 \
+    --system-font-family=Inter \
     --screenshot="$root/docs/screenshots/$name.png" \
     "file://$root/docs/mockup/index.html#bare=true&$state" >/dev/null 2>&1
   echo "$name"

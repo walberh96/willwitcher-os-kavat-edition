@@ -1,0 +1,20 @@
+# The loading screen. Plymouth reads its look from /usr/share/plymouth/themes, and a copy
+# travels inside the boot image so that it shows from the first moment: the command puts
+# the files there and builds the boot image again when they changed.
+
+reload = [["sh", "install"]]
+
+[[file]]
+from = "kavat.plymouth"
+
+[[file]]
+from = "kavat.script"
+
+[[file]]
+from = "ring.svg"
+
+[[file]]
+from = "name.svg"
+
+[[file]]
+from = "hint.svg"

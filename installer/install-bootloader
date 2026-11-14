@@ -19,4 +19,11 @@ fi
 
 rm -rf /boot/grub
 ln -s /efi/grub /boot/grub
+
+# The boot menu, the loading screen and the login screen get the look of the system's
+# theme. The loading screen travels inside the boot image, which the installer builds right
+# after this, so it is not built here. A look that cannot be made is no reason to stop:
+# the three screens work without one.
+KAVAT_THEME_BOOT_IMAGE=later kavat-theme boot || echo 'kavat-theme: the boot keeps its plain look' >&2
+
 grub-mkconfig -o /boot/grub/grub.cfg

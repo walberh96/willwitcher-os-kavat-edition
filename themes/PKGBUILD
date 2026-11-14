@@ -1,12 +1,17 @@
 pkgname=kavat-theme
 pkgver=0.1.0
-pkgrel=1
+pkgrel=5
 pkgdesc="Willwitcher-OS Kavat Edition: the theme system, with its palettes and its templates"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
-# the two fonts the default theme names
-depends=('gcc-libs' 'inter-font' 'ttf-jetbrains-mono')
+# the two fonts the default theme names; what makes the pictures and finds the fonts for
+# the boot menu and the loading screen; and where GTK apps, and the others that ask the
+# desktop, read whether the theme is light or dark
+depends=('gcc-libs' 'inter-font' 'ttf-jetbrains-mono' 'librsvg' 'fontconfig' 'polkit'
+         'dconf' 'gsettings-desktop-schemas')
+optdepends=('grub: the boot menu follows the theme'
+            'plymouth: the loading screen follows the theme')
 makedepends=('cargo')
 # no separate package of debugging symbols
 options=('!debug')
@@ -25,6 +30,7 @@ check() {
 package() {
   install -Dm755 "$srcdir/target/release/kavat-theme" "$pkgdir/usr/bin/kavat-theme"
   install -Dm644 "$startdir/theme.toml" "$pkgdir/usr/share/kavat/themes/theme.toml"
-  cp -r "$startdir/palettes" "$startdir/templates" "$pkgdir/usr/share/kavat/themes/"
+  install -Dm644 "$startdir/org.kavat.theme.policy" "$pkgdir/usr/share/polkit-1/actions/org.kavat.theme.policy"
+  cp -r "$startdir/palettes" "$startdir/templates" "$startdir/boot" "$pkgdir/usr/share/kavat/themes/"
   chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat"
 }

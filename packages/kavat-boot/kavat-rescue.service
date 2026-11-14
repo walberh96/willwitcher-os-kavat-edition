@@ -1,0 +1,24 @@
+# Part of kavat-boot. Runs kavat-rescue on the screen, as root. When it ends, the system
+# goes on to start as usual.
+[Unit]
+Description=Recovery console
+DefaultDependencies=no
+Conflicts=shutdown.target
+After=sysinit.target plymouth-start.service
+Before=shutdown.target
+
+[Service]
+Environment=HOME=/root
+WorkingDirectory=-/root
+ExecStartPre=-/usr/bin/plymouth --wait quit
+# getting this far is not a boot that failed, wherever it goes from here
+ExecStartPre=-/usr/lib/kavat/boot-state desktop
+ExecStart=/usr/bin/kavat-rescue
+ExecStopPost=-/usr/bin/systemctl --no-block default
+Type=idle
+StandardInput=tty-force
+StandardOutput=inherit
+StandardError=inherit
+KillMode=process
+IgnoreSIGPIPE=no
+SendSIGHUP=yes

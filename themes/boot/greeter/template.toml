@@ -1,0 +1,5 @@
+# The login screen. kavat-greeter's page reads these values straight from the generated
+# folder each time it shows, so there is nothing to put anywhere else.
+
+[[file]]
+from = "tokens.css"

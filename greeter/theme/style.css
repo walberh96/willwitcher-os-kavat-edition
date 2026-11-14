@@ -1,0 +1,160 @@
+/* The login screen of Willwitcher-OS Kavat Edition.
+ *
+ * Every colour, the roundness and the fonts come from the theme of the system: kavat-theme
+ * writes them as the variables below, in a file that index.html loads after this one. The
+ * values here are the Kavat theme in dark, for a system where it has not been applied yet.
+ *
+ * Sizes are in em, and one em follows the height of the screen, so the screen looks the
+ * same at any resolution. */
+
+:root {
+  --bg: #0d0f14;
+  --surface: #151821;
+  --surface2: #1e2230;
+  --text: #e8e6df;
+  --muted: #8b90a0;
+  --border: #2a2f3f;
+  --accent: #f2a93b;
+  --accent-text: #f2a93b;
+  --on-accent: #14110a;
+  --danger: #ff6b6b;
+  --radius: 10px;
+  --font-ui: "Inter";
+  --font-mono: "JetBrains Mono";
+  --scale: 1;
+  --picture: none;
+}
+
+* { box-sizing: border-box; margin: 0; }
+
+html {
+  font-size: calc(100vh / 62.5 * var(--scale));
+  height: 100%;
+}
+
+body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg) var(--picture) center / cover no-repeat;
+  color: var(--text);
+  font-family: var(--font-ui), "Inter", "Inter Variable", sans-serif;
+  cursor: default;
+  user-select: none;
+}
+
+/* Leaving for the desktop: the screen empties onto the picture, which stays. */
+body.leaving main, body.leaving .corner { opacity: 0; }
+
+main {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: .6em;
+  transition: opacity .25s;
+}
+
+.clock { font-size: 8.5em; font-weight: 200; letter-spacing: -.04em; line-height: 1; }
+.date { font-size: 1.25em; color: var(--muted); margin-bottom: 2.2em; }
+.date::first-letter { text-transform: uppercase; }
+
+.avatar {
+  width: 5.4em;
+  height: 5.4em;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  border: .2em solid var(--surface);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.avatar svg { width: 3em; height: 3em; }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+.name { font-size: 1.15em; font-weight: 600; margin: .3em 0 .5em; }
+
+/* The others who can log in, when there is more than one person. */
+.people { display: flex; gap: .7em; margin-bottom: .4em; }
+.people:empty { display: none; }
+.people button {
+  width: 2.6em;
+  height: 2.6em;
+  padding: 0;
+  border-radius: 50%;
+  border: .12em solid var(--border);
+  background: var(--surface2);
+  color: var(--muted);
+  font: inherit;
+  font-weight: 600;
+  overflow: hidden;
+  cursor: pointer;
+}
+.people button:hover, .people button:focus-visible { border-color: var(--accent); color: var(--text); outline: none; }
+.people button img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+.password {
+  width: 19em;
+  padding: .75em 1.1em;
+  display: flex;
+  align-items: center;
+  gap: .7em;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: .1em solid var(--border);
+  border-radius: var(--radius);
+  transition: border-color .15s;
+}
+.password:focus-within { border-color: var(--accent); }
+.password input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: none;
+  color: var(--text);
+  caret-color: var(--accent-text);
+  font: inherit;
+  letter-spacing: .3em;
+}
+.password .enter { border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; padding: 0; }
+.password.busy { opacity: .6; }
+.password.wrong { border-color: var(--danger); animation: no .3s; }
+@keyframes no {
+  25% { transform: translateX(-.5em); }
+  75% { transform: translateX(.5em); }
+}
+
+.message { min-height: 1.4em; font-size: .95em; color: var(--muted); }
+.message.wrong { color: var(--danger); }
+
+/* Session, keyboard and power stay out of sight until the pointer goes down there. */
+.corner {
+  position: absolute;
+  bottom: 1.6em;
+  display: flex;
+  gap: .7em;
+  align-items: center;
+  font-size: .9em;
+  opacity: 0;
+  transition: opacity .25s;
+}
+.corner.left { left: 1.8em; }
+.corner.right { right: 1.8em; }
+body.awake .corner, .corner:focus-within { opacity: 1; }
+
+.pill {
+  display: flex;
+  align-items: center;
+  gap: .4em;
+  padding: .4em .9em;
+  border-radius: calc(var(--radius) * .7);
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: .1em solid var(--border);
+  color: var(--text);
+  font: inherit;
+}
+button.pill { cursor: pointer; }
+button.pill:hover, button.pill:focus-visible { border-color: var(--accent); outline: none; }
+[hidden] { display: none !important; }

@@ -18,18 +18,13 @@ import os
 import sys
 import time
 
-from machine import BOOT_TIMEOUT, Checks, Machine, check_desktop, over_installed, print_journal
+from machine import BOOT_TIMEOUT, Checks, Machine, check_desktop, log_in, over_installed, print_journal
 
 USER, PASSWORD = 'tester', 'kavat-123'  # as tests/install.py made them
 BROKEN = f'/home/{USER}/.config/hypr/hyprland.lua'
 STATE = "grub-editenv /boot/grub/grubenv list | sed -n 's/^kavat_boot=//p'"
 
 
-def log_in(machine):
-    machine.wait_until('systemctl is-active lightdm', 60)
-    time.sleep(5)  # the login screen takes a moment to listen
-    machine.screen.type(PASSWORD)
-    machine.screen.press('enter')
 
 
 def main():
@@ -49,7 +44,7 @@ def main():
             machine.run(f"install -d -o {USER} -g {USER} $(dirname {BROKEN}) && "
                         f"echo 'os.exit(1)' > {BROKEN} && "
                         f"chown {USER}: {BROKEN}")
-            log_in(machine)
+            log_in(machine, PASSWORD)
             status, output = machine.wait_until(f'[ "$({STATE})" = session ]', 60)
             checks.report(status == 0, 'the login is recorded', machine.run(STATE)[1])
             time.sleep(30)
@@ -69,7 +64,7 @@ def main():
         if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the system boots on its own'):
             status, output = machine.run('cat /proc/cmdline')
             checks.report('kavat.safe=1' in output, 'GRUB chose safe mode', output)
-            log_in(machine)
+            log_in(machine, PASSWORD)
             check_desktop(machine, checks, USER)
             status, output = machine.run(f'test -s {BROKEN}')
             checks.report(status == 0, "the user's broken file was ignored, not deleted", output)

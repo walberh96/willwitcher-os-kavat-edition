@@ -1,0 +1,9 @@
+# What the boot menu, the loading screen and the login screen share: the picture behind
+# them, one for the three so that nothing jumps from one to the next, and the logo. Each
+# of them takes these from here.
+
+[[file]]
+from = "background.svg"
+
+[[file]]
+from = "logo.svg"

@@ -1,0 +1,6 @@
+# What the command that installs the boot menu needs from the theme, for the shell.
+accent="{{ accent }}"
+radius="{{ radius }}"
+border="{{ border_size }}"
+font_ui="{{ font_ui }}"
+font_mono="{{ font_mono }}"

@@ -18,10 +18,21 @@ usage: kavat-theme <command>
   set <setting> <value>…   change settings in ~/.config/kavat/theme.toml and apply them,
                            e.g. kavat-theme set mode light, or set palette nord accent frost
   get [setting]            the settings in force
+  boot                     give the boot menu, the loading screen and the login screen the
+                           look in force; they are system files, so it asks for a password
   list                     the palettes, each with its accents
   tokens                   every colour and value the templates can use
 
 The settings and what each one takes are in /usr/share/kavat/themes/theme.toml.";
+
+/// Prints a line. When whoever was reading has gone, as in `kavat-theme tokens | head`,
+/// there is nothing left to say.
+fn say(line: &str) {
+    use std::io::Write;
+    if writeln!(std::io::stdout(), "{line}").is_err() {
+        std::process::exit(0);
+    }
+}
 
 fn show(token: &Token) -> String {
     match token {
@@ -38,7 +49,7 @@ fn apply(paths: &Paths, user: Option<&toml_edit::DocumentMut>, reload: bool) -> 
     let tokens = apply::tokens(paths, &settings)?;
     let plan = apply::plan(paths, &tokens)?;
     if user.is_none() && apply::commit(paths, &plan)? && reload {
-        apply::reload(&plan);
+        apply::reload(paths, &plan);
     }
     Ok(plan)
 }
@@ -64,12 +75,60 @@ fn set(paths: &Paths, pairs: &[String]) -> Result<(), String> {
     std::fs::write(&fresh, document.to_string()).map_err(problem)?;
     std::fs::rename(&fresh, &file).map_err(problem)?;
     if apply::commit(paths, &plan)? {
-        apply::reload(&plan);
+        apply::reload(paths, &plan);
     }
     Ok(())
 }
 
+/// The look of the screens before the desktop. They are files of the system, so the work
+/// is done as root: a person's command hands over the settings in force, and nothing else,
+/// to the same command run through pkexec. Root keeps the settings it was handed, so that
+/// run again with none, as the installer and an update do, it gives the same look; until
+/// someone hands it any, the look is the machine's own.
+fn boot(pairs: &[String]) -> Result<(), String> {
+    let root = std::fs::metadata("/proc/self").is_ok_and(|me| std::os::unix::fs::MetadataExt::uid(&me) == 0);
+    if !root {
+        if !pairs.is_empty() {
+            return Err("boot takes no settings: it uses the ones in force".into());
+        }
+        let settings = apply::settings(&Paths::from_environment()?, None)?;
+        let program = std::env::current_exe().map_err(|error| error.to_string())?;
+        let mut command = std::process::Command::new("pkexec");
+        command.arg(program).arg("boot");
+        for (key, _) in KEYS {
+            command.arg(key).arg(show(settings.get(key)));
+        }
+        return match command.status() {
+            Ok(status) if status.success() => Ok(()),
+            Ok(_) => Err("the boot keeps the look it had".into()),
+            Err(error) => Err(format!("pkexec: {error}")),
+        };
+    }
+    if !pairs.len().is_multiple_of(2) {
+        return Err("boot takes settings in pairs: kavat-theme boot mode light".into());
+    }
+    let paths = Paths::for_the_system();
+    let kept = paths.state.join("settings.toml");
+    let mut given = if pairs.is_empty() { apply::read_document(&kept)?.unwrap_or_default() } else { toml_edit::DocumentMut::new() };
+    for pair in pairs.chunks(2) {
+        theme::write_setting(&mut given, &pair[0], &pair[1]).map_err(|problem| match problem {
+            theme::WriteProblem::Value(problem) => problem,
+            theme::WriteProblem::NotASection(part) => format!("{part} is not a section"),
+        })?;
+    }
+    let settings = apply::settings(&paths, Some(&given))?;
+    let plan = apply::plan(&paths, &apply::tokens(&paths, &settings)?)?;
+    apply::commit(&paths, &plan)?;
+    if !pairs.is_empty() {
+        std::fs::write(&kept, given.to_string()).map_err(|error| format!("{}: {error}", kept.display()))?;
+    }
+    apply::install(&paths, &plan)
+}
+
 fn run(arguments: &[String]) -> Result<(), String> {
+    if arguments.first().is_some_and(|command| command == "boot") {
+        return boot(&arguments[1..]);
+    }
     let paths = Paths::from_environment()?;
     match arguments.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
         ["apply"] => apply(&paths, None, true).map(drop),
@@ -78,14 +137,14 @@ fn run(arguments: &[String]) -> Result<(), String> {
         ["get"] => {
             let settings = apply::settings(&paths, None)?;
             for (key, _) in KEYS {
-                println!("{key} = {}", show(settings.get(key)));
+                say(&format!("{key} = {}", show(settings.get(key))));
             }
             Ok(())
         }
         ["get", key] => {
             let settings = apply::settings(&paths, None)?;
             theme::kind_of(key).ok_or_else(|| theme::parse_value(key, "").unwrap_err())?;
-            println!("{}", show(settings.get(key)));
+            say(&show(settings.get(key)));
             Ok(())
         }
         ["list"] => {
@@ -98,19 +157,19 @@ fn run(arguments: &[String]) -> Result<(), String> {
                     (Some(_), None) => "dark only",
                     _ => "light only",
                 };
-                println!("{id}: {}, {modes}; accents: {}", palette.name, accents.join(", "));
+                say(&format!("{id}: {}, {modes}; accents: {}", palette.name, accents.join(", ")));
             }
             Ok(())
         }
         ["tokens"] => {
             let settings = apply::settings(&paths, None)?;
             for (name, token) in apply::tokens(&paths, &settings)? {
-                println!("{name} {}", show(&token));
+                say(&format!("{name} {}", show(&token)));
             }
             Ok(())
         }
         [] | ["help"] | ["--help"] | ["-h"] => {
-            println!("{USAGE}");
+            say(USAGE);
             Ok(())
         }
         _ => Err(format!("that is not a command\n\n{USAGE}")),

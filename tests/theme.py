@@ -18,7 +18,7 @@ import os
 import sys
 import time
 
-from machine import BOOT_TIMEOUT, Checks, Machine, check_desktop, over_installed, print_journal
+from machine import BOOT_TIMEOUT, Checks, Machine, check_desktop, log_in, over_installed, print_journal
 
 USER, PASSWORD = 'tester', 'kavat-123'  # as tests/install.py made them
 KITTY = '/tmp/kitty-test'  # where the test's Kitty listens
@@ -65,10 +65,7 @@ def main():
     try:
         if not checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the installed system boots'):
             sys.exit(1)
-        machine.wait_until('systemctl is-active lightdm', 60)
-        time.sleep(5)  # the login screen takes a moment to listen
-        machine.screen.type(PASSWORD)
-        machine.screen.press('enter')
+        log_in(machine, PASSWORD)
         check_desktop(machine, checks, USER)
 
         print('the theme of a user who never chose one', flush=True)

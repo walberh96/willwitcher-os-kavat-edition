@@ -1,0 +1,16 @@
+#!/bin/sh
+# Part of kavat-boot. Writes the boot menu's Firmware settings entry, on a machine whose
+# firmware can be asked to open its settings. It takes the place of GRUB's own,
+# 30_uefi-firmware, which kavat-boot switches off: this one comes after the snapshots.
+set -e
+
+cat << 'EOF2'
+if [ "${grub_platform}" = efi ]; then
+  fwsetup --is-supported
+  if [ "$?" = 0 ]; then
+    menuentry 'Firmware settings' --class kavat --id kavat-firmware {
+      fwsetup
+    }
+  fi
+fi
+EOF2

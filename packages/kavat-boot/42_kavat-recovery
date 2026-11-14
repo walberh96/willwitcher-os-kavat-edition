@@ -1,0 +1,30 @@
+#!/bin/sh
+# Part of kavat-boot. Writes the boot menu's Recovery entry: the system up to its disks and
+# no further, with kavat-rescue on the screen instead of the desktop. It boots with the
+# fallback kernel when there is one, and shows the boot messages.
+set -e
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+. "$pkgdatadir/grub-mkconfig_lib"
+
+kernel=linux-lts
+[ -f "/boot/vmlinuz-${kernel}" ] || kernel=linux-zen
+[ -f "/boot/vmlinuz-${kernel}" ] || exit 0
+boot="$(make_system_path_relative_to_its_root /boot)"
+root="$(make_system_path_relative_to_its_root /)"
+case "${GRUB_FS}" in
+  btrfs) rootflags="rootflags=subvol=${root#/}" ;;
+  *) rootflags="" ;;
+esac
+# the usual options, without the ones that hide the boot behind the loading screen
+options="$(echo " ${GRUB_CMDLINE_LINUX_DEFAULT} " | sed -e 's/ quiet / /g' -e 's/ splash / /g' -e 's/ loglevel=[0-9]* / /g')"
+
+echo "menuentry 'Recovery' --class kavat --id kavat-recovery {"
+prepare_grub_to_access_device "${GRUB_DEVICE_BOOT}" | sed -e 's/^/\t/'
+cat << EOF2
+	linux ${boot}/vmlinuz-${kernel} root=UUID=${GRUB_DEVICE_UUID} rw ${rootflags} ${GRUB_CMDLINE_LINUX} ${options} systemd.unit=kavat-rescue.target
+	initrd ${boot}/initramfs-${kernel}.img
+}
+EOF2

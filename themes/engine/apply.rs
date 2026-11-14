@@ -20,6 +20,9 @@ pub struct Paths {
     pub config: PathBuf,
     /// where the generated files live, ~/.local/state/kavat/theme
     pub state: PathBuf,
+    /// true for the screens before the desktop (the boot menu, the loading screen and the
+    /// login): they belong to the machine, so nothing of a user's is read
+    pub system: bool,
 }
 
 impl Paths {
@@ -36,7 +39,19 @@ impl Paths {
             machine: "/etc/kavat/theme.toml".into(),
             config: folder("XDG_CONFIG_HOME", ".config")?,
             state: folder("XDG_STATE_HOME", ".local/state")?.join("kavat/theme"),
+            system: false,
         })
+    }
+
+    /// The places for the screens before the desktop.
+    pub fn for_the_system() -> Paths {
+        Paths {
+            data: std::env::var_os("KAVAT_THEME_DATA").map_or("/usr/share/kavat/themes".into(), PathBuf::from),
+            machine: "/etc/kavat/theme.toml".into(),
+            config: "/etc".into(),
+            state: "/var/lib/kavat/theme".into(),
+            system: true,
+        }
     }
 
     /// The one file a person edits.
@@ -45,13 +60,20 @@ impl Paths {
     }
 
     pub fn palette_folders(&self) -> Vec<PathBuf> {
+        if self.system {
+            return vec![self.data.join("palettes")];
+        }
         vec![self.config.join("kavat/palettes"), self.data.join("palettes")]
     }
 
     /// The templates by name; one of the user's takes the place of the system's.
     fn templates(&self) -> Result<Vec<Template>, String> {
         let mut folders = BTreeMap::new();
-        for parent in [self.data.join("templates"), self.config.join("kavat/templates")] {
+        let parents = match self.system {
+            true => vec![self.data.join("boot")],
+            false => vec![self.data.join("templates"), self.config.join("kavat/templates")],
+        };
+        for parent in parents {
             for entry in fs::read_dir(parent).into_iter().flatten().filter_map(Result::ok) {
                 if entry.path().join("template.toml").exists() {
                     folders.insert(entry.file_name(), entry.path());
@@ -70,12 +92,14 @@ pub fn read_document(path: &Path) -> Result<Option<DocumentMut>, String> {
     }
 }
 
-/// The settings in force. `user` stands in for the user's file when it is about to change.
+/// The settings in force. `user` stands in for the user's file when it is about to change;
+/// for the system, it is the settings the command was given.
 pub fn settings(paths: &Paths, user: Option<&DocumentMut>) -> Result<Settings, String> {
     let defaults: DocumentMut = DEFAULTS.parse().expect("the defaults are valid");
     let machine = read_document(&paths.machine)?;
-    let on_disk = if user.is_none() { read_document(&paths.user_file())? } else { None };
-    let (machine_name, user_name) = (paths.machine.display().to_string(), paths.user_file().display().to_string());
+    let on_disk = if user.is_none() && !paths.system { read_document(&paths.user_file())? } else { None };
+    let machine_name = paths.machine.display().to_string();
+    let user_name = if paths.system { "the settings given".to_string() } else { paths.user_file().display().to_string() };
     let mut layers = vec![("the defaults", &defaults)];
     if let Some(machine) = &machine {
         layers.push((&machine_name, machine));
@@ -92,7 +116,24 @@ pub struct Plan {
     files: BTreeMap<String, String>,
     /// links to leave where apps look, and the generated file each one leads to
     links: Vec<(PathBuf, String)>,
-    reload: Vec<Vec<String>>,
+    reload: Vec<Step>,
+}
+
+/// A command of a template, run in the template's folder once the files are in place.
+struct Step {
+    template: String,
+    folder: PathBuf,
+    words: Vec<String>,
+}
+
+impl Step {
+    /// The command, ready to run: KAVAT_THEME_FILES tells it where the generated files are.
+    fn command(&self, paths: &Paths) -> Command {
+        let mut command = Command::new(&self.words[0]);
+        command.args(&self.words[1..]).current_dir(&self.folder).env("KAVAT_THEME_FILES", paths.state.join("current"));
+        command.stdin(Stdio::null());
+        command
+    }
 }
 
 pub fn tokens(paths: &Paths, settings: &Settings) -> Result<Tokens, String> {
@@ -113,13 +154,16 @@ pub fn plan(paths: &Paths, tokens: &Tokens) -> Result<Plan, String> {
             if plan.files.insert(rule.to.clone(), filled).is_some() {
                 return Err(format!("two templates write {}", rule.to));
             }
-            if let Some(link) = &rule.link {
-                plan.links.push((paths.config.join(link.trim_start_matches("config:")), rule.to.clone()));
+            match &rule.link {
+                Some(_) if paths.system => return Err(problem("a template for the boot cannot leave links".into())),
+                Some(link) => plan.links.push((paths.config.join(link.trim_start_matches("config:")), rule.to.clone())),
+                None => {}
             }
         }
         for command in &template.reload {
             let words: Result<Vec<String>, String> = command.iter().map(|word| render(word, tokens)).collect();
-            plan.reload.push(words.map_err(|problem| format!("the reload command of {}: {problem}", template.name))?);
+            let words = words.map_err(|problem| format!("the reload command of {}: {problem}", template.name))?;
+            plan.reload.push(Step { template: template.name.clone(), folder: template.folder.clone(), words });
         }
     }
     Ok(plan)
@@ -172,6 +216,28 @@ pub fn commit(paths: &Paths, plan: &Plan) -> Result<bool, String> {
         }
     }
 
+    if paths.system {
+        // The login screen runs as its own user: it has to be able to read these, whatever
+        // permissions the one who ran this gives to new files.
+        fn open(path: &Path) {
+            use std::os::unix::fs::PermissionsExt;
+            let Ok(found) = fs::symlink_metadata(path) else { return };
+            if found.is_dir() {
+                let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o755));
+                for entry in fs::read_dir(path).into_iter().flatten().filter_map(Result::ok) {
+                    open(&entry.path());
+                }
+            } else if found.is_file() {
+                let _ = fs::set_permissions(path, fs::Permissions::from_mode(0o644));
+            }
+        }
+        if let Some(parent) = paths.state.parent() {
+            use std::os::unix::fs::PermissionsExt;
+            let _ = fs::set_permissions(parent, fs::Permissions::from_mode(0o755));
+        }
+        open(&paths.state);
+    }
+
     for (link, place) in &plan.links {
         let target = current.join(place);
         match fs::read_link(link) {
@@ -194,17 +260,30 @@ pub fn commit(paths: &Paths, plan: &Plan) -> Result<bool, String> {
 
 /// Tells the running apps to read their files again, all at once. An app that is not
 /// running, or does not answer, is not an error: it reads its file when it starts.
-pub fn reload(plan: &Plan) {
+pub fn reload(paths: &Paths, plan: &Plan) {
     let running: Vec<_> = plan
         .reload
         .iter()
-        .filter_map(|words| {
-            Command::new(&words[0]).args(&words[1..]).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).spawn().ok()
-        })
+        .filter_map(|step| step.command(paths).stdout(Stdio::null()).stderr(Stdio::null()).spawn().ok())
         .collect();
     for mut child in running {
         let _ = child.wait();
     }
+}
+
+/// For the screens before the desktop: each template's command puts its files where the
+/// system reads them. One at a time and in the open, because these take a while and can
+/// fail; one that fails leaves its screen as it was, and the others still get theirs.
+pub fn install(paths: &Paths, plan: &Plan) -> Result<(), String> {
+    let mut failed = Vec::new();
+    for step in &plan.reload {
+        match step.command(paths).status() {
+            Ok(status) if status.success() => {}
+            Ok(_) => failed.push(step.template.clone()),
+            Err(error) => failed.push(format!("{} ({}: {error})", step.template, step.words[0])),
+        }
+    }
+    if failed.is_empty() { Ok(()) } else { Err(format!("these kept the look they had: {}", failed.join(", "))) }
 }
 
 #[cfg(test)]
@@ -220,6 +299,7 @@ mod tests {
             machine: root.join("etc/theme.toml"),
             config: root.join("config"),
             state: root.join("state/kavat/theme"),
+            system: false,
         }
     }
 
@@ -244,6 +324,30 @@ mod tests {
         // where an app looks, a link leads to the current files
         let palette = fs::read_to_string(paths.config.join("noctalia/palettes/Kavat.json")).unwrap();
         assert!(palette.contains("\"mPrimary\": \"#f2a93b\""), "{palette}");
+    }
+
+    #[test]
+    fn the_screens_before_the_desktop_take_the_machine_s_look_and_nothing_of_a_user() {
+        let mut paths = paths("boot");
+        paths.system = true;
+        write(paths.machine.clone(), "mode = \"light\"\n");
+        write(paths.user_file(), "palette = \"nord\"\n");
+        write(paths.config.join("kavat/templates/mine/template.toml"), "[[file]]\nfrom = \"a.conf\"\n");
+        let settings = settings(&paths, None).unwrap();
+        let plan = plan(&paths, &tokens(&paths, &settings).unwrap()).unwrap();
+        assert_eq!(commit(&paths, &plan), Ok(true));
+        let menu = fs::read_to_string(paths.state.join("current/grub/theme.txt")).unwrap();
+        assert!(menu.contains("desktop-color: \"#ece8de\""), "{menu}");
+        let loading = fs::read_to_string(paths.state.join("current/plymouth/kavat.script")).unwrap();
+        assert!(loading.contains("Window.SetBackgroundTopColor(0.925, 0.910, 0.871);"), "{loading}");
+        assert!(!paths.state.join("current/kitty").exists(), "the desktop's templates are not for the boot");
+        // the settings a person hands over go on top of the machine's
+        let given: DocumentMut = "mode = \"dark\"\n".parse().unwrap();
+        let settings = super::settings(&paths, Some(&given)).unwrap();
+        let plan = super::plan(&paths, &tokens(&paths, &settings).unwrap()).unwrap();
+        assert_eq!(commit(&paths, &plan), Ok(true));
+        let menu = fs::read_to_string(paths.state.join("current/grub/theme.txt")).unwrap();
+        assert!(menu.contains("desktop-color: \"#0d0f14\""), "{menu}");
     }
 
     #[test]

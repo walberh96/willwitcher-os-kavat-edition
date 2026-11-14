@@ -10,8 +10,9 @@ use toml_edit::{DocumentMut, Item};
 
 /// Fills in a template. A token the theme does not have is an error, not an empty space.
 ///
-/// `{{ accent }}` gives `#f2a93b`; `{{ accent | hex }}` gives `f2a93b` and
-/// `{{ accent | rgb }}` gives `242, 169, 59`. Numbers, flags and texts go in as they are.
+/// `{{ accent }}` gives `#f2a93b`; `{{ accent | hex }}` gives `f2a93b`,
+/// `{{ accent | rgb }}` gives `242, 169, 59` and `{{ accent | parts }}` gives each of the
+/// three as a part of one, `0.949, 0.663, 0.231`. Numbers, flags and texts go in as they are.
 pub fn render(text: &str, tokens: &Tokens) -> Result<String, String> {
     let mut out = String::with_capacity(text.len());
     let mut rest = text;
@@ -28,6 +29,10 @@ pub fn render(text: &str, tokens: &Tokens) -> Result<String, String> {
             (Token::Color(colour), None) => colour.to_string(),
             (Token::Color(colour), Some("hex")) => colour.hex(),
             (Token::Color(colour), Some("rgb")) => format!("{}, {}, {}", colour.r, colour.g, colour.b),
+            (Token::Color(colour), Some("parts")) => {
+                let part = |value: u8| f64::from(value) / 255.0;
+                format!("{:.3}, {:.3}, {:.3}", part(colour.r), part(colour.g), part(colour.b))
+            }
             (Token::Number(number), None) => format!("{number}"),
             (Token::Flag(flag), None) => format!("{flag}"),
             (Token::Text(text), None) => text.clone(),
@@ -52,6 +57,7 @@ pub struct FileRule {
 
 pub struct Template {
     pub name: String,
+    pub folder: PathBuf,
     pub files: Vec<FileRule>,
     /// commands that tell the running app to read its file again; they may use tokens
     pub reload: Vec<Vec<String>>,
@@ -94,7 +100,7 @@ impl Template {
                 _ => return Err(problem("reload is a list of commands, each a list of words".into())),
             }
         }
-        Ok(Template { name, files, reload })
+        Ok(Template { name, folder: folder.to_path_buf(), files, reload })
     }
 }
 
@@ -117,6 +123,7 @@ mod tests {
     fn fills_in_each_kind_of_token() {
         let text = "a {{accent}} b {{ accent | hex }} c {{accent|rgb}} d {{radius}} e {{opacity}} f {{blur}} g {{ font }}";
         assert_eq!(render(text, &tokens()).unwrap(), "a #f2a93b b f2a93b c 242, 169, 59 d 10 e 0.9 f true g Inter");
+        assert_eq!(render("{{ accent | parts }}", &tokens()).unwrap(), "0.949, 0.663, 0.231");
     }
 
     #[test]

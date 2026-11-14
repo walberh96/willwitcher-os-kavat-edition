@@ -1,0 +1,78 @@
+#!/bin/sh
+# Part of kavat-theme. Puts the boot menu's look where GRUB reads it, the EFI partition:
+# the pictures as PNG and the fonts in GRUB's own format. The new look is made whole in a
+# folder beside the one in use and takes its place at the end, so a step that fails leaves
+# the menu as it was.
+set -eu
+# what is made here is for everyone to read, whoever runs this
+umask 022
+
+files="${KAVAT_THEME_FILES}"
+. "${files}/grub/values"
+
+if [ ! -d /boot/grub/ ]; then
+  echo "kavat-theme: GRUB is not installed here, so there is no boot menu to give a look" >&2
+  exit 0
+fi
+
+target=/boot/grub/themes/kavat
+fresh="${target}.new"
+rm -rf "${fresh}"
+mkdir -p "${fresh}"
+
+rsvg-convert -o "${fresh}/background.png" "${files}/common/background.svg"
+rsvg-convert -w 64 -h 64 -o "${fresh}/logo.png" "${files}/common/logo.svg"
+
+# The box around the chosen entry. GRUB wants it cut in nine: the corners keep their shape
+# and the sides stretch. Each piece is 12 pixels, so the corner cannot be rounder than that.
+# GRUB moves the chosen entry's text in by the size of its box, so every other entry gets a
+# box of the same size that cannot be seen, and the text stays in line.
+piece=12
+[ "${radius}" -le "${piece}" ] || radius="${piece}"
+[ "${border}" -ge 1 ] || border=1
+[ "${border}" -le 4 ] || border=4
+inset="$(awk "BEGIN { print ${border} / 2 }")"
+inner="$(awk "BEGIN { print ${piece} * 3 - ${border} }")"
+row=0
+for names in "nw n ne" "w c e" "sw s se"; do
+  column=0
+  for name in ${names}; do
+    rsvg-convert -o "${fresh}/select_${name}.png" << EOF2
+<svg xmlns="http://www.w3.org/2000/svg" width="${piece}" height="${piece}" viewBox="$((column * piece)) $((row * piece)) ${piece} ${piece}">
+  <rect x="${inset}" y="${inset}" width="${inner}" height="${inner}" rx="${radius}"
+        fill="${accent}" fill-opacity=".14" stroke="${accent}" stroke-width="${border}"/>
+</svg>
+EOF2
+    rsvg-convert -o "${fresh}/item_${name}.png" << EOF2
+<svg xmlns="http://www.w3.org/2000/svg" width="${piece}" height="${piece}"/>
+EOF2
+    column="$((column + 1))"
+  done
+  row="$((row + 1))"
+done
+
+# GRUB draws text with fonts in its own format, one file for each size, and finds each one
+# by the name written inside it: that name goes into the theme.
+font() {  # font <place in the theme> <family> <style> <pixels>
+  file="$(fc-match --format '%{file}' "$2:style=$3")"
+  index="$(fc-match --format '%{index}' "$2:style=$3")"
+  grub-mkfont --output "${fresh}/$1.pf2" --size "$4" --index "${index}" \
+    --range 0x20-0x7e,0xa0-0x17f,0x2010-0x203a,0x2190-0x2193 "${file}" 2> /dev/null
+  name="$(tail -c +21 "${fresh}/$1.pf2" | head -c 80 | tr '\0' '\n' | head -n 1)"
+  sed -i "s/@$1@/${name}/" "${fresh}/theme.txt"
+}
+cp "${files}/grub/theme.txt" "${fresh}/theme.txt"
+font title "${font_ui}" Bold 36
+font item "${font_ui}" Regular 22
+font small "${font_ui}" Regular 16
+font mono "${font_mono}" Regular 16
+
+rm -rf "${target}.old"
+[ ! -d "${target}" ] || mv "${target}" "${target}.old"
+mv "${fresh}" "${target}"
+rm -rf "${target}.old"
+
+# The menu itself names the theme's fonts: it is written again when there is one to write.
+if [ -f /boot/grub/grub.cfg ]; then
+  grub-mkconfig -o /boot/grub/grub.cfg
+fi

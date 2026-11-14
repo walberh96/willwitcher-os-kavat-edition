@@ -1,0 +1,18 @@
+# GRUB's own scripts for what kavat-boot's scripts write; see kavat-boot.hook.
+post_install() {
+  local script
+  for script in /etc/grub.d/10_linux /etc/grub.d/30_os-prober /etc/grub.d/30_uefi-firmware; do
+    [[ ! -f $script ]] || chmod -x "$script"
+  done
+}
+
+post_upgrade() {
+  post_install
+}
+
+post_remove() {
+  local script
+  for script in /etc/grub.d/10_linux /etc/grub.d/30_os-prober /etc/grub.d/30_uefi-firmware; do
+    [[ ! -f $script ]] || chmod +x "$script"
+  done
+}

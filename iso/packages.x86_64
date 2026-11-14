@@ -28,8 +28,7 @@ networkmanager
 iwd
 wireless-regdb
 
-# Loading screen of the installed system, with Plymouth's own theme until the system's
-# theme exists
+# Loading screen of the installed system. Its look comes from kavat-theme.
 plymouth
 
 # Sound
@@ -48,10 +47,10 @@ hyprland
 noctalia
 kavat-hyprland
 
-# Login screen of the installed system. The live session does not use it.
-# lightdm-gtk-greeter stands in until the system's own greeter exists.
+# Login screen of the installed system: LightDM with the system's own greeter, which draws
+# on an X server. The live session does not use it.
 lightdm
-lightdm-gtk-greeter
+kavat-greeter
 xorg-server
 
 # The installer. It takes itself out of the system it installs.

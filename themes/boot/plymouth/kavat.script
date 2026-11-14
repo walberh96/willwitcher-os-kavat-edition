@@ -1,0 +1,86 @@
+# The loading screen of Willwitcher-OS Kavat Edition. Made by kavat-theme: a change here is
+# lost the next time the theme is applied.
+#
+# The logo with a ring that grows and fades around it, over the same picture as the boot
+# menu. Everything is drawn for a screen 1080 pixels tall and scaled to the one there is.
+
+width = Window.GetWidth();
+height = Window.GetHeight();
+unit = height / 1080;
+
+Window.SetBackgroundTopColor({{ bg | parts }});
+Window.SetBackgroundBottomColor({{ bg | parts }});
+
+# the picture fills the screen; what does not fit is cut, as the boot menu does
+picture = Image("background.png");
+fill = Math.Max(width / picture.GetWidth(), height / picture.GetHeight());
+picture = picture.Scale(picture.GetWidth() * fill, picture.GetHeight() * fill);
+back = Sprite(picture);
+back.SetPosition((width - picture.GetWidth()) / 2, (height - picture.GetHeight()) / 2, -100);
+
+fun Sized(file) {
+    image = Image(file);
+    return image.Scale(image.GetWidth() * unit, image.GetHeight() * unit);
+}
+
+fun Centred(image, y, z) {
+    sprite = Sprite(image);
+    sprite.SetPosition((width - image.GetWidth()) / 2, y - image.GetHeight() / 2, z);
+    return sprite;
+}
+
+middle = height * 0.46;
+logo = Image("logo.png").Scale(120 * unit, 120 * unit);
+logo_sprite = Centred(logo, middle, 10);
+name_sprite = Centred(Sized("name.png"), middle + 152 * unit, 10);
+hint_sprite = Centred(Sized("hint.png"), height - 56 * unit, 10);
+
+# The ring, one picture for each step of its 2.2 seconds, made once.
+steps = 44;
+ring = Image("ring.png");
+for (step = 0; step < steps; step++) {
+    part = step / steps;
+    eased = 1 - (1 - part) * (1 - part);
+    size = 190 * unit * (0.75 + 0.55 * eased);
+    rings[step] = ring.Scale(size, size);
+}
+ring_sprite = Sprite();
+ring_sprite.SetZ(5);
+ticks = 0;
+
+# Plymouth calls this 50 times a second.
+fun Refresh() {
+    step = Math.Int(ticks * 20 / 50) % steps;
+    ticks++;
+    image = rings[step];
+    ring_sprite.SetImage(image);
+    ring_sprite.SetX((width - image.GetWidth()) / 2);
+    ring_sprite.SetY(middle - image.GetHeight() / 2);
+    ring_sprite.SetOpacity(0.7 * (1 - step / steps));
+}
+Plymouth.SetRefreshFunction(Refresh);
+
+# The disk is open by the time this screen shows, so nothing here asks for a password. If
+# something else does, the question goes under the name, with a dot for each character.
+ask_sprite = Sprite();
+dots_sprite = Sprite();
+
+fun Ask(question, typed) {
+    ask = Image.Text(question, {{ text | parts }});
+    dots = "";
+    for (count = 0; count < typed; count++) dots += "•";
+    marks = Image.Text(dots + " ", {{ accent | parts }});
+    ask_sprite.SetImage(ask);
+    ask_sprite.SetPosition((width - ask.GetWidth()) / 2, middle + 200 * unit, 10);
+    dots_sprite.SetImage(marks);
+    dots_sprite.SetPosition((width - marks.GetWidth()) / 2, middle + 200 * unit + ask.GetHeight() * 1.5, 10);
+    ask_sprite.SetOpacity(1);
+    dots_sprite.SetOpacity(1);
+}
+Plymouth.SetDisplayPasswordFunction(Ask);
+
+fun Normal() {
+    ask_sprite.SetOpacity(0);
+    dots_sprite.SetOpacity(0);
+}
+Plymouth.SetDisplayNormalFunction(Normal);

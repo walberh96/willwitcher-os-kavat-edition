@@ -1,0 +1,14 @@
+#!/bin/sh
+# Part of kavat-boot. Writes the boot menu's last entry, Other systems, only when another
+# system is installed on this machine: the entries are the ones GRUB's own script,
+# 30_os-prober, finds. kavat-boot switches that one off so that they come here, at the end
+# and under one name.
+set -e
+
+[ -f /etc/grub.d/30_os-prober ] || exit 0
+found="$(sh /etc/grub.d/30_os-prober)"
+[ -n "${found}" ] || exit 0
+
+echo "submenu 'Other systems' --class kavat --id kavat-other-systems {"
+echo "${found}" | sed -e 's/^/\t/'
+echo "}"

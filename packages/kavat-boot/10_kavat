@@ -1,0 +1,33 @@
+#!/bin/sh
+# Part of kavat-boot. Writes the boot menu's first two entries: the system with its kernel,
+# linux-zen, and the same system with the fallback kernel, linux-lts. They take the place of
+# GRUB's own list of kernels, 10_linux, which kavat-boot switches off.
+set -e
+
+prefix="/usr"
+exec_prefix="/usr"
+datarootdir="/usr/share"
+. "$pkgdatadir/grub-mkconfig_lib"
+
+boot="$(make_system_path_relative_to_its_root /boot)"
+root="$(make_system_path_relative_to_its_root /)"
+case "${GRUB_FS}" in
+  btrfs) rootflags="rootflags=subvol=${root#/}" ;;
+  *) rootflags="" ;;
+esac
+
+entry() {  # entry <name on the menu> <id> <kernel>
+  [ -f "/boot/vmlinuz-$3" ] || return 0
+  echo "menuentry '$1' --class kavat --class os --id $2 {"
+  prepare_grub_to_access_device "${GRUB_DEVICE_BOOT}" | sed -e 's/^/\t/'
+  cat << EOF2
+	linux ${boot}/vmlinuz-$3 root=UUID=${GRUB_DEVICE_UUID} rw ${rootflags} ${GRUB_CMDLINE_LINUX} ${GRUB_CMDLINE_LINUX_DEFAULT}
+	initrd ${boot}/initramfs-$3.img
+}
+EOF2
+}
+
+# The kernel keeps the screen as the menu left it, so the loading screen follows without a cut.
+echo 'set gfxpayload=keep'
+entry 'Willwitcher-OS Kavat Edition' kavat linux-zen
+entry 'Fallback kernel' kavat-fallback linux-lts

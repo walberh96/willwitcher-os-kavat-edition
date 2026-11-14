@@ -1,0 +1,54 @@
+pkgname=kavat-greeter
+pkgver=4.0.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: the login screen, a fork of web-greeter with the system's own page"
+arch=('x86_64')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+# web-greeter is GPL, and so is everything in this folder
+license=('GPL-3.0-or-later')
+depends=('lightdm' 'python' 'pyside6' 'qt6-webengine' 'qt6-webchannel' 'python-gobject' 'libx11' 'libxcb')
+makedepends=('git')
+optdepends=('kavat-theme: the login screen follows the theme of the system')
+backup=('etc/lightdm/kavat-greeter.toml')
+# web-greeter 4.0.0, at the commit of its tag
+_commit=fa111caa929cce4760cfda70a371cb18a7ade496
+source=("web-greeter::git+https://github.com/JezerM/web-greeter.git#commit=$_commit"
+        'system-python.patch' 'kavat-greeter' 'kavat-greeter.desktop' 'kavat-greeter.toml' 'lightdm.conf')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+options=('!debug')
+
+# web-greeter builds itself into one folder with its own Python and its own Qt, which it
+# downloads from PyPI. This fork runs on the Python and the Qt of the system instead, so
+# nothing comes from outside Arch's repositories: the patch takes out the two small
+# libraries that only PyPI has, and gives the greeter its name and its places here.
+prepare() {
+  cd web-greeter
+  patch -p1 < "$srcdir/system-python.patch"
+}
+
+build() {
+  cd web-greeter/src
+  # what the page needs from the greeter itself, in the form Qt reads
+  /usr/lib/qt6/rcc -g python resources/resources.qrc -o resources/rc_resources.py
+  # the small piece that switches the screen off after a while without use
+  gcc $CFLAGS $LDFLAGS -shared -fPIC -o bindings/_screensaver.so bindings/screensaver.c -lX11 -lxcb
+}
+
+package() {
+  local lib="$pkgdir/usr/lib/kavat-greeter"
+  install -d "$lib"
+  cd web-greeter/src
+  cp -r ./*.py bindings bridge browser utils "$lib/"
+  install -Dm644 resources/rc_resources.py "$lib/resources/rc_resources.py"
+  rm -f "$lib/bindings/screensaver.c"
+  # LightDM's user cannot write beside the program, so Python's compiled files are made here
+  python -m compileall -q -d /usr/lib/kavat-greeter "$lib"
+
+  install -Dm755 "$srcdir/kavat-greeter" "$pkgdir/usr/bin/kavat-greeter"
+  install -Dm644 "$srcdir/kavat-greeter.desktop" "$pkgdir/usr/share/xgreeters/kavat-greeter.desktop"
+  install -Dm644 "$srcdir/kavat-greeter.toml" "$pkgdir/etc/lightdm/kavat-greeter.toml"
+  install -Dm644 "$srcdir/lightdm.conf" "$pkgdir/usr/share/lightdm/lightdm.conf.d/50-kavat-greeter.conf"
+  install -d "$pkgdir/usr/share/kavat-greeter/themes"
+  cp -r "$startdir/theme" "$pkgdir/usr/share/kavat-greeter/themes/kavat"
+  chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat-greeter"
+}

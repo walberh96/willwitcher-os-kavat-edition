@@ -310,7 +310,6 @@ body.bare .monitor{width:100vw;border-radius:0;box-shadow:none}
 .ge{display:flex;align-items:baseline;gap:.8em;padding:.55em 1em;border-radius:calc(var(--r)*.6);border:.12em solid transparent;cursor:pointer;color:var(--muted)}
 .ge small{font-size:.75em;opacity:.8}
 .ge.on{color:var(--text);border-color:var(--accent);background:color-mix(in srgb,var(--accent) 14%,transparent)}
-.gdesc{min-height:3em;color:var(--muted);line-height:1.45;max-width:38em}
 .gfoot{display:flex;gap:1.6em;color:var(--muted);font-size:.9em;align-items:center}
 .gfoot b{color:var(--text);font-weight:400;background:var(--surface2);padding:.05em .5em;border-radius:.25em;margin-right:.5em;font-family:var(--mono);font-size:.9em}
 .gsub{position:absolute;left:56%;top:36%;width:34em;display:none;flex-direction:column;gap:.15em;padding:1em}
@@ -579,8 +578,7 @@ body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
     <div class="gveil"></div>
     <div class="gwrap">
       <div class="ghead"><svg class="logo" viewBox="0 0 100 100" fill="currentColor"><path d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/></svg><div><b>Willwitcher-OS</b><small>Kavat Edition</small></div></div>
-      <div class="gmenu"><div class="ge" data-g="main"><span>Willwitcher-OS Kavat Edition</span></div><div class="ge" data-g="lts"><span>Willwitcher-OS</span><small>fallback kernel · linux-lts</small></div><div class="ge" data-g="safe"><span>Safe mode</span><small>factory configuration</small></div><div class="ge" data-g="snaps"><span>Snapshots</span><small>›</small></div><div class="ge" data-g="rescue"><span>Recovery</span></div><div class="ge" data-g="fw"><span>Firmware settings</span></div></div>
-      <div class="gdesc js-gdesc"></div>
+      <div class="gmenu"><div class="ge" data-g="main"><span>Willwitcher-OS Kavat Edition</span></div><div class="ge" data-g="lts"><span>Fallback kernel</span></div><div class="ge" data-g="safe"><span>Safe mode</span></div><div class="ge" data-g="snaps"><span>Snapshots</span><small>›</small></div><div class="ge" data-g="rescue"><span>Recovery</span></div><div class="ge" data-g="fw"><span>Firmware settings</span></div></div>
       <div class="gfoot"><span class="js-gcount">Booting in 3 s</span><span><b>↑↓</b>select</span><span data-act="boot" style="cursor:pointer"><b>Enter</b>boot</span><span><b>e</b>edit</span><span><b>c</b>console</span></div>
     </div>
     <div class="gsub glass js-gsub"><div class="sec">Bootable snapshots</div><div class="gs"><span class="acc">#216</span><span class="muted" style="width:7.5em;flex:none">today 14:20</span><span>before update</span></div><div class="gs"><span class="acc">#215</span><span class="muted" style="width:7.5em;flex:none">today 14:02</span><span>before install obs-studio</span></div><div class="gs"><span class="acc">#214</span><span class="muted" style="width:7.5em;flex:none">Tue 09:12</span><span>before update · 38 packages</span></div><div class="gs"><span class="acc">#213</span><span class="muted" style="width:7.5em;flex:none">Mon 21:40</span><span>before install vesktop-bin</span></div><div class="gs"><span class="acc">#212</span><span class="muted" style="width:7.5em;flex:none">Sun 18:05</span><span>before removing 7 orphans</span></div><div class="gs"><span class="acc">#210</span><span class="muted" style="width:7.5em;flex:none">Nov 02</span><span>“fresh install”</span><span class="sp"></span><span class="info">pinned</span></div></div>
@@ -1175,16 +1173,9 @@ function apply(){
   $$('.js-bprofile').forEach(e=>e.textContent=inc?'Incognito':g?'Gamer':'Coder');
   $$('.js-btitle').forEach(e=>e.textContent=inc?'Kavat Browser · Incognito':'Kavat Browser');
   $$('.js-agstatus').forEach(e=>e.textContent=inc?'local · VPN · history off':'local · offline · 3.6 GB');
-  const GD={main:'Normal start: linux-zen, your configuration, your theme.',
-    lts:'The same system on the long-term kernel, for when a kernel update misbehaves.',
-    safe:'Starts with the factory configuration. Your config files are ignored, not deleted. The agent, autostart apps and live wallpapers stay off.',
-    snaps:'Boot the system as it was before a change. Each snapshot starts with its own kernel, and /home is left untouched.',
-    rescue:'A rescue console with kavat-rescue: mount the system, enter it, restore a snapshot.',
-    fw:'Restart into the UEFI firmware settings.'};
   $$('[data-g]').forEach(e=>e.classList.toggle('on',e.dataset.g===S.gsel));
   $$('.js-gsub').forEach(e=>e.classList.toggle('on',S.gsel==='snaps'));
-  $$('.js-gdesc').forEach(e=>e.textContent=GD[S.gsel]);
-  $$('.js-gcount').forEach(e=>e.textContent=S.gsel==='main'?'Booting in 3 s':'Countdown stopped');
+  $$('.js-gcount').forEach(e=>e.style.display=S.gsel==='main'?'':'none');
   $$('[data-ps]').forEach(e=>e.classList.toggle('on',e.dataset.ps===S.ps));
   const cf=S.scene==='editor'?CFG[S.cfg]:null;screen_.dataset.edcfg=!!cf;
   $$('.js-cfgpath').forEach(e=>e.textContent=(CFG[S.spage]||[''])[0]);

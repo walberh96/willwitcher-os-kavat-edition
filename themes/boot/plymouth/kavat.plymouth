@@ -1,0 +1,8 @@
+[Plymouth Theme]
+Name=Kavat
+Description=The loading screen of Willwitcher-OS Kavat Edition, made by kavat-theme
+ModuleName=script
+
+[script]
+ImageDir=/usr/share/plymouth/themes/kavat
+ScriptFile=/usr/share/plymouth/themes/kavat/kavat.script

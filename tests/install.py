@@ -21,7 +21,8 @@ import subprocess
 import sys
 import time
 
-from machine import BOOT_TIMEOUT, ROOT, Checks, Machine, check_desktop, check_packages, newest_iso, print_journal
+from machine import (BOOT_TIMEOUT, ROOT, Checks, Machine, check_desktop, check_packages, newest_iso, print_journal,
+                     wait_for_login_screen)
 
 USER = 'tester'
 PASSWORD = 'kavat-123'
@@ -176,6 +177,8 @@ def check_installed(machine, checks):
     checks.report(status == 0, 'the login screen is up', output)
     status, output = machine.run('systemctl --failed --no-legend')
     checks.report(not output, 'no service failed', output)
+    status, output = machine.run("stat -c '%a' /etc/fstab /etc/locale.conf /etc/default/grub /var/lib/kavat/theme | sort -u | tr '\\n' ' '")
+    checks.report(output == '644 755', 'what the installer wrote can be read by everyone', output)
 
 
 def boot_with_password(disk, firmware, checks, pictures):
@@ -237,7 +240,7 @@ def main():
                     check_encrypted(machine, checks)
                 check_installed(machine, checks)
                 check_packages(machine, checks)
-                time.sleep(5)  # the login screen takes a moment to listen
+                checks.report(wait_for_login_screen(machine), 'the login screen shows who logs in')
                 machine.screen.picture(f'{pictures}/login.png')
                 machine.screen.type(PASSWORD)
                 machine.screen.press('enter')

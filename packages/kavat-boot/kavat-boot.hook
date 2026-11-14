@@ -1,0 +1,15 @@
+# Part of kavat-boot. GRUB's own scripts for the list of kernels, the other systems and the
+# firmware settings are switched off each time the grub package brings them back: the boot
+# menu's entries come from kavat-boot's scripts, with their names and in their order.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Type = Path
+Target = etc/grub.d/10_linux
+Target = etc/grub.d/30_os-prober
+Target = etc/grub.d/30_uefi-firmware
+
+[Action]
+Description = Leaving the boot menu's entries to kavat-boot...
+When = PostTransaction
+Exec = /usr/bin/chmod -x /etc/grub.d/10_linux /etc/grub.d/30_os-prober /etc/grub.d/30_uefi-firmware

@@ -1,0 +1,7 @@
+# Part of kavat-boot. What the boot menu's Recovery entry starts: the system up to its
+# disks, and kavat-rescue on the screen.
+[Unit]
+Description=Recovery console
+Requires=sysinit.target kavat-rescue.service
+After=sysinit.target kavat-rescue.service
+AllowIsolate=yes

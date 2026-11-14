@@ -1,0 +1,45 @@
+<!doctype html>
+<!-- The login screen of Willwitcher-OS Kavat Edition: a clock, who you are and where the
+     password goes. The rest shows when the pointer goes down to the bottom of the screen. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Willwitcher-OS Kavat Edition</title>
+  <link rel="stylesheet" href="style.css">
+  <!-- The look in force, made by kavat-theme. Until it has been applied once, the values
+       in style.css stand. -->
+  <link rel="stylesheet" href="web-greeter://app/var/lib/kavat/theme/current/greeter/tokens.css">
+</head>
+<body>
+  <main>
+    <div class="clock" id="clock"></div>
+    <div class="date" id="date"></div>
+    <div class="people" id="people"></div>
+    <div class="avatar" id="avatar"></div>
+    <div class="name" id="name"></div>
+    <form class="password" id="form">
+      <input type="password" id="password" autocomplete="off" spellcheck="false" autofocus>
+      <button type="submit" class="enter" tabindex="-1" aria-label="Log in">↵</button>
+    </form>
+    <div class="message" id="message"></div>
+  </main>
+
+  <div class="corner left">
+    <button type="button" class="pill" id="session"></button>
+    <button type="button" class="pill" id="keyboard"></button>
+  </div>
+  <div class="corner right">
+    <span class="pill" id="battery" hidden></span>
+    <button type="button" class="pill" id="suspend" hidden></button>
+    <button type="button" class="pill" id="restart" hidden></button>
+    <button type="button" class="pill" id="shutdown" hidden></button>
+  </div>
+
+  <svg hidden>
+    <symbol id="logo" viewBox="0 0 100 100">
+      <path fill="currentColor" d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/>
+    </symbol>
+  </svg>
+  <script src="greeter.js"></script>
+</body>
+</html>

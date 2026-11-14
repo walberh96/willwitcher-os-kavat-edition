@@ -1,0 +1,10 @@
+# The boot menu. GRUB reads its look from the EFI partition, with the pictures and the
+# fonts in its own formats: the command makes them from these files and puts them there.
+
+reload = [["sh", "install"]]
+
+[[file]]
+from = "theme.txt"
+
+[[file]]
+from = "values"

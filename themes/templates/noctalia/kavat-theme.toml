@@ -16,6 +16,9 @@ font_family         = "{{ font_ui }}"
 # Noctalia's first-run dialog picks a palette and a mode of its own, which would take the
 # theme away from the system's; it also offers Noctalia's anonymous startup ping.
 setup_wizard_enabled = false
+# When something asks for the password of an administrator, as kavat-theme boot does, the
+# shell draws the dialog, with the theme. Nothing else in the system does.
+polkit_agent = true
 
 [shell.animation]
 enabled = {{ animations }}

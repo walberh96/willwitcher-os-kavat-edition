@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition
 
-Distribución personal basada en Arch Linux. Las fases 1 y 2 están cerradas: hay un perfil de archiso en `iso/`, paquetes `kavat-*` en `packages/` y un instalador en `installer/`, y el sistema instalado arranca, hace snapshots y vuelve a ellos, también en el PC de escritorio. Está en **fase 3, la identidad**: ya existe el sistema de temas, `kavat-theme`, y Hyprland y Noctalia van sin modificar; lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
+Distribución personal basada en Arch Linux. Las fases 1 y 2 están cerradas: hay un perfil de archiso en `iso/`, paquetes `kavat-*` en `packages/` y un instalador en `installer/`, y el sistema instalado arranca, hace snapshots y vuelve a ellos, también en el PC de escritorio. Está en **fase 3, la identidad**: ya existen el sistema de temas, `kavat-theme`, el menú de arranque, la pantalla de carga y el login propios, y Hyprland y Noctalia van sin modificar; lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
 
 ## Idiomas
 
@@ -39,7 +39,7 @@ Los dos diagramas del documento de diseño son imágenes en `docs/img/`. El del 
 
 - `tools/check-links.py`: comprueba que los enlaces del README, de `docs/DESIGN.md` y de `docs/PENDING.md` apuntan a archivos que existen. Se pasa tras editar cualquiera de los tres.
 - `tools/make-video.cjs [segundos]`: rehace `docs/video/kavat-tour.mp4`, el recorrido narrado por Kavat, desde `docs/video/index.html`, que usa el mockup como imagen. La voz es Supertonic-3, el modelo que el diseño da a Kavat. Pide `puppeteer-core`, `ffmpeg-static` y `supertonic` instalados fuera del repo; el uso está en la cabecera del script. El vídeo va en inglés y presenta el sistema como terminado, por decisión del usuario; el README sigue diciendo en qué fase está de verdad.
-- `tools/screenshots.sh [nombre ...]`: rehace las capturas de `docs/screenshots/` desde el mockup, con Chrome o Chromium sin ventana.
+- `tools/screenshots.sh [nombre ...]`: rehace las capturas de `docs/screenshots/` desde el mockup, con Chrome o Chromium sin ventana. En Linux pide tener instaladas las fuentes Inter y JetBrains Mono.
 
 ## Compilar y probar
 
@@ -53,10 +53,13 @@ Tras tocar `iso/`, `packages/` o `installer/` se pasan, en este orden. Los dos p
 - `tests/safemode.py [--encrypted]`: sobre el mismo disco, rompe a propósito la configuración de Hyprland del usuario y comprueba que el siguiente arranque abre en modo seguro y que en él sí aparece el escritorio.
 
 - `tests/theme.py [--encrypted]`: sobre el mismo disco, inicia sesión, cambia el modo, la paleta y el acento con `kavat-theme` y comprueba que Hyprland, Kitty y Noctalia siguen el cambio en menos de un segundo y sin reiniciarse. Es media puerta de la fase 3.
+- `tests/startup.py [--encrypted]`: sobre el mismo disco, mira la pantalla mientras arranca y comprueba que el menú de GRUB, la pantalla de carga y el login llevan el tema, que el menú tiene las entradas del sistema, que `kavat-theme boot` les cambia el aspecto y que la entrada Recovery acaba en `kavat-rescue`.
 
-Lo que comparten las pruebas está en `tests/machine.py`. Las tres últimas trabajan sobre una capa encima del disco instalado, así que no lo cambian.
+Lo que comparten las pruebas está en `tests/machine.py`. Las cuatro últimas trabajan sobre una capa encima del disco instalado, así que no lo cambian.
 
-`kavat-theme` está en `themes/` y es Rust: sus pruebas unitarias se pasan con `cargo test` dentro de esa carpeta, y `tools/build-repo.sh themes` las vuelve a pasar al empaquetar. Su código está en `themes/engine/` y no en `src/`, que es la carpeta que `makepkg` usa junto a un PKGBUILD.
+`kavat-theme` está en `themes/` y es Rust: sus pruebas unitarias se pasan con `cargo test` dentro de esa carpeta, y `tools/build-repo.sh themes` las vuelve a pasar al empaquetar. Su código está en `themes/engine/` y no en `src/`, que es la carpeta que `makepkg` usa junto a un PKGBUILD. Las plantillas del escritorio están en `themes/templates/` y las del arranque y el login en `themes/boot/`; estas se aplican como root con `kavat-theme boot`.
+
+`kavat-greeter`, el login, está en `greeter/`: su PKGBUILD baja web-greeter 4.0.0 por su commit, le aplica `system-python.patch` y le pone la página de `greeter/theme/`. Esa página se puede abrir en un navegador, donde ella misma hace de LightDM con un usuario inventado cuya contraseña es `kavat`. Todo lo de esa carpeta es GPL-3, como web-greeter.
 
 Los repos de Arch se usan tal como estaban el día que dice `iso/arch-snapshot`; cambiar esa fecha es actualizar el sistema. `out/`, `work/` y `vendor/` no entran en git: son resultados, trabajo temporal y descargas.
 

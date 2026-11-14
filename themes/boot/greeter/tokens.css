@@ -1,0 +1,21 @@
+/* The look of the login screen. Made by kavat-theme: a change here is lost the next time
+   the theme is applied. */
+
+:root {
+  --bg: {{ bg }};
+  --surface: {{ surface }};
+  --surface2: {{ surface2 }};
+  --text: {{ text }};
+  --muted: {{ muted }};
+  --border: {{ border }};
+  --accent: {{ accent }};
+  --accent-text: {{ accent_text }};
+  --on-accent: {{ on_accent }};
+  --danger: {{ danger }};
+  --radius: {{ radius }}px;
+  --font-ui: "{{ font_ui }}";
+  --font-mono: "{{ font_mono }}";
+  --scale: {{ font_scale }};
+  /* the same picture as the boot menu and the loading screen */
+  --picture: url("web-greeter://app/var/lib/kavat/theme/current/common/background.svg");
+}

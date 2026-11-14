@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="240" height="32" viewBox="0 0 240 32">
+  <rect x="38.5" y="4.5" width="36" height="22" rx="5" fill="{{ surface2 }}" stroke="{{ border }}"/>
+  <text x="56.5" y="20.5" text-anchor="middle" font-family="{{ font_mono }}" font-size="12" fill="{{ text }}">Esc</text>
+  <text x="86" y="21" font-family="{{ font_ui }}" font-size="15" fill="{{ muted }}">boot messages</text>
+</svg>

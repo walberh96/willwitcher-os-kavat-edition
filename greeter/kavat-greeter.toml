@@ -1,0 +1,23 @@
+# The settings of the login screen, kavat-greeter. Its look is not here: it follows the
+# theme of the system, which kavat-theme writes.
+
+# Keyboard layouts to offer on the login screen, by their xkb names. With fewer than two,
+# the login screen does not offer to change it.
+layouts = ["us", "es", "latam"]
+
+[greeter]
+# the page to show, a folder in /usr/share/kavat-greeter/themes
+theme = "kavat"
+# the page cannot reach the network
+secure-mode = true
+debug-mode = false
+# with one page there is no other to fall back on when it fails
+detect-theme-errors = false
+# seconds without use until the screen goes dark
+screensaver-timeout = 300
+
+[features.battery]
+enabled = true
+
+[features.backlight]
+enabled = false

@@ -1,0 +1,46 @@
+#!/bin/sh
+# Part of kavat-theme. Puts the loading screen's look where Plymouth reads it and makes it
+# the one Plymouth shows. A copy travels inside the boot image, so when the look changed the
+# boot image is built again, which takes a while. The new look is made whole in a folder
+# beside the one in use and takes its place at the end, so a step that fails leaves the
+# loading screen as it was.
+#
+# With KAVAT_THEME_BOOT_IMAGE=later the boot image is left alone: the installer asks for
+# that, because it builds the boot image itself right after.
+set -eu
+# what is made here is for everyone to read, whoever runs this
+umask 022
+
+files="${KAVAT_THEME_FILES}"
+
+if ! command -v plymouth-set-default-theme > /dev/null; then
+  echo "kavat-theme: Plymouth is not installed here, so there is no loading screen to give a look" >&2
+  exit 0
+fi
+
+target=/usr/share/plymouth/themes/kavat
+fresh="${target}.new"
+rm -rf "${fresh}"
+mkdir -p "${fresh}"
+
+cp "${files}/plymouth/kavat.plymouth" "${files}/plymouth/kavat.script" "${fresh}/"
+rsvg-convert -o "${fresh}/background.png" "${files}/common/background.svg"
+rsvg-convert -o "${fresh}/logo.png" "${files}/common/logo.svg"
+for picture in ring name hint; do
+  rsvg-convert -o "${fresh}/${picture}.png" "${files}/plymouth/${picture}.svg"
+done
+
+if [ "$(plymouth-set-default-theme)" = kavat ] && diff -r -q "${fresh}" "${target}" > /dev/null 2>&1; then
+  rm -rf "${fresh}"
+  exit 0
+fi
+
+rm -rf "${target}.old"
+[ ! -d "${target}" ] || mv "${target}" "${target}.old"
+mv "${fresh}" "${target}"
+rm -rf "${target}.old"
+plymouth-set-default-theme kavat
+
+if [ "${KAVAT_THEME_BOOT_IMAGE:-}" != later ]; then
+  mkinitcpio -P
+fi
