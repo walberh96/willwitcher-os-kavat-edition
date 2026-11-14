@@ -123,6 +123,9 @@ def main():
         _, output = machine.run('plymouth-set-default-theme; lsinitcpio /boot/initramfs-linux-zen.img | grep -c themes/kavat/')
         checks.report(output.split() and output.split()[0] == 'kavat' and output.split()[-1] not in ('', '0'),
                       "the loading screen is the system's, and travels inside the boot image", output)
+        _, output = machine.run('grep -c plymouth.use-simpledrm /proc/cmdline; grep -c "^  background_image" /boot/grub/grub.cfg')
+        checks.report(output.split() == ['1', '1'],
+                      'nothing waits for the graphics driver: GRUB keeps the picture up and the loading screen draws at once', output)
         _, output = machine.run('grep -c "^greeter-session=kavat-greeter" /etc/lightdm/lightdm.conf')
         checks.report(output == '1', "LightDM shows the system's own login screen", output)
 

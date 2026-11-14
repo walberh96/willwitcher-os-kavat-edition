@@ -1,0 +1,13 @@
+#!/bin/sh
+# Part of kavat-boot. Writes into grub.cfg, ahead of every menu, the picture that GRUB draws
+# behind its own console: the one of the boot menu's theme. GRUB shows that console while it
+# starts an entry, and without the picture it is a black screen between the menu and the
+# loading screen.
+set -e
+
+cat << 'EOF2'
+if [ -f "${prefix}/themes/kavat/background.png" ]; then
+  insmod png
+  background_image -m stretch "${prefix}/themes/kavat/background.png"
+fi
+EOF2

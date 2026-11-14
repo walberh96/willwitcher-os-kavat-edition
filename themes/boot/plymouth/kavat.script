@@ -4,58 +4,64 @@
 # The logo with a ring that grows and fades around it, over the same picture as the boot
 # menu. Everything is drawn for a screen 1080 pixels tall and scaled to the one there is.
 
-width = Window.GetWidth();
-height = Window.GetHeight();
-unit = height / 1080;
-
 Window.SetBackgroundTopColor({{ bg | parts }});
 Window.SetBackgroundBottomColor({{ bg | parts }});
 
-# the picture fills the screen; what does not fit is cut, as the boot menu does
-picture = Image("background.png");
-fill = Math.Max(width / picture.GetWidth(), height / picture.GetHeight());
-picture = picture.Scale(picture.GetWidth() * fill, picture.GetHeight() * fill);
-back = Sprite(picture);
-back.SetPosition((width - picture.GetWidth()) / 2, (height - picture.GetHeight()) / 2, -100);
+back = Sprite();
+logo_sprite = Sprite();
+name_sprite = Sprite();
+hint_sprite = Sprite();
+ring_sprite = Sprite();
+steps = 44;
+width = 0;
+height = 0;
+ticks = 0;
+
+fun Place(sprite, image, y, z) {
+    sprite.SetImage(image);
+    sprite.SetPosition((global.width - image.GetWidth()) / 2, y - image.GetHeight() / 2, z);
+}
 
 fun Sized(file) {
     image = Image(file);
-    return image.Scale(image.GetWidth() * unit, image.GetHeight() * unit);
+    return image.Scale(image.GetWidth() * global.unit, image.GetHeight() * global.unit);
 }
 
-fun Centred(image, y, z) {
-    sprite = Sprite(image);
-    sprite.SetPosition((width - image.GetWidth()) / 2, y - image.GetHeight() / 2, z);
-    return sprite;
-}
+# Everything is sized and put in its place for the screen there is. The screen can change
+# while this runs: the loading screen starts on the one the firmware left, and moves to the
+# graphics driver's when that is ready, which may have another size.
+fun Layout() {
+    global.width = Window.GetWidth();
+    global.height = Window.GetHeight();
+    global.unit = global.height / 1080;
+    global.middle = global.height * 0.46;
 
-middle = height * 0.46;
-logo = Image("logo.png").Scale(120 * unit, 120 * unit);
-logo_sprite = Centred(logo, middle, 10);
-name_sprite = Centred(Sized("name.png"), middle + 152 * unit, 10);
-hint_sprite = Centred(Sized("hint.png"), height - 56 * unit, 10);
+    # the picture fills the screen; what does not fit is cut, as the boot menu does
+    picture = Image("background.png");
+    fill = Math.Max(global.width / picture.GetWidth(), global.height / picture.GetHeight());
+    Place(back, picture.Scale(picture.GetWidth() * fill, picture.GetHeight() * fill), global.height / 2, -100);
 
-# The ring, one picture for each step of its 2.2 seconds, made once.
-steps = 44;
-ring = Image("ring.png");
-for (step = 0; step < steps; step++) {
-    part = step / steps;
-    eased = 1 - (1 - part) * (1 - part);
-    size = 190 * unit * (0.75 + 0.55 * eased);
-    rings[step] = ring.Scale(size, size);
+    Place(logo_sprite, Image("logo.png").Scale(120 * global.unit, 120 * global.unit), global.middle, 10);
+    Place(name_sprite, Sized("name.png"), global.middle + 152 * global.unit, 10);
+    Place(hint_sprite, Sized("hint.png"), global.height - 56 * global.unit, 10);
+
+    # the ring, one picture for each step of its 2.2 seconds
+    ring = Image("ring.png");
+    for (step = 0; step < steps; step++) {
+        part = step / steps;
+        eased = 1 - (1 - part) * (1 - part);
+        size = 190 * global.unit * (0.75 + 0.55 * eased);
+        global.rings[step] = ring.Scale(size, size);
+    }
 }
-ring_sprite = Sprite();
-ring_sprite.SetZ(5);
-ticks = 0;
+Layout();
 
 # Plymouth calls this 50 times a second.
 fun Refresh() {
+    if (Window.GetWidth() != width || Window.GetHeight() != height) Layout();
     step = Math.Int(ticks * 20 / 50) % steps;
-    ticks++;
-    image = rings[step];
-    ring_sprite.SetImage(image);
-    ring_sprite.SetX((width - image.GetWidth()) / 2);
-    ring_sprite.SetY(middle - image.GetHeight() / 2);
+    global.ticks = ticks + 1;
+    Place(ring_sprite, rings[step], middle, 5);
     ring_sprite.SetOpacity(0.7 * (1 - step / steps));
 }
 Plymouth.SetRefreshFunction(Refresh);
