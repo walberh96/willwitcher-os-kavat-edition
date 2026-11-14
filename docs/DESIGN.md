@@ -911,6 +911,15 @@ Un metapaquete `kavat-desktop` depende de todo lo anterior, de modo que una inst
 - Los plugins de zsh se cargan directamente, sin framework, y las completaciones usan caché.
 - Abrir una terminal tiene un presupuesto de tiempo que se mide en cada cambio de configuración. Propuesta: menos de 100 ms.
 
+**Cómo está hecho.** Desde la fase 3, en `packages/kavat-shell-config/`, y medido en `tests/install.py`:
+
+- **zsh es el shell de quien crea el instalador.** La configuración del sistema está en `/etc/zsh/zshrc`; tu `~/.zshrc` se lee después y manda. La sesión en vivo sigue con bash.
+- **El prompt** es un archivo de starship, `/usr/share/kavat/starship.toml`: usuario, carpeta, rama y el `❯`, verde o rojo. Usa los colores de la terminal, así que sigue al tema. La rama se lee de los archivos del repositorio, sin lanzar git. Si tienes `~/.config/starship.toml`, se usa el tuyo.
+- **Dos plugins**, cargados directamente: sugerencias del historial y colores al teclear. La lista de completaciones se calcula una vez al día y se guarda.
+- **Con el shell llegan** zoxide (`z`), lsd en el lugar de `ls`, fzf en `Ctrl+R` y `Ctrl+T`, ripgrep, fd, bat y jq. El historial se comparte entre terminales y no guarda repetidos.
+- **El presupuesto se cumple**: la prueba abre el shell cinco veces y exige que la más rápida baje de 100 ms.
+- **Queda para más adelante**: los alias y las funciones heredadas de Endgame, y la página Shell del panel.
+
 ## Heredado de Willwitcher-OS Endgame
 
 De tu repo anterior se conservan tal cual los atajos de Hyprland y tus preferencias de Neovim; lo demás sirve de referencia y se rehace mejor.

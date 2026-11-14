@@ -43,16 +43,19 @@ STEPS = {'location': 195, 'keyboard': 234, 'partitions': 273, 'users': 312, 'sum
 def next_page(screen, step, timeout=60):
     """Press Next and wait until the installer shows that step. True when it does.
 
-    Some pages take a while to come up, and keys typed before they do are lost.
+    Some pages take a while to come up, and keys typed before they do are lost. So is, now
+    and then, the press of Next itself: it is pressed again when nothing has moved for a while.
     """
-    screen.press('alt', 'n')
     deadline = time.time() + timeout
     while time.time() < deadline:
-        time.sleep(1)
-        red, green, blue = screen.pixel(30, STEPS[step])
-        if red > 200 and green > 130 and blue < 110:
+        screen.press('alt', 'n')
+        again = time.time() + 12
+        while time.time() < min(again, deadline):
             time.sleep(1)
-            return True
+            red, green, blue = screen.pixel(30, STEPS[step])
+            if red > 200 and green > 130 and blue < 110:
+                time.sleep(1)
+                return True
     return False
 
 
@@ -177,6 +180,15 @@ def check_installed(machine, checks):
     checks.report(status == 0, 'the login screen is up', output)
     status, output = machine.run('systemctl --failed --no-legend')
     checks.report(not output, 'no service failed', output)
+    as_user = f'runuser -u {USER} -- env HOME=/home/{USER} TERM=xterm-kitty'
+    status, output = machine.run(f'getent passwd {USER} | cut -d: -f7; {as_user} zsh -i -c "whence -w z ll; echo \\$STARSHIP_CONFIG"; '
+                                 f'cd /home/{USER} && {as_user} STARSHIP_CONFIG=/usr/share/kavat/starship.toml starship prompt --status 1')
+    checks.report(output.startswith('/usr/bin/zsh\nz: function\nll: alias\n/usr/share/kavat/starship.toml') and USER in output
+                  and '❯' in output, f"{USER}'s shell is zsh, with the system's prompt and tools", output)
+    # the fastest of five: the first one also builds what the later ones reuse
+    status, output = machine.run(f'for n in 1 2 3 4 5; do a=$(date +%s%N); {as_user} zsh -i -c exit 2> /dev/null; '
+                                 'echo $(( ($(date +%s%N) - a) / 1000000 )); done | sort -n | head -n 1', 60)
+    checks.report(output.isdigit() and int(output) < 100, 'a terminal opens its shell in under 100 ms', f'{output} ms')
     status, output = machine.run("stat -c '%a' /etc/fstab /etc/locale.conf /etc/default/grub /var/lib/kavat/theme | sort -u | tr '\\n' ' '")
     checks.report(output == '644 755', 'what the installer wrote can be read by everyone', output)
 

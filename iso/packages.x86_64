@@ -56,6 +56,15 @@ lightdm
 kavat-greeter
 xorg-server
 
+# The terminal's shell: zsh with the system's prompt, and the everyday tools that come
+# with it. The live session keeps bash.
+kavat-shell-config
+
+# Compressed files, which the file manager opens as folders; NTFS disks; headsets
+7zip
+ntfs-3g
+headsetcontrol
+
 # The installer. It takes itself out of the system it installs.
 kavat-installer
 

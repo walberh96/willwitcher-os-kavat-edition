@@ -1,6 +1,6 @@
 pkgname=kavat-installer
 pkgver=0.1.0
-pkgrel=6
+pkgrel=7
 pkgdesc="Willwitcher-OS Kavat Edition: the installer's configuration and looks"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

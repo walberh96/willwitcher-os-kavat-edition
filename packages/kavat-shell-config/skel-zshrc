@@ -1,0 +1,2 @@
+# Your own settings for zsh. The system's are in /etc/zsh/zshrc, which is read before
+# this file: the prompt, the history, completion and the plugins are already set up.

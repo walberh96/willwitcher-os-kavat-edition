@@ -1,0 +1,61 @@
+# Part of kavat-shell-config: what every interactive zsh on this system starts with.
+# Your own settings go in ~/.zshrc, which is read after this file and has the last word.
+#
+# Nothing here goes through a framework: each piece is read directly, and what takes time
+# to work out is kept from one terminal to the next. Opening a terminal has to stay fast.
+
+# History: kept across terminals, without repeats
+HISTFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/history"
+[[ -d ${HISTFILE:h} ]] || mkdir -p "${HISTFILE:h}"
+HISTSIZE=50000
+SAVEHIST=50000
+setopt share_history hist_ignore_all_dups hist_ignore_space hist_reduce_blanks
+setopt auto_cd interactive_comments
+
+# Keys: the usual ones of a terminal, with Home, End, Delete and Ctrl with the arrows
+bindkey -e
+bindkey '^[[H' beginning-of-line
+bindkey '^[[F' end-of-line
+bindkey '^[[3~' delete-char
+bindkey '^[[1;5C' forward-word
+bindkey '^[[1;5D' backward-word
+
+# Completion. What can be completed is worked out once a day and kept; in between, the
+# kept list is used as it is.
+autoload -Uz compinit
+() {
+  local kept="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump"
+  [[ -d ${kept:h} ]] || mkdir -p "${kept:h}"
+  local -a fresh=( ${kept}(N.mh-24) )
+  if (( $#fresh )); then
+    compinit -C -d "$kept"
+  else
+    compinit -d "$kept"
+  fi
+  zstyle ':completion:*' cache-path "${kept:h}/completions"
+}
+zstyle ':completion:*' use-cache on
+zstyle ':completion:*' menu select
+zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+
+# Suggestions from the history as you type; the right arrow takes one
+source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# fzf: Ctrl+R looks through the history, Ctrl+T through the files
+source /usr/share/fzf/key-bindings.zsh
+source /usr/share/fzf/completion.zsh
+
+# zoxide: z and part of a folder's name goes there
+eval "$(zoxide init zsh)"
+
+# lsd in the place of ls
+alias ls='lsd'
+alias ll='lsd -l'
+alias la='lsd -la'
+
+# The prompt: the system's, until you have your own in ~/.config/starship.toml
+[[ -e ${XDG_CONFIG_HOME:-$HOME/.config}/starship.toml ]] || export STARSHIP_CONFIG=/usr/share/kavat/starship.toml
+eval "$(starship init zsh)"
+
+# Colours for what you type, as you type it. It has to be the last thing read.
+source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
