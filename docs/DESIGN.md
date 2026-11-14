@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition — Design document
 
-Updated on 13 November 2026 · [Interactive mockup](mockup/index.html) · [Screenshots](screenshots/) · [README](../README.md)
+Updated on 14 November 2026 · [Interactive mockup](mockup/index.html) · [Screenshots](screenshots/) · [README](../README.md)
 
 ## Vision
 
@@ -146,7 +146,7 @@ Two limits: GRUB shows a still image, it does not play video or blur; and its fo
 - **Menu.** The theme goes to `/efi/grub/themes/kavat`: the background and the logo as PNG, the theme's fonts converted to GRUB's format and the box of the chosen entry cut into nine pieces. Two things in the mockup are beyond what GRUB can do and are not there: a different text under the menu depending on the chosen entry, and a second, smaller line inside an entry.
 - **Loading screen.** A Plymouth theme with the logo and a ring that grows and fades, over the same background as the menu. It travels inside the boot image, which is rebuilt only when the look changed. Of the four styles, the first one is there; the spinning ring, the bar and the text arrive with the Boot page of the panel.
 - **The background, for now**, is one generated with the theme's colors, the same on the three screens. The desktop wallpaper will take its place when that piece exists.
-- **No cut between menu and loading**: the kernel keeps the screen as the menu left it until Plymouth draws. Between the loading screen and the login there is an instant of black, that of the X server starting; how noticeable it is on the RX 6800 is checked on the PC.
+- **No cut between menu and loading.** Two things keep the picture on the screen. GRUB shows its console while it starts an entry, and it draws the theme's picture behind it instead of black. And Plymouth draws at once on the screen the firmware left, with `plymouth.use-simpledrm` on the kernel line, instead of waiting for the graphics driver. The first try on the PC, on 13 November 2026, showed why both are needed: the RX 6800's driver takes until second 8.5 to be ready, Plymouth was waiting for it, and what stayed on the screen meanwhile was GRUB's console, a black box. Between the loading screen and the login there is an instant of black, that of the X server starting.
 
 ## Login
 
@@ -216,6 +216,7 @@ Shortcuts: 19 inherited from Endgame as they are and 12 new ones for what did no
 | Cheat sheet | `Super+/` | New |
 | Quick note | `Super+N` | New |
 | Notes | `Super+Shift+N` | New |
+| File search | `Super+Shift+F` | New |
 
 **Noctalia.** Decided: fork of Noctalia 5. From that point on it is our app, with our changes, packaged as `kavat-shell`.
 
@@ -473,6 +474,29 @@ Added ideas:
 Fork: not needed today, because Yazi is configured and extended with plugins. There are two candidates for a patch if a plugin falls short: accepting files dropped directly on its window, without going through ripdrag, and reloading the theme live without reopening it. If they are needed, it is forked.
 
 Yazi is in the official Arch repos. ripdrag and the portal backend are in the AUR, so they come in through `[kavat]` already built. Everything is adjusted on the Files page of the panel.
+
+## File search
+
+One search for the whole system, instant, with the same picker wherever it is opened. Decided on 14 November 2026 (D36). It is not built yet; the mockup shows it under "File search".
+
+**One engine.**
+
+| What is searched | With | Why |
+| --- | --- | --- |
+| Your files, by name | `fd`, live | On an NVMe disk it lists hundreds of thousands of files in a fraction of a second and is never out of date, so your own files need no index |
+| The whole disk, by name | `plocate`, an index | It answers in milliseconds. The installer builds the index as its last step, so the first search is already instant; after that it is rebuilt once a day and after every `kav` transaction |
+| Text inside files | `ripgrep`, live | Fast enough for a home folder, and always correct |
+
+What files say is not indexed, only their names.
+
+**One picker.** `fzf` everywhere, so the keys and the look are the same in the four places below. It is already in the system, and both zsh and Neovim support it first-class.
+
+**Four doors.**
+
+- **The terminal.** `kavat-find` opens the search full screen: type to filter, a preview of the file on the right, `Enter` opens it, `Ctrl+O` opens its folder in Yazi and `Ctrl+Y` copies its path. `Ctrl+F` goes round the three sources: your files, the whole disk and text inside files. A result of a text search opens in Neovim at that line.
+- **zsh.** `Tab` shows the completions in the same picker instead of zsh's own menu, with a preview: files, folders, options, processes. This is the `fzf-tab` plugin, packaged in `[kavat]` if Arch's repositories do not have it. `Ctrl+R` searches the history, `Ctrl+T` pastes a file's path into the command, `Alt+C` jumps to a folder and `Ctrl+G` searches text inside files.
+- **Neovim.** `fzf-lua` is the one picker: files, text, buffers, recent files, help. It takes the place of Telescope, which did the same more slowly. `<leader>ff`, `fg`, `fb` and `fr` stay as they are.
+- **The desktop and Kavat.** `Super+Shift+F` opens the search as a floating window from anywhere, and the palette gets a files mode. In phase 4 Kavat gets a `find_files` tool that asks the same engine, so a file can be asked for by voice.
 
 ## Notes
 
@@ -929,7 +953,7 @@ From your previous repo, the Hyprland shortcuts and your Neovim preferences are 
 - `Ctrl+C` and `Ctrl+V` with the system clipboard, `Ctrl+A` to select all and `Ctrl+Space` to autocomplete were already VS Code style shortcuts and become part of the preset.
 - Your `<leader>` shortcuts keep working in normal mode: buffers (`<leader>b` + `c` `p` `o` `l` `r`), search (`<leader>ff`, `fg`, `fb`, `fr`), `<leader>e` explorer, `<leader>gg` Lazygit, `<leader>z` zen mode, `<leader>?` help.
 - `Tab` and `Shift+Tab` switch buffer in normal mode; `Ctrl+Tab` does it in any mode.
-- Plugins you already use: treesitter, gitsigns, neogit, diffview, fugitive, neo-tree, telescope, fzf-lua, render-markdown, which-key, bufferline, snacks.
+- Plugins you already use: treesitter, gitsigns, neogit, diffview, fugitive, neo-tree, fzf-lua, render-markdown, which-key, bufferline, snacks.
 - Change: the color scheme stops being a fixed Catppuccin and follows the system theme.
 
 | From Endgame | In Kavat Edition |
@@ -1160,7 +1184,7 @@ How the phase 2 ones stand, as of 13 November 2026:
 - **Verified in a virtual machine**: safe mode starts the desktop without reading the user's configuration; automatic safe mode after a failed boot works with GRUB on Btrfs, because GRUB's environment block lives on the EFI partition; GRUB boots each snapshot with its kernel, with and without encryption; and with the disk encrypted no password is asked for.
 - **Solved by design**: TPM2 unlocking does not depend on mkinitcpio, because the key is bound to PCR 7, which measures the firmware.
 - **Verified on real hardware** (13 November 2026, on the desktop PC, alongside CachyOS and Windows): the installation sharing CachyOS's EFI partition, the boot, booting a snapshot with `kavat-boot-once` and going back to it with `kavat-rollback`.
-- **Moves to phase 3**: that GRUB, Plymouth and the login link up without flicker on the RX 6800. They already have their theme; in a virtual machine the menu and the loading screen link up without a break, and it still has to be looked at on the PC.
+- **Moves to phase 3**: that GRUB, Plymouth and the login link up without flicker on the RX 6800. They already have their theme. The first try on the PC showed a black box between the menu and the login; its two causes are fixed and checked in a virtual machine without a graphics driver, and the PC has to be tried again.
 - **Moves to phase 3**: the test after updating. Detecting the broken boot already works, because it is the same mechanism as safe mode; offering to roll back is up to `kav`.
 
 From Omarchy we took the idea of the theme picker that changes the whole system. Its shortcuts and its defaults are not followed; its mechanisms only come in one by one and with your approval, and the approved ones are in "Ideas from other distros".

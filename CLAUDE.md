@@ -23,7 +23,7 @@ The two diagrams of the design document are images in `docs/img/`, each made fro
 
 ## How the design changes
 
-1. What the user has to decide goes to `docs/PENDING.md`, not to the design document. Each point has a number (D1 to D34 are used; the next is D35), a recommendation and what happens if the answer is no.
+1. What the user has to decide goes to `docs/PENDING.md`, not to the design document. Each point has a number (D1 to D36 are used; the next is D37), a recommendation and what happens if the answer is no.
 2. Before working, that file is read: the user answers in the chat or by writing in it.
 3. What is approved goes to `docs/DESIGN.md`, to the mockup and, when it applies, to the README, and leaves the pending list. The document and the mockup change in the same commit: neither is left for later.
 4. What is rejected is deleted from the pending list and is not asked again. If the user approves one part and says "not the rest", that no covers everything else that was on the table.
