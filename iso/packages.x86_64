@@ -58,6 +58,10 @@ kavat-greeter
 # with it. The live session keeps bash.
 kavat-shell-config
 
+# The file search: kavat-find, over fd, plocate and ripgrep, with fzf as its picker. It
+# comes with the two packages above; it is named here because it is a piece of its own.
+kavat-find
+
 # Compressed files, which the file manager opens as folders; NTFS disks; headsets
 7zip
 ntfs-3g

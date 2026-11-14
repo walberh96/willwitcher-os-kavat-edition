@@ -1,0 +1,226 @@
+#!/bin/bash
+# kavat-find: the system's file search, in one picker.
+#
+# usage: kavat-find [home|disk|text] [--window]
+#   home      your files by name, read from the disk as you look (the default)
+#   disk      every file of the system by name, from plocate's index
+#   text      what files say, in the folder it is opened from
+#   --window  it runs in a window of its own, which closes when something is picked: what
+#             is opened goes to a new window
+#
+# Enter opens what is picked, Ctrl+O shows it in Yazi, Ctrl+Y copies its path, Tab marks
+# several and Ctrl+F goes round the three sources.
+#
+# The rest of this file is what the picker calls back while it is open: the words that
+# start with two dashes below are not for a person to type.
+set -u
+
+self=/usr/bin/kavat-find
+[[ $0 == */* ]] && self=$(realpath "$0")
+
+# Which source is showing is kept in a file, since the picker runs each of its commands as
+# a new process.
+source_now() { cat "$KAVAT_FIND_STATE"; }
+
+# A picked line as the path it stands for; in a text search, the line number goes to $line.
+line=
+path_of() {
+  case $(source_now) in
+    home) path=$HOME/$1 ;;
+    disk) path=$1 ;;
+    text)
+      path=$KAVAT_FIND_FROM/${1%%:*}
+      line=${1#*:}
+      line=${line%%:*}
+      ;;
+  esac
+}
+
+# Whether a file is one to read in the editor
+is_text() {
+  case $(file -Lb --mime-type -- "$1") in
+    text/* | inode/x-empty | application/json | application/toml | application/x-shellscript | \
+      application/javascript | application/xml | application/x-desktop | application/x-wine-extension-ini) return 0 ;;
+  esac
+  return 1
+}
+
+# Run a program apart from this one, so that it outlives the window
+apart() { setsid -f "$@" < /dev/null > /dev/null 2>&1; }
+
+in_window() { [[ -n ${KAVAT_FIND_WINDOW:-} ]]; }
+
+list() {
+  case $1 in
+    home)
+      cd "$HOME" || exit 1
+      # the hidden ones too, without what programs keep for themselves: that is in the
+      # whole disk
+      exec fd --type file --type symlink --hidden --color never \
+        --exclude .git --exclude .cache --exclude .local/share --exclude .local/state
+      ;;
+    disk)
+      exec plocate ''
+      ;;
+    text)
+      [[ -n ${2:-} ]] || exit 0
+      cd "$KAVAT_FIND_FROM" || exit 1
+      # with something to read on its input, ripgrep would search that and not the folder
+      exec rg --line-number --no-heading --color always --smart-case --max-columns 400 \
+        --colors path:fg:blue --colors line:fg:white --colors match:fg:yellow -- "$2" < /dev/null
+      ;;
+  esac
+}
+
+# What the picker has to do to show a source: these are fzf's actions, as text.
+turn_to() {
+  local to=$1 label
+  if [[ $to == next ]]; then
+    case $(source_now) in
+      home) to=disk ;;
+      disk) to=text ;;
+      *) to=home ;;
+    esac
+  fi
+  echo "$to" > "$KAVAT_FIND_STATE"
+  case $to in
+    home)
+      echo "change-list-label( Your files · live )+unbind(change)+enable-search+reload($self --list home)"
+      ;;
+    disk)
+      if [[ -r /var/lib/plocate/plocate.db || -e /var/lib/plocate/plocate.db ]]; then
+        label="The whole disk · index from $(date -r /var/lib/plocate/plocate.db '+%b %-d, %H:%M')"
+      else
+        label="The whole disk · there is no index yet"
+      fi
+      echo "change-list-label( $label )+unbind(change)+enable-search+reload($self --list disk)"
+      ;;
+    text)
+      label="Inside files · live · ${KAVAT_FIND_FROM/#$HOME/\~}"
+      label=${label//[()]/}
+      echo "change-list-label( $label )+rebind(change)+disable-search+reload($self --list text {q})"
+      ;;
+  esac
+}
+
+preview() {
+  path_of "$1"
+  if [[ -d $path ]]; then
+    lsd -la --color always -- "$path"
+  elif [[ ! -r $path ]]; then
+    echo "This file is not yours to read."
+    ls -ld -- "$path"
+  elif is_text "$path"; then
+    if [[ -n $line ]]; then
+      # the line that was found, a third of the way down
+      local first=$((line - ${FZF_PREVIEW_LINES:-30} / 3))
+      ((first < 1)) && first=1
+      bat --theme ansi --color always --style numbers --line-range "$first:+${FZF_PREVIEW_LINES:-30}" --highlight-line "$line" -- "$path"
+    else
+      bat --theme ansi --color always --style numbers --line-range ":${FZF_PREVIEW_LINES:-200}" -- "$path"
+    fi
+  else
+    local kind
+    kind=$(file -Lb --mime-type -- "$path")
+    echo "$(file -Lb -- "$path" | cut -c 1-200)"
+    echo "$(du -h -- "$path" | cut -f 1) · $(date -r "$path" '+%-d %b %Y')"
+    echo
+    case $kind in
+      application/pdf)
+        pdftotext -l 2 -layout -- "$path" - 2> /dev/null | head -n "${FZF_PREVIEW_LINES:-40}"
+        ;;
+      image/*)
+        if [[ -n ${KITTY_WINDOW_ID:-} ]]; then
+          kitty icat --clear --transfer-mode memory --unicode-placeholder --stdin no \
+            --place "${FZF_PREVIEW_COLUMNS}x$((FZF_PREVIEW_LINES - 3))@0x0" -- "$path" | sed '$d' | sed $'$s/$/\e[m/'
+        fi
+        ;;
+    esac
+  fi
+}
+
+open() {
+  local item editable=() first_line=
+  for item in "$@"; do
+    path_of "$item"
+    if [[ -d $path ]]; then
+      if in_window; then apart kitty yazi "$path"; else exec yazi "$path"; fi
+    elif is_text "$path"; then
+      editable+=("$path")
+      [[ -z $first_line ]] && first_line=${line:-1}
+    else
+      apart xdg-open "$path"
+    fi
+  done
+  ((${#editable[@]})) || return 0
+  local editor=${VISUAL:-${EDITOR:-nvim}}
+  if in_window; then
+    apart kitty "$editor" "+$first_line" "${editable[@]}"
+  else
+    exec "$editor" "+$first_line" "${editable[@]}"
+  fi
+}
+
+folder() {
+  path_of "$1"
+  if in_window; then apart kitty yazi "$path"; else exec yazi "$path"; fi
+}
+
+copy() {
+  local item paths=()
+  for item in "$@"; do
+    path_of "$item"
+    paths+=("$path")
+  done
+  (
+    IFS=$'\n'
+    printf '%s' "${paths[*]}" | wl-copy
+  )
+}
+
+case ${1:-} in
+  --list) list "${@:2}" ;;
+  --turn) turn_to "$2" ;;
+  --preview) preview "$2" ;;
+  --open) open "${@:2}" ;;
+  --folder) folder "$2" ;;
+  --copy) copy "${@:2}" ;;
+  *)
+    first=home
+    for word in "$@"; do
+      case $word in
+        home | disk | text) first=$word ;;
+        --window) export KAVAT_FIND_WINDOW=1 ;;
+        *)
+          sed -n '2,13s/^# \{0,1\}//p' "$0" >&2
+          exit 2
+          ;;
+      esac
+    done
+
+    KAVAT_FIND_STATE=$(mktemp "${XDG_RUNTIME_DIR:-/tmp}/kavat-find.XXXXXX") || exit 1
+    trap 'rm -f "$KAVAT_FIND_STATE"' EXIT
+    export KAVAT_FIND_STATE KAVAT_FIND_FROM=$PWD
+    echo "$first" > "$KAVAT_FIND_STATE"
+
+    # the picker's colours, from the theme
+    look=${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/fzf/options
+    [[ -z ${FZF_DEFAULT_OPTS_FILE:-} && -e $look ]] && export FZF_DEFAULT_OPTS_FILE=$look
+
+    # the picker runs what it is told with this shell
+    SHELL=/bin/bash fzf --ansi --multi --layout reverse --info inline-right --prompt '❯ ' \
+      --border none --list-border top --list-label ' Your files · live ' --list-label-pos 2 \
+      --preview "$self --preview {}" --preview-window 'right,48%,border-left' \
+      --footer $'↵ open   Ctrl+O its folder in Yazi   Ctrl+Y copy the path\nTab mark several   Ctrl+F next source   Esc close' \
+      --bind "start:transform:$self --turn $first" \
+      --bind "ctrl-f:transform:$self --turn next" \
+      --bind "change:reload:$self --list text {q}" \
+      --bind "enter:become:$self --open {+}" \
+      --bind "ctrl-o:become:$self --folder {}" \
+      --bind "ctrl-y:execute-silent($self --copy {+})+abort"
+    status=$?
+    # 130 is leaving with Esc, and 1 is Enter with nothing found
+    ((status == 130 || status == 1)) && exit 0
+    exit $status
+    ;;
+esac

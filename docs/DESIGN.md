@@ -477,15 +477,15 @@ Yazi is in the official Arch repos. ripdrag and the portal backend are in the AU
 
 ## File search
 
-One search for the whole system, instant, with the same picker wherever it is opened. Decided on 14 November 2026 (D36). It is not built yet; the mockup shows it under "File search".
+One search for the whole system, instant, with the same picker wherever it is opened. Decided on 14 November 2026 (D36); the mockup shows it under "File search". The terminal, zsh and the desktop shortcut are built, in the `kavat-find` package. Neovim's picker comes with `kavat-nvim`, the palette's files mode with the shell's fork and Kavat's tools in phase 4.
 
 **One engine.**
 
 | What is searched | With | Why |
 | --- | --- | --- |
 | Your files, by name | `fd`, live | On an NVMe disk it lists hundreds of thousands of files in a fraction of a second and is never out of date, so your own files need no index |
-| The whole disk, by name | `plocate`, an index | It answers in milliseconds. The installer builds the index as its last step, so the first search is already instant; after that it is rebuilt once a day and after every `kav` transaction |
-| Text inside files | `ripgrep`, live | Fast enough for a home folder, and always correct |
+| The whole disk, by name | `plocate`, an index | It answers in milliseconds. The installer builds the index as its last step, so the first search is already instant; after that it is rebuilt once a day and after every change of packages. The snapshots are left out of it: each one is the whole system again |
+| Text inside files | `ripgrep`, live | Fast enough for a home folder, and always correct. It looks in the folder the search is opened from; from the desktop, that is your home folder |
 
 What files say is not indexed, only their names.
 
@@ -493,10 +493,10 @@ What files say is not indexed, only their names.
 
 **Four doors.**
 
-- **The terminal.** `kavat-find` opens the search full screen: type to filter, a preview of the file on the right, `Enter` opens it, `Ctrl+O` opens its folder in Yazi and `Ctrl+Y` copies its path. `Ctrl+F` goes round the three sources: your files, the whole disk and text inside files. A result of a text search opens in Neovim at that line.
+- **The terminal.** `kavat-find` opens the search full screen: type to filter, a preview of the file on the right, `Enter` opens it, `Ctrl+O` opens its folder in Yazi and `Ctrl+Y` copies its path. `Ctrl+F` goes round the three sources: your files, the whole disk and text inside files. A result of a text search opens in Neovim at that line. `kavat-find disk` and `kavat-find text` open it on that source. The picker's colours come from the theme.
 - **zsh.** `Tab` shows the completions in the same picker instead of zsh's own menu, with a preview: files, folders, options, processes. This is the `fzf-tab` plugin, packaged in `[kavat]` if Arch's repositories do not have it. `Ctrl+R` searches the history, `Ctrl+T` pastes a file's path into the command, `Alt+C` jumps to a folder and `Ctrl+G` searches text inside files.
 - **Neovim.** `fzf-lua` is the one picker: files, text, buffers, recent files, help. It takes the place of Telescope, which did the same more slowly. `<leader>ff`, `fg`, `fb` and `fr` stay as they are.
-- **The desktop and Kavat.** `Super+Shift+F` opens the search as a floating window from anywhere, and the palette gets a files mode. In phase 4 Kavat gets a `files.find` tool that asks the same engine, so a file can be asked for by typing or by voice: it answers with the files it found and offers to open one, show it in Yazi or hand the whole list to the search. Finding is a read; opening a file is a reversible action, like the rest of its tools.
+- **The desktop and Kavat.** `Super+Shift+F` opens the search as a floating window from anywhere, and the palette gets a files mode. From the desktop, what is picked opens in a window of its own and the search closes. In phase 4 Kavat gets three tools over the same engine: `files.find`, `files.open` and `files.read`. A file can be asked for by typing or by voice: it answers with the files it found and offers to open one, show it in Yazi or hand the whole list to the search; and it can read a file to answer a question about what it says, which stays on the machine, since the model is local. Finding and reading are reads; opening a file is a reversible action, like the rest of its tools.
 
 ## Notes
 
@@ -938,8 +938,8 @@ A `kavat-desktop` metapackage depends on all of the above, so that an existing A
 
 - **zsh is the shell of the user the installer creates.** The system configuration is in `/etc/zsh/zshrc`; your `~/.zshrc` is read afterwards and wins. The live session stays on bash.
 - **The prompt** is a starship file, `/usr/share/kavat/starship.toml`: user, folder, branch and the `❯`, green or red. It uses the terminal's colors, so it follows the theme. The branch is read from the repository's files, without launching git. If you have `~/.config/starship.toml`, yours is used.
-- **Two plugins**, loaded directly: history suggestions and colors as you type. The list of completions is computed once a day and saved.
-- **With the shell come** zoxide (`z`), lsd in place of `ls`, fzf on `Ctrl+R` and `Ctrl+T`, ripgrep, fd, bat and jq. The history is shared between terminals and does not keep duplicates.
+- **Three plugins**, loaded directly: history suggestions, colors as you type and `fzf-tab`, which shows the completions in the file search's picker. The list of completions is computed once a day and saved.
+- **With the shell come** zoxide (`z`), lsd in place of `ls`, the file search and its keys (`Ctrl+R`, `Ctrl+T`, `Alt+C`, `Ctrl+G`), ripgrep, fd, bat and jq. The history is shared between terminals and does not keep duplicates.
 - **The budget is met**: the test opens the shell five times and requires the fastest one to come in under 100 ms.
 - **Left for later**: the aliases and functions inherited from Endgame, and the Shell page of the panel.
 

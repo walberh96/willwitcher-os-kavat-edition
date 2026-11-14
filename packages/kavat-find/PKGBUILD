@@ -1,0 +1,22 @@
+pkgname=kavat-find
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: one search for the files of the whole system"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+# the picker; the three things that look: fd in your files, plocate in the whole disk and
+# ripgrep inside files; what draws the preview; and what a picked file opens in
+depends=('bash' 'fzf' 'fd' 'ripgrep' 'plocate'
+         'bat' 'lsd' 'file' 'poppler'
+         'neovim' 'yazi' 'kitty' 'xdg-utils' 'wl-clipboard')
+source=('kavat-find' 'kavat-find-index' 'plocate-updatedb.conf' 'kavat-find.hook')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm755 kavat-find "$pkgdir/usr/bin/kavat-find"
+  install -Dm755 kavat-find-index "$pkgdir/usr/lib/kavat/find-index"
+  install -Dm644 plocate-updatedb.conf "$pkgdir/usr/lib/systemd/system/plocate-updatedb.service.d/kavat.conf"
+  # plocate starts its own timer, once a day: nothing to enable
+  install -Dm644 kavat-find.hook "$pkgdir/usr/share/libalpm/hooks/kavat-find.hook"
+}

@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition
 
-A personal distribution based on Arch Linux. Phases 1 and 2 are closed: there is an archiso profile in `iso/`, `kavat-*` packages in `packages/` and an installer in `installer/`, and the installed system boots, takes snapshots and goes back to them, on the desktop PC too. It is in **phase 3, the identity**: the theme system, `kavat-theme`, the system's own boot menu, loading screen and login screen, and `kav` on the command line already exist; Hyprland is unmodified, the shell is `kavat-shell`, Noctalia with a patch that takes out its ping, and the terminal opens zsh with the system's prompt; the rest of the design is not implemented. It is built on the desktop PC. That PC runs CachyOS, installed only for this project: the ISO and the packages are built inside clean Arch chroots, with a `pacman.conf` of their own that only has Arch's repositories and `[kavat]`. The host's `pacman` and `makepkg` are never used for what ends up in the system: CachyOS's `pacman` leaves marks of its own in what it installs.
+A personal distribution based on Arch Linux. Phases 1 and 2 are closed: there is an archiso profile in `iso/`, `kavat-*` packages in `packages/` and an installer in `installer/`, and the installed system boots, takes snapshots and goes back to them, on the desktop PC too. It is in **phase 3, the identity**: the theme system, `kavat-theme`, the system's own boot menu, loading screen and login screen, and `kav` on the command line already exist; Hyprland is unmodified, the shell is `kavat-shell`, Noctalia with a patch that takes out its ping, the terminal opens zsh with the system's prompt, and `kavat-find` is the file search; the rest of the design is not implemented. It is built on the desktop PC. That PC runs CachyOS, installed only for this project: the ISO and the packages are built inside clean Arch chroots, with a `pacman.conf` of their own that only has Arch's repositories and `[kavat]`. The host's `pacman` and `makepkg` are never used for what ends up in the system: CachyOS's `pacman` leaves marks of its own in what it installs.
 
 ## Languages
 
@@ -57,12 +57,15 @@ After touching `iso/`, `packages/` or `installer/` these are run, in this order.
 - `tests/theme.py [--encrypted]`: on the same disk, logs in, changes the mode, the palette and the accent with `kavat-theme` and checks that Hyprland, Kitty and Noctalia follow the change in under a second and without restarting. It is half of the gate of phase 3.
 - `tests/startup.py [--encrypted]`: on the same disk, watches the screen while it boots and checks that the GRUB menu, the loading screen and the login screen wear the theme, that the menu has the system's entries, that `kavat-theme boot` changes their look and that the Recovery entry ends in `kavat-rescue`.
 - `tests/kav.py [--encrypted]`: on the same disk, asks `kav` for packages on and off the reviewed list, with a folder standing in for the AUR, and undoes a change with `kav undo`. It is the other half of the gate of phase 3. It uses the lists of packages that `tools/build-repo.sh` leaves in its chroot.
+- `tests/find.py [--encrypted]`: on the same disk, checks that the installer left the index of the whole disk built and that a change of packages brings it up to date, then logs in, opens the file search with `Super+Shift+F` and finds a file by name, in the index and by a word inside it.
 
-What the tests share is in `tests/machine.py`. The last five work on a layer over the installed disk, so they do not change it.
+What the tests share is in `tests/machine.py`. The last six work on a layer over the installed disk, so they do not change it.
 
 `kavat-theme` is in `themes/` and is Rust: its unit tests run with `cargo test` inside that folder, and `tools/build-repo.sh themes` runs them again when packaging. Its code is in `themes/engine/` and not in `src/`, which is the folder `makepkg` uses next to a PKGBUILD. The desktop's templates are in `themes/templates/` and those of the boot and the login in `themes/boot/`; these are applied as root with `kavat-theme boot`.
 
 `kav` is in `kav/` and is Rust too, with its code in `kav/core/`; its unit tests run with `cargo test` inside that folder. `kav install` is not tried on the build PC: CachyOS's repositories have packages there, like `yay`, that do not exist in Kavat.
+
+`kavat-find`, the file search, is in `packages/kavat-find/`: one bash script that drives `fzf`, which calls the same script back for its lists, its preview and what a key does. `fzf-tab`, which Arch's repositories do not have, is built in `packages/fzf-tab/` from its release.
 
 `kavat-greeter`, the login screen, is in `greeter/`: `greeter.py` is its program, which greetd starts inside a small Hyprland session (`hyprland.lua`), and `page/` is the web page it shows. That page can be opened in a browser, where it stands in for the program itself with a made-up user whose password is `kavat`.
 

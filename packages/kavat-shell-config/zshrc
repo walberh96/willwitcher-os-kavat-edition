@@ -35,15 +35,48 @@ autoload -Uz compinit
   zstyle ':completion:*' cache-path "${kept:h}/completions"
 }
 zstyle ':completion:*' use-cache on
-zstyle ':completion:*' menu select
 zstyle ':completion:*' matcher-list 'm:{a-z}={A-Za-z}'
+
+# The picker, fzf: the same one as in the file search, kavat-find, with the theme's colours.
+# It lists files with fd, which also shows the hidden ones.
+() {
+  local look="${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/fzf/options"
+  [[ -e $look ]] && export FZF_DEFAULT_OPTS_FILE="$look"
+}
+export BAT_THEME=ansi
+export FZF_DEFAULT_COMMAND='fd --type file --type symlink --hidden --exclude .git --exclude .cache'
+export FZF_CTRL_T_COMMAND="$FZF_DEFAULT_COMMAND"
+export FZF_CTRL_T_OPTS="--preview 'bat --color always --style numbers --line-range :200 {}'"
+export FZF_ALT_C_COMMAND='fd --type directory --hidden --exclude .git --exclude .cache'
+export FZF_ALT_C_OPTS="--preview 'lsd -la --color always {}'"
+
+# Ctrl+R looks through the history, Ctrl+T puts a file's path in the command and Alt+C
+# goes to a folder
+source /usr/share/fzf/key-bindings.zsh
+source /usr/share/fzf/completion.zsh
+
+# Tab shows what can be completed in the picker, with a look at each file or folder; / goes
+# into the folder under the cursor. It has to be read after compinit and fzf's own keys, which
+# take Tab too, and before the two plugins further down.
+source /usr/share/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh
+zstyle ':completion:*' menu no
+zstyle ':completion:*:descriptions' format '[%d]'
+zstyle ':fzf-tab:*' use-fzf-default-opts yes
+zstyle ':fzf-tab:complete:*:*' fzf-preview \
+  'if [[ -d $realpath ]]; then lsd -la --color always $realpath; elif [[ -f $realpath ]]; then bat --color always --style numbers --line-range :200 $realpath; fi'
+zstyle ':fzf-tab:complete:(kill|ps):argument-rest' fzf-preview 'ps -p $word -o cmd --no-headers -w -w'
+zstyle ':fzf-tab:complete:(kill|ps):argument-rest' fzf-flags --preview-window=down:3:wrap
 
 # Suggestions from the history as you type; the right arrow takes one
 source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
 
-# fzf: Ctrl+R looks through the history, Ctrl+T through the files
-source /usr/share/fzf/key-bindings.zsh
-source /usr/share/fzf/completion.zsh
+# Ctrl+G looks for text inside the files of this folder
+kavat-find-text() {
+  kavat-find text < /dev/tty
+  zle reset-prompt
+}
+zle -N kavat-find-text
+bindkey '^G' kavat-find-text
 
 # zoxide: z and part of a folder's name goes there
 eval "$(zoxide init zsh)"

@@ -1,0 +1,5 @@
+# Made by kavat-theme from the theme's settings; what is changed here is lost.
+# The settings are in ~/.config/kavat/theme.toml.
+--color=fg:{{ text }},bg:-1,hl:{{ accent_text }},fg+:{{ text }},bg+:{{ selection }},hl+:{{ accent_text }},gutter:-1
+--color=query:{{ text }},prompt:{{ accent_text }},pointer:{{ accent_text }},marker:{{ ok }},spinner:{{ accent_text }},info:{{ muted }}
+--color=border:{{ border }},label:{{ muted }},header:{{ muted }},footer:{{ muted }},separator:{{ border }},scrollbar:{{ border }}

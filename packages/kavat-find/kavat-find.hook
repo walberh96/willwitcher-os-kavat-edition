@@ -1,0 +1,13 @@
+# Part of kavat-find: after packages change, the index of file names is built again, in
+# the background. Where systemd is not running, as inside the installer, nothing is done.
+[Trigger]
+Operation = Install
+Operation = Upgrade
+Operation = Remove
+Type = Package
+Target = *
+
+[Action]
+Description = Bringing the file search's index up to date...
+When = PostTransaction
+Exec = /bin/sh -c 'test -d /run/systemd/system && systemctl start --no-block plocate-updatedb.service || true'

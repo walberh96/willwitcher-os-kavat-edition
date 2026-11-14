@@ -1,13 +1,14 @@
 pkgname=kavat-shell-config
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Willwitcher-OS Kavat Edition: zsh as the terminal's shell, with its prompt and the terminal's everyday tools"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
-# zsh, its prompt and its two plugins; and the tools the settings below make room for
-depends=('zsh' 'starship' 'zsh-autosuggestions' 'zsh-syntax-highlighting'
-         'zoxide' 'lsd' 'ripgrep' 'fd' 'fzf' 'bat' 'jq')
+# zsh, its prompt and its three plugins; the file search, whose picker Tab opens; and the
+# tools the settings below make room for
+depends=('zsh' 'starship' 'zsh-autosuggestions' 'zsh-syntax-highlighting' 'fzf-tab'
+         'kavat-find' 'zoxide' 'lsd' 'ripgrep' 'fd' 'fzf' 'bat' 'jq')
 source=('zshrc' 'starship.toml' 'skel-zshrc')
 sha256sums=('SKIP' 'SKIP' 'SKIP')
 

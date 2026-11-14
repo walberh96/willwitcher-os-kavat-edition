@@ -1,0 +1,7 @@
+# fzf, the picker of the file search, of zsh and of Neovim: its colours.
+#
+# kavat-find and the system's zshrc point fzf at this file, and fzf reads it each time it
+# opens, so there is nothing to reload.
+
+[[file]]
+from = "options"

@@ -1,0 +1,9 @@
+#!/bin/bash
+# Build plocate's index of every file name on the disk, which kavat-find's "whole disk"
+# reads. The installer runs it as its last step; after that plocate's own timer does, once
+# a day, and so does every change of packages.
+#
+# The folders of a Btrfs disk are mounted one by one, and plocate takes each for a folder
+# mounted a second time and leaves it out, /home with them: so it is told to leave none
+# out. The snapshots are left out by name: each one is the whole system again.
+exec updatedb --prune-bind-mounts no --add-prunepaths '/.snapshots /home/.snapshots'

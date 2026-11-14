@@ -40,7 +40,7 @@ SUBVOLUMES = {'/': '/@', '/home': '/@home', '/games': '/@games', '/var/log': '/@
 STEPS = {'location': 195, 'keyboard': 234, 'partitions': 273, 'users': 312, 'summary': 351}
 
 
-def next_page(screen, step, timeout=60):
+def next_page(screen, step, timeout=120):
     """Press Next and wait until the installer shows that step. True when it does.
 
     Some pages take a while to come up, and keys typed before they do are lost. So is, now

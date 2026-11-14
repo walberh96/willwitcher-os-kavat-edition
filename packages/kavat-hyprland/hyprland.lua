@@ -110,6 +110,18 @@ hl.bind(mod .. " + F", hl.dsp.window.fullscreen({ action = "toggle", mode = "ful
 
 hl.bind(mod .. " + Escape", hl.dsp.exec_cmd("noctalia msg panel-toggle session"))
 
+-- The file search, in a window of its own over whatever is open. Kitty asks for the size
+-- its last window had, which here was a tiled one: it is told not to.
+hl.bind(mod .. " + SHIFT + F",
+    hl.dsp.exec_cmd("kitty --class kavat-find -o remember_window_size=no kavat-find --window"))
+hl.window_rule({
+    name   = "file-search",
+    match  = { class = "^kavat-find$" },
+    float  = true,
+    size   = "(monitor_w*0.7) (monitor_h*0.7)",
+    center = true,
+})
+
 local step = 40 -- pixels a window grows or shrinks with each press
 for direction, by in pairs({ left = { -step, 0 }, right = { step, 0 }, up = { 0, -step }, down = { 0, step } }) do
     hl.bind(mod .. " + SHIFT + " .. direction, hl.dsp.window.move({ direction = direction }))
