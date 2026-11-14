@@ -4,7 +4,7 @@
 -- ~/.config/hypr/hyprland.lua, which then takes its place.
 --
 -- The shortcuts are the ones of Willwitcher-OS Endgame, plus the new ones whose target
--- exists today. The full table is in docs/DESIGN.md, under «Escritorio».
+-- exists today. The full table is in docs/DESIGN.md, under "Desktop".
 
 local mod      = "SUPER"
 local terminal = "kitty"

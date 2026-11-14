@@ -1,4 +1,4 @@
-# ISOs de Arch descargadas y artefactos de compilación
+# Downloaded Arch ISOs and what a build leaves
 vendor/
 out/
 work/
@@ -7,19 +7,19 @@ work/
 *.pkg.tar.zst
 *.pkg.tar.zst.sig
 
-# Lo que makepkg descarga o deja junto a un PKGBUILD
+# What makepkg downloads or leaves next to a PKGBUILD
 packages/*/*.tar.*
 packages/*/src/
 packages/*/pkg/
 greeter/web-greeter/
 
-# Sistema
+# The system's own files
 .DS_Store
 
-# Notas de investigación en bruto (el informe final vive en reports/)
+# Raw research notes (the finished report lives in reports/)
 research_notes/
 __pycache__/
 
-# Lo que cargo compila
+# What cargo builds
 themes/target/
 kav/target/

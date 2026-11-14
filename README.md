@@ -16,7 +16,7 @@ Fast like a tiling WM. Curated like one person's system. And with someone inside
 
 `Arch Linux` · `Hyprland` · `Noctalia` · `Calamares` · `kav` · `Neovim` · `Yazi` · `Custom Chromium` · `Local agent`
 
-**[Watch the tour](docs/video/kavat-tour.mp4)** · **[Interactive mockup](docs/mockup/index.html)** · **[Design document](docs/DESIGN.md)** (in Spanish) · **[Screenshots](docs/screenshots/)**
+**[Watch the tour](docs/video/kavat-tour.mp4)** · **[Interactive mockup](docs/mockup/index.html)** · **[Design document](docs/DESIGN.md)** · **[Screenshots](docs/screenshots/)**
 
 </div>
 
@@ -308,14 +308,14 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 
 | What | Where |
 | --- | --- |
-| Design document: every piece, every decision and what is still to be verified (in Spanish) | [`docs/DESIGN.md`](docs/DESIGN.md) |
-| Pending decisions: what is still waiting for an answer (in Spanish) | [`docs/PENDING.md`](docs/PENDING.md) |
+| Design document: every piece, every decision and what is still to be verified | [`docs/DESIGN.md`](docs/DESIGN.md) |
+| Pending decisions: what is still waiting for an answer | [`docs/PENDING.md`](docs/PENDING.md) |
 | A tour of the system, narrated by Kavat (3 min 30 s) | [`docs/video/kavat-tour.mp4`](docs/video/kavat-tour.mp4) |
 | Interactive mockup of the interface | [`docs/mockup/index.html`](docs/mockup/index.html) |
 | Screenshots of the mockup | [`docs/screenshots/`](docs/screenshots/) |
 | The cat's ASCII art for the terminal | [`docs/assets/kavat-ascii.txt`](docs/assets/kavat-ascii.txt) |
-| Research: what Omarchy and other distributions do, and which ideas are worth taking (in Spanish) | [`reports/Ideas de otras distros Linux.md`](reports/Ideas%20de%20otras%20distros%20Linux.md) |
-| Research: which local model should be the agent, how to split the 4 GB with voice, and the test that confirms it (in Spanish) | [`reports/Modelo local para el agente Kavat.md`](reports/Modelo%20local%20para%20el%20agente%20Kavat.md) |
+| Research: what Omarchy and other distributions do, and which ideas are worth taking | [`reports/ideas-from-other-linux-distros.md`](reports/ideas-from-other-linux-distros.md) |
+| Research: which local model should be the agent, how to split the 4 GB with voice, and the test that confirms it | [`reports/local-model-for-the-kavat-agent.md`](reports/local-model-for-the-kavat-agent.md) |
 
 ## The repository
 
@@ -379,6 +379,6 @@ tests/kav.py          # asks kav for packages on and off the reviewed list, and 
 | 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | In progress: the theme system, the boot screens, the login screen, `kav` on the command line and a first fork of the shell work |
 | 4 | Local agent, skills and voice | Pending |
 
-A study of Omarchy and other distributions reopened eight of those decisions. All are now answered. The current Noctalia was read against what this shell needs: plugins could host almost all of it, but not the settings panel, so the shell is a fork of Noctalia 5 and from that point on it is this system's own application. They are listed, with their status, in the design document under «Decisiones en revisión».
+A study of Omarchy and other distributions reopened eight of those decisions. All are now answered. The current Noctalia was read against what this shell needs: plugins could host almost all of it, but not the settings panel, so the shell is a fork of Noctalia 5 and from that point on it is this system's own application. They are listed, with their status, in the design document under "Decisions under review".
 
-The design also takes several assumptions for granted that have not been tested. They are listed, with the phase in which each gets verified, at the end of the [design document](docs/DESIGN.md#decisiones).
+The design also takes several assumptions for granted that have not been tested. They are listed, with the phase in which each gets verified, at the end of the [design document](docs/DESIGN.md#decisions).

@@ -1,503 +1,503 @@
-# Willwitcher-OS Kavat Edition — Documento de diseño
+# Willwitcher-OS Kavat Edition — Design document
 
-Actualizado el 13 de noviembre de 2026 · [Mockup interactivo](mockup/index.html) · [Capturas](screenshots/) · [README](../README.md)
+Updated on 13 November 2026 · [Interactive mockup](mockup/index.html) · [Screenshots](screenshots/) · [README](../README.md)
 
-## Visión
+## Vision
 
-Willwitcher-OS Kavat Edition es un Arch con opinión: se instala en 10 minutos, arranca ya configurado como tú trabajas, y se maneja hablando con un agente local que conoce el sistema por dentro.
+Willwitcher-OS Kavat Edition is an opinionated Arch: it installs in 10 minutes, boots already configured the way you work, and is driven by talking to a local agent that knows the system from the inside.
 
-Cinco principios deciden cada propuesta de este documento:
+Five principles decide every proposal in this document:
 
-1. **Arch por debajo, sin magia.** Todo es un paquete de pacman. Nada de scripts que parchean `~/.config` a ciegas; lo que el sistema instala, pacman lo puede quitar.
-2. **Curado, no abierto.** Los repos oficiales son libres; el AUR solo entra por una lista revisada y fijada a un commit.
-3. **Una sola fuente de verdad para la apariencia.** Un tema son tokens; cada app recibe su config generada. Cambiar de claro a oscuro tarda menos de 1 segundo y no reinicia nada.
-4. **Reversible siempre.** Cada cambio de paquetes crea un snapshot arrancable. Romper el sistema cuesta un reinicio, no una reinstalación.
-5. **El agente es parte del sistema, no una app.** Corre local, sin red, con permisos por niveles y registro de todo lo que hace.
+1. **Arch underneath, no magic.** Everything is a pacman package. No scripts that patch `~/.config` blindly; whatever the system installs, pacman can remove.
+2. **Curated, not open.** The official repos are free to use; the AUR only comes in through a reviewed list pinned to a commit.
+3. **A single source of truth for appearance.** A theme is tokens; each app receives its generated config. Switching from light to dark takes less than 1 second and restarts nothing.
+4. **Always reversible.** Every package change creates a bootable snapshot. Breaking the system costs a reboot, not a reinstall.
+5. **The agent is part of the system, not an app.** It runs locally, without network, with tiered permissions and a log of everything it does.
 
-El nombre de trabajo para las piezas propias es `kavat`: el repo de paquetes `[kavat]`, el gestor `kav` y los paquetes `kavat-*`.
+The working name for the project's own pieces is `kavat`: the package repo `[kavat]`, the manager `kav` and the `kavat-*` packages.
 
-![Arquitectura: cinco capas y el agente](img/architecture.png)
+![Architecture: five layers and the agent](img/architecture.png)
 
-La capa resaltada es la única que es código nuestro desde cero; lo de arriba son forks y configuración, lo de abajo es Arch.
+The highlighted layer is the only one that is our own code from scratch; what is above it is forks and configuration, what is below it is Arch.
 
-## Base del sistema
+## System base
 
-La ISO se construye con `archiso` a partir del perfil `releng`, y todo lo propio llega como paquetes firmados desde un repo pacman `[kavat]`. Arch solo existe para x86\_64, así que ese es el objetivo.
+The ISO is built with `archiso` from the `releng` profile, and everything of our own arrives as signed packages from a pacman repo, `[kavat]`. Arch only exists for x86\_64, so that is the target.
 
-| Pieza | Propuesta | Alternativa | Por qué |
+| Piece | Proposal | Alternative | Why |
 | --- | --- | --- | --- |
-| Construcción de la ISO | `archiso` con perfil propio en `iso/` | Partir de EndeavourOS o CachyOS | Control total y sin heredar decisiones ajenas; se compila en tu PC de escritorio |
-| Kernel | `linux-zen` + `linux-lts` de respaldo | `linux` estándar | Zen responde mejor en escritorio; LTS salva un arranque roto |
-| Gestor de arranque | GRUB con menú propio (decidido) | systemd-boot | Admite tema gráfico y submenús: fondo, entradas propias, modo seguro y lista de snapshots, cada uno con su kernel |
-| Sistema de archivos | Btrfs con subvolúmenes `@`, `@home`, `@games`, `@log`, `@pkg`, `@snapshots` | ext4 | Snapshots baratos y compresión zstd |
-| Snapshots | Snapper + hook de pacman antes y después de cada transacción | Timeshift | Se integra con el arranque y con `kav` |
-| Cifrado | LUKS2 opcional y apagado por defecto; lo abre GRUB con el TPM2 | Solo contraseña | Disco cifrado sin teclear ninguna contraseña |
-| Memoria | zram con zstd, sin partición swap | Swapfile | Menos escrituras a disco; la hibernación queda como opción del instalador |
-| Audio y red | PipeWire + WirePlumber; NetworkManager con iwd | wpa\_supplicant | Es lo que Noctalia y Hyprland esperan |
-| Arranque visual | Plymouth con tema generado por el sistema de temas | Texto | Misma identidad desde el primer fotograma |
+| ISO build | `archiso` with its own profile in `iso/` | Start from EndeavourOS or CachyOS | Full control and no inherited decisions from others; it is built on your desktop PC |
+| Kernel | `linux-zen` + `linux-lts` as fallback | Standard `linux` | Zen is more responsive on the desktop; LTS rescues a broken boot |
+| Boot loader | GRUB with its own menu (decided) | systemd-boot | Supports a graphical theme and submenus: background, own entries, safe mode and a list of snapshots, each with its own kernel |
+| File system | Btrfs with subvolumes `@`, `@home`, `@games`, `@log`, `@pkg`, `@snapshots` | ext4 | Cheap snapshots and zstd compression |
+| Snapshots | Snapper + a pacman hook before and after each transaction | Timeshift | It integrates with the boot and with `kav` |
+| Encryption | LUKS2, optional and off by default; GRUB opens it with the TPM2 | Password only | Encrypted disk without typing any password |
+| Memory | zram with zstd, no swap partition | Swapfile | Fewer writes to disk; hibernation stays as an installer option |
+| Audio and network | PipeWire + WirePlumber; NetworkManager with iwd | wpa\_supplicant | It is what Noctalia and Hyprland expect |
+| Visual boot | Plymouth with a theme generated by the theme system | Text | Same identity from the first frame |
 
-**Dónde se monta cada cosa.** Los subvolúmenes van en `/`, `/home`, `/games`, `/var/log`, `/var/cache/pacman/pkg` y `/.snapshots`, y la partición EFI en `/efi`. El kernel vive en `/boot`, dentro de `@`, así que cada snapshot lleva el suyo.
+**Where each thing is mounted.** The subvolumes go on `/`, `/home`, `/games`, `/var/log`, `/var/cache/pacman/pkg` and `/.snapshots`, and the EFI partition on `/efi`. The kernel lives in `/boot`, inside `@`, so each snapshot carries its own.
 
-**Dónde se compila.** El PC de escritorio lleva CachyOS, instalado solo para este proyecto. De CachyOS no entra nada en el sistema: la ISO y los paquetes `kavat-*` se construyen dentro de chroots limpios de Arch, con el `pacman` y las herramientas de Arch, y con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Tiene que ser así porque el `pacman` de CachyOS deja marcas propias en la base de datos de paquetes de lo que instala.
+**Where it is built.** The desktop PC runs CachyOS, installed only for this project. Nothing from CachyOS goes into the system: the ISO and the `kavat-*` packages are built inside clean Arch chroots, with Arch's `pacman` and tools, and with its own `pacman.conf` that only has the Arch repos and `[kavat]`. It has to be this way because CachyOS's `pacman` leaves its own marks in the package database of whatever it installs.
 
-El repositorio es un monorepo con una carpeta por pieza:
+The repository is a monorepo with one folder per piece:
 
-- `iso/`: perfil de archiso, lista de paquetes y overlay del sistema vivo.
-- `installer/`: configuración, módulos y branding de Calamares.
-- `packages/`: un PKGBUILD por paquete `kavat-*` que no tiene carpeta propia, incluidos los forks. Las piezas con carpeta propia, como `installer/`, llevan su PKGBUILD dentro.
-- `kav/`: el gestor de paquetes y su allowlist.
-- `themes/`: tokens, plantillas y temas incluidos.
-- `greeter/`: `kavat-greeter`, el fork de web-greeter, y la página del login.
-- `agent/`: daemon, herramientas y Modelfile del agente.
-- `tests/`: arranca e instala cada ISO en una máquina virtual.
-- `docs/`: decisiones de diseño.
+- `iso/`: archiso profile, package list and overlay of the live system.
+- `installer/`: Calamares configuration, modules and branding.
+- `packages/`: one PKGBUILD per `kavat-*` package that has no folder of its own, including the forks. The pieces with their own folder, such as `installer/`, carry their PKGBUILD inside.
+- `kav/`: the package manager and its allowlist.
+- `themes/`: tokens, templates and bundled themes.
+- `greeter/`: `kavat-greeter`, the fork of web-greeter, and the login page.
+- `agent/`: daemon, tools and Modelfile of the agent.
+- `tests/`: boots and installs each ISO in a virtual machine.
+- `docs/`: design decisions.
 
-Los forks (Hyprland, Noctalia) viven en repos aparte y aquí solo está su PKGBUILD apuntando a un tag.
+The forks (Hyprland, Noctalia) live in separate repos, and here there is only their PKGBUILD pointing to a tag.
 
-## Instalador
+## Installer
 
-Calamares con branding propio hace la instalación en 7 pantallas, y el sistema base se instala sin red. Calamares no está en los repos oficiales de Arch, así que se empaqueta como `kavat-calamares` en `[kavat]`.
+Calamares with its own branding does the installation in 7 screens, and the base system installs without network. Calamares is not in the official Arch repos, so it is packaged as `kavat-calamares` in `[kavat]`.
 
-El idioma por defecto es inglés, con español como segunda opción del selector. Los dos vienen ya instalados en la ISO y en el sistema, con teclado US por defecto. Todo lo propio (instalador, greeter, shell, `kav` y agente) trae sus textos en inglés, y solo en inglés: lo decidiste el 13 de noviembre de 2026.
+The default language is English, with Spanish as the second option in the selector. Both come already installed in the ISO and in the system, with the US keyboard by default. Everything of our own (installer, greeter, shell, `kav` and agent) ships its text in English, and only in English: you decided this on 13 November 2026.
 
-1. **Bienvenida**: idioma, teclado y comprobación de requisitos (UEFI, RAM, disco).
-2. **Disco**: borrar todo, junto a otro sistema, o manual. Btrfs y subvolúmenes ya decididos; cifrado como un interruptor, apagado por defecto.
-3. **Usuario**: nombre, contraseña, nombre del equipo.
-4. **Hardware**: detecta GPU y propone controladores (NVIDIA, AMD, Intel) en vez de preguntar a ciegas. En tu equipo, AMD con los controladores libres de Mesa, que ya vienen en la ISO.
-5. **Software**: programas que se añaden al sistema base, marcados uno a uno por categorías, y si se instala el agente con su modelo. Necesita red; el detalle está debajo.
-6. **Apariencia**: tema, modo claro u oscuro y tono de acento, con vista previa en vivo del propio instalador.
-7. **Resumen e instalación**: lista exacta de lo que se va a hacer y barra de progreso con diapositivas.
+1. **Welcome**: language, keyboard and requirements check (UEFI, RAM, disk).
+2. **Disk**: erase everything, alongside another system, or manual. Btrfs and subvolumes already decided; encryption as a switch, off by default.
+3. **User**: name, password, host name.
+4. **Hardware**: detects the GPU and proposes drivers (NVIDIA, AMD, Intel) instead of asking blindly. On your machine, AMD with the free Mesa drivers, which already come in the ISO.
+5. **Software**: programs that are added to the base system, checked one by one by category, and whether the agent is installed with its model. It needs network; the details are below.
+6. **Appearance**: theme, light or dark mode and accent hue, with a live preview of the installer itself.
+7. **Summary and installation**: exact list of what is going to be done and a progress bar with slides.
 
-Ideas propias sobre el Calamares de serie:
+Our own ideas on top of stock Calamares:
 
-- **Módulo `kavat-theme`**: lo elegido en la pantalla 6 queda aplicado al greeter, a Plymouth y al escritorio antes del primer arranque.
-- **Módulo `kavat-hardware`**: escribe la configuración de Hyprland según monitores y GPU detectados.
-- **Instalación sin red**: la ISO lleva los paquetes del sistema base; con red se actualiza al final y se añade el software elegido.
+- **`kavat-theme` module**: what was chosen on screen 6 is applied to the greeter, to Plymouth and to the desktop before the first boot.
+- **`kavat-hardware` module**: writes the Hyprland configuration according to the monitors and GPU detected.
+- **Installation without network**: the ISO carries the packages of the base system; with network, it updates at the end and adds the chosen software.
 
-- **Archivo de respuestas**: un `kavat-install.toml` en el USB reinstala tu máquina sin tocar nada.
-- **Primer arranque**: un asistente dentro de Noctalia termina lo que no pertenece al instalador (cuentas, llaves SSH, descarga del modelo).
+- **Answer file**: a `kavat-install.toml` on the USB reinstalls your machine without touching anything.
+- **First boot**: an assistant inside Noctalia finishes what does not belong to the installer (accounts, SSH keys, model download).
 
-**Elegir el software.** En el paso 5 se marca lo que el sistema trae desde el primer arranque, además del sistema base.
+**Choosing the software.** In step 5 you check what the system brings from the first boot, in addition to the base system.
 
-- **Categorías y casillas**: navegadores, desarrollo, creación, juegos, comunicación, multimedia y oficina, con una casilla por programa, como Firefox u OBS.
-- **Cualquier paquete**: un buscador añade lo que no esté en la lista, de los repos de Arch, de `[kavat]` o de la allowlist del AUR.
-- **Lo instala `kav`**, con sus reglas de siempre; lo del AUR solo entra por la allowlist.
-- **Necesita red**: lo que no viene en el sistema base se descarga durante la instalación. Sin red, el paso se salta y no deja añadir nada; el sistema se instala tal como viene.
-- **Se recuerda**: lo marcado queda en `kavat-install.toml`, así que reinstalar lo repite.
+- **Categories and checkboxes**: browsers, development, creation, games, communication, multimedia and office, with one checkbox per program, such as Firefox or OBS.
+- **Any package**: a search box adds what is not on the list, from the Arch repos, from `[kavat]` or from the AUR allowlist.
+- **`kav` installs it**, with its usual rules; anything from the AUR only comes in through the allowlist.
+- **It needs network**: what does not come in the base system is downloaded during the installation. Without network, the step is skipped and nothing can be added; the system is installed as it comes.
+- **It is remembered**: what was checked is kept in `kavat-install.toml`, so reinstalling repeats it.
 
-La categoría Development trae lo que hace falta para trabajar en lanequarters, incluida su app móvil en Android. La de iOS se compila en una Mac.
+The Development category brings what is needed to work on lanequarters, including its mobile app on Android. The iOS one is built on a Mac.
 
-| Grupo | Programas | Para qué |
+| Group | Programs | What for |
 | --- | --- | --- |
-| Esenciales | git, github-cli, mise, pnpm, docker con compose, claude-code | Los proyectos piden Node 22 o superior y pnpm; mise pone la versión de Node de cada uno |
-| Web | supabase, postgresql (cliente `psql`), stripe-cli | `supabase start` levanta la base local en Docker; `stripe listen` recibe los webhooks |
-| Rust | rustup con rustc, cargo, rustfmt, clippy y rust-analyzer; lldb, gcc y pkg-config | `kav` y `kavatd` se escriben en Rust |
-| Móvil, Android | jdk17-openjdk, SDK de Android con emulador, android-tools, watchman, maestro | Compilar la app de Expo para Android y probarla en el emulador o en un teléfono |
-| Al primer arranque, con pnpm | Navegadores de Playwright, vercel, eas-cli | No son paquetes de pacman: los instala pnpm y `kav` no los gestiona |
+| Essentials | git, github-cli, mise, pnpm, docker with compose, claude-code | The projects require Node 22 or higher and pnpm; mise sets each one's Node version |
+| Web | supabase, postgresql (`psql` client), stripe-cli | `supabase start` brings up the local database in Docker; `stripe listen` receives the webhooks |
+| Rust | rustup with rustc, cargo, rustfmt, clippy and rust-analyzer; lldb, gcc and pkg-config | `kav` and `kavatd` are written in Rust |
+| Mobile, Android | jdk17-openjdk, Android SDK with emulator, android-tools, watchman, maestro | Build the Expo app for Android and test it on the emulator or on a phone |
+| At first boot, with pnpm | Playwright browsers, vercel, eas-cli | They are not pacman packages: pnpm installs them and `kav` does not manage them |
 
-En la categoría de oficina, OnlyOffice sale como casilla sin marcar; viene del AUR.
+In the office category, OnlyOffice appears as an unchecked checkbox; it comes from the AUR.
 
-La extensión de navegador se prueba en `kavat-browser`, que es un fork de Chromium y admite las extensiones de Chrome. Seis de la lista vienen del AUR (claude-code, supabase, stripe-cli, el SDK de Android, watchman y maestro) y necesitan su entrada en la allowlist; en qué repositorio está cada paquete se comprueba al escribirla.
+The browser extension is tested in `kavat-browser`, which is a fork of Chromium and supports Chrome extensions. Six on the list come from the AUR (claude-code, supabase, stripe-cli, the Android SDK, watchman and maestro) and need their entry in the allowlist; which repository each package is in is checked when that entry is written.
 
-## Arranque
+## Boot
 
-Del botón de encendido al escritorio hay tres pantallas con la misma identidad: el menú de GRUB, la pantalla de carga de Plymouth y el login. Las dos primeras se configuran desde la página Boot del panel de Noctalia.
+From the power button to the desktop there are three screens with the same identity: the GRUB menu, the Plymouth loading screen and the login. The first two are configured from the Boot page of the Noctalia panel.
 
-**Menú de arranque (GRUB).**
+**Boot menu (GRUB).**
 
-| Entrada | Qué hace |
+| Entry | What it does |
 | --- | --- |
-| Willwitcher-OS Kavat Edition | Arranque normal; es la entrada por defecto |
-| Kernel de respaldo | El mismo sistema con `linux-lts` |
-| Modo seguro | Arranca con la configuración de fábrica: tus archivos se ignoran, no se borran; sin agente, sin apps de inicio automático y sin fondo animado |
-| Snapshots | Submenú con los últimos 10 estados arrancables y los fijados |
-| Recuperación | Consola de rescate con `kavat-rescue` |
-| Ajustes del firmware | Entra a la UEFI |
-| Otros sistemas | Solo aparece si hay otro sistema instalado |
+| Willwitcher-OS Kavat Edition | Normal boot; it is the default entry |
+| Fallback kernel | The same system with `linux-lts` |
+| Safe mode | Boots with the factory configuration: your files are ignored, not deleted; no agent, no autostart apps and no animated wallpaper |
+| Snapshots | Submenu with the last 10 bootable states and the pinned ones |
+| Recovery | Rescue console with `kavat-rescue` |
+| Firmware settings | Enters the UEFI |
+| Other systems | Only appears if another system is installed |
 
-- **Tema propio**: fondo, tipografía, colores y logo salen del tema del sistema. El fondo es el fondo de pantalla actual; si es un vídeo, su fotograma fijo.
-- **Modo seguro**: es la red de seguridad de que los archivos de configuración manden. Si un archivo editado a mano deja el escritorio sin arrancar, esta entrada entra sin leerlo.
-- **Arranque fallido**: si el arranque anterior no llegó al escritorio, el menú aparece solo y con Modo seguro ya seleccionado.
-- **Reiniciar hacia**: desde el menú de energía del shell se reinicia directamente al modo seguro, a un snapshot o al firmware, sin pasar por el menú. También son skills del agente.
-- **Configurable**: tiempo de espera, entrada por defecto, qué entradas se muestran, resolución y aspecto. Modo seguro no se puede ocultar.
+- **Own theme**: background, typography, colors and logo come from the system theme. The background is the current wallpaper; if it is a video, its still frame.
+- **Safe mode**: it is the safety net for letting the configuration files rule. If a hand-edited file leaves the desktop unable to start, this entry gets in without reading it.
+- **Failed boot**: if the previous boot did not reach the desktop, the menu appears on its own and with Safe mode already selected.
+- **Reboot into**: from the shell's power menu you reboot directly into safe mode, into a snapshot or into the firmware, without going through the menu. They are also skills of the agent.
+- **Configurable**: timeout, default entry, which entries are shown, resolution and look. Safe mode cannot be hidden.
 
-**Pantalla de carga (Plymouth).**
+**Loading screen (Plymouth).**
 
-- **Cuatro estilos**: logo con pulso, anillo giratorio, barra de progreso, o texto con los mensajes de arranque.
-- **Sigue al tema**, con la misma imagen de fondo que el menú y el login, para que no haya salto entre las tres pantallas.
-- **`Esc` muestra los mensajes de arranque.** La pantalla aparece también al apagar y al reiniciar.
-- **Disco cifrado**: esta pantalla no pide nada. El disco ya llega abierto: lo abre GRUB, antes del menú.
+- **Four styles**: logo with a pulse, spinning ring, progress bar, or text with the boot messages.
+- **It follows the theme**, with the same background image as the menu and the login, so there is no jump between the three screens.
+- **`Esc` shows the boot messages.** The screen also appears on shutdown and on reboot.
+- **Encrypted disk**: this screen asks for nothing. The disk arrives already open: GRUB opens it, before the menu.
 
-**Cómo se aplican los cambios.** El menú y la pantalla de carga son archivos del sistema, y cambiar la pantalla de carga obliga a regenerar la imagen de arranque, que tarda. Por eso el cambio de tema del escritorio sigue siendo instantáneo y el arranque se actualiza después, en segundo plano, con una sola petición de contraseña. Si la regeneración falla, se queda la versión anterior.
+**How the changes are applied.** The menu and the loading screen are system files, and changing the loading screen forces a rebuild of the boot image, which takes time. That is why the desktop theme change stays instant and the boot is updated afterwards, in the background, with a single password prompt. If the rebuild fails, the previous version stays.
 
-Dos límites: GRUB muestra una imagen fija, no reproduce vídeo ni desenfoca; y sus fuentes hay que convertirlas a su propio formato, cosa que hace el generador de temas. GRUB, grub-btrfs (la base del submenú de snapshots) y Plymouth están en los repos oficiales de Arch.
+Two limits: GRUB shows a still image, it does not play video or blur; and its fonts have to be converted to its own format, which the theme generator does. GRUB, grub-btrfs (the base of the snapshots submenu) and Plymouth are in the official Arch repos.
 
-**Cómo está hecho.** Desde la fase 2, y probado en máquina virtual con `tests/snapshots.py`, `tests/safemode.py` y `tests/install.py --encrypt`, este último con un TPM2 simulado:
+**How it is built.** Since phase 2, and tested in a virtual machine with `tests/snapshots.py`, `tests/safemode.py` and `tests/install.py --encrypt`, the last one with a simulated TPM2:
 
-- **GRUB vive en la partición EFI.** Sus archivos, su configuración y su bloque de entorno van en `/efi/grub`, porque GRUB no sabe escribir en Btrfs, y tanto «Reiniciar hacia» como el arranque fallido necesitan que escriba. `/boot/grub` apunta ahí. Los kernels siguen en `/boot`, dentro del sistema, así que cada snapshot lleva el suyo.
-- **Arrancar un snapshot.** El snapshot es de solo lectura y arranca con una capa en memoria encima, que recibe lo que el sistema escribe; nada llega al snapshot. `kavat-boot-once <n>` pide arrancar un snapshot solo en el siguiente arranque, y `kavat-rollback <n>` lo convierte en el sistema: el de antes queda aparte, como `@.old-<fecha>`. Son la base de «Reiniciar hacia» y de `kav undo`.
-- **Arranque fallido.** Cada arranque deja una marca en el bloque de entorno de GRUB, y el sistema la avanza: pantalla de login, sesión iniciada, escritorio. Si el arranque anterior no llegó al login, o alguien inició sesión y el escritorio no apareció, GRUB abre el menú con Modo seguro elegido y lo arranca solo a los 30 segundos. Si nadie inició sesión, no cuenta como fallo.
-- **Modo seguro.** La sesión arranca con las carpetas de configuración, estado y datos vacías, así que cada programa usa la configuración del sistema. Tus archivos no se tocan.
-- **Disco cifrado.** Decidido el 13 de noviembre de 2026 (D33). GRUB abre el disco antes del menú, con una llave que el instalador sella en el TPM2. Esa llave está atada al PCR 7, el estado de Secure Boot que mide el firmware, como hace systemd por defecto, así que una actualización del kernel o de mkinitcpio no obliga a volver a sellarla. Después, el sistema abre el disco otra vez con la misma llave, guardada dentro de su imagen de arranque, que vive en el disco cifrado: nadie teclea nada. Si el TPM2 no da la llave, GRUB pide la contraseña de recuperación, en texto. Como GRUB prueba las llaves del disco en el orden en que están escritas, la llave del TPM2 va primero y la contraseña, que es lenta de probar a propósito, después. Todo esto vale igual para los snapshots y el modo seguro, porque el disco ya está abierto cuando sale el menú.
-- **Sin Secure Boot.** Decidido el 13 de noviembre de 2026 (D34). GRUB sin shim no arranca ningún kernel con Secure Boot activo, y shim solo llega por el AUR: no compensa una pieza de fuera más. Secure Boot tiene que estar apagado en el firmware; con él encendido no arranca ni la ISO.
-- **El menú, con sus entradas.** Desde la fase 3 las escribe `kavat-boot`, con los nombres y el orden de la tabla: los guiones propios de GRUB para la lista de kernels, los otros sistemas y el firmware quedan apagados, y un hook de pacman los vuelve a apagar cuando `grub` se actualiza. «Otros sistemas» es un submenú con lo que encuentra `os-prober`, y solo sale si encuentra algo. Los textos del menú van en inglés.
-- **Recuperación.** Arranca el sistema hasta montar los discos y nada más, con el kernel de respaldo y los mensajes de arranque a la vista, y deja en pantalla `kavat-rescue`: volver a un snapshot, abrir una consola como root, seguir con el arranque normal, reiniciar o apagar. La consola no pide contraseña: quien llega al menú de arranque ya puede editar una entrada y conseguir lo mismo. Entrar aquí no cuenta como arranque fallido.
-- **El aspecto.** Lo genera `kavat-theme boot` para las tres pantallas a la vez, con las mismas paletas y los mismos ajustes que el escritorio. Es un paso de root: tu orden le pasa por `pkexec` los ajustes en vigor, y nada más, así que pide la contraseña una vez. Root recuerda los ajustes que recibió; mientras nadie le dé ninguno, usa los de la máquina, que es lo que hace el instalador. Probado en máquina virtual con `tests/startup.py`.
-- **Menú.** El tema va a `/efi/grub/themes/kavat`: el fondo y el logo como PNG, las fuentes del tema convertidas al formato de GRUB y la caja de la entrada elegida cortada en nueve piezas. Dos cosas del mockup no las sabe hacer GRUB y no están: un texto distinto bajo el menú según la entrada elegida, y una segunda línea más pequeña dentro de una entrada.
-- **Pantalla de carga.** Un tema de Plymouth con el logo y un anillo que crece y se desvanece, sobre el mismo fondo que el menú. Viaja dentro de la imagen de arranque, que se reconstruye solo cuando el aspecto cambió. De los cuatro estilos está el primero; el anillo giratorio, la barra y el texto llegan con la página Boot del panel.
-- **El fondo, por ahora**, es uno generado con los colores del tema, el mismo en las tres pantallas. El fondo de pantalla del escritorio ocupará su sitio cuando exista esa pieza.
-- **Sin corte entre menú y carga**: el kernel conserva la pantalla como la dejó el menú hasta que Plymouth dibuja. Entre la pantalla de carga y el login hay un instante en negro, el del servidor X al arrancar; cuánto se nota en la RX 6800 se mira en el PC.
+- **GRUB lives on the EFI partition.** Its files, its configuration and its environment block go in `/efi/grub`, because GRUB cannot write to Btrfs, and both "Reboot into" and the failed boot need it to write. `/boot/grub` points there. The kernels stay in `/boot`, inside the system, so each snapshot carries its own.
+- **Booting a snapshot.** The snapshot is read-only and boots with an in-memory layer on top, which receives what the system writes; nothing reaches the snapshot. `kavat-boot-once <n>` asks to boot a snapshot on the next boot only, and `kavat-rollback <n>` turns it into the system: the previous one is set aside, as `@.old-<date>`. They are the base of "Reboot into" and of `kav undo`.
+- **Failed boot.** Each boot leaves a mark in the GRUB environment block, and the system advances it: login screen, session started, desktop. If the previous boot did not reach the login, or someone logged in and the desktop did not appear, GRUB opens the menu with Safe mode chosen and boots it on its own after 30 seconds. If nobody logged in, it does not count as a failure.
+- **Safe mode.** The session starts with the configuration, state and data folders empty, so each program uses the system configuration. Your files are not touched.
+- **Encrypted disk.** Decided on 13 November 2026 (D33). GRUB opens the disk before the menu, with a key that the installer seals in the TPM2. That key is bound to PCR 7, the Secure Boot state that the firmware measures, as systemd does by default, so a kernel or mkinitcpio update does not force sealing it again. Afterwards, the system opens the disk again with the same key, stored inside its boot image, which lives on the encrypted disk: nobody types anything. If the TPM2 does not give the key, GRUB asks for the recovery password, in text. Since GRUB tries the disk's keys in the order in which they are written, the TPM2 key goes first and the password, which is slow to try on purpose, after it. All of this holds equally for the snapshots and safe mode, because the disk is already open when the menu comes up.
+- **No Secure Boot.** Decided on 13 November 2026 (D34). GRUB without shim does not boot any kernel with Secure Boot active, and shim only arrives through the AUR: one more outside piece is not worth it. Secure Boot has to be off in the firmware; with it on, not even the ISO boots.
+- **The menu, with its entries.** Since phase 3, `kavat-boot` writes them, with the names and the order of the table: GRUB's own scripts for the kernel list, the other systems and the firmware are turned off, and a pacman hook turns them off again when `grub` is updated. "Other systems" is a submenu with what `os-prober` finds, and it only appears if it finds something. The menu text is in English.
+- **Recovery.** It boots the system up to mounting the disks and nothing more, with the fallback kernel and the boot messages in view, and leaves `kavat-rescue` on screen: go back to a snapshot, open a console as root, continue with the normal boot, reboot or shut down. The console does not ask for a password: whoever reaches the boot menu can already edit an entry and get the same. Entering here does not count as a failed boot.
+- **The look.** `kavat-theme boot` generates it for the three screens at once, with the same palettes and the same settings as the desktop. It is a root step: your command passes it the settings in effect through `pkexec`, and nothing else, so it asks for the password once. Root remembers the settings it received; as long as nobody gives it any, it uses the machine's, which is what the installer does. Tested in a virtual machine with `tests/startup.py`.
+- **Menu.** The theme goes to `/efi/grub/themes/kavat`: the background and the logo as PNG, the theme's fonts converted to GRUB's format and the box of the chosen entry cut into nine pieces. Two things in the mockup are beyond what GRUB can do and are not there: a different text under the menu depending on the chosen entry, and a second, smaller line inside an entry.
+- **Loading screen.** A Plymouth theme with the logo and a ring that grows and fades, over the same background as the menu. It travels inside the boot image, which is rebuilt only when the look changed. Of the four styles, the first one is there; the spinning ring, the bar and the text arrive with the Boot page of the panel.
+- **The background, for now**, is one generated with the theme's colors, the same on the three screens. The desktop wallpaper will take its place when that piece exists.
+- **No cut between menu and loading**: the kernel keeps the screen as the menu left it until Plymouth draws. Between the loading screen and the login there is an instant of black, that of the X server starting; how noticeable it is on the RX 6800 is checked on the PC.
 
 ## Login
 
-LightDM con web-greeter muestra un tema propio en HTML/CSS/JS que lee los mismos tokens que el escritorio, así el login cambia de color cuando cambias de tema.
+LightDM with web-greeter shows its own theme in HTML/CSS/JS that reads the same tokens as the desktop, so the login changes color when you change theme.
 
-- **Diseño**: reloj grande, avatar, campo de contraseña y nada más a la vista. Sesión, energía y teclado aparecen al mover el ratón a una esquina.
-- **Fondo vivo**: el fondo del greeter es el mismo fondo del escritorio, desenfocado, para que el paso a Hyprland no tenga corte visual.
-- **Estado del sistema**: batería, red y una línea con actualizaciones pendientes.
-- **Varios usuarios**: selector por avatar; cada usuario ve el login con su propio tema.
-- **Bloqueo de pantalla**: mismo diseño que el login, hecho con hyprlock, para que bloquear y entrar se vean iguales.
+- **Design**: large clock, avatar, password field and nothing else in view. Session, power and keyboard appear when you move the mouse to a corner.
+- **Live background**: the greeter's background is the same background as the desktop, blurred, so the step into Hyprland has no visual cut.
+- **System status**: battery, network and a line with pending updates.
+- **Several users**: selector by avatar; each user sees the login with their own theme.
+- **Screen lock**: same design as the login, made with hyprlock, so locking and logging in look the same.
 
-Decidido: LightDM + web-greeter con tema propio. Riesgo a vigilar: web-greeter vive en el AUR, depende de Qt WebEngine y su mantenimiento es irregular. Por eso es un fork, `kavat-greeter`. El plan B es greetd con el greeter del propio Noctalia, que corre en Wayland nativo.
+Decided: LightDM + web-greeter with its own theme. Risk to watch: web-greeter lives in the AUR, depends on Qt WebEngine and its maintenance is irregular. That is why it is a fork, `kavat-greeter`. Plan B is greetd with Noctalia's own greeter, which runs on native Wayland.
 
-**Cómo está hecho.** Desde la fase 3, y probado en máquina virtual con `tests/startup.py`:
+**How it is built.** Since phase 3, and tested in a virtual machine with `tests/startup.py`:
 
-- **`kavat-greeter`** es web-greeter 4.0.0 con un parche pequeño, en `greeter/`. El original se compila bajando de PyPI su propio Python y su propio Qt; el fork corre con el Python y el Qt de Arch, así que nada llega de fuera de sus repos. El parche quita las dos librerías que solo están en PyPI y le da su nombre y sus rutas. Como web-greeter, es GPL-3.
-- **La página** es HTML, CSS y JavaScript, en `greeter/theme/`: reloj, avatar y contraseña. Sesión, teclado, suspender, reiniciar y apagar aparecen al bajar el ratón al borde inferior. Con varios usuarios, los demás salen como avatares pequeños. En las otras pantallas del equipo solo sale el reloj. Los textos van en inglés; el reloj y la fecha siguen el formato del sistema. Ofrece dos teclados, `us` y `es`.
-- **Sigue al tema del sistema**: lee los colores, las esquinas y las fuentes que deja `kavat-theme boot`, y usa el mismo fondo que el menú y la pantalla de carga.
-- **Queda para más adelante**: el estado de la red y las actualizaciones pendientes, que necesitan a `kavatd`; el tema propio de cada usuario; y el bloqueo de pantalla con hyprlock con este mismo diseño.
-- **El fork, por ahora, vive en este repo** como el commit de la versión 4.0.0 más el parche. Si hay que cambiarle más, pasa a un repo aparte, como los otros forks.
+- **`kavat-greeter`** is web-greeter 4.0.0 with a small patch, in `greeter/`. The original is built by downloading its own Python and its own Qt from PyPI; the fork runs with Arch's Python and Qt, so nothing arrives from outside its repos. The patch removes the two libraries that are only on PyPI and gives it its name and its paths. Like web-greeter, it is GPL-3.
+- **The page** is HTML, CSS and JavaScript, in `greeter/theme/`: clock, avatar and password. Session, keyboard, suspend, reboot and shut down appear when you move the mouse down to the bottom edge. With several users, the others appear as small avatars. On the machine's other screens only the clock appears. The text is in English; the clock and the date follow the system format. It offers two keyboards, `us` and `es`.
+- **It follows the system theme**: it reads the colors, the corners and the fonts that `kavat-theme boot` leaves, and uses the same background as the menu and the loading screen.
+- **Left for later**: the network status and the pending updates, which need `kavatd`; each user's own theme; and the screen lock with hyprlock with this same design.
+- **The fork, for now, lives in this repo** as the commit of version 4.0.0 plus the patch. If more has to be changed in it, it moves to a separate repo, like the other forks.
 
-## Escritorio
+## Desktop
 
-Hyprland compone las ventanas y un fork de Noctalia 5 pone la barra, el lanzador, las notificaciones, el centro de control, el panel del agente y el panel de ajustes.
+Hyprland composites the windows, and a fork of Noctalia 5 provides the bar, the launcher, the notifications, the control center, the agent panel and the settings panel.
 
-**Hyprland.** Decidido: no tocar el código del compositor al principio. La identidad va en un paquete `kavat-hyprland` con configuración modular y plugins; si la versión actual de Hyprland impide algo que queramos hacer, el fork del código se abre desde el día 1.
+**Hyprland.** Decided: do not touch the compositor's code at the start. The identity goes in a `kavat-hyprland` package with modular configuration and plugins; if the current version of Hyprland prevents something we want to do, the fork of the code is opened from day 1.
 
-- Configuración partida en archivos: `binds`, `rules`, `monitors`, `look`, `autostart`. Los del sistema viven en `/usr/share/kavat/hypr/`; los tuyos en `~/.config/hypr/` y siempre ganan.
-- Versión fijada en `[kavat]`: Hyprland cambia sintaxis con frecuencia, así que solo sube cuando la configuración ya está probada contra esa versión.
-- Los atajos parten de los de tu Willwitcher-OS Endgame, sin cambiar ninguno; lo nuevo solo ocupa teclas que tenías libres. Una hoja de atajos se genera desde la configuración.
-- Animaciones, bordes, radio y desenfoque salen de los tokens del tema, no de valores escritos a mano. Los valores iniciales son los de Endgame: radio 10, borde 2, separación 5 entre ventanas y 20 al borde, animaciones cortas.
+- Configuration split into files: `binds`, `rules`, `monitors`, `look`, `autostart`. The system's live in `/usr/share/kavat/hypr/`; yours in `~/.config/hypr/`, and they always win.
+- Version pinned in `[kavat]`: Hyprland changes syntax often, so it only moves up when the configuration is already tested against that version.
+- The shortcuts start from those of your Willwitcher-OS Endgame, without changing any; what is new only takes keys you had free. A cheat sheet is generated from the configuration.
+- Animations, borders, radius and blur come from the theme's tokens, not from hand-written values. The initial values are those of Endgame: radius 10, border 2, gap of 5 between windows and 20 at the edge, short animations.
 
-Desde Hyprland 0.55 la configuración es Lua, y así se usa. El panel de ajustes y el agente no generan Lua: escriben una tabla de valores, que son datos, y el Lua del sistema la carga. Así ningún texto que venga de fuera llega a ejecutarse.
+Since Hyprland 0.55 the configuration is Lua, and that is how it is used. The settings panel and the agent do not generate Lua: they write a table of values, which is data, and the system's Lua loads it. This way no text that comes from outside ever gets executed.
 
-Atajos: 19 heredados de Endgame tal cual y 12 nuevos para lo que antes no existía.
+Shortcuts: 19 inherited from Endgame as they are and 12 new ones for what did not exist before.
 
-| Acción | Atajo | Origen |
+| Action | Shortcut | Origin |
 | --- | --- | --- |
 | Terminal (Kitty) | `Super+Enter` | Endgame |
-| Cerrar ventana | `Super+Q` | Endgame |
-| Lanzador de apps | `Super+D` | Endgame |
-| Archivos (Yazi) | `Super+E` | Endgame |
-| Flotante | `Super+V` | Endgame |
-| Pseudomosaico | `Super+P` | Endgame |
-| Cambiar la división | `Super+J` | Endgame |
-| Mover el foco | `Super` + flechas | Endgame |
-| Ir al espacio 1 a 10 | `Super` + `1`…`0` | Endgame |
-| Enviar la ventana al espacio 1 a 10 | `Super+Shift` + `1`…`0` | Endgame |
-| Espacio siguiente o anterior | `Super` + rueda del ratón | Endgame |
-| Scratchpad: mostrar / enviar ventana | `Super+S` / `Super+Shift+S` | Endgame |
-| Cambiar de ventana | `Alt+Tab` | Endgame |
-| Historial del portapapeles | `Super+Shift+V` | Endgame |
-| Selector de color | `Super+Shift+P` | Endgame |
-| Captura de región al portapapeles | `Print` | Endgame |
-| Bloquear | `Super+Shift+L` | Endgame |
-| Salir de la sesión | `Super+M` | Endgame |
-| Mover / redimensionar con ratón | `Super` + arrastrar con botón izquierdo / derecho | Endgame |
-| Agente | `Super+Space` | Nuevo |
-| Navegador | `Super+B` | Nuevo |
-| Pantalla completa | `Super+F` | Nuevo |
-| Mover la ventana | `Super+Shift` + flechas | Nuevo |
-| Redimensionar | `Super+Ctrl` + flechas | Nuevo |
-| Selector de temas | `Super+T` | Nuevo |
-| Cambiar de modo | `Super+Shift+M` | Nuevo |
-| Panel de `kav` | `Super+U` | Nuevo |
-| Menú de energía | `Super+Escape` | Nuevo |
-| Hoja de atajos | `Super+/` | Nuevo |
-| Nota rápida | `Super+N` | Nuevo |
-| Notas | `Super+Shift+N` | Nuevo |
+| Close window | `Super+Q` | Endgame |
+| App launcher | `Super+D` | Endgame |
+| Files (Yazi) | `Super+E` | Endgame |
+| Floating | `Super+V` | Endgame |
+| Pseudotile | `Super+P` | Endgame |
+| Toggle split | `Super+J` | Endgame |
+| Move focus | `Super` + arrows | Endgame |
+| Go to workspace 1 to 10 | `Super` + `1`…`0` | Endgame |
+| Send the window to workspace 1 to 10 | `Super+Shift` + `1`…`0` | Endgame |
+| Next or previous workspace | `Super` + mouse wheel | Endgame |
+| Scratchpad: show / send window | `Super+S` / `Super+Shift+S` | Endgame |
+| Switch window | `Alt+Tab` | Endgame |
+| Clipboard history | `Super+Shift+V` | Endgame |
+| Color picker | `Super+Shift+P` | Endgame |
+| Region screenshot to the clipboard | `Print` | Endgame |
+| Lock | `Super+Shift+L` | Endgame |
+| Exit the session | `Super+M` | Endgame |
+| Move / resize with the mouse | `Super` + drag with left / right button | Endgame |
+| Agent | `Super+Space` | New |
+| Browser | `Super+B` | New |
+| Fullscreen | `Super+F` | New |
+| Move the window | `Super+Shift` + arrows | New |
+| Resize | `Super+Ctrl` + arrows | New |
+| Theme picker | `Super+T` | New |
+| Switch mode | `Super+Shift+M` | New |
+| `kav` panel | `Super+U` | New |
+| Power menu | `Super+Escape` | New |
+| Cheat sheet | `Super+/` | New |
+| Quick note | `Super+N` | New |
+| Notes | `Super+Shift+N` | New |
 
-**Noctalia.** Decidido: fork de Noctalia 5. Desde ese punto es nuestra app, con nuestros cambios, empaquetada como `kavat-shell`.
+**Noctalia.** Decided: fork of Noctalia 5. From that point on it is our app, with our changes, packaged as `kavat-shell`.
 
-- Parte de Noctalia 5.4.1, escrito en C++ y con licencia MIT. No se sigue cada versión de upstream: lo que interese de ellas se trae a mano, así que la regla de reaplicar parches no vale para este fork.
-- Añadidos propios: panel de ajustes con páginas nativas, panel del agente, selector de temas con vista previa, panel de `kav` (actualizaciones, snapshots, solicitudes de AUR) y el asistente de primer arranque.
-- El motor de colores de Noctalia se sustituye o se alimenta desde los tokens del sistema, para que haya una sola fuente de verdad.
-- El asistente de primer arranque de Noctalia está apagado: elige paleta y modo por su cuenta, que es cosa del tema del sistema. Quien cambie el tema desde los ajustes de Noctalia lo deja fuera de sincronía con el resto; esa página desaparece cuando el fork tenga el panel de ajustes propio.
-- Se quita el «Anonymous Startup Ping» de Noctalia, el aviso que manda a sus servidores la versión, el sistema, el compositor, las resoluciones, la RAM y la escala en cada arranque, y su casilla en el asistente de primer arranque. Lo pediste el 13 de noviembre de 2026, tras verlo en el asistente.
-- **Cómo está hecho.** Desde la fase 3 el shell es `kavat-shell`, en `packages/kavat-shell/`: Noctalia 5.4.1 con la receta de Arch y un parche, `no-ping.patch`, que quita el código que enviaba el ping, su casilla en los ajustes y su tarjeta en el asistente. No queda nada que encender; `tests/theme.py` comprueba que el programa instalado es el fork y que no lleva la dirección del ping. El programa se sigue llamando `noctalia`. Por ahora el fork es ese parche sobre la versión publicada; pasará a un repo aparte cuando lleve los añadidos propios. El diálogo de contraseña de polkit lo dibuja el shell: su agente viene encendido.
+- It starts from Noctalia 5.4.1, written in C++ and under the MIT license. Not every upstream version is followed: whatever is of interest in them is brought in by hand, so the rule of reapplying patches does not hold for this fork.
+- Our own additions: settings panel with native pages, agent panel, theme picker with preview, `kav` panel (updates, snapshots, AUR requests) and the first-run wizard.
+- Noctalia's color engine is replaced or fed from the system's tokens, so there is a single source of truth.
+- Noctalia's first-run wizard is turned off: it chooses palette and mode on its own, which is the system theme's business. Whoever changes the theme from Noctalia's settings leaves it out of sync with the rest; that page disappears when the fork has its own settings panel.
+- Noctalia's "Anonymous Startup Ping" is removed, the notice that sends the version, the system, the compositor, the resolutions, the RAM and the scale to its servers on every startup, along with its checkbox in the first-run wizard. You asked for this on 13 November 2026, after seeing it in the assistant.
+- **How it is built.** Since phase 3 the shell is `kavat-shell`, in `packages/kavat-shell/`: Noctalia 5.4.1 with Arch's recipe and one patch, `no-ping.patch`, which removes the code that sent the ping, its checkbox in the settings and its card in the assistant. Nothing is left to turn on; `tests/theme.py` checks that the installed program is the fork and that it does not carry the ping's address. The program is still called `noctalia`. For now the fork is that patch on top of the published version; it will move to a separate repo when it carries our own additions. The polkit password dialog is drawn by the shell: its agent comes turned on.
 
-**Paleta de comandos.** `Super+D` abre una sola paleta para todo el sistema: apps, archivos, ajustes, skills, paquetes, ventanas abiertas y pestañas del navegador. Usa la misma gramática y los mismos nombres de comando que la consola del navegador y la paleta de Neovim, y lo que no encuentra se lo puede pasar al agente.
+**Command palette.** `Super+D` opens a single palette for the whole system: apps, files, settings, skills, packages, open windows and browser tabs. It uses the same grammar and the same command names as the browser's console and the Neovim palette, and what it does not find it can pass to the agent.
 
-- **Proyectos.** Un proyecto guarda un espacio de trabajo entero: carpeta, terminales, editor, perfil del navegador y disposición de ventanas. Se abre desde la paleta o desde la barra, y vuelve tal como lo dejaste.
-- **Un comando `kavat` para todo.** `kavat theme`, `mode`, `wallpaper`, `project`, `ask`, `fetch`, `top` y `doctor` comparten verbos y autocompletado; todo lo que hace el panel se puede hacer desde la terminal.
-- **Hoja de atajos según contexto.** `Super+/` muestra los atajos de la app que tiene el foco, además de los del sistema.
-- **Captura con texto.** Al capturar una zona de la pantalla se puede copiar su texto, con reconocimiento local.
+- **Projects.** A project saves a whole workspace: folder, terminals, editor, browser profile and window layout. It is opened from the palette or from the bar, and comes back just as you left it.
+- **One `kavat` command for everything.** `kavat theme`, `mode`, `wallpaper`, `project`, `ask`, `fetch`, `top` and `doctor` share verbs and autocompletion; everything the panel does can be done from the terminal.
+- **Context-aware cheat sheet.** `Super+/` shows the shortcuts of the app that has the focus, in addition to the system's.
+- **Screenshot with text.** When capturing a region of the screen, its text can be copied, with local recognition.
 
-**Calculadora en la paleta.** Escribir una cuenta o una conversión de unidades en `Super+D` da el resultado, calculado en la máquina, y Enter lo copia.
+**Calculator in the palette.** Typing a calculation or a unit conversion in `Super+D` gives the result, computed on the machine, and Enter copies it.
 
-**Regla para todos los forks.** Cada fork lleva un `PATCHES.md` con qué cambia y por qué, y una tarea automática que avisa cuando upstream publica versión y si los parches aplican limpio.
+**Rule for all the forks.** Each fork carries a `PATCHES.md` with what it changes and why, and an automatic task that warns when upstream publishes a version and whether the patches apply cleanly.
 
-## Modos del sistema
+## System modes
 
-Un selector en la barra de Noctalia cambia el equipo entero entre tres modos; se parece a elegir un perfil de energía, pero cada modo decide qué corre, por dónde sale la red y qué se recuerda.
+A selector in the Noctalia bar switches the whole machine between three modes; it resembles choosing a power profile, but each mode decides what runs, where the network goes out and what is remembered.
 
-|  | Coder (por defecto) | Gamer | Incognito |
+|  | Coder (default) | Gamer | Incognito |
 | --- | --- | --- | --- |
-| Agente | Activo | Apagado; modelo y voz fuera de memoria | Activo, sin guardar historial |
-| GPU y memoria | Uso normal | Todo liberado para el juego | Uso normal |
-| Procesos de fondo | Todos | Se detienen los que no hacen falta: contenedores, indexado, actualizaciones y snapshots programados; el fondo animado se pausa | Todos |
-| Red | Directa | Directa | Todo por VPN (OpenVPN o Proton VPN) |
-| Navegador | Normal | Normal | Las ventanas nuevas se abren en incógnito |
-| Notificaciones | Normales | No molestar | Normales, sin vista previa del contenido |
-| Rendimiento | Equilibrado | Máximo rendimiento de CPU | Equilibrado |
+| Agent | Active | Off; model and voice out of memory | Active, without saving history |
+| GPU and memory | Normal use | Everything freed for the game | Normal use |
+| Background processes | All | The ones that are not needed are stopped: containers, indexing, updates and scheduled snapshots; the animated wallpaper is paused | All |
+| Network | Direct | Direct | Everything through VPN (OpenVPN or Proton VPN) |
+| Browser | Normal | Normal | New windows open in incognito |
+| Notifications | Normal | Do not disturb | Normal, without content preview |
+| Performance | Balanced | Maximum CPU performance | Balanced |
 
-Cómo funciona:
+How it works:
 
-- Cada modo es un archivo TOML en `/usr/share/kavat/modes/` que declara qué servicios para o arranca, qué perfil de red usa y qué ajustes cambia. Un modo propio es un archivo más.
-- `kavatd` aplica el cambio y lo deshace al salir: lo que el modo Gamer detuvo vuelve a arrancar al volver a Coder.
-- Se cambia desde la barra, con `Super+Shift+M`, con `kavat mode gamer` o pidiéndoselo al agente.
-- La barra muestra siempre el modo activo; en Incognito, también el estado de la VPN.
+- Each mode is a TOML file in `/usr/share/kavat/modes/` that declares which services it stops or starts, which network profile it uses and which settings it changes. A mode of your own is one more file.
+- `kavatd` applies the change and undoes it on exit: what Gamer mode stopped starts again when you return to Coder.
+- It is switched from the bar, with `Super+Shift+M`, with `kavat mode gamer` or by asking the agent.
+- The bar always shows the active mode; in Incognito, also the VPN status.
 
-Ideas añadidas sobre lo que pediste:
+Ideas added on top of what you asked for:
 
-- **Gamer automático**: entrar al modo al lanzar un juego desde Steam y salir al cerrarlo.
-- **Las animaciones y los efectos se quedan en Gamer**: el modo libera recursos apagando procesos, no la apariencia.
-- **Corte de red en Incognito**: si la VPN cae, no sale tráfico hasta que vuelve. Sin esto, una caída te deja navegando con tu IP real sin avisar.
-- **Incognito también fuera del navegador**: el historial del portapapeles, el de la terminal y los archivos recientes dejan de guardarse; al salir se vacía el portapapeles.
-- **No entra en Incognito hasta que la VPN conecta**: el modo solo se marca activo con el túnel arriba.
+- **Automatic Gamer**: enter the mode when a game is launched from Steam and leave it when it is closed.
+- **Animations and effects stay in Gamer**: the mode frees resources by turning off processes, not the appearance.
+- **Network cut in Incognito**: if the VPN drops, no traffic goes out until it comes back. Without this, a drop leaves you browsing with your real IP without warning.
+- **Incognito outside the browser too**: the clipboard history, the terminal history and the recent files stop being saved; on exit the clipboard is emptied.
+- **It does not enter Incognito until the VPN connects**: the mode is only marked active with the tunnel up.
 
-Límite a tener claro: la VPN oculta tu IP a los sitios y tu tráfico a tu proveedor, pero no te hace anónimo frente a cuentas en las que inicies sesión.
+A limit to keep clear: the VPN hides your IP from the sites and your traffic from your provider, but it does not make you anonymous to accounts you log in to.
 
-Al entrar en Incognito, las ventanas normales del navegador ya abiertas se ocultan en un espacio aparte y vuelven al salir.
+On entering Incognito, the normal browser windows already open are hidden in a separate workspace and come back on exit.
 
-## Juego y hardware
+## Gaming and hardware
 
-El equipo es un escritorio con una Radeon RX 6800, y el sistema lo trata como tal.
+The machine is a desktop with a Radeon RX 6800, and the system treats it as such.
 
-- **Perfil por juego**: en modo Gamer, cada juego puede tener su monitor de rendimiento, su límite de fotogramas y su perfil de GPU. El monitor y el límite son de MangoHud, y gamescope fija la resolución y el escalado de cada juego; los dos van en la categoría de juegos del instalador.
-- **Página de GPU**: curvas de ventilador, límites de potencia y sensores en la barra.
-- **Las luces siguen al tema**: con OpenRGB, teclado y torre toman el color de acento, cambian con el modo y laten con la voz de Kavat.
-- **Supresión de ruido del micrófono**: activa de serie, para la voz del agente y para directos.
-- **Discos extraíbles**: al enchufar un USB se monta solo y sale un aviso con «Abrir en Yazi» y «Expulsar». Los discos con NTFS se montan igual.
-- **Teclado Keychron**: se configura con la versión web de VIA desde `kavat-browser`. El sistema solo trae la regla de udev que da acceso al teclado; qmk y la app de VIA no se instalan.
-- **Auriculares**: headsetcontrol lee la batería de los auriculares USB, que sale en la página Network & Bluetooth junto a los demás dispositivos.
-- **Red y Bluetooth**: una página del panel reúne el cable, el Wi-Fi, las VPN guardadas y los dispositivos Bluetooth, como mandos y auriculares, con su batería.
+- **Per-game profile**: in Gamer mode, each game can have its own performance monitor, its frame limit and its GPU profile. The monitor and the limit come from MangoHud, and gamescope sets each game's resolution and scaling; both go in the installer's games category.
+- **GPU page**: fan curves, power limits and sensors in the bar.
+- **The lights follow the theme**: with OpenRGB, keyboard and tower take the accent color, change with the mode and pulse with Kavat's voice.
+- **Microphone noise suppression**: on by default, for the agent's voice and for live streams.
+- **Removable drives**: when a USB drive is plugged in it mounts on its own and a notice appears with "Open in Yazi" and "Eject". Drives with NTFS mount just the same.
+- **Keychron keyboard**: it is configured with the web version of VIA from `kavat-browser`. The system only ships the udev rule that gives access to the keyboard; qmk and the VIA app are not installed.
+- **Headphones**: headsetcontrol reads the battery of USB headphones, which appears on the Network & Bluetooth page next to the other devices.
+- **Network and Bluetooth**: one page of the panel gathers the cable, the Wi-Fi, the saved VPNs and the Bluetooth devices, such as controllers and headphones, with their battery.
 
-**Pantallas.** Se admite cualquier número de pantallas, y se colocan desde la página Displays del panel.
+**Displays.** Any number of displays is supported, and they are arranged from the Displays page of the panel.
 
-- **Arrastrando**: cada pantalla conectada se dibuja a escala y se coloca arrastrándola, en horizontal o en vertical; los bordes se pegan entre sí. Vale para una pantalla, dos una al lado de otra, o una horizontal junto a una vertical.
-- **Una disposición por conjunto de pantallas**: cada conjunto guarda la suya y se reconoce por el modelo y el número de serie de las pantallas, no por el puerto. El conjunto conectado decide cuál se aplica, así que una misma configuración sincronizada sirve en equipos con pantallas distintas.
-- **Pantalla principal**: en ella se abren el lanzador, Kavat, las notificaciones y los juegos. Los espacios de trabajo se reparten por pantalla.
-- **Confirmar o deshacer**: un cambio que no se confirma en 10 segundos se deshace solo.
-- **En el archivo**: las disposiciones viven en `~/.config/hypr/monitors.lua`, como tabla de valores. Por defecto, una pantalla nueva se extiende a la derecha.
+- **By dragging**: each connected display is drawn to scale and is placed by dragging it, in landscape or in portrait; the edges snap to each other. It works for one display, two side by side, or a landscape one next to a portrait one.
+- **One layout per set of displays**: each set saves its own and is recognized by the model and the serial number of the displays, not by the port. The connected set decides which one is applied, so one same synced configuration works on machines with different displays.
+- **Main display**: the launcher, Kavat, the notifications and the games open on it. The workspaces are distributed per display.
+- **Confirm or undo**: a change that is not confirmed in 10 seconds undoes itself.
+- **In the file**: the layouts live in `~/.config/hypr/monitors.lua`, as a table of values. By default, a new display extends to the right.
 
-## Ajustes desde Noctalia
+## Settings from Noctalia
 
-Un panel de Ajustes dentro de Noctalia configura todo el núcleo del sistema desde un solo sitio, y cada pieza nueva que entre al núcleo llega con su página de ajustes.
+A Settings panel inside Noctalia configures the whole core of the system from a single place, and each new piece that enters the core arrives with its settings page.
 
-| Página del panel | Qué se ajusta | Fork necesario |
+| Panel page | What is set | Fork needed |
 | --- | --- | --- |
-| Appearance | Todo el sistema de temas: paleta, modo, acento, tono, tipografía, perfiles; estilo de los iconos y tamaño del cursor; luces que siguen al acento | Propio |
-| Wallpaper | Imagen o vídeo, carpetas, ajustes del vídeo, reglas de pausa, fondo por pantalla | No: mpvpaper para el vídeo |
-| Accessibility | Reducir movimiento, escala de texto, contraste alto | Propio |
-| Windows (Hyprland) | Separación, bordes, animaciones, disposición, ratón y teclado, reglas de ventana | No previsto: admite cambios en vivo |
-| Keybindings | Todos los atajos, con detección de conflictos y hoja de atajos | No |
-| Displays | Disposición de las pantallas arrastrando, una por cada conjunto de pantallas; pantalla principal; resolución, frecuencia, escala, rotación, sincronización adaptativa y espacios de trabajo de cada una; luz nocturna | No: lo aplica Hyprland |
-| GPU | Curvas de ventilador, límite de potencia, sensores en la barra, perfiles por juego | No |
-| Sound | Salida, entrada, volumen por app, supresión de ruido del micrófono | No |
-| Network & Bluetooth | Cable, Wi-Fi, VPN guardadas, dispositivos Bluetooth y su batería, y si arrancan encendidos | No |
-| Terminal (Kitty) | Fuente, tamaño, cursor, opacidad, márgenes, pestañas, historial; logo, líneas y saludo de la información del sistema; agrupación, historial, aviso y tecla del agente en el monitor del sistema | No previsto: admite recarga en vivo |
-| Editor (Neovim) | Preset de atajos, numeración, tabulación, formateo y guardado automáticos, paquetes de lenguaje, plugins, paneles laterales | No: es configuración propia (`kavat-nvim`) |
-| Files (Yazi) | Preset de atajos, arrastrar y soltar, copiador con pop-up, selector de archivos del sistema, qué hace pulsar una descarga, vistas previas, abrir con | No previsto: plugins; fork solo si un plugin no llega |
-| Notes (nb) | Carpeta de notas, cuaderno por defecto, nota rápida, recordatorios y cuánto posponen, vistas de tareas, qué cuadernos lee el agente, cifrado y sincronización | Fork de nb (kavat-notes) |
-| Shell (zsh) | Prompt, plugins, historial, alias, apps por defecto | No |
-| Browser | Bloqueador, apariencia, perfil por modo, vídeo protegido, comandos de la consola, recortes y álbumes | El fork de Chromium ya previsto |
-| Bar & widgets | Posición y densidad de la barra, widgets y su orden, lanzador, notificaciones | El fork de Noctalia ya previsto |
-| Modes | Qué hace cada modo, automatización con Steam, VPN de Incognito, modos nuevos | Propio |
-| Projects | Proyectos guardados: carpeta, terminales, editor, perfil del navegador y ventanas de cada uno | Propio |
-| Agent & voice | Presupuesto de memoria, modelo, permisos por nivel, voz y cómo se activa, lo que se ve mientras habla, avisos, registro de actividad | Propio |
-| Skills | Skills de serie y propias, sus pasos, atajo, frase de voz, dónde se fijan y cuándo se lanzan solas | Propio |
-| Packages (kav) | Fuentes, actualizaciones y su comprobación, snapshots, allowlist del AUR y solicitudes | Propio |
-| Backup & sync | Snapshots de `/home`, copias externas, historial de la configuración y su sincronización | Propio |
-| Privacy & network | Qué app usó micrófono, cámara o pantalla; reglas del cortafuegos por aplicación; llavero y llaves SSH y GPG | No |
-| Boot | Menú de GRUB (espera, entrada por defecto, entradas visibles, aspecto) y pantalla de carga (estilo, mensajes) | No: temas generados para GRUB y Plymouth |
-| Login & lock | Fondo, reloj, usuarios, idioma del login, tiempos de bloqueo | El fork de web-greeter ya previsto |
-| Language & region | Idioma del sistema (inglés o español), distribuciones de teclado, formatos | Propio |
+| Appearance | The whole theme system: palette, mode, accent, hue, typography, profiles; icon style and cursor size; lights that follow the accent | Own |
+| Wallpaper | Image or video, folders, video settings, pause rules, wallpaper per display | No: mpvpaper for the video |
+| Accessibility | Reduce motion, text scale, high contrast | Own |
+| Windows (Hyprland) | Gaps, borders, animations, layout, mouse and keyboard, window rules | Not planned: it supports live changes |
+| Shortcuts | All the shortcuts, with conflict detection and cheat sheet | No |
+| Displays | Layout of the displays by dragging, one for each set of displays; main display; resolution, refresh rate, scale, rotation, adaptive sync and workspaces of each one; night light | No: Hyprland applies it |
+| GPU | Fan curves, power limit, sensors in the bar, per-game profiles | No |
+| Sound | Output, input, per-app volume, microphone noise suppression | No |
+| Network & Bluetooth | Cable, Wi-Fi, saved VPNs, Bluetooth devices and their battery, and whether they start turned on | No |
+| Terminal (Kitty) | Font, size, cursor, opacity, margins, tabs, history; logo, lines and greeting of the system information; grouping, history, alert and agent key in the system monitor | Not planned: it supports live reload |
+| Editor (Neovim) | Shortcut preset, line numbers, tabs, automatic formatting and saving, language packs, plugins, side panels | No: it is our own configuration (`kavat-nvim`) |
+| Files (Yazi) | Shortcut preset, drag and drop, copier with pop-up, system file picker, what clicking a download does, previews, open with | Not planned: plugins; fork only if a plugin falls short |
+| Notes (nb) | Notes folder, default notebook, quick note, reminders and how long they snooze, task views, which notebooks the agent reads, encryption and sync | Fork of nb (kavat-notes) |
+| Shell (zsh) | Prompt, plugins, history, aliases, default apps | No |
+| Browser | Blocker, appearance, profile per mode, protected video, console commands, clips and albums | The Chromium fork already planned |
+| Bar & widgets | Position and density of the bar, widgets and their order, launcher, notifications | The Noctalia fork already planned |
+| Modes | What each mode does, automation with Steam, Incognito VPN, new modes | Own |
+| Projects | Saved projects: folder, terminals, editor, browser profile and windows of each one | Own |
+| Agent & voice | Memory budget, model, permissions per tier, voice and how it is activated, what is seen while it speaks, alerts, activity log | Own |
+| Skills | Stock and own skills, their steps, shortcut, voice phrase, where they are pinned and when they launch on their own | Own |
+| Packages (kav) | Sources, updates and their check, snapshots, AUR allowlist and requests | Own |
+| Backup & sync | Snapshots of `/home`, external backups, configuration history and its sync | Own |
+| Privacy & network | Which app used the microphone, camera or screen; per-application firewall rules; keyring and SSH and GPG keys | No |
+| Boot | GRUB menu (timeout, default entry, visible entries, look) and loading screen (style, messages) | No: generated themes for GRUB and Plymouth |
+| Login & lock | Background, clock, users, login language, lock timings | The web-greeter fork already planned |
+| Language & region | System language (English or Spanish), keyboard layouts, formats | Own |
 
-En Neovim, como en el resto, tus archivos en \~/.config/nvim/ ganan sobre lo que el panel genera.
+In Neovim, as in the rest, your files in \~/.config/nvim/ win over what the panel generates.
 
-Cómo funciona:
+How it works:
 
-- **El archivo de configuración es la verdad.** Cada ajuste vive en un solo sitio: el archivo de configuración de su app, o `~/.config/kavat/` para lo propio del sistema. Lo que hay en el archivo es lo que vale.
-- **Calle de doble sentido.** Si cambias un valor a mano, el panel lo muestra al momento. Si lo cambias en el panel, el panel edita esa línea en el archivo, sin tocar el resto ni los comentarios. No hay una segunda copia que pueda quedar desfasada.
-- **Validar antes de aplicar.** Cada cambio de configuración, venga del panel o de tu editor, se comprueba antes de cargarse. Si el escritorio no recarga bien, vuelve solo a la última versión buena y te dice qué línea falló. Si aun así no arranca, queda el modo seguro del menú de arranque.
-- **Lo que el panel no tiene vive solo en el archivo.** El panel no lo toca, no lo oculta y no lo borra.
-- **Límite en archivos que son código.** En `la configuración de Hyprland, que es Lua, en el init.lua de Neovim y en .zshrc, el panel solo edita su tabla de valores o su bloque de ajustes`; el resto lo deja como está y lo abre en Neovim.
-- **Abrir la configuración en Neovim, en todas partes.** Cada página del panel y cada pieza del sistema (el panel del agente, el selector de temas, `kav`, Yazi, el navegador, el marketplace) tiene un botón que abre su archivo de configuración en Neovim, en la sección que corresponde.
-- **En vivo y reversible**: cada cambio, venga del panel o del archivo, se aplica al instante; tiene deshacer y queda en un historial para volver a cualquier estado anterior.
-- **Editor de atajos**: muestra todos, detecta conflictos al asignar y regenera la hoja de atajos.
-- **Buscador**: escribir «gaps» o «fuente» lleva al ajuste, esté en la app que esté.
-- **El agente usa lo mismo**: «sube la separación a 10» cambia el mismo valor que el panel, con el mismo deshacer.
-- **Exportar e importar**: todo tu estado cabe en un archivo; reinstalar es restaurarlo.
+- **The configuration file is the truth.** Each setting lives in a single place: the configuration file of its app, or `~/.config/kavat/` for what is the system's own. What is in the file is what counts.
+- **Two-way street.** If you change a value by hand, the panel shows it at once. If you change it in the panel, the panel edits that line in the file, without touching the rest or the comments. There is no second copy that could fall out of date.
+- **Validate before applying.** Each configuration change, whether it comes from the panel or from your editor, is checked before it is loaded. If the desktop does not reload properly, it goes back on its own to the last good version and tells you which line failed. If even so it does not start, there is still the safe mode of the boot menu.
+- **What the panel does not have lives only in the file.** The panel does not touch it, does not hide it and does not delete it.
+- **Limit in files that are code.** In `the Hyprland configuration, which is Lua, in Neovim's init.lua and in .zshrc, the panel only edits its table of values or its settings block`; the rest it leaves as it is and opens in Neovim.
+- **Open the configuration in Neovim, everywhere.** Each page of the panel and each piece of the system (the agent panel, the theme picker, `kav`, Yazi, the browser, the marketplace) has a button that opens its configuration file in Neovim, at the corresponding section.
+- **Live and reversible**: each change, whether it comes from the panel or from the file, is applied instantly; it has undo and is kept in a history to go back to any previous state.
+- **Shortcut editor**: it shows all of them, detects conflicts when assigning and regenerates the cheat sheet.
+- **Search**: typing "gaps" or "font" takes you to the setting, whichever app it is in.
+- **The agent uses the same thing**: "raise the gap to 10" changes the same value as the panel, with the same undo.
+- **Export and import**: your whole state fits in one file; reinstalling is restoring it.
 
-**Dependencias garantizadas.** Ninguna opción del panel queda activa sin el software que necesita: si eliges mpvpaper como motor de fondos, `kav` se asegura de que está instalado antes de aplicar el ajuste.
+**Guaranteed dependencies.** No option of the panel stays active without the software it needs: if you choose mpvpaper as the wallpaper engine, `kav` makes sure it is installed before applying the setting.
 
-- **Cada opción declara lo que necesita.** El motor de fondos, el proveedor de VPN, un paquete de lenguaje del editor o un motor de voz llevan su lista de paquetes.
-- **Se instala al elegir.** Al marcar una opción, el panel pide a `kav` que instale lo que falte, con las reglas de siempre (repos oficiales, `[kavat]` o allowlist) y su snapshot. El ajuste solo se da por aplicado cuando `kav` confirma; si la instalación falla, se queda el valor anterior.
-- **Lo que viene por defecto ya está instalado.** Las opciones por defecto de cada página van en la ISO, así que el sistema recién instalado funciona tal como viene sin red.
-- **No se quita por accidente.** `kav remove` avisa de qué ajuste depende del paquete y pide cambiar el ajuste primero; la limpieza de huérfanos no lo toca.
-- **Se vigila.** `kav doctor` comprueba que todo lo que los ajustes necesitan sigue instalado, y lo repara.
-- **Vale para todo lo que declare dependencias**: las skills del agente, los plugins del marketplace que necesitan un programa del sistema, y los modos.
+- **Each option declares what it needs.** The wallpaper engine, the VPN provider, a language pack of the editor or a voice engine carry their list of packages.
+- **It is installed on choosing.** When an option is checked, the panel asks `kav` to install what is missing, with the usual rules (official repos, `[kavat]` or allowlist) and its snapshot. The setting is only considered applied when `kav` confirms; if the installation fails, the previous value stays.
+- **What comes by default is already installed.** The default options of each page go in the ISO, so the freshly installed system works as it comes without network.
+- **It is not removed by accident.** `kav remove` warns which setting depends on the package and asks you to change the setting first; the orphan cleanup does not touch it.
+- **It is watched.** `kav doctor` checks that everything the settings need is still installed, and repairs it.
+- **It holds for everything that declares dependencies**: the agent's skills, the marketplace plugins that need a system program, and the modes.
 
-Regla para los forks: una app se bifurca cuando no deja cambiar su configuración en vivo o no deja incluir un archivo generado. Hyprland y Kitty permiten las dos cosas, así que hoy no hace falta ningún fork más; se confirma al implementarlo en la fase 3.
+Rule for the forks: an app is forked when it does not allow changing its configuration live or does not allow including a generated file. Hyprland and Kitty allow both, so today no further fork is needed; this is confirmed when implementing it in phase 3.
 
-## Navegador
+## Browser
 
-`kavat-browser` es un fork de Chromium con ocho cambios: sigue los modos del sistema, cambia de tema con el sistema, bloquea anuncios de serie, habla con el agente, tiene una consola de comandos, usa Yazi como explorador de archivos, guarda recortes y álbumes en las notas y reproduce vídeo protegido.
+`kavat-browser` is a fork of Chromium with eight changes: it follows the system modes, changes theme with the system, blocks ads out of the box, talks to the agent, has a command console, uses Yazi as its file explorer, saves clippings and albums to the notes and plays protected video.
 
-| Cambio | Qué hace |
+| Change | What it does |
 | --- | --- |
-| Modos del sistema | En Incognito las ventanas nuevas se abren en incógnito; en Gamer suspende las pestañas para soltar memoria; cada modo puede tener su propio perfil de navegador |
-| Tema automático | Colores, modo claro u oscuro y radio de esquinas salen de los tokens del sistema y cambian en vivo, también en la página de inicio y las páginas internas |
-| Bloqueador por defecto | Anuncios y rastreadores bloqueados desde el primer arranque, con listas actualizables e interruptor por sitio |
-| Agente integrado | Panel lateral de Kavat: resume la página, responde sobre ella, busca entre pestañas y actúa en el navegador con los mismos niveles de permiso que en el sistema |
-| Consola de comandos | Una paleta con comandos propios que cambian el navegador: ocultar o mostrar paneles, barra de pestañas, modo zen, y los que definas tú |
-| Yazi como explorador | Subir un archivo y «guardar como» abren Yazi; pulsar una descarga abre Yazi en la carpeta de descargas con el archivo seleccionado |
-| Recortes y álbumes | Guarda en las notas la página con la selección como cita y una captura; reúne sitios favoritos en álbumes con miniatura, y enseña en un panel las notas que ya tienes del sitio. El detalle está en la sección Notas |
-| Vídeo protegido | Reproduce contenido con DRM mediante Widevine, que viene de serie. Sus condiciones y sus límites están más abajo |
+| System modes | In Incognito, new windows open in incognito; in Gamer it suspends tabs to free memory; each mode can have its own browser profile |
+| Automatic theme | Colors, light or dark mode and corner radius come from the system tokens and change live, also on the start page and the internal pages |
+| Blocker by default | Ads and trackers blocked from the first start, with updatable lists and a per-site switch |
+| Built-in agent | Kavat side panel: it summarizes the page, answers questions about it, searches across tabs and acts in the browser with the same permission levels as in the system |
+| Command console | A palette with its own commands that change the browser: hide or show panels, tab bar, zen mode, and the ones you define |
+| Yazi as file explorer | Uploading a file and "save as" open Yazi; clicking a download opens Yazi in the downloads folder with the file selected |
+| Clippings and albums | Saves the page to the notes with the selection as a quote and a screenshot; gathers favorite sites into albums with a thumbnail, and shows in a panel the notes you already have about the site. The details are in the Notes section |
+| Protected video | Plays DRM content through Widevine, which comes out of the box. Its conditions and its limits are further down |
 
-Cómo mantenerlo barato:
+How to keep it cheap:
 
-- **Capa 1, sin tocar C++**: políticas de Chromium y extensiones incluidas de fábrica cubren el tema, el bloqueador, el panel del agente y buena parte de la consola.
-- **Capa 2, parches**: solo para lo que una extensión no puede hacer, como ocultar paneles nativos de la interfaz o reaccionar a los modos del sistema.
-- Los parches se reaplican sobre cada versión estable de Chromium. Tu PC compila cada versión; conviene automatizarlo porque los parches de seguridad salen muy seguido.
+- **Layer 1, without touching C++**: Chromium policies and bundled extensions cover the theme, the blocker, the agent panel and a good part of the console.
+- **Layer 2, patches**: only for what an extension cannot do, such as hiding native interface panels or reacting to the system modes.
+- The patches are reapplied on top of each stable Chromium release. Your PC builds each release; it is worth automating because security patches come out very often.
 
-Ideas añadidas:
+Added ideas:
 
-- **Los comandos de la consola son también herramientas del agente**: lo que puedes escribir en la consola, se lo puedes pedir a Kavat, y `kavatd` puede dispararlo desde fuera (por ejemplo, al cambiar de modo).
-- **Comandos en un archivo**: los comandos propios se definen en un TOML en `~/.config/kavat/browser/`, con nombre, atajo y acción.
-- **En Incognito el agente no guarda** nada de lo que lee en el navegador.
-- **Vídeo protegido (DRM)**: el navegador se compila con soporte para Widevine, para ver Netflix, Prime Video, Disney+ o Spotify web. El módulo de Widevine viene de serie: un paquete `kavat-widevine` en `[kavat]`, del que `kavat-browser` depende, lo descarga de Google al compilarse en tu PC. Va en la ISO, así que funciona también en una instalación sin red.
-- **Condición del vídeo protegido**: Widevine es propietario de Google y no se puede repartir a otros. El repo del código solo guarda el PKGBUILD, sin el binario; el repo binario `[kavat]` y la ISO que lo llevan dentro no se publican. Vale porque el sistema es solo para ti; si algún día se publica, el paquete sale y Widevine pasa a descargarse al instalar.
-- **Mantenimiento**: Google retira versiones antiguas del módulo, así que `kavat-widevine` se recompila cuando deja de funcionar; `kav doctor` lo comprueba.
-- **Límite del vídeo protegido**: en Linux Widevine corre por software, y los servicios limitan la calidad en ese caso; lo habitual es 720p, sin 4K ni HDR. Pasa igual en cualquier navegador de Linux.
-- **Bloqueador**: empezar con uBlock Origin incluido de fábrica y pasar a un bloqueador nativo solo si hace falta, porque Chromium limita cada vez más lo que las extensiones de bloqueo pueden hacer.
+- **The console commands are also agent tools**: what you can type in the console, you can ask Kavat for, and `kavatd` can trigger it from outside (for example, when the mode changes).
+- **Commands in a file**: your own commands are defined in a TOML file in `~/.config/kavat/browser/`, with a name, a shortcut and an action.
+- **In Incognito the agent does not save** anything it reads in the browser.
+- **Protected video (DRM)**: the browser is built with Widevine support, to watch Netflix, Prime Video, Disney+ or Spotify web. The Widevine module comes out of the box: a `kavat-widevine` package in `[kavat]`, which `kavat-browser` depends on, downloads it from Google when it is built on your PC. It goes in the ISO, so it also works on an install with no network.
+- **Condition of protected video**: Widevine is proprietary to Google and cannot be distributed to others. The source repo only holds the PKGBUILD, without the binary; the `[kavat]` binary repo and the ISO that carry it are not published. That is fine because the system is only for you; if it is ever published, the package goes away and Widevine is downloaded at install time instead.
+- **Maintenance**: Google retires old versions of the module, so `kavat-widevine` is rebuilt when it stops working; `kav doctor` checks it.
+- **Limit of protected video**: on Linux Widevine runs in software, and the services limit the quality in that case; the usual is 720p, with no 4K or HDR. The same happens in any Linux browser.
+- **Blocker**: start with uBlock Origin bundled and move to a native blocker only if needed, because Chromium limits more and more what blocking extensions can do.
 
 ## Editor
 
-Neovim es el editor del núcleo y llega como `kavat-nvim`: útil nada más abrirlo, con atajos estilo VS Code, plugins preinstalados, un marketplace de plugins dentro del editor y su página en el panel de ajustes.
+Neovim is the core editor and ships as `kavat-nvim`: useful as soon as you open it, with VS Code-style shortcuts, preinstalled plugins, a plugin marketplace inside the editor and its own page in the settings panel.
 
-**Atajos estilo VS Code.** Decidido el híbrido: los modos de Vim se quedan, y lo que cambia es la navegación y los atajos, que son los de VS Code en cualquier modo. El editor abre listo para escribir y `Esc` lleva al modo normal.
+**VS Code-style shortcuts.** Decided: the hybrid. Vim's modes stay, and what changes is the navigation and the shortcuts, which are those of VS Code in any mode. The editor opens ready to type and `Esc` goes to normal mode.
 
-| Acción | Atajo |
+| Action | Shortcut |
 | --- | --- |
-| Moverse | Flechas, `Home` / `End`, `Ctrl` + flechas por palabras, `Ctrl+Home` / `Ctrl+End` |
-| Seleccionar | `Shift` + flechas, `Ctrl+Shift` + flechas por palabras, `Ctrl+L` línea entera |
-| Ir a una línea / volver atrás y adelante | `Ctrl+G` / `Alt` + flechas izquierda y derecha |
-| Buscar archivo | `Ctrl+P` |
-| Paleta de comandos | `Ctrl+Shift+P` |
-| Guardar / cerrar pestaña | `Ctrl+S` / `Ctrl+W` |
-| Copiar, cortar, pegar, deshacer, rehacer | `Ctrl+C`, `Ctrl+X`, `Ctrl+V`, `Ctrl+Z`, `Ctrl+Y` |
-| Buscar / reemplazar / buscar en el proyecto | `Ctrl+F` / `Ctrl+H` / `Ctrl+Shift+F` |
-| Comentar línea | `Ctrl+/` |
-| Mover línea / duplicar línea | `Alt` + flechas arriba y abajo / `Shift+Alt` + flechas arriba y abajo |
-| Seleccionar la siguiente coincidencia (multicursor) | `Ctrl+D` |
-| Explorador / terminal | `Ctrl+B` / `Ctrl` + acento grave, la tecla sobre `Tab` |
-| Cambiar de pestaña | `Ctrl+Tab` |
-| Ir a definición / renombrar / acción rápida | `F12` / `F2` / `Ctrl+.` |
-| Formatear | `Shift+Alt+F` |
+| Move | Arrows, `Home` / `End`, `Ctrl` + arrows by words, `Ctrl+Home` / `Ctrl+End` |
+| Select | `Shift` + arrows, `Ctrl+Shift` + arrows by words, `Ctrl+L` whole line |
+| Go to a line / go back and forward | `Ctrl+G` / `Alt` + left and right arrows |
+| Find file | `Ctrl+P` |
+| Command palette | `Ctrl+Shift+P` |
+| Save / close tab | `Ctrl+S` / `Ctrl+W` |
+| Copy, cut, paste, undo, redo | `Ctrl+C`, `Ctrl+X`, `Ctrl+V`, `Ctrl+Z`, `Ctrl+Y` |
+| Find / replace / find in the project | `Ctrl+F` / `Ctrl+H` / `Ctrl+Shift+F` |
+| Comment line | `Ctrl+/` |
+| Move line / duplicate line | `Alt` + up and down arrows / `Shift+Alt` + up and down arrows |
+| Select the next match (multicursor) | `Ctrl+D` |
+| Explorer / terminal | `Ctrl+B` / `Ctrl` + backtick, the key above `Tab` |
+| Switch tab | `Ctrl+Tab` |
+| Go to definition / rename / quick action | `F12` / `F2` / `Ctrl+.` |
+| Format | `Shift+Alt+F` |
 | Marketplace | `Ctrl+Shift+X` |
 
-- Es viable porque el terminal es Kitty: su protocolo de teclado deja que Neovim distinga `Ctrl+Shift+P` de `Ctrl+P` y reciba `Ctrl+Tab`, cosa que un terminal clásico no permite. Se confirma al implementarlo.
-- Dos límites: el multicursor va por plugin (multicursor.nvim) y no es idéntico al de VS Code, y las ventanas internas de algunos plugins siguen usando teclas de Vim (`j`, `k`, `q`).
-- Tus atajos de `<leader>` de Endgame siguen disponibles en modo normal.
+- It is feasible because the terminal is Kitty: its keyboard protocol lets Neovim tell `Ctrl+Shift+P` from `Ctrl+P` and receive `Ctrl+Tab`, which a classic terminal does not allow. It is confirmed when it is implemented.
+- Two limits: multicursor comes from a plugin (multicursor.nvim) and is not identical to VS Code's, and the internal windows of some plugins still use Vim keys (`j`, `k`, `q`).
+- Your `<leader>` shortcuts from Endgame are still available in normal mode.
 
-**Preinstalado.** Con lazy.nvim como gestor: explorador de archivos, buscador difuso, paleta de comandos, pestañas de buffers, barra de estado, resaltado con treesitter, LSP con autocompletado, formateo al guardar, integración con git, terminal flotante, ayuda de atajos y multicursor. El tema sigue al del sistema. Para Markdown trae Marksman como servidor de lenguaje, que completa y sigue los enlaces entre notas.
+**Preinstalled.** With lazy.nvim as the manager: file explorer, fuzzy finder, command palette, buffer tabs, status bar, treesitter highlighting, LSP with autocompletion, format on save, git integration, floating terminal, shortcut help and multicursor. The theme follows the system's. For Markdown it brings Marksman as the language server, which completes and follows the links between notes.
 
-**Marketplace.** `Ctrl+Shift+X` abre una TUI dentro de Neovim para buscar, ver e instalar plugins por categorías, como la pestaña de extensiones de VS Code.
+**Marketplace.** `Ctrl+Shift+X` opens a TUI inside Neovim to search, view and install plugins by category, like the extensions tab of VS Code.
 
-- **Base**: ya existe un plugin parecido, store.nvim, con un índice de más de 6.000 plugins e instalación automática. Decidido: se parte de él y se le añade lo que sigue.
-- **Lo que añadimos, el catálogo verificado**: en Neovim instalar un plugin no basta, casi todos necesitan configuración y atajos. Cada plugin del catálogo trae un preset probado con atajos estilo VS Code, así que instalar es un solo paso.
-- **Dos niveles, como en `kav`**: «Verified» (revisado, fijado a un commit, con preset) y «Community» (el resto del índice; se instala sin preset y con aviso). Un plugin es código que corre con tus permisos, igual que un paquete del AUR.
-- **Paquetes de lenguaje**: «Rust», «TypeScript» o «Python» instalan de una vez servidor LSP, formateador, linter, parser y depurador.
-- **Sigue siendo lazy.nvim**: el marketplace escribe un archivo por plugin en tu configuración, que puedes editar a mano, y las versiones quedan fijadas en el lockfile.
+- **Base**: a similar plugin already exists, store.nvim, with an index of more than 6,000 plugins and automatic installation. Decided: we start from it and add what follows.
+- **What we add, the verified catalog**: in Neovim installing a plugin is not enough, almost all of them need configuration and shortcuts. Each plugin in the catalog comes with a tested preset with VS Code-style shortcuts, so installing is a single step.
+- **Two levels, as in `kav`**: "Verified" (reviewed, pinned to a commit, with a preset) and "Community" (the rest of the index; it installs without a preset and with a warning). A plugin is code that runs with your permissions, just like an AUR package.
+- **Language packs**: "Rust", "TypeScript" or "Python" install the LSP server, formatter, linter, parser and debugger in one go.
+- **It is still lazy.nvim**: the marketplace writes one file per plugin in your configuration, which you can edit by hand, and the versions are pinned in the lockfile.
 
-**Ajustes.** La página Editor del panel de Noctalia cambia el preset de atajos (VS Code, Vim o propio), numeración, tabulación, formateo y guardado automáticos y paquetes de lenguaje, y abre el marketplace. Los cambios llegan en vivo a las ventanas de Neovim abiertas.
+**Settings.** The Editor page of the Noctalia panel changes the shortcut preset (VS Code, Vim or custom), line numbers, tabs, automatic formatting and saving, and language packs, and opens the marketplace. Changes reach the open Neovim windows live.
 
-**Paneles.** Neovim trae paneles laterales de serie, y el primero es Claude: un panel a la derecha con Claude Code, conectado al editor.
+**Panels.** Neovim comes with side panels out of the box, and the first one is Claude: a panel on the right with Claude Code, connected to the editor.
 
-- **Quién hace la división**: Kitty, no Neovim. El panel es una ventana real de Kitty junto a la de Neovim, que el editor abre y cierra por control remoto. Claude Code es un programa de terminal completo, con sus propias teclas; en el terminal embebido de Neovim esas teclas chocan, y en una ventana de Kitty se comporta como en cualquier terminal.
-- **Conectado al editor**: con claudecode.nvim, que habla el mismo protocolo que la extensión oficial de VS Code y admite que Claude corra en un terminal externo. Claude ve el archivo y la selección actuales, y lo que propone cambiar se abre como un diff nativo de Neovim que aceptas o rechazas con una tecla.
-- **Teclas**: `Ctrl+Alt+B` abre y cierra el panel, como la barra lateral secundaria de VS Code, y `Ctrl+Alt+K` le manda la selección. Moverse entre editor y panel usa las mismas teclas que entre divisiones de Neovim.
-- **Más de un panel**: el mismo sistema sirve para el agente local Kavat, un terminal inferior, Lazygit o las pruebas. Cada panel es un archivo que dice qué programa abre y dónde.
-- **Sacar y esconder**: una tecla saca el panel a su propia ventana, para que Hyprland la coloque donde quieras, y otra lo oculta sin cerrar la conversación.
-- **Por proyecto**: cada proyecto recuerda sus paneles y retoma su conversación al abrirse.
-- **Fuera de Kitty**: por SSH o en otro terminal, el panel cae a una división normal de Neovim.
+- **Who does the split**: Kitty, not Neovim. The panel is a real Kitty window next to Neovim's, which the editor opens and closes by remote control. Claude Code is a full terminal program, with its own keys; in Neovim's embedded terminal those keys clash, and in a Kitty window it behaves as in any terminal.
+- **Connected to the editor**: with claudecode.nvim, which speaks the same protocol as the official VS Code extension and allows Claude to run in an external terminal. Claude sees the current file and selection, and what it proposes to change opens as a native Neovim diff that you accept or reject with one key.
+- **Keys**: `Ctrl+Alt+B` opens and closes the panel, like the secondary side bar of VS Code, and `Ctrl+Alt+K` sends it the selection. Moving between editor and panel uses the same keys as between Neovim splits.
+- **More than one panel**: the same system works for the local agent Kavat, a bottom terminal, Lazygit or the tests. Each panel is a file that says which program it opens and where.
+- **Pop out and hide**: one key pops the panel out into its own window, so that Hyprland places it wherever you want, and another hides it without closing the conversation.
+- **Per project**: each project remembers its panels and resumes its conversation when it is opened.
+- **Outside Kitty**: over SSH or in another terminal, the panel falls back to a normal Neovim split.
 
-Dos cosas a tener claras. Claude Code es un servicio en la nube que usa tu cuenta: es una herramienta tuya de desarrollo, aparte de Kavat, que sigue siendo local. Y el control remoto de Kitty se limita con contraseña a las acciones que los paneles necesitan: abrir, enfocar, redimensionar y cerrar ventanas.
+Two things to be clear about. Claude Code is a cloud service that uses your account: it is a development tool of yours, separate from Kavat, which stays local. And Kitty's remote control is limited by password to the actions the panels need: opening, focusing, resizing and closing windows.
 
-## Archivos
+## Files
 
-Yazi es el gestor de archivos del núcleo y llega como `kavat-files`: sigue el tema, arrastra y suelta, y es el explorador de archivos de todo el sistema, incluido el navegador.
+Yazi is the core file manager and ships as `kavat-files`: it follows the theme, drags and drops, and is the file explorer for the whole system, including the browser.
 
-| Integración | Cómo se consigue |
+| Integration | How it is achieved |
 | --- | --- |
-| Tema | El generador de temas escribe el tema de Yazi desde los tokens, como para el resto de apps |
-| Arrastrar y soltar | Con ripdrag, como ya hacías en Endgame: `Alt+D` saca la selección para arrastrarla a cualquier app, y lo que sueltes ahí se copia a la carpeta actual |
-| Selector de archivos del sistema | Un backend de portal (xdg-desktop-portal-termfilechooser) abre Yazi cada vez que una app pide «abrir» o «guardar como» |
-| Navegador | `kavat-browser` usa siempre ese portal: subir un archivo o elegir dónde guardar abre Yazi |
-| Descargas | Pulsar una descarga en el navegador abre Yazi en la carpeta de descargas, con el archivo seleccionado |
-| «Mostrar en carpeta» | Un servicio propio responde a la interfaz estándar de gestores de archivos, así que cualquier app que lo pida abre Yazi en esa ruta |
-| Abrir con | Las reglas de apertura de Yazi salen de las apps por defecto del panel de ajustes |
-| Agente | Skills «abrir archivos» y «buscar un archivo»; desde Yazi, una tecla pregunta a Kavat por lo seleccionado |
+| Theme | The theme generator writes Yazi's theme from the tokens, as for the rest of the apps |
+| Drag and drop | With ripdrag, as you already did in Endgame: `Alt+D` takes the selection out to drag it to any app, and whatever you drop there is copied to the current folder |
+| System file picker | A portal backend (xdg-desktop-portal-termfilechooser) opens Yazi every time an app asks to "open" or "save as" |
+| Browser | `kavat-browser` always uses that portal: uploading a file or choosing where to save opens Yazi |
+| Downloads | Clicking a download in the browser opens Yazi in the downloads folder, with the file selected |
+| "Show in folder" | A service of our own answers the standard file manager interface, so any app that asks for it opens Yazi at that path |
+| Open with | Yazi's opening rules come from the default apps in the settings panel |
+| Agent | "open files" and "find a file" skills; from Yazi, one key asks Kavat about the selection |
 
-**Copiar y mover con ventana propia.** Pegar abre un pop-up que dice qué se copia y a dónde, con el progreso por archivo y el total, la velocidad y el tiempo que falta. Sustituye al comportamiento de serie de Yazi, donde el progreso apenas se ve y un conflicto de nombres se resuelve sin preguntar.
+**Copy and move with their own window.** Pasting opens a pop-up that says what is being copied and where to, with the progress per file and in total, the speed and the time left. It replaces Yazi's stock behavior, where the progress is barely visible and a name conflict is resolved without asking.
 
-- **Conflictos a la vista**: si un archivo ya existe en el destino, el pop-up pregunta si reemplazar, omitir o conservar los dos, con la opción de aplicarlo a todos.
-- **Segundo plano**: `Esc` deja la copia trabajando con un indicador en la barra de estado; al terminar, avisa con una notificación si Yazi no está a la vista.
-- **Recordatorio**: tras `Ctrl+C`, una línea dice cuántos elementos hay listos para pegar.
-- **Portapapeles del sistema**: lo copiado en Yazi queda también en el portapapeles, así que se puede pegar como archivo en otra app.
-- **Cómo se hace**: como plugin. Yazi deja que un plugin dibuje su propia ventana, que es como funciona su gestor de discos. Si un plugin no puede seguir el progreso real de la copia, se bifurca.
+- **Conflicts in plain sight**: if a file already exists at the destination, the pop-up asks whether to replace, skip or keep both, with the option to apply it to all.
+- **Background**: `Esc` leaves the copy working with an indicator in the status bar; when it finishes, it tells you with a notification if Yazi is not in view.
+- **Reminder**: after `Ctrl+C`, a line says how many items are ready to paste.
+- **System clipboard**: what is copied in Yazi is also on the clipboard, so it can be pasted as a file in another app.
+- **How it is done**: as a plugin. Yazi lets a plugin draw its own window, which is how its disk manager works. If a plugin cannot follow the real progress of the copy, it is forked.
 
-Ideas añadidas:
+Added ideas:
 
-- **Navegación sin teclas de Vim**: un preset con flechas, `Enter`, `Retroceso`, `Ctrl+C` / `Ctrl+X` / `Ctrl+V`, `Supr` a la papelera y `F2` para renombrar, con la misma lógica que el editor. Las de Vim siguen disponibles, y tus teclas de Endgame se conservan: `Alt+D` para arrastrar y `M` para los discos.
-- **Ratón**: clic, doble clic y rueda funcionan.
-- **Vistas previas en la terminal**: imágenes, miniaturas de vídeo, PDF, archivos comprimidos y código con resaltado. Los programas que hacen falta los garantiza `kav`.
-- **Acciones del sistema desde Yazi**: poner como fondo (imagen o vídeo), abrir una terminal aquí, abrir en el editor, comprimir y extraer.
-- **Papelera y discos**: borrar manda a la papelera; USB y discos se montan desde el gestor de montaje, como en Endgame.
-- **Flotante cuando es selector**: al hacer de selector de archivos, Yazi se abre como ventana flotante centrada con un aviso de para quién elige; como app normal, va en mosaico.
-- **En Incognito** no guarda carpetas recientes.
-- **Bandeja de arrastre en el shell**, a futuro: la selección aparece en una bandeja de Noctalia en el borde de la pantalla, desde la que se arrastra, sin ventana aparte.
+- **Navigation without Vim keys**: a preset with arrows, `Enter`, `Backspace`, `Ctrl+C` / `Ctrl+X` / `Ctrl+V`, `Delete` to the trash and `F2` to rename, with the same logic as the editor. The Vim ones are still available, and your Endgame keys are kept: `Alt+D` to drag and `M` for the disks.
+- **Mouse**: click, double click and wheel work.
+- **Previews in the terminal**: images, video thumbnails, PDF, archives and code with highlighting. `kav` guarantees the programs that are needed.
+- **System actions from Yazi**: set as wallpaper (image or video), open a terminal here, open in the editor, compress and extract.
+- **Trash and disks**: deleting sends to the trash; USB drives and disks are mounted from the mount manager, as in Endgame.
+- **Floating when it is a picker**: when it acts as the file picker, Yazi opens as a centered floating window with a notice of who it is choosing for; as a normal app, it is tiled.
+- **In Incognito** it does not save recent folders.
+- **Drag tray in the shell**, in the future: the selection appears in a Noctalia tray at the edge of the screen, from which it is dragged, with no separate window.
 
-Fork: hoy no hace falta, porque Yazi se configura y se amplía con plugins. Hay dos candidatos a parche si un plugin no llega: aceptar archivos soltados directamente sobre su ventana, sin pasar por ripdrag, y recargar el tema en vivo sin reabrirlo. Si hacen falta, se bifurca.
+Fork: not needed today, because Yazi is configured and extended with plugins. There are two candidates for a patch if a plugin falls short: accepting files dropped directly on its window, without going through ripdrag, and reloading the theme live without reopening it. If they are needed, it is forked.
 
-Yazi está en los repos oficiales de Arch. ripdrag y el backend del portal están en el AUR, así que entran por `[kavat]` ya compilados. Se ajusta todo en la página Files del panel.
+Yazi is in the official Arch repos. ripdrag and the portal backend are in the AUR, so they come in through `[kavat]` already built. Everything is adjusted on the Files page of the panel.
 
-## Notas
+## Notes
 
-Las notas son un componente más del sistema, hecho sobre un fork de `nb` que se empaqueta como `kavat-notes`. Una nota es un archivo Markdown en `~/Notes`, y cada cuaderno es un repositorio git, así que cada cambio queda en el historial y se sincroniza como el resto de tu configuración. El comando sigue siendo `nb`.
+Notes are one more component of the system, built on a fork of `nb` that is packaged as `kavat-notes`. A note is a Markdown file in `~/Notes`, and each notebook is a git repository, so every change stays in the history and syncs like the rest of your configuration. The command is still `nb`.
 
-`nb` es un solo script de Bash (versión 7.25.6, licencia AGPL-3.0) y está en el AUR, así que entra por `[kavat]`. Esto es lo que ya trae y lo que añade el fork:
+`nb` is a single Bash script (version 7.25.6, AGPL-3.0 license) and is in the AUR, so it comes in through `[kavat]`. This is what it already brings and what the fork adds:
 
-|  | `nb` de serie | Lo que añade `kavat-notes` |
+|  | Stock `nb` | What `kavat-notes` adds |
 | --- | --- | --- |
-| Notas | Markdown, cuadernos, carpetas, etiquetas, enlaces entre notas, búsqueda, cifrado, historial y sincronización con git | Tema del sistema, plantillas y nota del día |
-| Tareas | To-dos con casillas y una fecha límite que es solo texto | Fechas que el sistema entiende, repetición, y vistas de hoy, próximas y vencidas |
-| Recordatorios | No tiene | Fecha y hora en la nota; el aviso llega como notificación |
-| Enlaces | A otras notas y a páginas web | A carpetas y archivos, que se abren en Yazi o en Neovim |
-| Interfaz | Comandos y una vista web local | Una TUI como la de `kav`, nota rápida con una tecla y resultados en la paleta |
-| Agente | No tiene | Herramientas para anotar, buscar y recordar |
-| Índice | Búsqueda de texto cada vez que la pides | Índice permanente de títulos, etiquetas, enlaces y fechas |
+| Notes | Markdown, notebooks, folders, tags, links between notes, search, encryption, history and sync with git | System theme, templates and daily note |
+| Tasks | To-dos with checkboxes and a due date that is only text | Dates the system understands, repetition, and views for today, upcoming and overdue |
+| Reminders | It has none | Date and time in the note; the alert arrives as a notification |
+| Links | To other notes and to web pages | To folders and files, which open in Yazi or in Neovim |
+| Interface | Commands and a local web view | A TUI like the one in `kav`, quick note with one key and results in the palette |
+| Agent | It has none | Tools to take notes, search and remind |
+| Index | Text search every time you ask for it | Permanent index of titles, tags, links and dates |
 
-**El formato no cambia.** Una tarea sigue siendo el archivo que `nb` ya escribe. Lo nuevo va en la cabecera, que `nb` de serie ignora, y el enlace a la carpeta va donde `nb` ya pone los enlaces relacionados. Tus notas siguen siendo texto que abre cualquier editor:
+**The format does not change.** A task is still the file that `nb` already writes. What is new goes in the front matter, which stock `nb` ignores, and the link to the folder goes where `nb` already puts the related links. Your notes are still text that any editor opens:
 
 ```markdown
 ---
 remind: 2026-11-13 09:00
 repeat: weekly
 ---
-# [ ] Revisar el PR de kav
+# [ ] Review the kav PR
 
 ## Due
 
@@ -505,662 +505,662 @@ repeat: weekly
 
 ## Tasks
 
-- [ ] Probar la migración en la máquina virtual
-- [ ] Leer el diff de mpvpaper
+- [ ] Test the migration in the virtual machine
+- [ ] Read the diff of mpvpaper
 
 ## Related
 
 - [[~/Projects/kav]]
 ```
 
-**Cómo se ven.** Las notas se leen y se editan en Neovim, y allí se ven con formato y color, no como texto plano.
+**How they look.** Notes are read and edited in Neovim, and there they are shown with formatting and color, not as plain text.
 
-- **Con formato**: títulos en bandas de color, casillas marcables, tablas con bordes, bloques de código con fondo, avisos destacados y enlaces con icono. Lo hace render-markdown.nvim, un plugin que ya existe, así que no hay que escribirlo. Si se queda corto, la alternativa es markview.nvim.
-- **Editar sin salir**: la línea donde está el cursor se ve en Markdown tal cual, para tocarla; el resto sigue con formato. `Ctrl+K V` alterna entre con formato y texto plano, como la vista previa de VS Code.
-- **Lo propio**: la fecha límite, el recordatorio, la repetición y las etiquetas se pintan como fichas arriba de la nota, y los enlaces a carpetas y a `archivo:línea` se abren con Enter. Va en `kavat-nvim`, sobre el punto de extensión del plugin.
-- **Imágenes dentro de la nota**: las capturas de los recortes se ven en la propia nota, con image.nvim y el protocolo gráfico de Kitty.
-- **Colores del tema**, como todo lo demás.
+- **With formatting**: headings in colored bands, checkable checkboxes, tables with borders, code blocks with a background, highlighted callouts and links with an icon. render-markdown.nvim does it, a plugin that already exists, so it does not have to be written. If it falls short, the alternative is markview.nvim.
+- **Edit without leaving**: the line where the cursor is shows as raw Markdown, so you can edit it; the rest stays formatted. `Ctrl+K V` toggles between formatted and plain text, like the VS Code preview.
+- **Our own part**: the due date, the reminder, the repetition and the tags are drawn as chips at the top of the note, and the links to folders and to `file:line` open with Enter. It goes in `kavat-nvim`, on the plugin's extension point.
+- **Images inside the note**: the screenshots of the clippings are shown in the note itself, with image.nvim and Kitty's graphics protocol.
+- **Theme colors**, like everything else.
 
-**Recordatorios.**
+**Reminders.**
 
-- Se ponen con `nb remind`, desde la TUI, en la nota rápida («tomorrow 9:00») o pidiéndoselo al agente.
-- Cada recordatorio es un temporizador del sistema, así que suena aunque el agente esté descargado.
-- El aviso es una notificación con tres botones: abrir la nota, posponer (10 minutos, 1 hora o mañana) y hecho.
-- Los que vencieron con el equipo apagado salen al iniciar sesión.
-- En modo Gamer esperan a que salgas, salvo los que marques como urgentes.
+- They are set with `nb remind`, from the TUI, in the quick note ("tomorrow 9:00") or by asking the agent.
+- Each reminder is a system timer, so it goes off even if the agent is unloaded.
+- The alert is a notification with three buttons: open the note, snooze (10 minutes, 1 hour or tomorrow) and done.
+- The ones that came due while the computer was off show up at login.
+- In Gamer mode they wait until you leave it, except the ones you mark as urgent.
 
-**Fechas de tareas.**
+**Task dates.**
 
-- Una tarea puede tener fecha límite, fecha de inicio, prioridad y repetición.
-- La TUI las ordena en Hoy, Próximas y Vencidas. La barra muestra cuántas vencen hoy, y el calendario del centro de control marca los días que tienen algo.
-- Una tarea vencida no se pierde: se queda en Vencidas hasta que la cierras o le cambias la fecha.
+- A task can have a due date, a start date, a priority and a repetition.
+- The TUI sorts them into Today, Upcoming and Overdue. The bar shows how many are due today, and the calendar in the control center marks the days that have something.
+- An overdue task is not lost: it stays in Overdue until you close it or change its date.
 
-**Enlaces a carpetas.**
+**Links to folders.**
 
-- `[[~/Projects/kav]]` dentro de una nota es un enlace a esa carpeta. Con Enter o con un clic se abre en Yazi.
-- Si el enlace es a un archivo, se abre con la app que le toca; `resolve.rs:42` abre Neovim en esa línea.
-- Al revés también: desde Yazi, una tecla abre o crea la nota de la carpeta donde estás, y las carpetas que tienen notas llevan una marca.
-- Una nota también puede enlazar una página de ajustes, un paquete de `kav` o una skill, que se ejecuta al pulsarla.
+- `[[~/Projects/kav]]` inside a note is a link to that folder. With Enter or with a click it opens in Yazi.
+- If the link is to a file, it opens with the app that corresponds to it; `resolve.rs:42` opens Neovim at that line.
+- The other way round too: from Yazi, one key opens or creates the note of the folder you are in, and the folders that have notes carry a mark.
+- A note can also link to a settings page, a `kav` package or a skill, which runs when you press it.
 
-**El agente toma notas.**
+**The agent takes notes.**
 
-- «Note that…» guarda la nota con título y etiquetas. «Remind me on Friday…» crea el recordatorio. «What did I write about the TPM?» busca en el índice y contesta con la nota delante.
-- Herramientas de `kavatd`: anotar, añadir a una nota, buscar, crear tarea, poner recordatorio y marcar como hecha.
-- Leer y buscar es nivel Leer. Crear y editar es nivel Reversible, porque cada cambio es un commit que se deshace. Borrar un cuaderno pide confirmación.
-- Organiza sin mover nada a tus espaldas: lo que anota él lo archiva él; para las notas de tu bandeja de entrada propone cuaderno y etiquetas, y tú aceptas.
-- Las notas que escribe el agente llevan su marca, para distinguirlas de las tuyas.
-- Los cuadernos que marques como privados no los lee. En Incognito ni anota ni lee.
-- Lo que hay dentro de una nota es información, nunca una orden, igual que una página web o un archivo.
+- "Note that…" saves the note with a title and tags. "Remind me on Friday…" creates the reminder. "What did I write about the TPM?" searches the index and answers with the note in front of it.
+- `kavatd` tools: take a note, add to a note, search, create a task, set a reminder and mark as done.
+- Reading and searching is the Read level. Creating and editing is the Reversible level, because each change is a commit that can be undone. Deleting a notebook asks for confirmation.
+- It organizes without moving anything behind your back: what it writes down, it files itself; for the notes in your inbox it proposes a notebook and tags, and you accept.
+- The notes the agent writes carry its mark, to tell them apart from yours.
+- It does not read the notebooks you mark as private. In Incognito it neither takes notes nor reads.
+- What is inside a note is information, never an order, just like a web page or a file.
 
-**Indexadas y organizadas.** `kavatd` mantiene un índice de títulos, etiquetas, enlaces, fechas y texto, y lo actualiza cada vez que se guarda una nota. De ese índice salen la búsqueda de la paleta, las vistas de tareas, la lista de qué notas enlazan a cada nota o carpeta, y lo que consulta el agente. La organización es la de `nb`: cuadernos, carpetas y etiquetas, más una bandeja de entrada donde cae la nota rápida.
+**Indexed and organized.** `kavatd` keeps an index of titles, tags, links, dates and text, and updates it every time a note is saved. From that index come the palette search, the task views, the list of which notes link to each note or folder, and what the agent looks up. The organization is the one `nb` has: notebooks, folders and tags, plus an inbox where the quick note lands.
 
-**Dentro del sistema.**
+**Inside the system.**
 
-- **Nota rápida**: `Super+N` abre una línea para escribir y Enter la guarda en la bandeja de entrada. Entiende etiquetas y fechas escritas a mano en inglés, sin pasar por el modelo. `Super+Shift+N` abre la TUI.
-- **Paleta**: `Super+D` encuentra notas y tareas, y crea una nota.
-- **Neovim**: las notas se editan ahí, con autocompletado de enlaces y etiquetas, salto al enlace y casillas que se marcan con una tecla.
-- **Navegador**: recortes de páginas y álbumes de sitios, descritos más abajo. En Incognito no guarda.
-- **Yazi**: vista previa de las notas y la tecla que abre la nota de una carpeta.
-- **Voz y capturas**: dictar una nota manteniendo la tecla de hablar, y mandar a una nota el texto de una captura.
-- **Proyectos**: cada proyecto tiene su cuaderno, y al abrir el proyecto ves sus tareas pendientes.
-- **Ajustes, tema y copias**: una página Notes en el panel, los colores del tema, y los cuadernos dentro de la sincronización con tu repositorio privado. Las dependencias las garantiza `kav`.
+- **Quick note**: `Super+N` opens a line to type in and Enter saves it to the inbox. It understands tags and dates written by hand in English, without going through the model. `Super+Shift+N` opens the TUI.
+- **Palette**: `Super+D` finds notes and tasks, and creates a note.
+- **Neovim**: notes are edited there, with autocompletion of links and tags, jump to the link and checkboxes that are checked with one key.
+- **Browser**: page clippings and site albums, described further down. In Incognito it does not save.
+- **Yazi**: preview of the notes and the key that opens the note of a folder.
+- **Voice and screenshots**: dictate a note while holding the talk key, and send the text of a screenshot to a note.
+- **Projects**: each project has its notebook, and when you open the project you see its pending tasks.
+- **Settings, theme and backups**: a Notes page in the panel, the theme colors, and the notebooks inside the sync with your private repository. `kav` guarantees the dependencies.
 
-**Además.**
+**Also.**
 
-- **Resumen de la mañana**: un aviso discreto con las tareas y los recordatorios del día.
-- **Recordatorios por situación**, y no solo por hora: al abrir un proyecto, al iniciar sesión o al salir del modo Gamer.
-- **De aviso a tarea**: el disco casi lleno o una revisión del AUR pendiente pasan a tu lista con un clic.
-- **De la terminal a una nota**: una tecla en Kitty guarda el último comando y su salida.
-- **Plantillas**: reunión, bug, idea y nota del día, con las plantillas que `nb` ya admite.
-- **Selección a nota**: con texto seleccionado en cualquier app, la nota rápida se abre con ese texto y su origen ya puestos.
-- **Nota fijada en el escritorio**, como un widget.
-- **Búsqueda por significado**, y no solo por palabras. Usa el mismo modelo de búsqueda pequeño que elige las herramientas del agente, así que no carga otro.
+- **Morning summary**: a discreet notice with the day's tasks and reminders.
+- **Reminders by situation**, and not only by time: when a project is opened, at login or when leaving Gamer mode.
+- **From alert to task**: the disk almost full or a pending AUR review go to your list with one click.
+- **From the terminal to a note**: one key in Kitty saves the last command and its output.
+- **Templates**: meeting, bug, idea and daily note, with the templates that `nb` already supports.
+- **Selection to note**: with text selected in any app, the quick note opens with that text and its source already filled in.
+- **Note pinned to the desktop**, like a widget.
+- **Search by meaning**, and not only by words. It uses the same small search model that picks the agent's tools, so it does not load another one.
 
-**El navegador y las notas.** El navegador guarda en las notas de dos formas: recortes de una página y álbumes de sitios. Las dos usan el formato de marcador que `nb` ya tiene, así que siguen siendo archivos Markdown en tus cuadernos.
+**The browser and the notes.** The browser saves to the notes in two ways: clippings of a page and albums of sites. Both use the bookmark format that `nb` already has, so they are still Markdown files in your notebooks.
 
-Un recorte guarda en una nota lo que estás viendo:
+A clipping saves what you are looking at to a note:
 
-| Qué guarda | De dónde sale |
+| What it saves | Where it comes from |
 | --- | --- |
-| Título, dirección y fecha | De la página |
-| Cita | El texto que tengas seleccionado. Si recortas otra selección de la misma página, se añade a la misma nota |
-| Captura | La zona visible, una región que marcas o la página entera |
-| Comentario y etiquetas | Los escribes al guardar, o los dejas en blanco |
-| Texto de la página | Lo guarda `nb`, para encontrarla después sin red |
+| Title, address and date | From the page |
+| Quote | The text you have selected. If you clip another selection from the same page, it is added to the same note |
+| Screenshot | The visible area, a region you mark or the whole page |
+| Comment and tags | You write them when saving, or leave them blank |
+| Page text | `nb` saves it, to find the page later without a network |
 
-- **Cómo se lanza**: un atajo en el navegador, `clip` en su consola de comandos, el botón derecho sobre una selección, o pidiéndoselo al agente.
-- **Dónde cae**: en la bandeja de entrada, o en el cuaderno o álbum que elijas al guardar.
-- **Álbumes**: un álbum es una colección de sitios favoritos, cada uno con su miniatura. Es una carpeta de marcadores dentro de un cuaderno. Se ve como una cuadrícula de miniaturas en una página del navegador, y como lista con vista previa en la TUI de notas y en Yazi. Se abre entero en pestañas.
-- **Panel de notas**: al entrar en un sitio, un panel del navegador enseña las notas y recortes que ya tienes de él, y se añade desde ahí.
-- **Pestañas a álbum**: las pestañas abiertas se guardan como un álbum de una vez.
-- **Álbum como página de inicio**: la pestaña nueva enseña el álbum que elijas.
-- **Leer más tarde**: un álbum fijo con su propio atajo; lo que ya leíste se archiva solo.
-- **Imágenes a álbum**: el botón derecho sobre una imagen la guarda en un álbum, con la página de la que salió.
-- **Peso**: las capturas hacen crecer el repositorio de notas, así que se guardan comprimidas y la de página entera queda como opción.
+- **How it is launched**: a shortcut in the browser, `clip` in its command console, the right button on a selection, or by asking the agent.
+- **Where it lands**: in the inbox, or in the notebook or album you choose when saving.
+- **Albums**: an album is a collection of favorite sites, each with its thumbnail. It is a folder of bookmarks inside a notebook. It is shown as a grid of thumbnails on a browser page, and as a list with a preview in the notes TUI and in Yazi. It opens whole in tabs.
+- **Notes panel**: when you enter a site, a browser panel shows the notes and clippings you already have from it, and you can add from there.
+- **Tabs to album**: the open tabs are saved as an album in one go.
+- **Album as start page**: the new tab shows the album you choose.
+- **Read later**: a fixed album with its own shortcut; what you have already read is archived by itself.
+- **Images to album**: the right button on an image saves it to an album, with the page it came from.
+- **Weight**: the screenshots make the notes repository grow, so they are saved compressed and the whole-page one stays as an option.
 
-**Qué va en el fork y qué va fuera.** El fork de `nb` es pequeño: entiende los campos nuevos, añade los comandos `nb remind` y `nb due`, abre los enlaces a carpetas y avisa al índice en cada cambio. La TUI, el índice y los recordatorios son piezas nuevas en Rust, como `kav`, que leen los mismos archivos. Las notas entran en la fase 3 y las herramientas del agente en la fase 4. Queda por comprobar que `nb` de serie siga leyendo bien una tarea que lleva cabecera.
+**What goes in the fork and what goes outside.** The `nb` fork is small: it understands the new fields, adds the `nb remind` and `nb due` commands, opens the links to folders and notifies the index on every change. The TUI, the index and the reminders are new pieces in Rust, like `kav`, that read the same files. The notes come in phase 3 and the agent's tools in phase 4. It remains to be verified that stock `nb` still reads a task that has front matter correctly.
 
-## Información y monitor del sistema
+## System information and monitor
 
-Dos herramientas de terminal pasan a ser piezas del sistema, cada una con su fork: la que enseña qué máquina es esta y la que enseña qué está corriendo.
+Two terminal tools become pieces of the system, each with its fork: the one that shows what machine this is and the one that shows what is running.
 
-**Información del sistema (`kavat-fetch`).** Es un fork de fastfetch. Se parte de fastfetch y no de neofetch porque neofetch está archivado desde 2024 y fastfetch es el que se mantiene.
+**System information (`kavat-fetch`).** It is a fork of fastfetch. It starts from fastfetch and not from neofetch because neofetch has been archived since 2024 and fastfetch is the one that is maintained.
 
-- **Logo propio**: el gato de Kavat va dentro del programa. En Kitty se pinta como imagen, con su protocolo gráfico; fuera de Kitty sale el de caracteres, con el color de acento. Hay una versión pequeña y se puede quitar.
-- **La información que tú eliges**: las líneas y su orden se eligen en el panel o en el archivo. De serie: sistema, kernel, gestor de ventanas, shell, tema, modo, paquetes, GPU, agente y salud.
-- **Líneas del propio sistema**: el tema y el modo activos, los paquetes contados por `kav` con los que vienen del AUR, y el estado del agente. Son módulos nuevos, y es lo que justifica el fork.
-- **Línea de salud**: las actualizaciones pendientes y los avisos de `kav doctor`, leídos de lo último que `kav` guardó para no frenar.
-- **Colores del tema**: toma los tokens del sistema de temas y cambia con él, como el resto.
-- **Saludo opcional**: una versión de tres líneas al abrir la primera terminal de la sesión. Viene apagado.
-- **Cómo se lanza**: con `kavat fetch`. Su configuración vive en `~/.config/fastfetch/config.jsonc` y se ajusta en la página Terminal del panel.
+- **Its own logo**: the Kavat cat goes inside the program. In Kitty it is drawn as an image, with its graphics protocol; outside Kitty the character one comes out, in the accent color. There is a small version and it can be removed.
+- **The information you choose**: the lines and their order are chosen in the panel or in the file. Out of the box: system, kernel, window manager, shell, theme, mode, packages, GPU, agent and health.
+- **Lines from the system itself**: the active theme and mode, the packages counted by `kav` with the ones that come from the AUR, and the state of the agent. They are new modules, and that is what justifies the fork.
+- **Health line**: the pending updates and the warnings from `kav doctor`, read from the last thing `kav` saved so as not to slow it down.
+- **Theme colors**: it takes the tokens from the theme system and changes with it, like the rest.
+- **Optional greeting**: a three-line version when the first terminal of the session opens. It comes turned off.
+- **How it is launched**: with `kavat fetch`. Its configuration lives in `~/.config/fastfetch/config.jsonc` and is adjusted on the Terminal page of the panel.
 
-**Monitor del sistema (`kavat-top`).** Es un fork de btop, que ya usabas en Endgame. Se bifurca porque lo que se le pide no cabe en su configuración: preguntar al agente por un proceso y agrupar los procesos por lo que son.
+**System monitor (`kavat-top`).** It is a fork of btop, which you already used in Endgame. It is forked because what is asked of it does not fit in its configuration: asking the agent about a process and grouping the processes by what they are.
 
-- **Tema del sistema**: sus colores salen de los tokens y cambian en vivo con el tema.
-- **Pregunta a Kavat**: con `K` sobre un proceso, el agente explica qué es, quién lo arrancó y por qué gasta lo que gasta, y propone qué hacer. Usa la herramienta de lectura `system.processes`; si lo que propone cambia algo, pasa por los permisos de siempre.
-- **Procesos agrupados**: cada proceso dice de qué forma parte: el navegador con sus pestañas, los contenedores, el proyecto abierto, el escritorio o el agente.
-- **La GPU y el agente a la vista**: una caja para la RX 6800 con uso, memoria, temperatura y ventilador, y en ella cuánto ocupa el agente de sus 4 GB.
-- **Conoce el resto del sistema**: muestra el modo activo y, en la red, que `kavatd` sigue sin salida.
-- **Pestaña de servicios**: los servicios de systemd, con los que fallaron arriba y su log al lado; Kavat explica el error y propone el arreglo.
-- **Historial de 24 horas**: CPU, memoria, GPU y temperatura del último día, para preguntarle «qué pasó a las tres». Lo guarda un recolector ligero que se detiene en modo Gamer.
-- **Del proceso a sus reglas**: con `r` se salta a la regla del cortafuegos de ese proceso y a cuándo usó el micrófono, la cámara o la pantalla.
-- **Aviso cuando algo se desboca**: si un proceso lleva minutos comiéndose la CPU o la memoria, sale un aviso discreto que abre el monitor en ese proceso. Calla en modo Gamer.
-- **Cómo se lanza**: con `kavat top` o desde el lanzador. Su configuración vive en `~/.config/btop/btop.conf` y se ajusta en la página Terminal del panel.
+- **System theme**: its colors come from the tokens and change live with the theme.
+- **Ask Kavat**: with `K` on a process, the agent explains what it is, who started it and why it uses what it uses, and proposes what to do. It uses the read tool `system.processes`; if what it proposes changes something, it goes through the usual permissions.
+- **Grouped processes**: each process says what it is part of: the browser with its tabs, the containers, the open project, the desktop or the agent.
+- **The GPU and the agent in view**: a box for the RX 6800 with usage, memory, temperature and fan, and in it how much of its 4 GB the agent takes up.
+- **It knows the rest of the system**: it shows the active mode and, under network, that `kavatd` still has no way out.
+- **Services tab**: the systemd services, with the ones that failed at the top and their log beside them; Kavat explains the error and proposes the fix.
+- **24-hour history**: CPU, memory, GPU and temperature of the last day, to ask it "what happened at three". A lightweight collector saves it, and stops in Gamer mode.
+- **From the process to its rules**: with `r` you jump to the firewall rule of that process and to when it used the microphone, the camera or the screen.
+- **Warning when something runs away**: if a process has been eating the CPU or the memory for minutes, a discreet notice comes up that opens the monitor on that process. It stays quiet in Gamer mode.
+- **How it is launched**: with `kavat top` or from the launcher. Its configuration lives in `~/.config/btop/btop.conf` and is adjusted on the Terminal page of the panel.
 
-Los dos forks siguen la regla de los demás: son pequeños y llevan su `PATCHES.md`.
+The two forks follow the rule of the others: they are small and carry their `PATCHES.md`.
 
-## Gestor de paquetes
+## Package manager
 
-`kav` es un solo comando sobre pacman que resuelve cada paquete en tres niveles y rechaza todo AUR que no esté en la lista revisada.
+`kav` is a single command over pacman that resolves each package in three levels and rejects any AUR package that is not on the reviewed list.
 
-| Nivel | Origen | Qué pasa al pedir el paquete |
+| Level | Source | What happens when the package is requested |
 | --- | --- | --- |
-| 1 | Repos oficiales de Arch | Se instala con pacman, sin restricción |
-| 2 | Repo `[kavat]` | Binario ya compilado y firmado por nosotros: forks, paquetes propios y los AUR más usados |
-| 3 | AUR en la allowlist | Se compila en local desde el commit exacto que fue revisado |
-| — | AUR fuera de la lista | Se rechaza, explica por qué y ofrece `kav request` |
+| 1 | Official Arch repos | It is installed with pacman, with no restriction |
+| 2 | `[kavat]` repo | Binary already built and signed by us: forks, our own packages and the most used AUR packages |
+| 3 | AUR on the allowlist | It is built locally from the exact commit that was reviewed |
+| — | AUR outside the list | It is rejected, explains why and offers `kav request` |
 
-La allowlist es un archivo en git, firmado, con una entrada por paquete:
+The allowlist is a file in git, signed, with one entry per package:
 
 ```toml
 [packages.visual-studio-code-bin]
-commit   = "3f9c2ab41d0e5f6a7b8c9d0e1f2a3b4c5d6e7f80"   # commit del PKGBUILD revisado, entero
+commit   = "3f9c2ab41d0e5f6a7b8c9d0e1f2a3b4c5d6e7f80"   # the commit of the PKGBUILD that was reviewed, whole
 reviewed = "2026-11-11"
 sources  = ["update.code.visualstudio.com"]
-notes    = "Binario oficial de Microsoft, sin scripts de instalación"
+notes    = "Official Microsoft binary, no install scripts"
 ```
 
-Lo que hace distinta la capa de un `yay` con filtro:
+What makes the layer different from a `yay` with a filter:
 
-- **Fijado por commit, no por nombre.** Un paquete permitido que cambia de PKGBUILD no se actualiza hasta que la nueva versión se revisa. Esto cubre el caso real de paquetes AUR secuestrados.
-- **Revisión asistida.** `kav review <paquete>` muestra el diff del PKGBUILD contra el commit aprobado y marca lo sospechoso: dominios nuevos, `curl | sh`, scripts `.install`, binarios sin checksum. El agente puede resumir el diff, pero aprueba una persona.
-- **Compilación aislada.** El nivel 3 compila en un chroot limpio sin acceso a tu `$HOME`.
-- **Snapshot en cada transacción.** `kav undo` devuelve el sistema al estado anterior.
-- **Sin escape accidental.** `yay` y `paru` no vienen instalados; pacman sigue ahí y funciona normal.
+- **Pinned by commit, not by name.** An allowed package whose PKGBUILD changes is not updated until the new version is reviewed. This covers the real case of hijacked AUR packages.
+- **Assisted review.** `kav review <package>` shows the diff of the PKGBUILD against the approved commit and flags what is suspicious: new domains, `curl | sh`, `.install` scripts, binaries without a checksum. The agent can summarize the diff, but a person approves.
+- **Isolated build.** Level 3 builds in a clean chroot with no access to your `$HOME`.
+- **Snapshot on every transaction.** `kav undo` returns the system to the previous state.
+- **No accidental escape.** `yay` and `paru` do not come installed; pacman is still there and works as normal.
 
-Comandos previstos: `kav install`, `remove`, `update`, `search`, `info`, `review`, `request`, `undo`, `list --aur`, `doctor`. Se escribe en Rust, como un solo binario sin dependencias.
+Planned commands: `kav install`, `remove`, `update`, `search`, `info`, `review`, `request`, `undo`, `list --aur`, `doctor`. It is written in Rust, as a single binary with no dependencies.
 
-**Cómo está hecho.** Desde la fase 3, y probado en máquina virtual con `tests/kav.py`:
+**How it is built.** Since phase 3, and tested in a virtual machine with `tests/kav.py`:
 
-- **`kav`** es un programa en Rust, en `kav/`, de un solo binario. Corre como tu usuario y pide root con `sudo` solo para lo que lo necesita: pacman, y escribir una aprobación.
-- **De dónde sale un paquete**: primero se mira en los repos de pacman, y solo si no está ahí, en la lista revisada. Así un paquete del AUR nunca suplanta a uno de Arch. Si uno de los paquetes pedidos se rechaza, no se instala ninguno.
-- **La lista revisada** son dos archivos con la misma forma: `/usr/share/kav/allowlist.toml`, que viene con el sistema, y `/etc/kav/allowlist.toml`, con lo aprobado en esta máquina, que manda. La que viene con el sistema está vacía: ningún paquete del AUR entra sin que una persona lo haya leído.
-- **El commit va entero**, con sus cuarenta caracteres: una forma corta la puede igualar otro commit hecho a propósito.
-- **`kav review <paquete>`** baja el repositorio del paquete en el AUR y lo enseña: entero la primera vez, y después solo lo que cambió desde el commit aprobado. Marca las líneas que merecen una segunda mirada, como descargar algo y ejecutarlo, pedir root, tocar tu carpeta personal, saltarse una suma de comprobación o traer un script de instalación, y dice de qué dominios descarga y cuáles son nuevos. Aprobar es teclear el nombre del paquete; la aprobación la escribe root.
-- **Compilar** un paquete aprobado es dejar su carpeta exactamente en el commit aprobado, compilarlo con las herramientas de Arch en un sistema limpio que no ve tu carpeta personal, e instalar el resultado con pacman. Si el AUR no tiene ese commit, no se compila nada. Esas herramientas, `devtools`, arrastran mucho y no vienen instaladas: `kav` las instala la primera vez que hacen falta.
-- **`kav update`** actualiza el sistema con pacman y recompila los paquetes del AUR cuyo commit aprobado cambió. Uno instalado que ya no está en la lista se queda como está.
-- **`kav undo`** vuelve al snapshot que quedó antes del último cambio de paquetes, y dice cuál fue ese cambio. Usa `kavat-rollback`, así que hay que reiniciar.
-- **`kav request`** apunta un paquete como pedido; `kav list --aur` enseña la lista, lo instalado y lo pedido.
-- **`kav doctor`** mira servicios fallidos, paquetes huérfanos, archivos `.pacnew` y `.pacsave`, espacio en disco, que los snapshots se sigan tomando y que la base de datos de pacman no quedó bloqueada.
-- **Recién instalado**, pacman aún no tiene sus listas de paquetes, y `kav` lo dice en vez de dar un paquete por inexistente: `kav update` las baja.
-- **Queda para más adelante en esta fase**: la TUI, la firma de la lista, que un paquete del AUR dependa de otro del AUR, las noticias de Arch con sus intervenciones guiadas, las migraciones, las guardas de transacción y el firmware. Compilar de verdad un paquete del AUR necesita red, y la máquina de pruebas no tiene: la prueba llega hasta comprobar qué commit se compilaría.
+- **`kav`** is a Rust program, in `kav/`, with a single binary. It runs as your user and asks for root with `sudo` only for what needs it: pacman, and writing an approval.
+- **Where a package comes from**: first it is looked up in the pacman repos, and only if it is not there, in the reviewed list. This way an AUR package never impersonates an Arch one. If one of the requested packages is rejected, none is installed.
+- **The reviewed list** is two files with the same shape: `/usr/share/kav/allowlist.toml`, which comes with the system, and `/etc/kav/allowlist.toml`, with what was approved on this machine, which takes precedence. The one that comes with the system is empty: no AUR package gets in without a person having read it.
+- **The commit goes in full**, with its forty characters: a short form can be matched by another commit made on purpose.
+- **`kav review <package>`** downloads the package's repository from the AUR and shows it: in full the first time, and after that only what changed since the approved commit. It flags the lines that deserve a second look, such as downloading something and running it, asking for root, touching your home folder, skipping a checksum or bringing an install script, and says which domains it downloads from and which are new. Approving is typing the name of the package; root writes the approval.
+- **Building** an approved package is leaving its folder exactly at the approved commit, building it with Arch's tools in a clean system that does not see your home folder, and installing the result with pacman. If the AUR does not have that commit, nothing is built. Those tools, `devtools`, pull in a lot and do not come installed: `kav` installs them the first time they are needed.
+- **`kav update`** updates the system with pacman and rebuilds the AUR packages whose approved commit changed. An installed one that is no longer on the list stays as it is.
+- **`kav undo`** goes back to the snapshot that was left before the last package change, and says what that change was. It uses `kavat-rollback`, so a reboot is needed.
+- **`kav request`** notes down a package as requested; `kav list --aur` shows the list, what is installed and what is requested.
+- **`kav doctor`** looks at failed services, orphan packages, `.pacnew` and `.pacsave` files, disk space, that the snapshots are still being taken and that the pacman database was not left locked.
+- **Freshly installed**, pacman does not have its package lists yet, and `kav` says so instead of treating a package as nonexistent: `kav update` downloads them.
+- **Left for later in this phase**: the TUI, the signing of the list, an AUR package depending on another AUR package, the Arch news with its guided interventions, the migrations, the transaction guards and the firmware. Really building an AUR package needs a network, and the test machine has none: the test goes as far as checking which commit would be built.
 
-**Interfaz de terminal.** `kav` sin argumentos abre una TUI de pantalla completa. Los comandos siguen existiendo para scripts y para el agente; TUI y comandos comparten el mismo núcleo en Rust (la TUI con ratatui).
+**Terminal interface.** `kav` with no arguments opens a full-screen TUI. The commands still exist for scripts and for the agent; TUI and commands share the same Rust core (the TUI with ratatui).
 
-| Pestaña | Qué muestra | Qué se puede hacer |
+| Tab | What it shows | What can be done |
 | --- | --- | --- |
-| Dashboard | Actualizaciones pendientes, revisiones del AUR en espera, último snapshot, noticias de Arch, salud del sistema, actividad reciente | Saltar a cada cosa |
-| Browse | Búsqueda unificada en Arch, `[kavat]` y la allowlist, con filtros: instalados, explícitos, huérfanos, AUR | Ver la ficha completa (versión, tamaños, licencia, dependencias, quién lo requiere, archivos, motivo y fecha de instalación); instalar o quitar |
-| Updates | Lista agrupada por origen con versión actual y nueva, tamaño de descarga, cambio neto en disco y si pide reinicio | Actualizar todo; retener un paquete del AUR |
-| AUR | La allowlist con su commit fijado y su estado; solicitudes pendientes | Revisar el diff del PKGBUILD con las líneas sospechosas marcadas, aprobar y fijar, rechazar, pedir un resumen al agente |
-| Snapshots | Línea de tiempo con qué paquetes cambió cada uno y cuánto ocupa | Comparar con el estado actual, volver atrás, arrancar desde uno, fijarlo o borrarlo |
-| Doctor | Servicios fallidos, `.pacnew` sin fusionar, huérfanos, caché, llavero, mirrors | Arreglar cada punto desde ahí, con diff para los `.pacnew` |
-| Settings | Mirrors y descargas paralelas, frecuencia de actualización, compilación del AUR, retención de snapshots y de caché, qué puede hacer el agente | Cambiar cada ajuste; los que protegen el sistema aparecen bloqueados |
+| Dashboard | Pending updates, AUR reviews waiting, last snapshot, Arch news, system health, recent activity | Jump to each thing |
+| Browse | Unified search across Arch, `[kavat]` and the allowlist, with filters: installed, explicit, orphans, AUR | See the full record (version, sizes, license, dependencies, who requires it, files, install reason and date); install or remove |
+| Updates | List grouped by source with current and new version, download size, net change on disk and whether it asks for a reboot | Update everything; hold back an AUR package |
+| AUR | The allowlist with its pinned commit and its status; pending requests | Review the PKGBUILD diff with the suspicious lines flagged, approve and pin, reject, ask the agent for a summary |
+| Snapshots | Timeline with which packages each one changed and how much space it takes | Compare with the current state, go back, boot from one, pin it or delete it |
+| Doctor | Failed services, unmerged `.pacnew`, orphans, cache, keyring, mirrors | Fix each item from there, with a diff for the `.pacnew` files |
+| Settings | Mirrors and parallel downloads, update frequency, AUR build, snapshot and cache retention, what the agent can do | Change each setting; the ones that protect the system appear locked |
 
-Tres reglas de la TUI:
+Three rules of the TUI:
 
-- Los paquetes oficiales se actualizan todos juntos: Arch no soporta actualizaciones parciales, así que la TUI no ofrece elegir uno suelto.
-- Teclado primero, con ratón opcional: los números cambian de pestaña, `/` busca y `?` muestra la ayuda.
-- Usa los colores del tema del sistema y comparte ajustes con la página Packages del panel de Noctalia.
+- The official packages are all updated together: Arch does not support partial upgrades, so the TUI does not offer picking a single one.
+- Keyboard first, with optional mouse: the numbers switch tabs, `/` searches and `?` shows the help.
+- It uses the colors of the system theme and shares settings with the Packages page of the Noctalia panel.
 
-**Actualizaciones que no te dejan a medias.** Cuatro mecanismos tomados de otras distros, aprobados tras el análisis:
+**Updates that do not leave you halfway.** Four mechanisms taken from other distros, approved after the analysis:
 
-- **Migraciones** (de Omarchy): cuando una versión nueva necesita cambiar algo que pacman no gestiona, como tu configuración o un servicio de usuario, lo hace un script que corre una sola vez, después de pacman y en orden. Si uno falla, la cola se detiene y te avisa; nunca migra en silencio. Su estado se guarda dentro de la raíz, así que volver a un snapshot también deshace las migraciones.
-- **Intervenciones guiadas** (de Garuda y EndeavourOS): cada «intervención manual» que publica Arch se convierte en un paso de `kav update` que explica qué pasa, enseña el comando, pide confirmación y anota que ya se aplicó.
-- **Dos guardas de transacción** (de Omarchy): si un archivo sin dueño choca con un paquete, se aparta, se reintenta una vez y se devuelve lo que el paquete no reclamó; y Hyprland no recarga su configuración mientras pacman la está cambiando, sino una sola vez al final.
-- **Comprobación de salud con memoria** (de openSUSE): tras cada actualización y en cada arranque se comprueba que el sistema está sano, y se guarda cuál fue la última instantánea buena. Si falla justo después de actualizar, vuelve a esa instantánea; si falla un sistema que ya funcionaba, reinicia una vez y, si sigue mal, se queda encendido con los servicios parados. Es también el mecanismo del modo seguro automático.
+- **Migrations** (from Omarchy): when a new version needs to change something that pacman does not manage, such as your configuration or a user service, a script does it that runs only once, after pacman and in order. If one fails, the queue stops and tells you; it never migrates silently. Its state is stored inside the root, so going back to a snapshot also undoes the migrations.
+- **Guided interventions** (from Garuda and EndeavourOS): each "manual intervention" that Arch publishes becomes a step of `kav update` that explains what is happening, shows the command, asks for confirmation and records that it was already applied.
+- **Two transaction guards** (from Omarchy): if a file with no owner collides with a package, it is moved aside, the transaction is retried once and what the package did not claim is put back; and Hyprland does not reload its configuration while pacman is changing it, but only once at the end.
+- **Health check with memory** (from openSUSE): after each update and on each boot the system is checked to be healthy, and which was the last good snapshot is saved. If it fails right after updating, it goes back to that snapshot; if a system that was already working fails, it reboots once and, if it is still bad, stays on with the services stopped. It is also the mechanism of the automatic safe mode.
 
-**Firmware.** `kav update` consulta fwupd y ofrece el firmware de la placa, del SSD y de los periféricos como un paso más de la actualización, con su aviso de reinicio.
+**Firmware.** `kav update` queries fwupd and offers the firmware for the motherboard, the SSD and the peripherals as one more step of the update, with its reboot notice.
 
-## Sistema de temas
+## Theme system
 
-Un tema es un archivo de tokens y el sistema genera la configuración de cada app desde plantillas, así que modo, paleta y acento se cambian por separado y en vivo.
+A theme is a file of tokens and the system generates each app's configuration from templates, so mode, palette and accent are changed separately and live.
 
-La diferencia con Omarchy: allí un tema es un archivo de colores más plantillas, como aquí, pero cada tema es una sola variante, sin par claro y oscuro. Aquí la apariencia tiene ejes independientes que se combinan:
+The difference from Omarchy: there a theme is a file of colors plus templates, as here, but each theme is a single variant, with no light and dark pair. Here the appearance has independent axes that combine:
 
-| Eje | Valores | Ejemplo |
+| Axis | Values | Example |
 | --- | --- | --- |
-| Paleta | Familia de color del tema | Kavat, Catppuccin, Gruvbox, Tokyo Night, Nord, Rosé Pine, Everforest |
-| Modo | Claro, oscuro, automático por hora o por amanecer | Oscuro de 19:00 a 07:00 |
-| Acento | Cualquier color de la paleta o uno libre | Acento ámbar sobre Nord |
-| Tono | Temperatura y saturación del fondo | Neutro, cálido, frío, OLED negro puro |
-| Contraste | Normal, alto | Alto para pantallas al sol |
-| Forma | Radio de esquinas, grosor de borde, separación entre ventanas | Recto y compacto, o redondo y amplio |
-| Efectos | Desenfoque, transparencia, sombras, velocidad de animación | Todo apagado en batería |
-| Tipografía | Fuente de interfaz, fuente mono, escala | Inter + JetBrains Mono al 110% |
-| Iconos y cursor | Estilo de los iconos (Colour, Tinted o Line) y tamaño del cursor; sus colores salen del resto de ejes | Colour con cursor de 24 |
+| Palette | The theme's color family | Kavat, Catppuccin, Gruvbox, Tokyo Night, Nord, Rosé Pine, Everforest |
+| Mode | Light, dark, automatic by time or by sunrise | Dark from 19:00 to 07:00 |
+| Accent | Any color of the palette or a free one | Amber accent on Nord |
+| Tone | Temperature and saturation of the background | Neutral, warm, cool, pure black OLED |
+| Contrast | Normal, high | High for screens in the sun |
+| Shape | Corner radius, border thickness, gap between windows | Square and compact, or round and roomy |
+| Effects | Blur, transparency, shadows, animation speed | Everything off on battery |
+| Typography | Interface font, mono font, scale | Inter + JetBrains Mono at 110% |
+| Icons and cursor | Icon style (Colour, Tinted or Line) and cursor size; their colors come from the other axes | Colour with a cursor of 24 |
 
-Cómo funciona:
+How it works:
 
-1. `~/.config/kavat/theme.toml` guarda la combinación activa. Es lo único que editas.
-2. `kavat-theme apply` resuelve los tokens (unos 40 colores semánticos: `surface`, `text`, `accent`, `danger`, etc.) y rellena las plantillas.
-3. Cada app recibe su archivo y una señal de recarga: Hyprland, Noctalia, terminal, GTK, Qt, Neovim, el monitor y la información del sistema, los iconos, el cursor, el greeter, hyprlock, Plymouth, el instalador y las apps Electron que lo permitan.
-4. El cambio es atómico: se genera todo en un directorio nuevo y se cambia un enlace. Si una plantilla falla, no se aplica nada.
+1. `~/.config/kavat/theme.toml` holds the active combination. It is the only thing you edit.
+2. `kavat-theme apply` resolves the tokens (about 40 semantic colors: `surface`, `text`, `accent`, `danger`, etc.) and fills in the templates.
+3. Each app receives its file and a reload signal: Hyprland, Noctalia, terminal, GTK, Qt, Neovim, the system monitor and system information, the icons, the cursor, the greeter, hyprlock, Plymouth, the installer and the Electron apps that allow it.
+4. The change is atomic: everything is generated in a new directory and a link is switched. If a template fails, nothing is applied.
 
-**Cómo está hecho.** Desde la fase 3, y probado en máquina virtual con `tests/theme.py` y `tests/startup.py`:
+**How it is built.** Since phase 3, and tested in a virtual machine with `tests/theme.py` and `tests/startup.py`:
 
-- **`kavat-theme`** es un programa en Rust, en `themes/`, con sus paletas y sus plantillas. `kavat-theme set mode light` cambia esa línea de tu archivo y la aplica; `set` admite varios ajustes a la vez, y `apply`, `get`, `list`, `tokens` y `boot` completan los comandos.
-- **Tres capas de ajustes**: los valores de fábrica, `/etc/kavat/theme.toml` para la máquina y `~/.config/kavat/theme.toml`, donde solo están las líneas que cambiaste; tus comentarios se conservan. Un ajuste o un valor que no existe se rechaza diciendo qué se admite.
-- **Una paleta es un archivo TOML** con sus acentos por nombre y, para claro y para oscuro, seis neutros y seis tonos: rojo, verde, amarillo, azul, magenta y cian. Vienen siete: Kavat, Catppuccin, Gruvbox, Tokyo Night, Nord, Rosé Pine y Everforest. Las tuyas van en `~/.config/kavat/palettes/`.
-- **Contraste comprobado al resolver**: el texto, el texto secundario, el acento usado como texto y los seis tonos se ajustan lo justo para llegar a 4,5:1 sobre el fondo de las ventanas, o 7:1 con contraste alto. Así una paleta puede traer los colores originales de su familia. De ahí salen 47 colores y 17 valores.
-- **Una plantilla es una carpeta** con los archivos de una app y un `template.toml` que dice dónde va cada uno y con qué orden se avisa a la app. Las tuyas van en `~/.config/kavat/templates/` y pueden sustituir a una del sistema.
-- **Dónde quedan los archivos**: en `~/.local/state/kavat/theme/`, una carpeta por generación, y el enlace `current` apunta a la que está en uso. Aplicar dos veces lo mismo no cambia nada.
-- **El arranque y el login** tienen sus propias plantillas, en `themes/boot/`, y se aplican aparte con `kavat-theme boot`, porque son archivos del sistema: lo cuenta la sección «Arranque».
-- **Hoy siguen el tema** Hyprland (bordes, esquinas, separación, desenfoque, sombras y animaciones), Kitty (colores, fuente y opacidad; en claro deja pasar menos el fondo, para no agrisarse), Noctalia (paleta, modo, esquinas y fuente; sus plantillas para otras apps y su asistente de primer arranque quedan apagados) y GTK (colores y preferencia de claro u oscuro). Hyprland pide el tema al cargar su configuración, así que el primer inicio de sesión y el modo seguro ya salen con él.
-- **Los textos no llegan a ser código**: un nombre de fuente o de paleta solo admite letras, dígitos, espacios y `- _ . #`, porque acaba dentro de los archivos de configuración de otras apps.
-- **Queda para más adelante en esta fase**: el modo automático por hora, los perfiles y las reglas, el tema desde el fondo, la sobrescritura por app, `kavat-theme add`, los iconos y el cursor, que el arranque siga solo al tema del escritorio, y las plantillas del resto: Qt, Neovim, Yazi, hyprlock y el instalador.
+- **`kavat-theme`** is a Rust program, in `themes/`, with its palettes and its templates. `kavat-theme set mode light` changes that line of your file and applies it; `set` accepts several settings at once, and `apply`, `get`, `list`, `tokens` and `boot` complete the commands.
+- **Three layers of settings**: the factory values, `/etc/kavat/theme.toml` for the machine and `~/.config/kavat/theme.toml`, which holds only the lines you changed; your comments are kept. A setting or a value that does not exist is rejected, saying what is accepted.
+- **A palette is a TOML file** with its accents by name and, for light and for dark, six neutrals and six hues: red, green, yellow, blue, magenta and cyan. Seven are included: Kavat, Catppuccin, Gruvbox, Tokyo Night, Nord, Rosé Pine and Everforest. Yours go in `~/.config/kavat/palettes/`.
+- **Contrast checked when resolving**: the text, the secondary text, the accent used as text and the six hues are adjusted just enough to reach 4.5:1 over the window background, or 7:1 with high contrast. That way a palette can carry the original colors of its family. From that come 47 colors and 17 values.
+- **A template is a folder** with an app's files and a `template.toml` that says where each one goes and with which command the app is notified. Yours go in `~/.config/kavat/templates/` and can replace one of the system's.
+- **Where the files end up**: in `~/.local/state/kavat/theme/`, one folder per generation, and the `current` link points to the one in use. Applying the same thing twice changes nothing.
+- **Boot and login** have their own templates, in `themes/boot/`, and are applied separately with `kavat-theme boot`, because they are system files: the "Boot" section covers it.
+- **Today the theme is followed by** Hyprland (borders, corners, gaps, blur, shadows and animations), Kitty (colors, font and opacity; in light mode it lets less of the background through, so it does not turn gray), Noctalia (palette, mode, corners and font; its templates for other apps and its first-run wizard stay off) and GTK (colors and the light or dark preference). Hyprland asks for the theme when it loads its configuration, so the first login and safe mode already come up with it.
+- **Text never becomes code**: a font or palette name only accepts letters, digits, spaces and `- _ . #`, because it ends up inside the configuration files of other apps.
+- **Left for later in this phase**: the automatic mode by time, profiles and rules, the theme from the wallpaper, the per-app override, `kavat-theme add`, the icons and the cursor, having boot follow the desktop theme on its own, and the templates for the rest: Qt, Neovim, Yazi, hyprlock and the installer.
 
-**Iconos y cursor.** También salen de los tokens, así que cambian con la paleta, el modo y el acento.
+**Icons and cursor.** They also come from the tokens, so they change with the palette, the mode and the accent.
 
-- **Iconos generados (`kavat-icons`)**: un juego de iconos en SVG, hecho a partir de Papirus, que `kavat-theme` vuelve a colorear en cada cambio de tema.
-- **Tres estilos**: Colour, el de serie, deja a cada app su color de marca y pone el acento en las carpetas y en los iconos de sistema. Tinted pinta todos los iconos con colores de la paleta. Line los dibuja de línea, en el color del texto.
-- **Cursor generado (`kavat-cursor`)**: el relleno sigue al modo, claro sobre oscuro y al revés, y el borde lleva el acento. Tamaños 24, 32 y 48.
-- **Iconos de archivo en la terminal**: los de Yazi, Neovim y `kav` usan los colores de la paleta, no un color fijo por tipo de archivo.
-- **Bandeja en un solo color**: los iconos de la bandeja de la barra se pintan en el color del texto.
-- **Lo que no sigue el tema, a la vista**: la página Appearance dice qué apps no se pueden tematizar, como Steam u OnlyOffice.
-- **Límite**: una app cuyo icono no esté en el juego trae el suyo, sin tematizar.
+- **Generated icons (`kavat-icons`)**: a set of SVG icons, made from Papirus, which `kavat-theme` recolors on every theme change.
+- **Three styles**: Colour, the default, leaves each app its brand color and puts the accent on folders and system icons. Tinted paints all the icons with colors from the palette. Line draws them as outlines, in the text color.
+- **Generated cursor (`kavat-cursor`)**: the fill follows the mode, light on dark and the reverse, and the border carries the accent. Sizes 24, 32 and 48.
+- **File icons in the terminal**: those of Yazi, Neovim and `kav` use the palette's colors, not a fixed color per file type.
+- **Tray in a single color**: the icons in the bar's tray are painted in the text color.
+- **What does not follow the theme, in plain sight**: the Appearance page says which apps cannot be themed, such as Steam or OnlyOffice.
+- **Limit**: an app whose icon is not in the set brings its own, unthemed.
 
-Ideas propias:
+Our own ideas:
 
-- **Tema insignia Kavat** con dos variantes hechas a mano, una oscura y una clara, que definen la identidad del sistema.
-- **Tema desde el fondo de pantalla**: extrae una paleta de la imagen y la ajusta para cumplir contraste mínimo, cosa que los generadores automáticos suelen fallar en modo claro.
-- **Modo claro de verdad**: cada paleta incluida se revisa en claro, con contraste comprobado, no solo los colores invertidos.
-- **Perfiles**: guardar combinaciones con nombre (`trabajo`, `noche`, `presentación`) y cambiarlas con un atajo o desde el agente.
-- **Reglas**: cambiar de perfil según hora, batería o monitor conectado.
-- **Sobrescritura por app**: fijar una paleta distinta solo para el terminal o el editor.
-- **Un tema de terceros es un solo archivo TOML**, fácil de compartir e instalar con `kavat-theme add <url>`.
-- **Plantillas añadibles**: soportar una app nueva es añadir una plantilla, sin tocar los temas existentes.
+- **Kavat flagship theme** with two handmade variants, one dark and one light, which define the system's identity.
+- **Theme from the wallpaper**: it extracts a palette from the image and adjusts it to meet minimum contrast, something automatic generators usually get wrong in light mode.
+- **A real light mode**: each included palette is reviewed in light mode, with contrast checked, not just the colors inverted.
+- **Profiles**: save named combinations (`work`, `night`, `presentation`) and switch between them with a shortcut or from the agent.
+- **Rules**: switch profile according to time, battery or connected monitor.
+- **Per-app override**: set a different palette only for the terminal or the editor.
+- **A third-party theme is a single TOML file**, easy to share and to install with `kavat-theme add <url>`.
+- **Templates can be added**: supporting a new app means adding a template, without touching the existing themes.
 
-## Fondos de pantalla
+## Wallpapers
 
-El fondo puede ser una imagen, que es lo normal, o un vídeo en bucle, y se elige desde la página Wallpaper del panel de Noctalia. Es la misma idea que ya tenías en Endgame, con sus carpetas `images` y `live`.
+The wallpaper can be an image, which is the normal case, or a looping video, and it is chosen from the Wallpaper page of the Noctalia panel. It is the same idea you already had in Endgame, with its `images` and `live` folders.
 
-|  | Imagen (por defecto) | Vídeo |
+|  | Image (default) | Video |
 | --- | --- | --- |
-| Quién lo pinta | El shell (Noctalia) | mpvpaper |
-| Formatos | PNG, JPG, WebP | MP4, WebM, MKV, GIF |
-| Coste | Ninguno una vez puesto | Decodifica vídeo de forma continua; con decodificación por GPU es bajo, pero no cero |
-| Carpeta | `~/Pictures/Wallpapers/images` | `~/Pictures/Wallpapers/live` |
+| Who paints it | The shell (Noctalia) | mpvpaper |
+| Formats | PNG, JPG, WebP | MP4, WebM, MKV, GIF |
+| Cost | None once it is set | Decodes video continuously; with GPU decoding it is low, but not zero |
+| Folder | `~/Pictures/Wallpapers/images` | `~/Pictures/Wallpapers/live` |
 
-Cómo funciona:
+How it works:
 
-- **Selector único**: imágenes y vídeos salen en la misma cuadrícula, los vídeos con una marca y una vista previa en movimiento. Se filtra por tipo.
-- **Fotograma fijo**: de cada vídeo se guarda un fotograma. Es lo que se ve en las miniaturas, en el login, en la pantalla de bloqueo y cuando el vídeo está en pausa.
-- **Pausa automática**: el vídeo se detiene cuando una ventana está a pantalla completa, cuando el fondo queda tapado del todo, con la pantalla bloqueada o apagada, y en modo Gamer.
-- **Ajustes del vídeo**: sonido (apagado por defecto), bucle, encaje, límite de fotogramas y decodificación por GPU.
-- **Tema desde el fondo**: la paleta «desde fondo» funciona también con vídeos, usando el fotograma fijo.
-- **Por pantalla**: cada monitor puede tener su fondo; también hay presentación de imágenes por tiempo.
-- **Fuera del panel**: `kavat wallpaper set <archivo>` y el agente hacen lo mismo.
+- **Single picker**: images and videos appear in the same grid, the videos with a mark and a moving preview. It can be filtered by type.
+- **Still frame**: one frame of each video is saved. It is what you see in the thumbnails, at login, on the lock screen and when the video is paused.
+- **Automatic pause**: the video stops when a window is full screen, when the wallpaper is completely covered, with the screen locked or off, and in Gamer mode.
+- **Video settings**: sound (off by default), loop, fit, frame limit and GPU decoding.
+- **Theme from the wallpaper**: the "from wallpaper" palette also works with videos, using the still frame.
+- **Per screen**: each monitor can have its own wallpaper; there is also a timed image slideshow.
+- **Outside the panel**: `kavat wallpaper set <file>` and the agent do the same.
 
-mpvpaper está en el AUR y no en los repos oficiales, así que entra por `[kavat]` ya compilado. Si diera problemas, sirve cualquier otro reproductor de fondos: el panel habla con una capa propia, no con mpvpaper directamente.
+mpvpaper is in the AUR and not in the official repos, so it comes in through `[kavat]` already built. If it caused problems, any other wallpaper player would do: the panel talks to a layer of its own, not to mpvpaper directly.
 
-## Agente local
+## Local agent
 
-El agente es un modelo pequeño servido por Ollama que no toca el sistema directamente: llama a un daemon con herramientas tipadas, y cada herramienta tiene un nivel de permiso. Va después de la base, pero la base se diseña ya pensando en él.
+The agent is a small model served by Ollama that does not touch the system directly: it calls a daemon with typed tools, and each tool has a permission level. It comes after the base, but the base is already designed with it in mind.
 
-| Nivel | Qué puede hacer | Confirmación |
+| Level | What it can do | Confirmation |
 | --- | --- | --- |
-| Leer | Estado del sistema, ventanas, paquetes, logs, búsqueda de archivos | Ninguna |
-| Reversible | Cambiar tema, mover ventanas, volumen, brillo, abrir apps, crear notas | Ninguna; queda en el registro |
-| Con snapshot | Instalar o quitar paquetes con `kav`, cambiar configuración del sistema | Una confirmación; snapshot antes |
-| Privilegiado | Discos, usuarios, red, servicios, borrar archivos | Confirmación con contraseña por polkit |
+| Read | System state, windows, packages, logs, file search | None |
+| Reversible | Change the theme, move windows, volume, brightness, open apps, create notes | None; it stays in the log |
+| With snapshot | Install or remove packages with `kav`, change system configuration | One confirmation; snapshot first |
+| Privileged | Disks, users, network, services, deleting files | Confirmation with password through polkit |
 
-Piezas:
+Parts:
 
-- **`kavatd`**: daemon que expone las herramientas (por D-Bus o MCP). `kav`, `kavat-theme` y `hyprctl` son las primeras. El modelo nunca recibe una shell libre.
-- **Modelo**: un Modelfile sobre Qwen3.5 4B, servido por Ollama en la GPU. Es el punto de partida, no una elección cerrada: se confirma o se cambia con una prueba propia contra tareas reales del sistema, y el ajuste fino queda para una segunda vuelta. Se le habla en inglés. No tiene que programar ni hacer tareas pesadas: para eso está Claude en el editor. Su trabajo es manejar el sistema. El modelo es configurable: se puede cambiar por otro desde el panel.
-- **Límite de 4 GB**: el agente ocupa como máximo 4 GB de la memoria de la GPU, para que conviva con un juego sin tener que cerrarlo. El modelo de lenguaje corre en la GPU, que es donde se nota la velocidad. La voz corre en la CPU: sus motores ligeros son de CPU, y ahí ya reconocen varias veces más rápido que el tiempo real. Usa entre 1 y 2,5 GB de RAM, que no cuentan en el límite, y sus modelos solo se cargan cuando la voz está activa. El modelo queda cargado mientras estás en Coder, para que conteste al instante, y sale de memoria en Gamer; el ajuste se puede cambiar en el panel.
-- **Voz con VoiceStudio**: el agente escucha y habla a través de VoiceStudio, que corre en local y ofrece dictado, transcripción, síntesis y clonación de voz por una API local y por MCP. kavatd lo usa como servicio: lo que dices se transcribe, pasa al modelo y la respuesta se sintetiza con una voz propia de Kavat. Se empaqueta como kavat-voice; su licencia es AGPL-3.0, sin problema para uso personal. Sus motores corren en la CPU y no gastan memoria de la GPU; aun así se eligen los más ligeros que den buena calidad.
-- **Interfaz**: panel en Noctalia con `Super+Space`, y `kavat ask "..."` en el terminal.
-- **Contexto del sistema**: el agente conoce la documentación de Willwitcher-OS, tus atajos y tu configuración, así que contesta sobre tu máquina, no sobre Linux en general.
-- **Registro**: cada llamada a una herramienta queda en un log legible con qué pidió, qué hizo y cómo deshacerlo.
-- **Sin red**: el agente funciona sin conexión y no envía nada fuera. Cualquier herramienta que use red se activa aparte.
+- **`kavatd`**: daemon that exposes the tools (over D-Bus or MCP). `kav`, `kavat-theme` and `hyprctl` are the first ones. The model never gets a free shell.
+- **Model**: a Modelfile on top of Qwen3.5 4B, served by Ollama on the GPU. It is the starting point, not a closed choice: it is confirmed or changed with a test of our own against real system tasks, and fine-tuning is left for a second round. You speak to it in English. It does not have to program or do heavy tasks: Claude in the editor is there for that. Its job is to operate the system. The model is configurable: it can be swapped for another from the panel.
+- **4 GB limit**: the agent takes at most 4 GB of GPU memory, so that it can coexist with a game without having to close it. The language model runs on the GPU, which is where speed is noticed. The voice runs on the CPU: its lightweight engines are CPU engines, and there they already recognize several times faster than real time. It uses between 1 and 2.5 GB of RAM, which do not count toward the limit, and its models are only loaded when the voice is active. The model stays loaded while you are in Coder, so that it answers instantly, and leaves memory in Gamer; the setting can be changed in the panel.
+- **Voice with VoiceStudio**: the agent listens and speaks through VoiceStudio, which runs locally and offers dictation, transcription, synthesis and voice cloning through a local API and through MCP. kavatd uses it as a service: what you say is transcribed, goes to the model and the answer is synthesized with a voice of Kavat's own. It is packaged as kavat-voice; its license is AGPL-3.0, no problem for personal use. Its engines run on the CPU and use no GPU memory; even so, the lightest ones that give good quality are chosen.
+- **Interface**: panel in Noctalia with `Super+Space`, and `kavat ask "..."` in the terminal.
+- **System context**: the agent knows the Willwitcher-OS documentation, your shortcuts and your configuration, so it answers about your machine, not about Linux in general.
+- **Log**: each call to a tool is kept in a readable log with what it asked for, what it did and how to undo it.
+- **No network**: the agent works offline and sends nothing out. Any tool that uses the network is enabled separately.
 
-**Modelo y memoria.** Decidido en noviembre de 2026, tras comparar los modelos pequeños de Ollama para este trabajo. Ningún modelo se ha ejecutado todavía en la máquina real, así que las cifras de memoria son estimaciones. El informe completo, con sus fuentes, está en [`reports/Modelo local para el agente Kavat.md`](../reports/Modelo%20local%20para%20el%20agente%20Kavat.md); como el límite es de memoria de la GPU, vale su apartado «Si el límite contara solo la VRAM».
+**Model and memory.** Decided in November 2026, after comparing Ollama's small models for this job. No model has been run on the real machine yet, so the memory figures are estimates. The full report, with its sources, is in [`reports/local-model-for-the-kavat-agent.md`](../reports/local-model-for-the-kavat-agent.md); since the limit is on GPU memory, its section "If the limit counted only VRAM" is the one that applies.
 
-| Pieza | Elección | Dónde corre | Memoria |
+| Part | Choice | Where it runs | Memory |
 | --- | --- | --- | --- |
-| Modelo de lenguaje | Qwen3.5 4B (`qwen3.5:4b-q4_K_M`) | GPU | 3,3 GB de descarga; cargado, cerca de 4 GB de VRAM, sin medir |
-| Reconocimiento de voz | Parakeet TDT v3, dentro de VoiceStudio | CPU | 1 a 1,5 GB de RAM, estimado |
-| Síntesis de voz | Supertonic-3, dentro de VoiceStudio | CPU | 0,4 a 0,5 GB de RAM, estimado |
-| VoiceStudio en sí |  | CPU | 0,5 GB de RAM |
+| Language model | Qwen3.5 4B (`qwen3.5:4b-q4_K_M`) | GPU | 3.3 GB download; loaded, close to 4 GB of VRAM, not measured |
+| Speech recognition | Parakeet TDT v3, inside VoiceStudio | CPU | 1 to 1.5 GB of RAM, estimated |
+| Speech synthesis | Supertonic-3, inside VoiceStudio | CPU | 0.4 to 0.5 GB of RAM, estimated |
+| VoiceStudio itself |  | CPU | 0.5 GB of RAM |
 
-- **Por qué Qwen3.5 4B**: es el modelo pequeño con mejores pruebas independientes: 87 % en el banco de pruebas de Home Assistant, que es el proyecto más parecido a este, y 97,5 % en otra prueba de 40 casos.
-- **Cabe justo**: su memoria cargada no está medida. De sus 3,3 GB, 0,7 son un proyector de visión que el agente no usa, y no se sabe si Ollama lo carga. Si no entra en 4 GB, se acorta el contexto o se pasa a una alternativa.
-- **Alternativas, por orden**: Ministral 3 3B (80 % en el mismo banco), Qwen3 4B Instruct (75 %; es el que Home Assistant usa por defecto) y LFM3 1.7B, que ocupa 1,5 GB pero solo tiene notas del fabricante.
-- **Solo en inglés**: al agente se le habla en inglés. Eso acorta la prueba y permite motores de voz solo de inglés, más ligeros que los de la tabla; se eligen midiendo.
-- **Cómo se confirma**: con una prueba propia de unos 160 casos en inglés, cuatro veces por candidato, midiendo aciertos, latencia y memoria con un juego abierto.
+- **Why Qwen3.5 4B**: it is the small model with the best independent tests: 87% on the Home Assistant benchmark, which is the project most similar to this one, and 97.5% on another test of 40 cases.
+- **It just fits**: its loaded memory is not measured. Of its 3.3 GB, 0.7 are a vision projector that the agent does not use, and it is not known whether Ollama loads it. If it does not fit in 4 GB, the context is shortened or an alternative is used.
+- **Alternatives, in order**: Ministral 3 3B (80% on the same benchmark), Qwen3 4B Instruct (75%; it is the one Home Assistant uses by default) and LFM3 1.7B, which takes 1.5 GB but only has scores from its maker.
+- **English only**: you speak to the agent in English. That shortens the test and allows English-only voice engines, lighter than those in the table; they are chosen by measuring.
+- **How it is confirmed**: with a test of our own of about 160 cases in English, four times per candidate, measuring correct answers, latency and memory with a game open.
 
-**Cómo se le ayuda a acertar.** Un modelo pequeño no es fiable por sí solo con muchas herramientas, así que el diseño le quita trabajo:
+**How it is helped to get things right.** A small model is not reliable on its own with many tools, so the design takes work off it:
 
-- **Pocas herramientas a la vez**: antes de cada petición se eligen por parecido las cinco a ocho que vienen al caso, y el modelo solo ve esas. Si ninguna encaja, se amplía la lista o contesta que no hay herramienta para eso. Las elige un modelo de búsqueda pequeño, que corre en la CPU.
-- **Inglés por dentro**: los nombres de las herramientas, sus descripciones y sus valores van en inglés, igual que lo que tú le dices.
-- **Un paso por orden**: una skill de varios pasos es una sola herramienta, y los pasos los ejecuta `kavatd`, no el modelo.
-- **Frases exactas primero**: lo que coincide con la frase de una skill no pasa por el modelo.
+- **Few tools at a time**: before each request, the five to eight that are relevant are chosen by similarity, and the model only sees those. If none fits, the list is widened or it answers that there is no tool for that. They are chosen by a small search model, which runs on the CPU.
+- **English inside**: the names of the tools, their descriptions and their values are in English, the same as what you say to it.
+- **One step per command**: a skill with several steps is a single tool, and the steps are run by `kavatd`, not by the model.
+- **Exact phrases first**: whatever matches a skill's phrase does not go through the model.
 
-Límite deliberado: el agente puede resumir un diff de `kav review`, pero no puede aprobar un paquete AUR ni ampliar sus propios permisos.
+Deliberate limit: the agent can summarize a `kav review` diff, but it cannot approve an AUR package or widen its own permissions.
 
-**Lo que el agente lee nunca es una orden.** El contenido de una página web, de un archivo o de la salida de un comando es solo información: no puede hacer que el agente ejecute herramientas. Solo cuentan tus mensajes, tus clics y las skills que tú lanzas. Si una acción se propone a raíz de algo leído, pide confirmación aunque su nivel normalmente no la pida.
+**What the agent reads is never a command.** The content of a web page, of a file or of a command's output is only information: it cannot make the agent run tools. Only your messages, your clicks and the skills you launch count. If an action is proposed because of something it read, it asks for confirmation even if its level normally does not.
 
-- **Pulsar para hablar**: por defecto la voz se activa manteniendo una tecla, no escuchando siempre; la palabra de activación queda como opción.
-- **Ayuda en la terminal**: una tecla en Kitty explica el último error o propone el comando correcto, sin salir de la terminal.
-- **Avisos discretos**: el agente avisa de lo que importa (disco casi lleno, una revisión del AUR pendiente, una copia que falló, un proceso desbocado) y propone la skill que lo arregla. No interrumpe en modo Gamer.
+- **Push to talk**: by default the voice is activated by holding a key, not by always listening; the wake word stays as an option.
+- **Help in the terminal**: a key in Kitty explains the last error or proposes the right command, without leaving the terminal.
+- **Discreet alerts**: the agent warns about what matters (disk almost full, a pending AUR review, a backup that failed, a runaway process) and proposes the skill that fixes it. It does not interrupt in Gamer mode.
 
-**Isla de voz.** Cuando le hablas por voz, una isla baja de la barra con la cara de Kavat y se queda mientras escucha, piensa y contesta. Como preguntaste mientras trabajabas, la respuesta llega sobre lo que estabas haciendo.
+**Voice island.** When you speak to it by voice, an island drops from the bar with Kavat's face and stays while it listens, thinks and answers. Since you asked while you were working, the answer arrives over what you were doing.
 
-- **Los bigotes son la onda**: se mueven con el sonido de la voz. Las ondas van hacia la cara mientras Kavat escucha y salen de ella mientras habla, y toman el color de quien habla: el de acento para Kavat, el del texto para ti.
-- **Subtítulos**: la isla muestra lo que te ha entendido, la herramienta que llama con su nivel de permiso y la respuesta palabra por palabra, con la palabra que suena resaltada.
-- **Las luces laten con la voz**: teclado y torre pulsan mientras Kavat habla.
-- **La tecla de hablar**: soltarla envía lo que dijiste; mientras Kavat habla, un toque lo calla y mantenerla es contestarle.
-- **Tres interruptores**: isla, subtítulos y luces se apagan por separado en la página Agent & voice o en `agent.toml`, en `[voice.feedback]`. Los tres vienen encendidos.
+- **The whiskers are the waveform**: they move with the sound of the voice. The waves go toward the face while Kavat listens and come out of it while it speaks, and they take the color of whoever is speaking: the accent color for Kavat, the text color for you.
+- **Subtitles**: the island shows what it understood from you, the tool it calls with its permission level and the answer word by word, with the word being spoken highlighted.
+- **The lights pulse with the voice**: keyboard and tower pulse while Kavat speaks.
+- **The talk key**: releasing it sends what you said; while Kavat is speaking, a tap silences it and holding it is answering it.
+- **Three switches**: island, subtitles and lights are turned off separately on the Agent & voice page or in `agent.toml`, under `[voice.feedback]`. All three come switched on.
 
-**Skills.** Una skill es una acción ya definida que el agente sabe hacer, como abrir el navegador. Aparece como un botón en su panel y se puede pulsar, pedir por voz o escribir.
+**Skills.** A skill is an action already defined that the agent knows how to do, such as opening the browser. It appears as a button in its panel and can be pressed, asked for by voice or typed.
 
-| Parte de una skill | Qué lleva |
+| Part of a skill | What it holds |
 | --- | --- |
-| Nombre y descripción | Lo que ves en el botón y lo que el modelo lee para elegirla |
-| Pasos | Una o varias herramientas de `kavatd`, con sus parámetros |
-| Nivel de permiso | El más alto de sus pasos; decide si pide confirmación |
-| Dependencias | Los paquetes que necesita, garantizados por `kav` |
-| Atajo y frase | Opcionales: una tecla y una frase de voz que la lanzan directamente |
+| Name and description | What you see on the button and what the model reads to choose it |
+| Steps | One or several `kavatd` tools, with their parameters |
+| Permission level | The highest of its steps; it decides whether it asks for confirmation |
+| Dependencies | The packages it needs, guaranteed by `kav` |
+| Shortcut and phrase | Optional: a key and a voice phrase that launch it directly |
 
-- **Catálogo de serie**: abrir navegador, terminal, editor o archivos; cambiar de modo; cambiar tema o fondo; actualizar el sistema; captura y grabación de pantalla; volumen, brillo, Wi-Fi y Bluetooth; bloquear, suspender y apagar; tomar una nota y poner un recordatorio. Los scripts `ww-*` de Endgame pasan a ser skills.
-- **Pulsar no usa el modelo**: un clic ejecuta la skill directamente, así que responde al instante y funciona también en modo Gamer, con el modelo descargado.
-- **Tres formas de lanzarla**: el botón, una frase exacta por voz (sin pasar por el modelo) o lenguaje libre, donde el modelo elige la skill y rellena los parámetros.
-- **Skills propias**: una skill es un archivo TOML en `~/.config/kavat/skills/`. Se crean desde el panel encadenando pasos; por ejemplo, «empezar directo» = abrir OBS + modo Gamer + no molestar.
-- **Guardar como skill**: cuando el agente resuelve algo en varios pasos, un botón lo guarda como skill para repetirlo igual la próxima vez.
-- **Fijar donde quieras**: las favoritas se fijan en el panel del agente, en la barra o en el lanzador, y admiten atajo de teclado.
-- **Sugeridas por contexto**: el panel propone las que tienen sentido en cada momento, como «salir de Incognito» cuando estás en ese modo.
-- **Disparadores**: una skill puede lanzarse sola a una hora, al entrar en un modo o al iniciar sesión.
-- **Antes y después**: cada skill muestra qué va a hacer antes de ejecutarse y queda en el registro con su deshacer.
-- **Límite**: una skill no puede superar su nivel de permiso, y el agente no puede crear ni editar skills sin tu confirmación.
+- **Built-in catalog**: open the browser, terminal, editor or files; change mode; change theme or wallpaper; update the system; screenshot and screen recording; volume, brightness, Wi-Fi and Bluetooth; lock, suspend and shut down; take a note and set a reminder. Endgame's `ww-*` scripts become skills.
+- **Pressing does not use the model**: a click runs the skill directly, so it responds instantly and also works in Gamer mode, with the model unloaded.
+- **Three ways to launch it**: the button, an exact phrase by voice (without going through the model) or free language, where the model chooses the skill and fills in the parameters.
+- **Your own skills**: a skill is a TOML file in `~/.config/kavat/skills/`. They are created from the panel by chaining steps; for example, "go live" = open OBS + Gamer mode + do not disturb.
+- **Save as skill**: when the agent solves something in several steps, a button saves it as a skill to repeat it the same way next time.
+- **Pin wherever you want**: favorites are pinned in the agent's panel, in the bar or in the launcher, and accept a keyboard shortcut.
+- **Suggested by context**: the panel proposes the ones that make sense at each moment, such as "leave Incognito" when you are in that mode.
+- **Triggers**: a skill can launch on its own at a given time, on entering a mode or at login.
+- **Before and after**: each skill shows what it is going to do before it runs and stays in the log with its undo.
+- **Limit**: a skill cannot exceed its permission level, and the agent cannot create or edit skills without your confirmation.
 
-Las skills se gestionan en la página Skills del panel de ajustes.
+Skills are managed on the Skills page of the settings panel.
 
-## Software preinstalado
+## Preinstalled software
 
-Terminal, shell, editor y navegador ya están decididos; el resto son valores habituales en Hyprland que puedes corregir.
+Terminal, shell, editor and browser are already decided; the rest are the usual choices on Hyprland, which you can correct.
 
-| Categoría | Propuesta inicial | Paquete propio |
+| Category | Initial proposal | Own package |
 | --- | --- | --- |
-| Compositor | Hyprland + hyprlock + hypridle | `kavat-hyprland` (configuración) |
-| Shell de escritorio | Noctalia | `kavat-shell` (fork) |
-| Login | LightDM + web-greeter | `kavat-greeter` (fork + tema) |
-| Terminal | Kitty | Solo plantilla de tema |
-| Shell de terminal | zsh, con starship | `kavat-shell-config` |
-| Editor | Neovim con configuración propia | `kavat-nvim` |
-| Archivos | Yazi | `kavat-files` (configuración, plugins y portal) |
-| Notas | nb | kavat-notes (fork, TUI e índice) |
-| Navegador | Chromium | kavat-browser (fork) |
-| Vídeo protegido | Widevine | `kavat-widevine`, descargado de Google al compilar; no se publica |
-| Información del sistema | fastfetch | `kavat-fetch` (fork) |
-| Monitor del sistema | btop | `kavat-top` (fork) |
-| Capturas y grabación | grim + slurp, grabador integrado en el shell | Integrado en `kavat-shell` |
-| Portapapeles | cliphist con historial en el lanzador | Integrado en `kavat-shell` |
-| Desarrollo | git, github-cli, mise, pnpm, docker, claude-code, supabase, postgresql y stripe-cli; Rust con rustup; para Android, JDK 17, el SDK con emulador, android-tools, watchman y maestro | Categoría Development del instalador |
-| Utilidades de terminal | zoxide, lsd, ripgrep, fd, fzf, bat y jq | En el sistema base |
-| Comprimidos y discos | 7zip, para que Yazi abra los comprimidos de serie; ntfs-3g, para montar discos NTFS | En el sistema base |
-| Auriculares | headsetcontrol | En el sistema base |
-| Visores | imv para imágenes, mpv para vídeo y audio, zathura para PDF; los comprimidos se abren en Yazi como carpetas | Solo plantilla de tema |
-| Juego | MangoHud y gamescope | Categoría de juegos del instalador |
-| Red y Bluetooth | NetworkManager y BlueZ | Página en `kavat-shell` |
-| Llavero y llaves | gnome-keyring, ssh-agent y gpg-agent | Configuración en `kavat-desktop` |
-| Discos extraíbles | udisks2 | Integrado en `kavat-shell` |
-| Firmware | fwupd | Integrado en `kav` |
-| Impresión y escáner | CUPS y SANE | Opcional, en el instalador |
-| Fuentes | Inter, JetBrains Mono Nerd Font, Noto para emoji y CJK | `kavat-fonts` |
-| Iconos y cursor | Papirus como base, recoloreado; cursor propio | `kavat-icons` y `kavat-cursor` |
-| Agente | Ollama + `kavatd` + modelo | `kavat-agent` |
+| Compositor | Hyprland + hyprlock + hypridle | `kavat-hyprland` (configuration) |
+| Desktop shell | Noctalia | `kavat-shell` (fork) |
+| Login | LightDM + web-greeter | `kavat-greeter` (fork + theme) |
+| Terminal | Kitty | Theme template only |
+| Terminal shell | zsh, with starship | `kavat-shell-config` |
+| Editor | Neovim with its own configuration | `kavat-nvim` |
+| Files | Yazi | `kavat-files` (configuration, plugins and portal) |
+| Notes | nb | kavat-notes (fork, TUI and index) |
+| Browser | Chromium | kavat-browser (fork) |
+| Protected video | Widevine | `kavat-widevine`, downloaded from Google at build time; it is not published |
+| System information | fastfetch | `kavat-fetch` (fork) |
+| System monitor | btop | `kavat-top` (fork) |
+| Screenshots and recording | grim + slurp, recorder built into the shell | Built into `kavat-shell` |
+| Clipboard | cliphist with history in the launcher | Built into `kavat-shell` |
+| Development | git, github-cli, mise, pnpm, docker, claude-code, supabase, postgresql and stripe-cli; Rust with rustup; for Android, JDK 17, the SDK with emulator, android-tools, watchman and maestro | Development category of the installer |
+| Terminal utilities | zoxide, lsd, ripgrep, fd, fzf, bat and jq | In the base system |
+| Archives and disks | 7zip, so that Yazi opens archives out of the box; ntfs-3g, to mount NTFS disks | In the base system |
+| Headset | headsetcontrol | In the base system |
+| Viewers | imv for images, mpv for video and audio, zathura for PDF; archives are opened in Yazi as folders | Theme template only |
+| Gaming | MangoHud and gamescope | Gaming category of the installer |
+| Network and Bluetooth | NetworkManager and BlueZ | Page in `kavat-shell` |
+| Keyring and keys | gnome-keyring, ssh-agent and gpg-agent | Configuration in `kavat-desktop` |
+| Removable disks | udisks2 | Built into `kavat-shell` |
+| Firmware | fwupd | Built into `kav` |
+| Printing and scanning | CUPS and SANE | Optional, in the installer |
+| Fonts | Inter, JetBrains Mono Nerd Font, Noto for emoji and CJK | `kavat-fonts` |
+| Icons and cursor | Papirus as the base, recolored; own cursor | `kavat-icons` and `kavat-cursor` |
+| Agent | Ollama + `kavatd` + model | `kavat-agent` |
 
-Un metapaquete `kavat-desktop` depende de todo lo anterior, de modo que una instalación de Arch existente se convierte en Willwitcher-OS con un solo `pacman -S`.
+A `kavat-desktop` metapackage depends on all of the above, so that an existing Arch installation becomes Willwitcher-OS with a single `pacman -S`.
 
-**Shell rápido.** zsh usa starship con un preset mínimo que reproduce tu prompt de Endgame: usuario, carpeta, rama de git y un `❯` que cambia de color según el resultado del último comando.
+**Fast shell.** zsh uses starship with a minimal preset that reproduces your Endgame prompt: user, folder, git branch and a `❯` that changes color according to the result of the last command.
 
-- Quedan apagados los módulos de starship que lanzan procesos en cada prompt: versiones de lenguajes y estado detallado de git. Se pueden encender uno a uno desde el panel, que avisa de cuáles ralentizan.
-- Los plugins de zsh se cargan directamente, sin framework, y las completaciones usan caché.
-- Abrir una terminal tiene un presupuesto de tiempo que se mide en cada cambio de configuración. Propuesta: menos de 100 ms.
+- The starship modules that launch processes on every prompt stay off: language versions and detailed git status. They can be turned on one by one from the panel, which warns about which ones slow it down.
+- The zsh plugins are loaded directly, without a framework, and completions use a cache.
+- Opening a terminal has a time budget that is measured on every configuration change. Proposal: under 100 ms.
 
-**Cómo está hecho.** Desde la fase 3, en `packages/kavat-shell-config/`, y medido en `tests/install.py`:
+**How it is built.** Since phase 3, in `packages/kavat-shell-config/`, and measured in `tests/install.py`:
 
-- **zsh es el shell de quien crea el instalador.** La configuración del sistema está en `/etc/zsh/zshrc`; tu `~/.zshrc` se lee después y manda. La sesión en vivo sigue con bash.
-- **El prompt** es un archivo de starship, `/usr/share/kavat/starship.toml`: usuario, carpeta, rama y el `❯`, verde o rojo. Usa los colores de la terminal, así que sigue al tema. La rama se lee de los archivos del repositorio, sin lanzar git. Si tienes `~/.config/starship.toml`, se usa el tuyo.
-- **Dos plugins**, cargados directamente: sugerencias del historial y colores al teclear. La lista de completaciones se calcula una vez al día y se guarda.
-- **Con el shell llegan** zoxide (`z`), lsd en el lugar de `ls`, fzf en `Ctrl+R` y `Ctrl+T`, ripgrep, fd, bat y jq. El historial se comparte entre terminales y no guarda repetidos.
-- **El presupuesto se cumple**: la prueba abre el shell cinco veces y exige que la más rápida baje de 100 ms.
-- **Queda para más adelante**: los alias y las funciones heredadas de Endgame, y la página Shell del panel.
+- **zsh is the shell of the user the installer creates.** The system configuration is in `/etc/zsh/zshrc`; your `~/.zshrc` is read afterwards and wins. The live session stays on bash.
+- **The prompt** is a starship file, `/usr/share/kavat/starship.toml`: user, folder, branch and the `❯`, green or red. It uses the terminal's colors, so it follows the theme. The branch is read from the repository's files, without launching git. If you have `~/.config/starship.toml`, yours is used.
+- **Two plugins**, loaded directly: history suggestions and colors as you type. The list of completions is computed once a day and saved.
+- **With the shell come** zoxide (`z`), lsd in place of `ls`, fzf on `Ctrl+R` and `Ctrl+T`, ripgrep, fd, bat and jq. The history is shared between terminals and does not keep duplicates.
+- **The budget is met**: the test opens the shell five times and requires the fastest one to come in under 100 ms.
+- **Left for later**: the aliases and functions inherited from Endgame, and the Shell page of the panel.
 
-## Heredado de Willwitcher-OS Endgame
+## Inherited from Willwitcher-OS Endgame
 
-De tu repo anterior se conservan tal cual los atajos de Hyprland y tus preferencias de Neovim; lo demás sirve de referencia y se rehace mejor.
+From your previous repo, the Hyprland shortcuts and your Neovim preferences are kept as they are; the rest serves as a reference and is redone better.
 
-**Neovim (`kavat-nvim`).** Se conservan tus preferencias, con un cambio: los atajos por defecto pasan a ser estilo VS Code (sección Editor).
+**Neovim (`kavat-nvim`).** Your preferences are kept, with one change: the default shortcuts become VS Code style (Editor section).
 
-- Líder en `Space`, números de línea relativos, colores de 24 bits, plugins con lazy.nvim.
-- `Ctrl+C` y `Ctrl+V` con el portapapeles del sistema, `Ctrl+A` para seleccionar todo y `Ctrl+Space` para autocompletar ya eran atajos estilo VS Code y pasan a formar parte del preset.
-- Tus atajos de `<leader>` siguen funcionando en modo normal: buffers (`<leader>b` + `c` `p` `o` `l` `r`), búsqueda (`<leader>ff`, `fg`, `fb`, `fr`), `<leader>e` explorador, `<leader>gg` Lazygit, `<leader>z` modo zen, `<leader>?` ayuda.
-- `Tab` y `Shift+Tab` cambian de buffer en modo normal; `Ctrl+Tab` lo hace en cualquier modo.
-- Plugins que ya usas: treesitter, gitsigns, neogit, diffview, fugitive, neo-tree, telescope, fzf-lua, render-markdown, which-key, bufferline, snacks.
-- Cambio: el esquema de color deja de ser Catppuccin fijo y sigue al tema del sistema.
+- Leader on `Space`, relative line numbers, 24-bit colors, plugins with lazy.nvim.
+- `Ctrl+C` and `Ctrl+V` with the system clipboard, `Ctrl+A` to select all and `Ctrl+Space` to autocomplete were already VS Code style shortcuts and become part of the preset.
+- Your `<leader>` shortcuts keep working in normal mode: buffers (`<leader>b` + `c` `p` `o` `l` `r`), search (`<leader>ff`, `fg`, `fb`, `fr`), `<leader>e` explorer, `<leader>gg` Lazygit, `<leader>z` zen mode, `<leader>?` help.
+- `Tab` and `Shift+Tab` switch buffer in normal mode; `Ctrl+Tab` does it in any mode.
+- Plugins you already use: treesitter, gitsigns, neogit, diffview, fugitive, neo-tree, telescope, fzf-lua, render-markdown, which-key, bufferline, snacks.
+- Change: the color scheme stops being a fixed Catppuccin and follows the system theme.
 
-| De Endgame | En Kavat Edition |
+| From Endgame | In Kavat Edition |
 | --- | --- |
-| Scripts `ww-*` sueltos en `~/.local/bin` (volumen, wifi, bluetooth, energía) | Funciones del shell y herramientas de `kavatd`, que el agente también puede usar |
-| Waybar + rofi + swaync + wlogout | Todo dentro de `kavat-shell` (Noctalia), con un solo estilo |
-| Grabación de pantalla con gpu-screen-recorder y menús de rofi | Grabador integrado en el shell, con indicador en la barra |
-| Menú de energía que cierra Steam antes de apagar | Se conserva la idea: cierre limpio de las apps antes de apagar o reiniciar |
-| Asistentes de primer inicio (git y gh, tema GTK, fondo, apps por defecto) | Un solo asistente de primer arranque; tema, fondo y apps por defecto ya vienen puestos |
-| Catppuccin Mocha con acento azul, fijo | Una paleta más del sistema de temas, con ese azul como acento inicial |
-| Wi-Fi y Bluetooth apagados al iniciar | Se conserva como ajuste por defecto en escritorio |
-| Steam y Vesktop al iniciar; Yazi, zathura, btop, cliphist, hyprpicker | Se conservan, btop como base de `kavat-top`; Steam y Vesktop entran en la categoría de juegos del instalador |
+| Loose `ww-*` scripts in `~/.local/bin` (volume, wifi, bluetooth, power) | Shell functions and `kavatd` tools, which the agent can also use |
+| Waybar + rofi + swaync + wlogout | Everything inside `kavat-shell` (Noctalia), with a single style |
+| Screen recording with gpu-screen-recorder and rofi menus | Recorder built into the shell, with an indicator in the bar |
+| Power menu that closes Steam before shutting down | The idea is kept: a clean close of the apps before shutting down or restarting |
+| First-login wizards (git and gh, GTK theme, wallpaper, default apps) | A single first-run wizard; theme, wallpaper and default apps are already set |
+| Catppuccin Mocha with a blue accent, fixed | One more palette of the theme system, with that blue as the initial accent |
+| Wi-Fi and Bluetooth off at startup | Kept as the default setting on desktop |
+| Steam and Vesktop at startup; Yazi, zathura, btop, cliphist, hyprpicker | They are kept, btop as the base of `kavat-top`; Steam and Vesktop go into the gaming category of the installer |
 | WezTerm | Kitty |
-| NixOS con flake | Arch con paquetes `kavat-*` |
+| NixOS with a flake | Arch with `kavat-*` packages |
 
-## Seguridad y recuperación
+## Security and recovery
 
-El sistema asume que algo se va a romper y que algún paquete será malicioso, y limita el daño en ambos casos.
+The system assumes that something is going to break and that some package will be malicious, and it limits the damage in both cases.
 
-- **Cadena de paquetes**: `[kavat]` firmado con una llave propia guardada fuera de la máquina de compilación; el AUR solo por allowlist fijada a commit.
-- **Sin Secure Boot**: tiene que estar apagado en el firmware. GRUB sin shim no arranca ningún kernel con él, y shim no está en los repos de Arch.
-- **Disco**: LUKS2 opcional, apagado por defecto, con desbloqueo TPM2 y contraseña de recuperación. Sin Secure Boot, el TPM2 protege el disco si lo sacan del equipo, no si se llevan el equipo entero: quien lo arranque llega al menú con el disco ya abierto.
-- **Red**: cortafuegos nftables activo por defecto, todo lo entrante cerrado; DNS cifrado opcional.
-- **Aislamiento**: perfiles de sandbox para navegador y apps Electron; Flatpak disponible para software que no quieres en el sistema base.
-- **Snapshots arrancables**: los últimos 10 estados del sistema aparecen en el menú de arranque.
-- **Actualizaciones con freno**: `kav update` lee las noticias de Arch y se detiene si alguna pide intervención manual.
-- **Modo rescate**: la ISO incluye `kavat-rescue`, que monta la instalación, entra por chroot y restaura un snapshot.
-- **`kav doctor`**: comprueba servicios fallidos, paquetes huérfanos, archivos `.pacnew` sin resolver, espacio en disco y estado de los snapshots.
-- **Permisos del agente**: los cuatro niveles de la sección anterior, aplicados por `kavatd` y polkit, no por el modelo.
-- **Diálogo de contraseña propio**: cuando polkit pide la contraseña, el diálogo lo dibuja el shell, con el tema del sistema, y dice qué programa pide permiso y para qué.
-- **Llavero y llaves**: un llavero que se abre al iniciar sesión guarda las contraseñas del navegador y los tokens de git y de `gh`; un agente guarda las llaves SSH y GPG, que piden su contraseña una vez por sesión.
+- **Package chain**: `[kavat]` signed with a key of our own kept off the build machine; the AUR only through an allowlist pinned to a commit.
+- **No Secure Boot**: it has to be turned off in the firmware. GRUB without shim does not boot any kernel with it on, and shim is not in the Arch repos.
+- **Disk**: optional LUKS2, off by default, with TPM2 unlocking and a recovery password. Without Secure Boot, the TPM2 protects the disk if it is taken out of the computer, not if the whole computer is taken: whoever boots it reaches the menu with the disk already open.
+- **Network**: nftables firewall active by default, everything incoming closed; optional encrypted DNS.
+- **Isolation**: sandbox profiles for the browser and Electron apps; Flatpak available for software you do not want in the base system.
+- **Bootable snapshots**: the last 10 states of the system appear in the boot menu.
+- **Updates with a brake**: `kav update` reads the Arch news and stops if any item asks for manual intervention.
+- **Rescue mode**: the ISO includes `kavat-rescue`, which mounts the installation, enters it by chroot and restores a snapshot.
+- **`kav doctor`**: checks failed services, orphaned packages, unresolved `.pacnew` files, disk space and the state of the snapshots.
+- **Agent permissions**: the four levels of the previous section, enforced by `kavatd` and polkit, not by the model.
+- **Own password dialog**: when polkit asks for the password, the dialog is drawn by the shell, with the system theme, and says which program is asking for permission and what for.
+- **Keyring and keys**: a keyring that opens at login holds the browser's passwords and the git and `gh` tokens; an agent holds the SSH and GPG keys, which ask for their password once per session.
 
-* **Comprobación tras actualizar**: después de `kav update`, una prueba automática comprueba el arranque gráfico, la GPU y los servicios; si algo falla, ofrece volver al snapshot anterior.
-* **Snapshots de `/home`**: cada hora, ligeros; desde Yazi se ven las versiones anteriores de una carpeta y se recupera un archivo borrado. La biblioteca de Steam vive en su propio subvolumen y queda fuera de ellos.
-* **Copias fuera del equipo**: copia cifrada a un disco externo o a otra máquina, programada desde el panel.
-* **Historial de configuración**: cada cambio de configuración, del panel o a mano, queda como un commit en un repo local; el botón History del panel es ese historial, con diff.
-* **Configuración sincronizada**: ese repo se puede enviar a un remoto privado; reinstalar o montar otra máquina es clonarlo.
-* **Privacidad a la vista**: la barra muestra cuándo una app usa el micrófono, la cámara o la pantalla, y el panel guarda quién accedió a qué.
-* **Cortafuegos por aplicación**: la primera vez que una app quiere salir a la red, el sistema pregunta; las reglas se ven y se cambian en el panel. Los juegos que lanza Steam usan la regla de Steam, así que no pregunta por cada juego.
+* **Check after updating**: after `kav update`, an automatic test checks the graphical boot, the GPU and the services; if something fails, it offers to go back to the previous snapshot.
+* **Snapshots of `/home`**: every hour, lightweight; from Yazi you can see the previous versions of a folder and recover a deleted file. The Steam library lives in its own subvolume and stays out of them.
+* **Backups off the computer**: encrypted backup to an external disk or to another machine, scheduled from the panel.
+* **Configuration history**: each configuration change, from the panel or by hand, is kept as a commit in a local repo; the panel's History button is that history, with a diff.
+* **Synced configuration**: that repo can be pushed to a private remote; reinstalling or setting up another machine means cloning it.
+* **Privacy in plain sight**: the bar shows when an app is using the microphone, the camera or the screen, and the panel keeps who accessed what.
+* **Per-application firewall**: the first time an app wants to reach the network, the system asks; the rules are seen and changed in the panel. The games that Steam launches use Steam's rule, so it does not ask for each game.
 
-## Accesibilidad
+## Accessibility
 
-El panel tiene una página Accessibility con los ajustes que hacen el sistema más cómodo de ver.
+The panel has an Accessibility page with the settings that make the system more comfortable to look at.
 
-- **Reducir movimiento**: deja las animaciones al mínimo en todo el sistema y detiene el fondo animado.
-- **Escala de texto**: agranda el texto de todas las apps sin cambiar la resolución.
-- **Contraste alto**: el eje de contraste del sistema de temas, accesible también desde aquí.
+- **Reduce motion**: keeps animations to a minimum across the whole system and stops the animated wallpaper.
+- **Text scale**: enlarges the text of all apps without changing the resolution.
+- **High contrast**: the contrast axis of the theme system, also reachable from here.
 
 ## Roadmap
 
-Son cinco fases en orden, y ninguna empieza hasta que la anterior pasa su puerta. No hay fechas todavía: dependen de cuántas horas por semana le dediquemos.
+There are five phases in order, and none starts until the previous one passes its gate. There are no dates yet: they depend on how many hours a week we put into it.
 
-![Roadmap: cinco fases y cuatro puertas](img/roadmap.png)
+![Roadmap: five phases and four gates](img/roadmap.png)
 
-La fase 1 usa Hyprland y Noctalia tal como vienen; los forks y la identidad entran en la fase 3, cuando ya hay un sistema instalable sobre el que probarlos.
+Phase 1 uses Hyprland and Noctalia as they come; the forks and the identity come in phase 3, when there is already an installable system to test them on.
 
-**Pruebas automáticas.** Cada compilación de la ISO se arranca en una máquina virtual, se instala y ejecuta el diagnóstico del sistema. Las puertas de cada fase son esas pruebas: una fase no se da por cerrada hasta que pasan.
+**Automatic tests.** Each build of the ISO is booted in a virtual machine, installed, and runs the system diagnosis. The gates of each phase are those tests: a phase is not considered closed until they pass.
 
-**Versiones fijadas por fecha.** Cada ISO se construye contra los repos de Arch de un día concreto, así que instalar sin red da siempre el mismo sistema.
+**Versions pinned by date.** Each ISO is built against the Arch repos of one specific day, so installing without a network always gives the same system.
 
-**Presupuestos de rendimiento.** El tiempo de arranque y el de abrir la terminal, el editor y Yazi se miden en cada compilación; si alguno empeora, la compilación avisa.
+**Performance budgets.** The boot time and the time to open the terminal, the editor and Yazi are measured on every build; if any of them gets worse, the build warns.
 
-**Nombre.** «Kavat» viene de un videojuego. Mientras el sistema sea solo para ti no importa; si algún día se publica, hay que revisarlo.
+**Name.** "Kavat" comes from a video game. As long as the system is only for you it does not matter; if it is ever published, it has to be reviewed.
 
-## Decisiones en revisión
+## Decisions under review
 
-El análisis de Omarchy y de otras distros encontró ocho hechos de 2026 que tocan decisiones ya escritas en este documento. Todos tienen ya respuesta; la columna Estado lo resume. El informe completo, con sus fuentes, está en [`reports/Ideas de otras distros Linux.md`](../reports/Ideas%20de%20otras%20distros%20Linux.md).
+The analysis of Omarchy and of other distros found eight facts from 2026 that touch decisions already written in this document. All of them now have an answer; the Status column sums it up. The full report, with its sources, is in [`reports/ideas-from-other-linux-distros.md`](../reports/ideas-from-other-linux-distros.md).
 
-| # | Decisión que toca | Qué se encontró | Estado |
+| # | Decision it touches | What was found | Status |
 | --- | --- | --- | --- |
-| 1 | Shell: fork de Noctalia sobre Quickshell | Noctalia congeló su versión en Quickshell (v4) en abril de 2026, y la v5 es una reescritura en C++ sin Qt, con plugins en Luau | Decidido: fork de Noctalia 5, empaquetado como kavat-shell; desde ese punto es nuestra app. La evaluación mostró que casi todo cabía con plugins, pero el panel de ajustes no; con el fork queda dentro. El detalle está debajo de la tabla |
-| 2 | Configuración de Hyprland en archivos que el panel edita línea a línea | Desde Hyprland 0.55 la configuración es Lua y el formato anterior está obsoleto | Decidido: se usa Lua; el panel escribe una tabla de valores que el Lua del sistema carga |
-| 3 | LUKS2 con desbloqueo por TPM2, arrancando con GRUB | mkinitcpio 42 (septiembre de 2026) cambia las mediciones del TPM y obliga a reinscribirlo. Además, según documenta CachyOS, GRUB solo descifra `/boot` con LUKS1 o PBKDF2 | Resuelto en la fase 2 (D33): abre el disco GRUB, con la llave atada al PCR 7, que mkinitcpio no toca, así que no hay nada que reinscribir. El GRUB de Arch de hoy, el 2.16, ya descifra LUKS2 con Argon2. El kernel de cada snapshot sigue dentro del disco cifrado |
-| 4 | Secure Boot con llaves propias | El nuevo anti-cheat de Epic para Linux (EAC v2, anunciado en octubre de 2026) pediría un arranque firmado con llaves que Epic reconozca. Es fuente secundaria y aún no está desplegado | Cerrado: Secure Boot se quitó en la fase 2 (D34). Un juego que exija ese anti-cheat no funcionará, como ya se había aceptado |
-| 5 | Modo seguro automático tras un arranque fallido | GRUB no cuenta arranques fallidos por sí solo | Resuelto con la comprobación de salud con memoria. Un kernel que no llega a arrancar sigue sin detectarse |
-| 6 | `kav review` marca lo sospechoso por patrones de texto | Dos oleadas de malware en el AUR en 2026 burlaron justo ese tipo de detección. La allowlist fijada a commit sí las habría parado | Cerrado sin cambios: no se añaden señales. La protección es la allowlist fijada a commit y tu lectura del diff; las marcas automáticas son una ayuda, no una garantía |
-| 7 | Snapshots de `/home` cada hora | Omarchy los retiró en su versión 3.6 por uso de disco y por el coste de CPU de las cuotas de Btrfs | Cerrado sin cambios: se quedan como estaban. Si en la fase 3 pesan en disco o CPU, se quitan |
-| 8 | Perfiles de sandbox para el navegador | secureblue advierte de que envolver Chromium en un segundo sandbox puede restar seguridad | Cerrado sin cambios: se queda como estaba. Si en la fase 3 se ve que debilita el sandbox de Chromium, el perfil del navegador se quita |
+| 1 | Shell: fork of Noctalia on Quickshell | Noctalia froze its Quickshell version (v4) in April 2026, and v5 is a rewrite in C++ without Qt, with plugins in Luau | Decided: fork of Noctalia 5, packaged as kavat-shell; from that point on it is our app. The evaluation showed that almost everything fit with plugins, but the settings panel did not; with the fork it stays inside. The detail is below the table |
+| 2 | Hyprland configuration in files that the panel edits line by line | Since Hyprland 0.55 the configuration is Lua and the previous format is obsolete | Decided: Lua is used; the panel writes a table of values that the system's Lua loads |
+| 3 | LUKS2 with TPM2 unlocking, booting with GRUB | mkinitcpio 42 (September 2026) changes the TPM measurements and forces it to be re-enrolled. Also, as CachyOS documents, GRUB only decrypts `/boot` with LUKS1 or PBKDF2 | Solved in phase 2 (D33): GRUB opens the disk, with the key bound to PCR 7, which mkinitcpio does not touch, so there is nothing to re-enroll. Today's Arch GRUB, 2.16, already decrypts LUKS2 with Argon2. The kernel of each snapshot stays inside the encrypted disk |
+| 4 | Secure Boot with our own keys | Epic's new anti-cheat for Linux (EAC v2, announced in October 2026) would require a boot signed with keys that Epic recognizes. It is a secondary source and is not deployed yet | Closed: Secure Boot was removed in phase 2 (D34). A game that requires that anti-cheat will not work, as had already been accepted |
+| 5 | Automatic safe mode after a failed boot | GRUB does not count failed boots on its own | Solved with the health check with memory. A kernel that never gets to boot still goes undetected |
+| 6 | `kav review` flags what is suspicious by text patterns | Two waves of malware in the AUR in 2026 got past exactly that kind of detection. The allowlist pinned to a commit would have stopped them | Closed without changes: no signals are added. The protection is the allowlist pinned to a commit and your reading of the diff; the automatic flags are a help, not a guarantee |
+| 7 | Snapshots of `/home` every hour | Omarchy removed them in its version 3.6 because of disk use and the CPU cost of Btrfs quotas | Closed without changes: they stay as they were. If in phase 3 they weigh on disk or CPU, they are removed |
+| 8 | Sandbox profiles for the browser | secureblue warns that wrapping Chromium in a second sandbox can reduce security | Closed without changes: it stays as it was. If in phase 3 it is seen to weaken Chromium's sandbox, the browser's profile is removed |
 
-Los dos ajustes menores que señalaba el informe tampoco se aplican: la VPN de Incognito sigue siendo OpenVPN o Proton VPN, y el modo Gamer sigue poniendo la CPU en máximo rendimiento.
+The two minor adjustments that the report pointed out are not applied either: the Incognito VPN is still OpenVPN or Proton VPN, and Gamer mode still sets the CPU to maximum performance.
 
-**Evaluación de Noctalia 5.** El 11 de noviembre de 2026 se leyeron el código y la documentación de Noctalia 5.4.1 contra lo que el diseño le pide al shell. No se ejecutó nada: es lo que el proyecto documenta y lo que ya hacen sus plugins. Está en el repositorio oficial de Arch y su licencia es MIT.
+**Evaluation of Noctalia 5.** On 11 November 2026 the code and the documentation of Noctalia 5.4.1 were read against what the design asks of the shell. Nothing was run: it is what the project documents and what its plugins already do. It is in the official Arch repository and its license is MIT.
 
-| Lo que el diseño pide | Resultado |
+| What the design asks for | Result |
 | --- | --- |
-| Widgets en la barra alimentados por nuestros programas: selector de modo, estado, contador de actualizaciones | Con plugin propio. Los de VPN y sensores de GPU ya vienen |
-| Panel del agente: chat que se va escribiendo, botones de skills, abrirlo con una tecla | Con plugin propio. Ya hay plugins de la comunidad con chats así |
-| Selector de temas | Con plugin propio |
-| Lanzador con resultados nuestros: archivos, ajustes, skills, paquetes | Con plugin propio. Las ventanas abiertas ya vienen |
-| Notificaciones con acciones, historial y no molestar | Ya viene, y se controla desde fuera |
-| Colores, modo claro u oscuro, radio, fuentes y opacidad puestos desde fuera | Sí, con un archivo de paleta y comandos. Sus plantillas para otras apps se apagan, así que nuestros tokens quedan como única fuente |
-| Fondo de vídeo con mpvpaper | Hay un plugin oficial que hace justo eso, y su fondo de imagen se apaga por monitor |
-| hyprlock e hypridle en lugar de su bloqueo | Sí; su bloqueo se desactiva |
-| Hyprland con configuración en Lua y barra distinta por monitor | Sí |
-| Indicador de micrófono, cámara y captura; historial del portapapeles | Ya vienen |
-| OCR, cuentagotas y chuleta de atajos | Solo existen como plugins de la comunidad; se hacen propios |
-| Panel de ajustes de 24 páginas | No cabe en su ventana de ajustes: ahí un plugin solo tiene una página sencilla. Como panel propio queda corto: tamaño fijo, 22 tipos de control, sin tablas ni pestañas, y no puede capturar atajos con Super |
+| Widgets in the bar fed by our programs: mode selector, status, update counter | With our own plugin. The VPN and GPU sensor ones are already included |
+| Agent panel: a chat that is written as it goes, skill buttons, opening it with a key | With our own plugin. There are already community plugins with chats like that |
+| Theme picker | With our own plugin |
+| Launcher with our own results: files, settings, skills, packages | With our own plugin. Open windows are already included |
+| Notifications with actions, history and do not disturb | Already included, and it is controlled from outside |
+| Colors, light or dark mode, radius, fonts and opacity set from outside | Yes, with a palette file and commands. Its templates for other apps are turned off, so our tokens remain the only source |
+| Video wallpaper with mpvpaper | There is an official plugin that does exactly that, and its image wallpaper is turned off per monitor |
+| hyprlock and hypridle instead of its lock | Yes; its lock is disabled |
+| Hyprland with configuration in Lua and a different bar per monitor | Yes |
+| Microphone, camera and capture indicator; clipboard history | Already included |
+| OCR, color picker and shortcut cheat sheet | They only exist as community plugins; we make our own |
+| Settings panel of 24 pages | It does not fit in its settings window: there a plugin only has one simple page. As a panel of its own it falls short: fixed size, 22 types of control, no tables or tabs, and it cannot capture shortcuts with Super |
 
-Lo que se desprende:
+What follows from this:
 
-- **Decidido: fork.** Para que el panel de ajustes quede dentro del shell, con páginas nativas, se hace fork de Noctalia 5. Desde ese punto `kavat-shell` es nuestra app, con nuestros cambios.
-- **Lo demás de la tabla sigue valiendo.** Lo que ya viene se aprovecha tal cual. Lo que pedía un plugin propio se puede hacer como plugin o directamente en el código, según convenga en cada caso.
-- **El coste.** Son unas 360 000 líneas de C++, y upstream saca versión casi cada semana. No se sigue ese ritmo: se parte de la 5.4.1 y se trae a mano lo que interese.
-- **Un solo dueño de los ajustes.** La ventana de ajustes pasa a ser la nuestra, así que ya no hay dos sitios que escriban la configuración.
+- **Decided: fork.** So that the settings panel stays inside the shell, with native pages, Noctalia 5 is forked. From that point on `kavat-shell` is our app, with our changes.
+- **The rest of the table still holds.** What is already included is used as it is. What called for our own plugin can be done as a plugin or directly in the code, whichever suits each case.
+- **The cost.** It is about 360,000 lines of C++, and upstream releases a version almost every week. That pace is not followed: we start from 5.4.1 and bring over by hand whatever is of interest.
+- **A single owner of the settings.** The settings window becomes ours, so there are no longer two places that write the configuration.
 
-## Ideas de otras distros
+## Ideas from other distros
 
-De las 20 ideas que el informe recomendaba, se aprobaron las cuatro de `kav` y se descartó el resto para no complicar el sistema. El catálogo completo sigue en el informe por si alguna vuelve a interesar.
+Of the 20 ideas that the report recommended, the four for `kav` were approved and the rest were discarded so as not to complicate the system. The full catalog stays in the report in case any of them becomes interesting again.
 
-| Código | Idea aprobada | De dónde viene |
+| Code | Approved idea | Where it comes from |
 | --- | --- | --- |
-| A1 | Migraciones que corren una vez tras cada actualización | Omarchy |
-| A2 | Intervenciones manuales de Arch como pasos guiados | Garuda, EndeavourOS |
-| A8 | Dos guardas durante la actualización | Omarchy |
-| R10 | Comprobación de salud que recuerda la última instantánea buena | openSUSE |
+| A1 | Migrations that run once after each update | Omarchy |
+| A2 | Arch manual interventions as guided steps | Garuda, EndeavourOS |
+| A8 | Two guards during the update | Omarchy |
+| R10 | Health check that remembers the last good snapshot | openSUSE |
 
-Están descritas en «Gestor de paquetes».
+They are described in "Package manager".
 
-Lo que el informe recomienda no copiar: los repos binarios de CachyOS, porque su política lo prohíbe; el modelo de imagen inmutable; meter el bloqueo de pantalla dentro del shell; los demonios globales de rendimiento; y el endurecimiento que rompe Steam.
+What the report recommends not copying: the CachyOS binary repos, because its policy forbids it; the immutable image model; putting the screen lock inside the shell; global performance daemons; and the hardening that breaks Steam.
 
-## Decisiones
+## Decisions
 
-Las decisiones de esta tabla están tomadas; las que el análisis de otras distros dejó en revisión están en «Decisiones en revisión», con su estado. Lo que todavía espera tu decisión está en un documento aparte, [«Decisiones pendientes»](PENDING.md); cuando se aprueba, pasa a este.
+The decisions in this table are made; those that the analysis of other distros left under review are in "Decisions under review", with their status. What is still waiting for your decision is in a separate document, ["Pending decisions"](PENDING.md); when it is approved, it moves to this one.
 
-| Decidido | Decisión |
+| Decided | Decision |
 | --- | --- |
-| Compilación de la ISO | En tu PC de escritorio, que lleva CachyOS; la ISO y los paquetes se construyen dentro de chroots limpios de Arch, solo contra los repos de Arch |
-| Máquina objetivo | Escritorio con AMD Radeon RX 6800 de 16 GB de VRAM |
-| Límite del agente | El agente ocupa como máximo 4 GB de VRAM; quedan 12 GB para juegos aun con él cargado. La voz corre en la CPU y usa RAM aparte |
-| Alcance | Solo para ti |
-| Idioma | Inglés por defecto; español preinstalado como segunda opción |
-| Menú de arranque | GRUB con menú propio y tema del sistema, configurable desde Noctalia |
-| Pantalla de carga | Plymouth con tema propio y cuatro estilos, configurable desde Noctalia |
-| Modo seguro | Entrada del menú de arranque que ignora tu configuración y usa la de fábrica; se selecciona sola tras un arranque fallido |
-| Login | LightDM + web-greeter con tema propio |
-| Hyprland | Sin fork, con configuración propia en Lua; el panel solo escribe datos. Fork desde el día 1 solo si la versión actual impide algo |
-| Paleta de comandos | Una sola para todo el sistema, con la gramática de la consola del navegador y de Neovim |
-| Coherencia | Proyectos, un comando `kavat` para todo, hoja de atajos según contexto y captura con texto |
-| Lenguaje de `kav` y `kavatd` | Rust |
-| Gestor de paquetes | `kav` con comandos y con TUI completa sobre el mismo núcleo; migraciones, intervenciones guiadas, guardas de transacción y comprobación de salud con memoria |
-| Dependencias | Lo que un ajuste, una skill o un plugin necesita lo instala y lo protege `kav` |
-| Software diario | Kitty, zsh, Neovim, Yazi y un fork de Chromium |
-| Software en el instalador | Se elige programa a programa en el paso Software y lo instala `kav`; necesita red, y sin ella el paso se salta. La categoría Development cubre lanequarters, con su app móvil en Android y sin la de iOS |
-| Prompt de zsh | starship con preset mínimo, sin módulos que lancen procesos |
-| Editor | Neovim en el núcleo, híbrido: modos de Vim con navegación y atajos de VS Code; panel lateral de Claude y otros paneles, abiertos como divisiones de Kitty |
-| Marketplace de plugins | Partiendo de store.nvim, con catálogo verificado y presets encima |
-| Gestor de archivos | Yazi integrado: tema, arrastrar y soltar, copiar y mover con pop-up de progreso, y explorador de archivos del sistema y del navegador |
-| Fork de Chromium | Modos, tema automático, bloqueador, agente integrado, consola de comandos, Yazi como explorador, recortes y álbumes en las notas, y vídeo protegido |
-| Perfiles del navegador | Uno por modo, por ahora |
-| Vídeo protegido | `kavat-browser` reproduce contenido con DRM mediante Widevine, que viene de serie en un paquete propio compilado en tu PC; ese paquete y la ISO no se publican. La calidad queda en lo que los servicios dan a Linux |
-| Modos del sistema | Coder, Gamer e Incognito, seleccionables desde Noctalia |
-| Ventanas al entrar en Incognito | Las normales se ocultan y vuelven al salir |
-| Juego y hardware | Perfil por juego, página de GPU, varias pantallas colocadas desde el panel, luces que siguen al tema y a la voz de Kavat, y supresión de ruido del micrófono |
-| Ajustes | Todo el núcleo se configura desde un panel dentro del shell, con páginas nativas |
-| Shell | Fork de Noctalia 5, empaquetado como kavat-shell: es nuestra app desde ahora, con nuestros cambios y con el panel de ajustes dentro |
-| Notas | nb como componente del sistema, con fork propio (kavat-notes): recordatorios, fechas de tareas, enlaces a carpetas que se abren en Yazi y el agente tomando notas; además, resumen de la mañana, recordatorios por situación, plantillas y búsqueda por significado. En Neovim se ven con formato y color |
-| Información del sistema | Fork de fastfetch (`kavat-fetch`) con el logo de Kavat, como imagen en Kitty, las líneas que elijas, una línea de salud y los colores del tema |
-| Monitor del sistema | Fork de btop (`kavat-top`) con el tema del sistema, procesos agrupados, servicios con su log, historial de 24 horas, aviso de procesos desbocados y el agente explicando cada cosa |
-| Red y Bluetooth | Página propia en el panel |
-| Llavero y llaves | Llavero abierto al iniciar sesión y agente para las llaves SSH y GPG |
-| Apps por defecto | imv, mpv y zathura; los comprimidos, en Yazi |
-| Capa de juego | MangoHud y gamescope en la categoría de juegos del instalador; sin tiendas fuera de Steam |
-| Discos extraíbles y firmware | Los USB se montan solos con aviso; el firmware se actualiza dentro de `kav update` |
-| Calculadora | Cuentas y conversiones de unidades en la paleta |
-| Herramientas de base | zoxide, lsd, ripgrep, fd, fzf, bat y jq; 7zip para los comprimidos de Yazi y ntfs-3g para discos NTFS |
-| Teclado y auriculares | El Keychron se configura con VIA web desde el navegador, con solo su regla de udev; headsetcontrol para la batería de los auriculares |
-| Oficina | OnlyOffice, como casilla sin marcar del instalador |
-| Impresión y escáner | Opcional, en el instalador |
-| Diálogo de contraseña | Lo dibuja el shell, con el tema, diciendo quién pide permiso y para qué |
-| Modelo del agente | Qwen3.5 4B como punto de partida, en la GPU y configurable; queda cargado en Coder y se confirma con una prueba propia |
-| Cómo acierta el agente | Ve de cinco a ocho herramientas por petición, con nombres en inglés, y cada skill es una sola llamada |
-| Idioma del agente | Se le habla en inglés; el sistema sigue en inglés o español |
-| Configuración | El archivo de configuración es la verdad y la calle es de doble sentido: el panel lo lee y lo edita, y un botón lo abre en Neovim desde cualquier parte |
-| Validación | Todo cambio de configuración se comprueba antes de aplicarse y vuelve atrás solo si falla |
-| Robustez | Comprobación tras actualizar, snapshots de `/home` sin la biblioteca de Steam, copias externas, e historial y sincronización de la configuración |
-| Privacidad | Indicadores de micrófono, cámara y pantalla, y cortafuegos por aplicación, con los juegos bajo la regla de Steam |
-| Accesibilidad | Reducir movimiento y escala de texto |
-| Skills del agente | Acciones predefinidas, pulsables desde su panel, que no pasan por el modelo |
-| Seguridad del agente | Lo que el agente lee nunca es una orden; solo cuentan tus mensajes |
-| Agente, además | Pulsar para hablar, isla de voz con subtítulos, ayuda en la terminal y avisos discretos |
-| Iconos y cursor | Generados desde el tema: iconos en estilo Colour de serie, con Tinted y Line como opción, y cursor con el acento |
-| Fondos de pantalla | Imagen por defecto o vídeo con mpvpaper, elegibles desde Noctalia |
-| Pruebas | Cada ISO se arranca e instala en una máquina virtual; las puertas del roadmap son esas pruebas |
-| Compilación reproducible | ISO con versiones fijadas por fecha y presupuestos de rendimiento medidos |
-| Atajos de Hyprland | Los de Willwitcher-OS Endgame |
-| Referencia a omarchy | El selector de temas global y los mecanismos que apruebes del análisis de otras distros; sus atajos y sus valores por defecto, no |
+| Building the ISO | On your desktop PC, which runs CachyOS; the ISO and the packages are built inside clean Arch chroots, only against the Arch repos |
+| Target machine | Desktop with an AMD Radeon RX 6800 with 16 GB of VRAM |
+| Agent limit | The agent takes at most 4 GB of VRAM; 12 GB remain for games even with it loaded. The voice runs on the CPU and uses RAM separately |
+| Scope | Only for you |
+| Language | English by default; Spanish preinstalled as a second option |
+| Boot menu | GRUB with its own menu and the system theme, configurable from Noctalia |
+| Loading screen | Plymouth with its own theme and four styles, configurable from Noctalia |
+| Safe mode | Boot menu entry that ignores your configuration and uses the factory one; it selects itself after a failed boot |
+| Login | LightDM + web-greeter with its own theme |
+| Hyprland | No fork, with its own configuration in Lua; the panel only writes data. Fork from day 1 only if the current version prevents something |
+| Command palette | A single one for the whole system, with the grammar of the browser's console and of Neovim |
+| Coherence | Projects, one `kavat` command for everything, shortcut sheet by context and screenshot with text |
+| Language of `kav` and `kavatd` | Rust |
+| Package manager | `kav` with commands and with a full TUI on the same core; migrations, guided interventions, transaction guards and health check with memory |
+| Dependencies | What a setting, a skill or a plugin needs is installed and protected by `kav` |
+| Daily software | Kitty, zsh, Neovim, Yazi and a fork of Chromium |
+| Software in the installer | It is chosen program by program in the Software step and installed by `kav`; it needs a network, and without one the step is skipped. The Development category covers lanequarters, with its mobile app on Android and without the iOS one |
+| zsh prompt | starship with a minimal preset, without modules that launch processes |
+| Editor | Neovim at the core, hybrid: Vim modes with VS Code navigation and shortcuts; Claude side panel and other panels, opened as Kitty splits |
+| Plugin marketplace | Starting from store.nvim, with a verified catalog and presets on top |
+| File manager | Integrated Yazi: theme, drag and drop, copy and move with a progress pop-up, and file explorer for the system and for the browser |
+| Chromium fork | Modes, automatic theme, blocker, integrated agent, command console, Yazi as explorer, clippings and albums in the notes, and protected video |
+| Browser profiles | One per mode, for now |
+| Protected video | `kavat-browser` plays DRM content through Widevine, which comes by default in a package of its own built on your PC; that package and the ISO are not published. The quality stays at what the services give to Linux |
+| System modes | Coder, Gamer and Incognito, selectable from Noctalia |
+| Windows on entering Incognito | The normal ones are hidden and come back on leaving |
+| Gaming and hardware | Per-game profile, GPU page, several screens arranged from the panel, lights that follow the theme and Kavat's voice, and microphone noise suppression |
+| Settings | The whole core is configured from a panel inside the shell, with native pages |
+| Shell | Fork of Noctalia 5, packaged as kavat-shell: it is our app from now on, with our changes and with the settings panel inside |
+| Notes | nb as a system component, with its own fork (kavat-notes): reminders, task dates, links to folders that open in Yazi and the agent taking notes; also, a morning summary, reminders by situation, templates and search by meaning. In Neovim they are shown with formatting and color |
+| System information | Fork of fastfetch (`kavat-fetch`) with the Kavat logo, as an image in Kitty, the lines you choose, a health line and the theme's colors |
+| System monitor | Fork of btop (`kavat-top`) with the system theme, grouped processes, services with their log, 24-hour history, runaway process warning and the agent explaining each thing |
+| Network and Bluetooth | Own page in the panel |
+| Keyring and keys | Keyring opened at login and an agent for the SSH and GPG keys |
+| Default apps | imv, mpv and zathura; archives, in Yazi |
+| Gaming layer | MangoHud and gamescope in the gaming category of the installer; no stores outside Steam |
+| Removable disks and firmware | USB drives mount on their own with a notice; firmware is updated inside `kav update` |
+| Calculator | Calculations and unit conversions in the palette |
+| Base tools | zoxide, lsd, ripgrep, fd, fzf, bat and jq; 7zip for Yazi's archives and ntfs-3g for NTFS disks |
+| Keyboard and headset | The Keychron is configured with web VIA from the browser, with only its udev rule; headsetcontrol for the headset's battery |
+| Office | OnlyOffice, as an unchecked box in the installer |
+| Printing and scanning | Optional, in the installer |
+| Password dialog | Drawn by the shell, with the theme, saying who is asking for permission and what for |
+| Agent model | Qwen3.5 4B as the starting point, on the GPU and configurable; it stays loaded in Coder and is confirmed with a test of our own |
+| How the agent gets things right | It sees five to eight tools per request, with names in English, and each skill is a single call |
+| Agent language | You speak to it in English; the system stays in English or Spanish |
+| Configuration | The configuration file is the truth and the street runs both ways: the panel reads it and edits it, and a button opens it in Neovim from anywhere |
+| Validation | Every configuration change is checked before it is applied and rolls back on its own if it fails |
+| Robustness | Check after updating, snapshots of `/home` without the Steam library, external backups, and history and syncing of the configuration |
+| Privacy | Microphone, camera and screen indicators, and per-application firewall, with games under Steam's rule |
+| Accessibility | Reduce motion and text scale |
+| Agent skills | Predefined actions, pressable from its panel, that do not go through the model |
+| Agent security | What the agent reads is never a command; only your messages count |
+| Agent, also | Push to talk, voice island with subtitles, help in the terminal and discreet alerts |
+| Icons and cursor | Generated from the theme: icons in the Colour style by default, with Tinted and Line as options, and a cursor with the accent |
+| Wallpapers | Image by default or video with mpvpaper, selectable from Noctalia |
+| Tests | Each ISO is booted and installed in a virtual machine; the gates of the roadmap are those tests |
+| Reproducible build | ISO with versions pinned by date and measured performance budgets |
+| Hyprland shortcuts | Those of Willwitcher-OS Endgame |
+| Reference to omarchy | The global theme picker and the mechanisms you approve from the analysis of other distros; its shortcuts and its defaults, no |
 
-Estos supuestos del diseño no son decisiones: se confirman al implementar, y si alguno falla se revisa la parte que depende de él.
+These assumptions of the design are not decisions: they are confirmed when implementing, and if any of them fails, the part that depends on it is reviewed.
 
-| Supuesto por comprobar | Fase |
+| Assumption to verify | Phase |
 | --- | --- |
-| GRUB arranca cada snapshot con su kernel, con y sin cifrado de disco | 2 |
-| Con el disco cifrado, GRUB no pide la contraseña dos veces | 2 |
-| El desbloqueo por TPM2 sobrevive a una actualización de mkinitcpio | 2 |
-| El modo seguro arranca el escritorio sin leer la configuración del usuario | 2 |
-| El modo seguro automático tras un arranque fallido tiene un mecanismo real con GRUB sobre Btrfs | 2 |
-| GRUB, Plymouth y el login enlazan sin parpadeo en la RX 6800 | 2 |
-| La prueba tras actualizar detecta un arranque gráfico roto y ofrece volver atrás | 2 |
-| Regenerar la pantalla de carga en segundo plano no bloquea ni rompe el arranque | 3 |
-| Kitty y Neovim distinguen los atajos con `Ctrl+Shift` y `Ctrl+Tab`, y el panel de Claude sigue conectado al editor cuando lo abre Kitty en una división | 3 |
-| Hyprland y Kitty aceptan en vivo todos los cambios del panel de ajustes; en Hyprland, cargando la tabla de valores desde su configuración en Lua | 3 |
-| El panel puede leer la configuración de cada app y editar una línea suya sin romper el formato ni los comentarios | 3 |
-| La configuración de cada app se puede validar antes de cargarla | 3 |
-| zsh con starship abre dentro del presupuesto de tiempo | 3 |
-| store.nvim admite añadirle el catálogo verificado sin reescribirlo | 3 |
-| Noctalia y mpvpaper conviven: uno pinta la imagen, el otro el vídeo, y la pausa automática funciona | 3 |
-| El portal con Yazi sirve de selector de archivos para Chromium y para las apps GTK y Qt | 3 |
-| El navegador abre Yazi al pulsar una descarga, con el archivo seleccionado | 3 |
-| Yazi acepta archivos soltados sobre su ventana, recarga el tema en vivo y muestra el progreso real de una copia en un pop-up, por plugin o por fork | 3 |
-| Un proyecto restaura ventanas, terminales y editor tal como estaban | 3 |
-| OpenRGB controla las luces de tu teclado y de tu torre | 3 |
-| Los iconos de Papirus se recolorean bien de forma automática, también los de app en el estilo Tinted | 3 |
-| El cursor cambia en vivo con el tema, también en las apps ya abiertas | 3 |
-| La versión web de VIA configura el teclado Keychron desde `kavat-browser` con solo la regla de udev | 3 |
-| Las curvas de ventilador y el límite de potencia de la RX 6800 se pueden fijar desde el panel | 3 |
-| El cortafuegos por aplicación no estorba a Steam ni a los juegos | 3 |
-| Los snapshots horarios de `/home` no degradan el disco ni la CPU | 3 |
-| El perfil de sandbox del navegador no debilita el sandbox propio de Chromium | 3 |
-| Los servicios de vídeo aceptan `kavat-browser` con Widevine, aunque no sea un navegador firmado por Google; se prueba servicio por servicio | 3 |
-| Ollama acelera bien en la RX 6800, el modelo elegido cabe cargado en 4 GB de VRAM y la voz va sobrada en la CPU | 4 |
-| Modelo y voz caben juntos en 4 GB con calidad aceptable | 4 |
-| El agente distingue de forma fiable lo que lee de lo que tú le pides | 4 |
+| GRUB boots each snapshot with its kernel, with and without disk encryption | 2 |
+| With the disk encrypted, GRUB does not ask for the password twice | 2 |
+| TPM2 unlocking survives a mkinitcpio update | 2 |
+| Safe mode starts the desktop without reading the user's configuration | 2 |
+| Automatic safe mode after a failed boot has a real mechanism with GRUB on Btrfs | 2 |
+| GRUB, Plymouth and the login link up without flicker on the RX 6800 | 2 |
+| The test after updating detects a broken graphical boot and offers to roll back | 2 |
+| Regenerating the loading screen in the background does not block or break the boot | 3 |
+| Kitty and Neovim tell apart the shortcuts with `Ctrl+Shift` and `Ctrl+Tab`, and the Claude panel stays connected to the editor when Kitty opens it in a split | 3 |
+| Hyprland and Kitty accept live all the changes from the settings panel; in Hyprland, by loading the table of values from its Lua configuration | 3 |
+| The panel can read each app's configuration and edit one of its lines without breaking the format or the comments | 3 |
+| Each app's configuration can be validated before it is loaded | 3 |
+| zsh with starship opens within the time budget | 3 |
+| store.nvim allows the verified catalog to be added to it without rewriting it | 3 |
+| Noctalia and mpvpaper coexist: one paints the image, the other the video, and the automatic pause works | 3 |
+| The portal with Yazi works as the file picker for Chromium and for GTK and Qt apps | 3 |
+| The browser opens Yazi when a download is clicked, with the file selected | 3 |
+| Yazi accepts files dropped on its window, reloads the theme live and shows the real progress of a copy in a pop-up, by plugin or by fork | 3 |
+| A project restores windows, terminals and editor just as they were | 3 |
+| OpenRGB controls the lights of your keyboard and of your tower | 3 |
+| The Papirus icons recolor well automatically, including the app ones in the Tinted style | 3 |
+| The cursor changes live with the theme, including in apps already open | 3 |
+| The web version of VIA configures the Keychron keyboard from `kavat-browser` with only the udev rule | 3 |
+| The fan curves and the power limit of the RX 6800 can be set from the panel | 3 |
+| The per-application firewall does not get in the way of Steam or of games | 3 |
+| The hourly snapshots of `/home` do not degrade the disk or the CPU | 3 |
+| The browser's sandbox profile does not weaken Chromium's own sandbox | 3 |
+| The video services accept `kavat-browser` with Widevine, even though it is not a browser signed by Google; it is tested service by service | 3 |
+| Ollama accelerates well on the RX 6800, the chosen model fits loaded in 4 GB of VRAM and the voice has plenty of room on the CPU | 4 |
+| Model and voice fit together in 4 GB with acceptable quality | 4 |
+| The agent reliably tells apart what it reads from what you ask of it | 4 |
 
-En la RX 6800, si la aceleración va por ROCm o por Vulkan sale de esa misma prueba.
+On the RX 6800, whether acceleration goes through ROCm or through Vulkan comes out of that same test.
 
-Cómo van los de la fase 2, a 13 de noviembre de 2026:
+How the phase 2 ones stand, as of 13 November 2026:
 
-- **Comprobados en máquina virtual**: el modo seguro arranca el escritorio sin leer la configuración del usuario; el modo seguro automático tras un arranque fallido funciona con GRUB sobre Btrfs, porque el bloque de entorno de GRUB vive en la partición EFI; GRUB arranca cada snapshot con su kernel, con y sin cifrado; y con el disco cifrado no se pide ninguna contraseña.
-- **Resuelto por diseño**: el desbloqueo por TPM2 no depende de mkinitcpio, porque la llave está atada al PCR 7, que mide el firmware.
-- **Comprobado en hardware real** (13 de noviembre de 2026, en el PC de escritorio, junto a CachyOS y Windows): la instalación compartiendo la partición EFI de CachyOS, el arranque, arrancar un snapshot con `kavat-boot-once` y volver a él con `kavat-rollback`.
-- **Pasa a la fase 3**: que GRUB, Plymouth y el login enlacen sin parpadeo en la RX 6800. Ya tienen su tema; en máquina virtual el menú y la pantalla de carga enlazan sin corte, y falta mirarlo en el PC.
-- **Pasa a la fase 3**: la prueba tras actualizar. Detectar el arranque roto ya funciona, porque es el mismo mecanismo del modo seguro; ofrecer volver atrás le corresponde a `kav`.
+- **Verified in a virtual machine**: safe mode starts the desktop without reading the user's configuration; automatic safe mode after a failed boot works with GRUB on Btrfs, because GRUB's environment block lives on the EFI partition; GRUB boots each snapshot with its kernel, with and without encryption; and with the disk encrypted no password is asked for.
+- **Solved by design**: TPM2 unlocking does not depend on mkinitcpio, because the key is bound to PCR 7, which measures the firmware.
+- **Verified on real hardware** (13 November 2026, on the desktop PC, alongside CachyOS and Windows): the installation sharing CachyOS's EFI partition, the boot, booting a snapshot with `kavat-boot-once` and going back to it with `kavat-rollback`.
+- **Moves to phase 3**: that GRUB, Plymouth and the login link up without flicker on the RX 6800. They already have their theme; in a virtual machine the menu and the loading screen link up without a break, and it still has to be looked at on the PC.
+- **Moves to phase 3**: the test after updating. Detecting the broken boot already works, because it is the same mechanism as safe mode; offering to roll back is up to `kav`.
 
-De Omarchy se tomó la idea del selector de temas que cambia todo el sistema. Sus atajos y sus valores por defecto no se siguen; sus mecanismos solo entran uno a uno y con tu aprobación, y los aprobados están en «Ideas de otras distros».
+From Omarchy we took the idea of the theme picker that changes the whole system. Its shortcuts and its defaults are not followed; its mechanisms only come in one by one and with your approval, and the approved ones are in "Ideas from other distros".

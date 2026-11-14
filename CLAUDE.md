@@ -1,72 +1,71 @@
 # Willwitcher-OS Kavat Edition
 
-Distribución personal basada en Arch Linux. Las fases 1 y 2 están cerradas: hay un perfil de archiso en `iso/`, paquetes `kavat-*` en `packages/` y un instalador en `installer/`, y el sistema instalado arranca, hace snapshots y vuelve a ellos, también en el PC de escritorio. Está en **fase 3, la identidad**: ya existen el sistema de temas, `kavat-theme`, el menú de arranque, la pantalla de carga y el login propios y `kav` en línea de órdenes; Hyprland va sin modificar, el shell es `kavat-shell`, Noctalia con un parche que le quita el ping, y la terminal abre zsh con el prompt del sistema; lo demás del diseño no está implementado. Se compila en el PC de escritorio. Ese PC lleva CachyOS, instalado solo para este proyecto: la ISO y los paquetes se construyen dentro de chroots limpios de Arch, con un `pacman.conf` propio que solo tiene los repos de Arch y `[kavat]`. Nunca se usa el `pacman` ni el `makepkg` del anfitrión para lo que acaba en el sistema: el `pacman` de CachyOS deja marcas propias en lo que instala.
+A personal distribution based on Arch Linux. Phases 1 and 2 are closed: there is an archiso profile in `iso/`, `kavat-*` packages in `packages/` and an installer in `installer/`, and the installed system boots, takes snapshots and goes back to them, on the desktop PC too. It is in **phase 3, the identity**: the theme system, `kavat-theme`, the system's own boot menu, loading screen and login screen, and `kav` on the command line already exist; Hyprland is unmodified, the shell is `kavat-shell`, Noctalia with a patch that takes out its ping, and the terminal opens zsh with the system's prompt; the rest of the design is not implemented. It is built on the desktop PC. That PC runs CachyOS, installed only for this project: the ISO and the packages are built inside clean Arch chroots, with a `pacman.conf` of their own that only has Arch's repositories and `[kavat]`. The host's `pacman` and `makepkg` are never used for what ends up in the system: CachyOS's `pacman` leaves marks of its own in what it installs.
 
-## Idiomas
+## Languages
 
-- Con el usuario se habla en español.
-- Todo lo que se escribe en el repo y en el sistema va en inglés: código, comentarios, mensajes, textos de la interfaz, commits y documentos. El sistema no lleva textos propios en otro idioma.
-- `docs/DESIGN.md`, `docs/PENDING.md`, `reports/` y este archivo se escribieron en español antes de esa regla, del 13 de noviembre de 2026, y están pendientes de pasar a inglés. Hasta entonces, lo que se les añada sigue su idioma, para no dejarlos a medias.
-- Teclados: `us` por defecto y `es`. Ninguno más.
+- The user is spoken to in Spanish.
+- Everything written in the repository and in the system is in English: code, comments, messages, interface texts, commits and documents. The system carries no texts of its own in another language. The user ruled this on 13 November 2026.
+- The installer offers English by default and Spanish as the second option: the user does install it.
+- Keyboards: `us` by default and `es`. No others.
 
-## Dónde vive el diseño
+## Where the design lives
 
-Todo el diseño vive en el repo, para que llegue igual a cualquier equipo. Son tres sitios, y los dos primeros deben decir lo mismo:
+The whole design lives in the repository, so that it reaches any machine the same. It is three places, and the first two must say the same:
 
-1. **`docs/DESIGN.md`.** El documento de diseño. Es la fuente y se edita directamente; al editarlo se pone al día la fecha de su cabecera.
-2. **`docs/mockup/index.html`.** El mockup interactivo de la interfaz, en un solo HTML. Cuando el usuario pide un «diseño propuesto» quiere verlo dibujado ahí, no descrito en texto.
-3. **`docs/PENDING.md`.** El documento «Decisiones pendientes»: lo que espera una decisión del usuario.
+1. **`docs/DESIGN.md`.** The design document. It is the source and is edited directly; editing it brings the date in its header up to date.
+2. **`docs/mockup/index.html`.** The interactive mockup of the interface, in a single HTML file. When the user asks for a "proposed design" they want to see it drawn there, not described in text.
+3. **`docs/PENDING.md`.** The "Pending decisions" document: what waits for a decision of the user's.
 
-El usuario llama «artifact» tanto a los dos documentos como al mockup. Hasta el 11 de noviembre de 2026 los dos documentos vivían en claude.ai y `docs/DESIGN.md` era una exportación; esas copias de claude.ai ya no se usan ni se actualizan.
+The user calls both documents and the mockup "artifact". Until 11 November 2026 the two documents lived in claude.ai and `docs/DESIGN.md` was an export; those copies in claude.ai are no longer used or updated.
 
-Los dos diagramas del documento de diseño son imágenes en `docs/img/`. El del roadmap sale de `docs/img/roadmap.html`: se edita ese archivo y se captura con Chromium sin ventana, a 672×466 y escala 2. El de la arquitectura no tiene fuente en el repo: si cambia, se redibuja.
+The two diagrams of the design document are images in `docs/img/`, each made from the HTML file of the same name beside it: that file is edited and captured with headless Chromium at scale 2, with `--system-font-family=Inter`. The roadmap is 672×466 and the architecture 672×412.
 
-## Cómo se cambia el diseño
+## How the design changes
 
-1. Lo que el usuario tiene que decidir va a `docs/PENDING.md`, no al documento de diseño. Cada punto lleva un número (D1 a D34 ya se usaron; se sigue en D35), una recomendación y qué pasa si dice que no.
-2. Antes de trabajar, se mira ese archivo: el usuario contesta por chat o escribiendo en él.
-3. Lo aprobado pasa a `docs/DESIGN.md`, al mockup y, si toca, al README, y sale de pendientes. El documento y el mockup cambian en el mismo commit: no se deja uno para después.
-4. Lo rechazado se borra de pendientes y no se vuelve a preguntar. Si el usuario aprueba una parte y dice «lo otro no», ese no cubre todo lo demás que estuviera sobre la mesa.
-5. Tras tocar el mockup se rehacen las capturas afectadas con `tools/screenshots.sh <nombre>`.
-6. Se hace commit en `main` después de cada cambio de diseño, sin preguntar. El push no va incluido: se hace cuando el usuario lo pide.
+1. What the user has to decide goes to `docs/PENDING.md`, not to the design document. Each point has a number (D1 to D34 are used; the next is D35), a recommendation and what happens if the answer is no.
+2. Before working, that file is read: the user answers in the chat or by writing in it.
+3. What is approved goes to `docs/DESIGN.md`, to the mockup and, when it applies, to the README, and leaves the pending list. The document and the mockup change in the same commit: neither is left for later.
+4. What is rejected is deleted from the pending list and is not asked again. If the user approves one part and says "not the rest", that no covers everything else that was on the table.
+5. After touching the mockup, the screenshots it affects are retaken with `tools/screenshots.sh <name>`.
+6. A commit goes on `main` after each change to the design, without asking. Pushing is not included: it is done when the user asks.
 
-## Criterios del usuario
+## The user's criteria
 
-- No complicar: no añadir piezas ni preguntas que no pidió.
-- De Omarchy no se toman ni los atajos ni los valores por defecto. Sus mecanismos solo entran uno a uno y con aprobación.
-- Los atajos de Hyprland son los de su sistema anterior, Willwitcher-OS Endgame. Lo nuevo solo ocupa teclas que estaban libres.
-- Al agente local se le habla en inglés. Para programar, el usuario usa Claude y no el agente local.
+- Do not complicate: add no pieces and no questions that were not asked for.
+- The size of the ISO or of the installed system is not a cost to weigh: it is the user's own system.
+- Nothing is taken from Omarchy's shortcuts or defaults. Its mechanisms only come in one by one and with approval.
+- The Hyprland shortcuts are those of the user's earlier system, Willwitcher-OS Endgame. New ones only take keys that were free.
+- The local agent is spoken to in English. For programming, the user uses Claude and not the local agent.
 
-## Herramientas
+## Tools
 
-- `tools/check-links.py`: comprueba que los enlaces del README, de `docs/DESIGN.md` y de `docs/PENDING.md` apuntan a archivos que existen. Se pasa tras editar cualquiera de los tres.
-- `tools/make-video.cjs [segundos]`: rehace `docs/video/kavat-tour.mp4`, el recorrido narrado por Kavat, desde `docs/video/index.html`, que usa el mockup como imagen. La voz es Supertonic-3, el modelo que el diseño da a Kavat. Pide `puppeteer-core`, `ffmpeg-static` y `supertonic` instalados fuera del repo; el uso está en la cabecera del script. El vídeo va en inglés y presenta el sistema como terminado, por decisión del usuario; el README sigue diciendo en qué fase está de verdad.
-- `tools/screenshots.sh [nombre ...]`: rehace las capturas de `docs/screenshots/` desde el mockup, con Chrome o Chromium sin ventana. En Linux pide tener instaladas las fuentes Inter y JetBrains Mono.
+- `tools/check-links.py`: checks that the links in the README, in `docs/DESIGN.md` and in `docs/PENDING.md` point to files that exist. It is run after editing any of the three.
+- `tools/make-video.cjs [seconds]`: remakes `docs/video/kavat-tour.mp4`, the tour narrated by Kavat, from `docs/video/index.html`, which uses the mockup as its picture. The voice is Supertonic-3, the model the design gives Kavat. It needs `puppeteer-core`, `ffmpeg-static` and `supertonic` installed outside the repository; how to use it is in the script's header. The video presents the system as finished, by the user's decision; the README still says which phase it is really in.
+- `tools/screenshots.sh [name ...]`: retakes the screenshots in `docs/screenshots/` from the mockup, with headless Chrome or Chromium. On Linux it needs the fonts Inter and JetBrains Mono installed.
 
-## Compilar y probar
+## Building and testing
 
-Tras tocar `iso/`, `packages/` o `installer/` se pasan, en este orden. Los dos primeros piden `devtools` y sudo; la prueba no pide root. El PC se suspende solo si nadie lo toca, así que lo que tarde se lanza con `systemd-inhibit --what=sleep:idle`.
+After touching `iso/`, `packages/` or `installer/` these are run, in this order. The first two need `devtools` and sudo; the tests need no root. The PC suspends by itself when nobody touches it, so anything that takes a while is started with `systemd-inhibit --what=sleep:idle`.
 
-- `tools/build-repo.sh [carpeta ...]`: compila en un chroot limpio de Arch los paquetes de `packages/` y los de las piezas que llevan su propio PKGBUILD, como `installer/`, y los reúne en `out/repo/`, el repo `[kavat]` local. Con nombres, solo esos: `tools/build-repo.sh installer`.
-- `tools/build-iso.sh`: construye la ISO desde `iso/`, con `mkarchiso` dentro de otro chroot limpio de Arch, y la deja en `out/`.
-- `tests/boot.py [iso]`: arranca la ISO en QEMU, comprueba desde dentro que llega al escritorio y deja una captura en `out/test/desktop.png`. Es la puerta de la fase 1 y tiene que seguir pasando. Pide `qemu-desktop` y `edk2-ovmf`.
-- `tests/install.py [--encrypt] [iso]`: instala la ISO en un disco virtual manejando el instalador con el teclado, arranca desde ese disco e inicia sesión. Con `--encrypt`, la máquina tiene un TPM2 simulado con `swtpm` y el disco se cifra: arranca sin pedir contraseña y, sin el TPM2, con la de recuperación tecleada en GRUB; todo va a `out/test/encrypted/`. Tarda unos seis minutos y deja capturas en `out/test/`.
-- `tests/snapshots.py [--encrypted]`: sobre el disco que deja la prueba anterior, o el cifrado con `--encrypted`, cambia un paquete, arranca el snapshot de antes y vuelve a él con `kavat-rollback`.
-- `tests/safemode.py [--encrypted]`: sobre el mismo disco, rompe a propósito la configuración de Hyprland del usuario y comprueba que el siguiente arranque abre en modo seguro y que en él sí aparece el escritorio.
+- `tools/build-repo.sh [folder ...]`: builds, in a clean Arch chroot, the packages in `packages/` and those of the pieces that carry their own PKGBUILD, like `installer/`, and gathers them in `out/repo/`, the local `[kavat]` repository. With names, only those: `tools/build-repo.sh installer`.
+- `tools/build-iso.sh`: builds the ISO from `iso/`, with `mkarchiso` inside another clean Arch chroot, and leaves it in `out/`.
+- `tests/boot.py [iso]`: boots the ISO in QEMU, checks from inside that it reaches the desktop and leaves a picture in `out/test/desktop.png`. It is the gate of phase 1 and has to keep passing. Needs `qemu-desktop` and `edk2-ovmf`.
+- `tests/install.py [--encrypt] [iso]`: installs the ISO on a virtual disk, driving the installer with the keyboard, boots from that disk and logs in. With `--encrypt`, the machine has a TPM2 simulated with `swtpm` and the disk is encrypted: it boots without asking for a password and, without the TPM2, with the recovery one typed at GRUB; everything goes to `out/test/encrypted/`. It takes about six minutes and leaves pictures in `out/test/`.
+- `tests/snapshots.py [--encrypted]`: on the disk the previous test leaves, or the encrypted one with `--encrypted`, changes a package, boots the snapshot from before and goes back to it with `kavat-rollback`.
+- `tests/safemode.py [--encrypted]`: on the same disk, breaks the user's Hyprland configuration on purpose and checks that the next boot opens in safe mode and that the desktop does come up there.
+- `tests/theme.py [--encrypted]`: on the same disk, logs in, changes the mode, the palette and the accent with `kavat-theme` and checks that Hyprland, Kitty and Noctalia follow the change in under a second and without restarting. It is half of the gate of phase 3.
+- `tests/startup.py [--encrypted]`: on the same disk, watches the screen while it boots and checks that the GRUB menu, the loading screen and the login screen wear the theme, that the menu has the system's entries, that `kavat-theme boot` changes their look and that the Recovery entry ends in `kavat-rescue`.
+- `tests/kav.py [--encrypted]`: on the same disk, asks `kav` for packages on and off the reviewed list, with a folder standing in for the AUR, and undoes a change with `kav undo`. It is the other half of the gate of phase 3. It uses the lists of packages that `tools/build-repo.sh` leaves in its chroot.
 
-- `tests/theme.py [--encrypted]`: sobre el mismo disco, inicia sesión, cambia el modo, la paleta y el acento con `kavat-theme` y comprueba que Hyprland, Kitty y Noctalia siguen el cambio en menos de un segundo y sin reiniciarse. Es media puerta de la fase 3.
-- `tests/startup.py [--encrypted]`: sobre el mismo disco, mira la pantalla mientras arranca y comprueba que el menú de GRUB, la pantalla de carga y el login llevan el tema, que el menú tiene las entradas del sistema, que `kavat-theme boot` les cambia el aspecto y que la entrada Recovery acaba en `kavat-rescue`.
+What the tests share is in `tests/machine.py`. The last five work on a layer over the installed disk, so they do not change it.
 
-- `tests/kav.py [--encrypted]`: sobre el mismo disco, pide a `kav` paquetes de dentro y de fuera de la lista revisada, con una carpeta que hace de AUR, y deshace un cambio con `kav undo`. Es la otra media puerta de la fase 3. Usa las listas de paquetes que `tools/build-repo.sh` deja en su chroot.
+`kavat-theme` is in `themes/` and is Rust: its unit tests run with `cargo test` inside that folder, and `tools/build-repo.sh themes` runs them again when packaging. Its code is in `themes/engine/` and not in `src/`, which is the folder `makepkg` uses next to a PKGBUILD. The desktop's templates are in `themes/templates/` and those of the boot and the login in `themes/boot/`; these are applied as root with `kavat-theme boot`.
 
-Lo que comparten las pruebas está en `tests/machine.py`. Las cinco últimas trabajan sobre una capa encima del disco instalado, así que no lo cambian.
+`kav` is in `kav/` and is Rust too, with its code in `kav/core/`; its unit tests run with `cargo test` inside that folder. `kav install` is not tried on the build PC: CachyOS's repositories have packages there, like `yay`, that do not exist in Kavat.
 
-`kavat-theme` está en `themes/` y es Rust: sus pruebas unitarias se pasan con `cargo test` dentro de esa carpeta, y `tools/build-repo.sh themes` las vuelve a pasar al empaquetar. Su código está en `themes/engine/` y no en `src/`, que es la carpeta que `makepkg` usa junto a un PKGBUILD. Las plantillas del escritorio están en `themes/templates/` y las del arranque y el login en `themes/boot/`; estas se aplican como root con `kavat-theme boot`.
+`kavat-greeter`, the login screen, is in `greeter/`: its PKGBUILD fetches web-greeter 4.0.0 by its commit, applies `system-python.patch` to it and gives it the page in `greeter/theme/`. That page can be opened in a browser, where it stands in for LightDM itself with a made-up user whose password is `kavat`. Everything in that folder is GPL-3, like web-greeter.
 
-`kav` está en `kav/` y también es Rust, con su código en `kav/core/`; sus pruebas unitarias se pasan con `cargo test` dentro de esa carpeta. No se prueba `kav install` en el PC de compilación: allí los repos de CachyOS tienen paquetes, como `yay`, que en Kavat no existen.
+Arch's repositories are used as they were on the day `iso/arch-snapshot` says; changing that date is updating the system. `out/`, `work/` and `vendor/` do not go into git: they are results, temporary work and downloads.
 
-`kavat-greeter`, el login, está en `greeter/`: su PKGBUILD baja web-greeter 4.0.0 por su commit, le aplica `system-python.patch` y le pone la página de `greeter/theme/`. Esa página se puede abrir en un navegador, donde ella misma hace de LightDM con un usuario inventado cuya contraseña es `kavat`. Todo lo de esa carpeta es GPL-3, como web-greeter.
-
-Los repos de Arch se usan tal como estaban el día que dice `iso/arch-snapshot`; cambiar esa fecha es actualizar el sistema. `out/`, `work/` y `vendor/` no entran en git: son resultados, trabajo temporal y descargas.
-
-La configuración de Hyprland es Lua y su API cambia: antes de usar una función nueva se comprueba en la máquina virtual, no se supone.
+Hyprland's configuration is Lua and its API changes: before using a new function, it is checked in the virtual machine, not assumed.

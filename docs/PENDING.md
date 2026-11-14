@@ -1,20 +1,20 @@
-# Willwitcher-OS Kavat Edition — Decisiones pendientes
+# Willwitcher-OS Kavat Edition — Pending decisions
 
-Actualizado el 13 de noviembre de 2026 · [Documento de diseño](DESIGN.md) · [Mockup interactivo](mockup/index.html)
+Updated on 13 November 2026 · [Design document](DESIGN.md) · [Interactive mockup](mockup/index.html)
 
-## Cómo funciona
+## How it works
 
-Aquí está solo lo que espera tu decisión. Todo lo demás vive en el [documento de diseño](DESIGN.md) y en el mockup.
+Only what waits for your decision is here. Everything else lives in the [design document](DESIGN.md) and in the mockup.
 
-- **Si apruebas algo**, pasa al documento de diseño y al mockup, y sale de aquí.
-- **Si lo rechazas**, se borra de aquí y no se vuelve a preguntar.
-- **Para contestar**, basta el número por chat («D1 sí, D5 no») o escribir la respuesta junto a la decisión en este archivo.
+- **If you approve something**, it goes to the design document and to the mockup, and leaves this file.
+- **If you reject it**, it is deleted from here and is not asked again.
+- **To answer**, the number in the chat is enough ("D1 yes, D5 no"), or write the answer next to the decision in this file.
 
-## Resumen
+## Summary
 
-No hay decisiones pendientes.
+There are no pending decisions.
 
-Las dos últimas se resolvieron el 13 de noviembre de 2026 y ya están en el documento de diseño:
+The last two were settled on 13 November 2026 and are already in the design document:
 
-- **D33**: con el disco cifrado, lo abre GRUB con la llave sellada en el TPM2. El cifrado sigue apagado por defecto.
-- **D34**: Secure Boot se quita, y con él las llaves propias y las firmas. Tiene que estar apagado en el firmware.
+- **D33**: with an encrypted disk, GRUB opens it with the key sealed in the TPM2. Encryption stays off by default.
+- **D34**: Secure Boot is dropped, and with it the system's own keys and signatures. It has to be off in the firmware.
