@@ -176,7 +176,7 @@ def check_installed(machine, checks):
     checks.report(output == 'L', 'nobody can log in as root', output)
     status, output = machine.run(f'id -nG {USER}')
     checks.report(status == 0 and 'wheel' in output.split(), f'{USER} exists and administers the machine', output)
-    status, output = machine.wait_until('systemctl is-active lightdm', 60)
+    status, output = machine.wait_until('systemctl is-active greetd', 60)
     checks.report(status == 0, 'the login screen is up', output)
     status, output = machine.run('systemctl --failed --no-legend')
     checks.report(not output, 'no service failed', output)
@@ -205,7 +205,7 @@ def boot_with_password(disk, firmware, checks, pictures):
         if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'without the TPM2, the recovery password typed at GRUB opens the disk'):
             status, output = machine.run('cat /proc/cmdline')
             checks.report('kavat.safe' not in output and '@snapshots' not in output, 'it is a normal boot', output)
-            status, output = machine.wait_until('systemctl is-active lightdm', 60)
+            status, output = machine.wait_until('systemctl is-active greetd', 60)
             checks.report(status == 0, 'the login screen is up', output)
         else:
             machine.screen.picture(f'{pictures}/password-stuck.png')

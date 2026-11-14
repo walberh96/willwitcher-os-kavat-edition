@@ -1,0 +1,12 @@
+# Part of kavat-greeter: what greetd shows to log in.
+#
+# The login screen is a web page, and it needs something to draw it on: a small Hyprland
+# session of its own, with nothing in it but the page. When someone logs in, that session
+# ends and theirs starts.
+
+[terminal]
+vt = 1
+
+[default_session]
+command = "start-hyprland -- --config /usr/share/kavat-greeter/hyprland.lua"
+user = "greeter"

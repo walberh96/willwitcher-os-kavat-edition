@@ -435,7 +435,7 @@ def wait_for_login_screen(machine, timeout=90):
             size, (avatar, corner) = machine.screen.pixels(AVATAR, CORNER)
         except OSError:
             size, avatar, corner = None, None, None
-        if size == (1920, 1080) and not near(avatar, corner) and machine.run('pgrep -u lightdm -f kavat-greeter')[0] == 0:
+        if size == (1920, 1080) and not near(avatar, corner) and machine.run('pgrep -u greeter -f kavat-greeter')[0] == 0:
             time.sleep(1)  # the page takes the keyboard a moment after it draws
             return True
         time.sleep(0.5)

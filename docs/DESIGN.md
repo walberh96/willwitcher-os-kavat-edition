@@ -47,7 +47,7 @@ The repository is a monorepo with one folder per piece:
 - `packages/`: one PKGBUILD per `kavat-*` package that has no folder of its own, including the forks. The pieces with their own folder, such as `installer/`, carry their PKGBUILD inside.
 - `kav/`: the package manager and its allowlist.
 - `themes/`: tokens, templates and bundled themes.
-- `greeter/`: `kavat-greeter`, the fork of web-greeter, and the login page.
+- `greeter/`: `kavat-greeter`, the login screen: its program and its page.
 - `agent/`: daemon, tools and Modelfile of the agent.
 - `tests/`: boots and installs each ISO in a virtual machine.
 - `docs/`: design decisions.
@@ -146,11 +146,11 @@ Two limits: GRUB shows a still image, it does not play video or blur; and its fo
 - **Menu.** The theme goes to `/efi/grub/themes/kavat`: the background and the logo as PNG, the theme's fonts converted to GRUB's format and the box of the chosen entry cut into nine pieces. Two things in the mockup are beyond what GRUB can do and are not there: a different text under the menu depending on the chosen entry, and a second, smaller line inside an entry.
 - **Loading screen.** A Plymouth theme with the logo and a ring that grows and fades, over the same background as the menu. It travels inside the boot image, which is rebuilt only when the look changed. Of the four styles, the first one is there; the spinning ring, the bar and the text arrive with the Boot page of the panel.
 - **The background, for now**, is one generated with the theme's colors, the same on the three screens. The desktop wallpaper will take its place when that piece exists.
-- **No cut between menu and loading.** Two things keep the picture on the screen. GRUB shows its console while it starts an entry, and it draws the theme's picture behind it instead of black. And Plymouth draws at once on the screen the firmware left, with `plymouth.use-simpledrm` on the kernel line, instead of waiting for the graphics driver. The first try on the PC, on 13 November 2026, showed why both are needed: the RX 6800's driver takes until second 8.5 to be ready, Plymouth was waiting for it, and what stayed on the screen meanwhile was GRUB's console, a black box. Between the loading screen and the login there is an instant of black, that of the X server starting.
+- **No cut between menu and loading.** Two things keep the picture on the screen. GRUB shows its console while it starts an entry, and it draws the theme's picture behind it instead of black. And Plymouth draws at once on the screen the firmware left, with `plymouth.use-simpledrm` on the kernel line, instead of waiting for the graphics driver. The first try on the PC, on 13 November 2026, showed why both are needed: the RX 6800's driver takes until second 8.5 to be ready, Plymouth was waiting for it, and what stayed on the screen meanwhile was GRUB's console, a black box. Between the loading screen and the login, the login's own small session starts; how that instant looks on the PC has to be seen.
 
 ## Login
 
-LightDM with web-greeter shows its own theme in HTML/CSS/JS that reads the same tokens as the desktop, so the login changes color when you change theme.
+greetd with `kavat-greeter` shows a page in HTML/CSS/JS that reads the same tokens as the desktop, so the login changes color when you change theme.
 
 - **Design**: large clock, avatar, password field and nothing else in view. Session, power and keyboard appear when you move the mouse to a corner.
 - **Live background**: the greeter's background is the same background as the desktop, blurred, so the step into Hyprland has no visual cut.
@@ -158,15 +158,15 @@ LightDM with web-greeter shows its own theme in HTML/CSS/JS that reads the same 
 - **Several users**: selector by avatar; each user sees the login with their own theme.
 - **Screen lock**: same design as the login, made with hyprlock, so locking and logging in look the same.
 
-Decided: LightDM + web-greeter with its own theme. Risk to watch: web-greeter lives in the AUR, depends on Qt WebEngine and its maintenance is irregular. That is why it is a fork, `kavat-greeter`. Plan B is greetd with Noctalia's own greeter, which runs on native Wayland.
+Decided on 14 November 2026: greetd, with the system's own greeter drawing its page on Wayland. It takes the place of LightDM with web-greeter, the first decision, which worked but started an X server only to show the login. The page is the same one.
 
 **How it is built.** Since phase 3, and tested in a virtual machine with `tests/startup.py`:
 
-- **`kavat-greeter`** is web-greeter 4.0.0 with a small patch, in `greeter/`. The original is built by downloading its own Python and its own Qt from PyPI; the fork runs with Arch's Python and Qt, so nothing arrives from outside its repos. The patch removes the two libraries that are only on PyPI and gives it its name and its paths. Like web-greeter, it is GPL-3.
-- **The page** is HTML, CSS and JavaScript, in `greeter/theme/`: clock, avatar and password. Session, keyboard, suspend, reboot and shut down appear when you move the mouse down to the bottom edge. With several users, the others appear as small avatars. On the machine's other screens only the clock appears. The text is in English; the clock and the date follow the system format. It offers two keyboards, `us` and `es`.
+- **greetd** asks for the password and starts the session. What it shows to log in is a small Hyprland session of its own, as its own user, with nothing in it but the login page; when someone logs in, that session ends and theirs starts. No X server runs at any point.
+- **`kavat-greeter`** is the system's own program, in `greeter/`: a couple of hundred lines of Python on Arch's Qt that show the page on every screen and stand between the page and greetd. The page can read files of this machine and nothing else.
+- **The page** is HTML, CSS and JavaScript, in `greeter/page/`: clock, avatar and password. Session, keyboard, suspend, reboot and shut down appear when you move the mouse down to the bottom edge. With several users, the others appear as small avatars. On the machine's other screens only the clock appears. The text is in English; the clock and the date follow the system format. It offers two keyboards, `us` and `es`.
 - **It follows the system theme**: it reads the colors, the corners and the fonts that `kavat-theme boot` leaves, and uses the same background as the menu and the loading screen.
 - **Left for later**: the network status and the pending updates, which need `kavatd`; each user's own theme; and the screen lock with hyprlock with this same design.
-- **The fork, for now, lives in this repo** as the commit of version 4.0.0 plus the patch. If more has to be changed in it, it moves to a separate repo, like the other forks.
 
 ## Desktop
 
@@ -322,7 +322,7 @@ A Settings panel inside Noctalia configures the whole core of the system from a 
 | Backup & sync | Snapshots of `/home`, external backups, configuration history and its sync | Own |
 | Privacy & network | Which app used the microphone, camera or screen; per-application firewall rules; keyring and SSH and GPG keys | No |
 | Boot | GRUB menu (timeout, default entry, visible entries, look) and loading screen (style, messages) | No: generated themes for GRUB and Plymouth |
-| Login & lock | Background, clock, users, login language, lock timings | The web-greeter fork already planned |
+| Login & lock | Background, clock, users, login language, lock timings | `kavat-greeter`, already there |
 | Language & region | System language (English or Spanish), keyboard layouts, formats | Own |
 
 In Neovim, as in the rest, your files in \~/.config/nvim/ win over what the panel generates.
@@ -899,7 +899,7 @@ Terminal, shell, editor and browser are already decided; the rest are the usual 
 | --- | --- | --- |
 | Compositor | Hyprland + hyprlock + hypridle | `kavat-hyprland` (configuration) |
 | Desktop shell | Noctalia | `kavat-shell` (fork) |
-| Login | LightDM + web-greeter | `kavat-greeter` (fork + theme) |
+| Login | greetd | `kavat-greeter` (program + page) |
 | Terminal | Kitty | Theme template only |
 | Terminal shell | zsh, with starship | `kavat-shell-config` |
 | Editor | Neovim with its own configuration | `kavat-nvim` |
@@ -1088,7 +1088,7 @@ The decisions in this table are made; those that the analysis of other distros l
 | Boot menu | GRUB with its own menu and the system theme, configurable from Noctalia |
 | Loading screen | Plymouth with its own theme and four styles, configurable from Noctalia |
 | Safe mode | Boot menu entry that ignores your configuration and uses the factory one; it selects itself after a failed boot |
-| Login | LightDM + web-greeter with its own theme |
+| Login | greetd with the system's own greeter, on Wayland |
 | Hyprland | No fork, with its own configuration in Lua; the panel only writes data. Fork from day 1 only if the current version prevents something |
 | Command palette | A single one for the whole system, with the grammar of the browser's console and of Neovim |
 | Coherence | Projects, one `kavat` command for everything, shortcut sheet by context and screenshot with text |

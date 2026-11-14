@@ -17,5 +17,5 @@
   --font-mono: "{{ font_mono }}";
   --scale: {{ font_scale }};
   /* the same picture as the boot menu and the loading screen */
-  --picture: url("web-greeter://app/var/lib/kavat/theme/current/common/background.svg");
+  --picture: url("file:///var/lib/kavat/theme/current/common/background.svg");
 }

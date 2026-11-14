@@ -62,7 +62,7 @@ def main():
             checks.report(output == 'overlay', 'the root takes writes in memory', output)
             status, output = machine.run(f'pacman -Q {PACKAGE}')
             checks.report(status == 0, f'{PACKAGE} is there, as before the change', output)
-            status, output = machine.wait_until('systemctl is-active lightdm', 60)
+            status, output = machine.wait_until('systemctl is-active greetd', 60)
             checks.report(status == 0, 'the login screen is up', output)
             status, output = machine.run('systemctl --failed --no-legend')
             checks.report(not output, 'no service failed', output)
@@ -95,7 +95,7 @@ def main():
             checks.report(status == 0, f'{PACKAGE} is back', output)
             status, output = machine.run("btrfs subvolume list / | grep -c ' path @.old-'")
             checks.report(output == '1', 'the system as it was is kept aside', output)
-            status, output = machine.wait_until('systemctl is-active lightdm', 60)
+            status, output = machine.wait_until('systemctl is-active greetd', 60)
             checks.report(status == 0, 'the login screen is up', output)
             if checks.failed:
                 print_journal(machine)

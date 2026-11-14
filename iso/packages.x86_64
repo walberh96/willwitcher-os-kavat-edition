@@ -50,11 +50,9 @@ hyprland
 kavat-shell
 kavat-hyprland
 
-# Login screen of the installed system: LightDM with the system's own greeter, which draws
-# on an X server. The live session does not use it.
-lightdm
+# Login screen of the installed system: greetd, with the system's own greeter, which draws
+# its page on Wayland. The live session does not use it.
 kavat-greeter
-xorg-server
 
 # The terminal's shell: zsh with the system's prompt, and the everyday tools that come
 # with it. The live session keeps bash.

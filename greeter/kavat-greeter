@@ -1,3 +1,9 @@
 #!/bin/sh
-# Starts the login screen. LightDM runs this as its own user, on the display it has made.
-exec /usr/bin/python3 /usr/lib/kavat-greeter/__main__.py "$@"
+# Starts the login screen's program. It runs inside the small Wayland session that greetd
+# starts for it, as the greeter's own user, which has no home folder to keep anything in:
+# what the program wants to keep goes to a folder that lasts until the machine is off.
+keep="${XDG_RUNTIME_DIR:-/tmp}/kavat-greeter"
+mkdir -p "$keep"
+export HOME="$keep" XDG_CACHE_HOME="$keep/cache" XDG_CONFIG_HOME="$keep/config" XDG_DATA_HOME="$keep/data"
+export QT_QPA_PLATFORM=wayland
+exec /usr/bin/python3 /usr/lib/kavat-greeter/greeter.py "$@"

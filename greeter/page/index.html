@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="style.css">
   <!-- The look in force, made by kavat-theme. Until it has been applied once, the values
        in style.css stand. -->
-  <link rel="stylesheet" href="web-greeter://app/var/lib/kavat/theme/current/greeter/tokens.css">
+  <link rel="stylesheet" href="file:///var/lib/kavat/theme/current/greeter/tokens.css">
 </head>
 <body>
   <main>
@@ -29,7 +29,6 @@
     <button type="button" class="pill" id="keyboard"></button>
   </div>
   <div class="corner right">
-    <span class="pill" id="battery" hidden></span>
     <button type="button" class="pill" id="suspend" hidden></button>
     <button type="button" class="pill" id="restart" hidden></button>
     <button type="button" class="pill" id="shutdown" hidden></button>
@@ -40,6 +39,7 @@
       <path fill="currentColor" d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/>
     </symbol>
   </svg>
+  <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
   <script src="greeter.js"></script>
 </body>
 </html>

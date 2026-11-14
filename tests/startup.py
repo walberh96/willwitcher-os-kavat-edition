@@ -126,8 +126,8 @@ def main():
         _, output = machine.run('grep -c plymouth.use-simpledrm /proc/cmdline; grep -c "^  background_image" /boot/grub/grub.cfg')
         checks.report(output.split() == ['1', '1'],
                       'nothing waits for the graphics driver: GRUB keeps the picture up and the loading screen draws at once', output)
-        _, output = machine.run('grep -c "^greeter-session=kavat-greeter" /etc/lightdm/lightdm.conf')
-        checks.report(output == '1', "LightDM shows the system's own login screen", output)
+        _, output = machine.run('systemctl show greetd -p ExecStart | grep -c kavat-greeter; pgrep -c -x Xorg; pgrep -c -u greeter -x Xwayland')
+        checks.report(output.split() == ['1', '0', '0'], "greetd shows the system's own login screen, and no X server runs for it", output)
 
         if checks.report(wait_for_login_screen(machine), 'the login screen shows who logs in'):
             _, (avatar, corner, glow) = machine.screen.pixels(AVATAR, CORNER, GLOW)
@@ -176,7 +176,7 @@ def main():
             machine.screen.press('enter')
             if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the Recovery entry boots'):
                 status, output = machine.wait_until('systemctl is-active kavat-rescue.service', 60)
-                _, state = machine.run('systemctl is-active lightdm; cat /proc/cmdline')
+                _, state = machine.run('systemctl is-active greetd; cat /proc/cmdline')
                 checks.report(status == 0 and state.startswith('inactive') and 'kavat-rescue.target' in state,
                               'it ends in the recovery console, with no desktop', f'{output}\n{state}')
                 status, output = machine.wait_until("! grub-editenv /boot/grub/grubenv list | grep -q '^kavat_boot='", 30)

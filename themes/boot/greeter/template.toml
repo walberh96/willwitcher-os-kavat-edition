@@ -3,3 +3,6 @@
 
 [[file]]
 from = "tokens.css"
+
+[[file]]
+from = "look.lua"

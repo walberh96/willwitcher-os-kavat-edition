@@ -64,7 +64,7 @@ What the tests share is in `tests/machine.py`. The last five work on a layer ove
 
 `kav` is in `kav/` and is Rust too, with its code in `kav/core/`; its unit tests run with `cargo test` inside that folder. `kav install` is not tried on the build PC: CachyOS's repositories have packages there, like `yay`, that do not exist in Kavat.
 
-`kavat-greeter`, the login screen, is in `greeter/`: its PKGBUILD fetches web-greeter 4.0.0 by its commit, applies `system-python.patch` to it and gives it the page in `greeter/theme/`. That page can be opened in a browser, where it stands in for LightDM itself with a made-up user whose password is `kavat`. Everything in that folder is GPL-3, like web-greeter.
+`kavat-greeter`, the login screen, is in `greeter/`: `greeter.py` is its program, which greetd starts inside a small Hyprland session (`hyprland.lua`), and `page/` is the web page it shows. That page can be opened in a browser, where it stands in for the program itself with a made-up user whose password is `kavat`.
 
 Arch's repositories are used as they were on the day `iso/arch-snapshot` says; changing that date is updating the system. `out/`, `work/` and `vendor/` do not go into git: they are results, temporary work and downloads.
 

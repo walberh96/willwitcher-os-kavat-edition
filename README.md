@@ -41,7 +41,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 | | |
 | --- | --- |
 | ![Boot menu](docs/screenshots/boot-menu.png) **Boot menu.** GRUB with the system theme, safe mode and bootable snapshots. | ![Loading screen](docs/screenshots/loading.png) **Loading screen.** Plymouth, in the same identity. |
-| ![Login](docs/screenshots/login.png) **Login.** LightDM with its own theme, over your blurred wallpaper. | ![The agent](docs/screenshots/agent.png) **Kavat.** The agent, its clickable skills, and every tool it uses with its permission level. |
+| ![Login](docs/screenshots/login.png) **Login.** greetd with the system's own page, over your blurred wallpaper. | ![The agent](docs/screenshots/agent.png) **Kavat.** The agent, its clickable skills, and every tool it uses with its permission level. |
 | ![Light theme](docs/screenshots/themes-light.png) **Themes.** Palette, mode, accent and shape, live. | ![Wallpapers](docs/screenshots/settings-wallpaper.png) **Wallpapers.** Image or video, from the settings panel. |
 | ![Modes](docs/screenshots/settings-modes.png) **Modes.** Coder, Gamer and Incognito. | ![Skills](docs/screenshots/settings-skills.png) **Skills.** What the agent does with one click, one phrase or one key. |
 | ![Agent and voice](docs/screenshots/settings-agent.png) **Agent and voice.** At most 4 GB of the GPU. | ![kav](docs/screenshots/kav-dashboard.png) **`kav`.** The package manager, as a TUI. |
@@ -179,7 +179,7 @@ A settings panel inside the shell configures the whole core, on twenty-six pages
 
 - **Hyprland**, with modular configuration: the system's in `/usr/share/kavat/`, yours in `~/.config/`, and yours always wins. Its configuration is Lua, and the settings panel only ever writes plain values for that Lua to load.
 - **Noctalia**, in its own fork: bar, launcher, notifications, control centre, plus the agent's panel, the mode selector and the settings panel.
-- **LightDM + web-greeter**, with a login screen that uses your theme and your wallpaper. Entering the desktop has no visual cut.
+- **greetd + `kavat-greeter`**, with a login screen that uses your theme and your wallpaper. Entering the desktop has no visual cut.
 - **Kitty and zsh**, with a starship prompt cut down to what costs no time: opening a terminal goes unnoticed.
 - **One command palette.** `Super+D` searches apps, files, settings, skills, packages, windows and browser tabs, works out sums and unit conversions, with the same commands as the browser console and Neovim.
 - **Projects.** A project saves a whole workspace (folder, terminals, editor, browser profile, window layout) and brings it back as you left it.
@@ -327,7 +327,7 @@ Today the repository holds this README, the `docs/` folder, the research reports
 | `packages/` | One PKGBUILD per `kavat-*` package, forks included | 1 |
 | `installer/` | Calamares configuration, modules and branding | 2 |
 | `themes/` | Tokens, templates and bundled themes | 3 |
-| `greeter/` | `kavat-greeter`, the web-greeter fork, and the login screen's page | 3 |
+| `greeter/` | `kavat-greeter`, the login screen: its program and its page | 3 |
 | `kav/` | The package manager, its TUI and the AUR allowlist | 3 |
 | `notes/` | `kavat-notes`: the `nb` fork, its TUI, the index and the reminders | 3 |
 | `agent/` | `kavatd`, tools, skills and the agent's Modelfile | 4 |
@@ -355,7 +355,7 @@ This README describes the finished system. Today phases 1 and 2 are done, the li
 - **Phase 1 is done.** The ISO boots to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts.
 - **Phase 2 is done.** The installer puts the system on a disk with no network: Btrfs with its subvolumes, zram, the zen kernel with the LTS one as fallback, GRUB and a login screen. Every package change takes a snapshot, a snapshot boots from the menu with its own kernel, and the system can go back to it. A boot that fails opens the next one in safe mode, which ignores your settings without deleting them. The disk can be encrypted, off by default: GRUB opens it with a key sealed in the TPM2, and asks for the recovery password only when the TPM2 does not give it. Secure Boot is not used and has to be off.
 - **Phase 2 was checked on real hardware**: installed next to CachyOS and Windows, sharing CachyOS's EFI partition, booted, and taken back to a snapshot.
-- **Phase 3 has started.** The theme system works: `kavat-theme set mode light` changes Hyprland, Kitty, the shell and GTK apps at once, without restarting any of them. Seven palettes come with it, each with a dark and a light side. The boot menu, the loading screen and the login screen wear the same theme, over one picture, and `kavat-theme boot` gives them the look of your desktop. The boot menu has the system's own entries, with a recovery console among them, and the login screen is `kavat-greeter`, a fork of web-greeter that runs on Arch's own Python and Qt. `kav` is the one command over pacman: it installs from Arch's repositories and refuses any AUR package that is not on the reviewed list, which starts empty; `kav review` shows a package with its risky lines marked, and an approved package is built from the exact commit that was read. The shell is now `kavat-shell`, a fork of Noctalia whose only change so far is that the anonymous startup ping is gone, code and switches. The terminal's shell is zsh, with the system's prompt and its everyday tools, and it opens in under 100 ms. Icons, the cursor and the rest of the apps do not follow the theme yet, `kav` has no full-screen interface yet and the shell has none of its own panels yet.
+- **Phase 3 has started.** The theme system works: `kavat-theme set mode light` changes Hyprland, Kitty, the shell and GTK apps at once, without restarting any of them. Seven palettes come with it, each with a dark and a light side. The boot menu, the loading screen and the login screen wear the same theme, over one picture, and `kavat-theme boot` gives them the look of your desktop. The boot menu has the system's own entries, with a recovery console among them, and the login screen is `kavat-greeter`, the system's own page behind greetd, drawn on Wayland with no X server. `kav` is the one command over pacman: it installs from Arch's repositories and refuses any AUR package that is not on the reviewed list, which starts empty; `kav review` shows a package with its risky lines marked, and an approved package is built from the exact commit that was read. The shell is now `kavat-shell`, a fork of Noctalia whose only change so far is that the anonymous startup ping is gone, code and switches. The terminal's shell is zsh, with the system's prompt and its everyday tools, and it opens in under 100 ms. Icons, the cursor and the rest of the apps do not follow the theme yet, `kav` has no full-screen interface yet and the shell has none of its own panels yet.
 
 To build and try it on an Arch-based machine with `devtools`, `qemu-desktop` and `edk2-ovmf`:
 
