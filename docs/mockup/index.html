@@ -99,6 +99,9 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .msg{max-width:84%;padding:.6em .9em;border-radius:var(--r);line-height:1.45}
 .msg.me{align-self:flex-end;background:var(--accent);color:#14110a}
 .msg.ai{background:var(--surface2)}
+.js-agfind{display:none}.screen[data-afind=true] .js-agfind{display:flex}.screen[data-afind=true] .js-agmain{display:none}
+.afiles{display:flex;flex-direction:column;gap:.25em;margin:.6em 0 .2em;font-family:var(--mono);font-size:.84em}
+.afile{display:flex;gap:1em;padding:.3em .6em;border-radius:calc(var(--r)*.5);background:var(--surface);border:.1em solid var(--border)}
 .tool{display:flex;align-items:center;gap:.6em;font-family:var(--mono);font-size:.82em;color:var(--muted);padding:.1em .3em}
 .badge{font-family:var(--ui);font-size:.85em;padding:.1em .6em;border-radius:1em;border:.1em solid currentColor}
 .btns{display:flex;gap:.5em;margin-top:.6em}
@@ -745,8 +748,19 @@ body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
     <!-- agent -->
     <div class="ov glass" id="ov-agent">
       <div class="ag-head"><svg class="logo" viewBox="0 0 100 100" fill="currentColor"><path d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z"/></svg><b>Kavat</b><span class="sp"></span><span class="cfglink" data-cfg="agent">agent.toml ›</span><span class="muted" style="font-size:.85em"><span class="dot"></span> <span class="js-agstatus">local · offline · 3.6 GB</span></span></div>
-      <div class="skills"><div class="skh"><span class="sec" style="margin:0">Skills</span><span class="muted">click, say or type · a click needs no model</span><span class="sp"></span><span class="acc" data-act="skills" style="cursor:pointer">Manage ›</span></div><div class="skg"><button class="skill" data-act="browser"><b>Open browser</b><small>Super+B</small></button><button class="skill" data-act="editor"><b>Open editor</b><small>reversible</small></button><button class="skill" data-act="gamer"><b>Gamer mode</b><small>Super+Shift+M</small></button><button class="skill" data-act="mode"><b>Light / dark</b><small>“night mode”</small></button><button class="skill" data-act="wall"><b>Next wallpaper</b><small>reversible</small></button><button class="skill" data-act="update"><b>Update system</b><small>snapshot first</small></button><button class="skill" data-act="files"><b>Open files</b><small>Super+E</small></button><button class="skill" data-act="stream"><b>Start stream</b><small>yours · 3 steps</small></button></div></div>
-      <div class="ag-body">
+      <div class="skills"><div class="skh"><span class="sec" style="margin:0">Skills</span><span class="muted">click, say or type · a click needs no model</span><span class="sp"></span><span class="acc" data-act="skills" style="cursor:pointer">Manage ›</span></div><div class="skg"><button class="skill" data-act="browser"><b>Open browser</b><small>Super+B</small></button><button class="skill" data-act="editor"><b>Open editor</b><small>reversible</small></button><button class="skill" data-act="gamer"><b>Gamer mode</b><small>Super+Shift+M</small></button><button class="skill" data-act="mode"><b>Light / dark</b><small>“night mode”</small></button><button class="skill" data-act="wall"><b>Next wallpaper</b><small>reversible</small></button><button class="skill" data-act="update"><b>Update system</b><small>snapshot first</small></button><button class="skill" data-act="files"><b>Open files</b><small>Super+E</small></button><button class="skill" data-act="afind"><b>Find a file</b><small>“find the invoice…”</small></button><button class="skill" data-act="stream"><b>Start stream</b><small>yours · 3 steps</small></button></div></div>
+      <div class="ag-body js-agfind">
+        <div class="msg me">find the hosting invoice from March</div>
+        <div class="tool">⚙ files.find("invoice hosting", in="~", around="2026-03") <span class="badge info">read</span></div>
+        <div class="msg ai">Two files in your home folder match. The first is the March one.
+          <div class="afiles"><div class="afile"><span><b>Documents/Invoices/2026-03 invoice hosting.pdf</b></span><span class="sp"></span><span class="muted">11 Mar · 84 KB</span></div><div class="afile"><span>Documents/Invoices/2026-02 invoice hosting.pdf</span><span class="sp"></span><span class="muted">10 Feb · 83 KB</span></div></div>
+          <div class="btns"><span class="btn pri">Open the first</span><span class="btn" data-act="files">Show in Yazi</span><span class="btn" data-act="find">See all in the search</span></div></div>
+        <div class="msg me">open it, and tell me the total</div>
+        <div class="tool">⚙ files.open("~/Documents/Invoices/2026-03 invoice hosting.pdf") <span class="badge ok">reversible</span></div>
+        <div class="tool">⚙ files.read("…/2026-03 invoice hosting.pdf") <span class="badge info">read</span></div>
+        <div class="msg ai">Opened in zathura. The total is <b>14.00 EUR</b>: 12.00 for the server and 2.00 for backups.</div>
+      </div>
+      <div class="ag-body js-agmain">
         <div class="msg me">dark mode and dim the screen, I’m coding tonight</div>
         <div class="tool">⚙ kavat-theme.apply(profile="night") <span class="badge ok">reversible</span></div>
         <div class="msg ai">Done. <b>night</b> profile applied, brightness at 35%.</div>
@@ -1089,7 +1103,7 @@ const P = {
   rose:{n:'Rosé Pine',d:['#191724','#1f1d2e','#26233a','#e0def4','#908caa','#403d52'],l:['#ede3d9','#faf4ed','#f2e9e1','#575279','#797593','#dfdad9'],a:['#ebbcba','#c4a7e7','#9ccfd8','#f6c177','#eb6f92']},
   everforest:{n:'Everforest',d:['#232a2e','#2d353b','#3d484d','#d3c6aa','#9da9a0','#475258'],l:['#efebd4','#fdf6e3','#e6e2cc','#5c6a72','#829181','#d5d0b8'],a:['#a7c080','#7fbbb3','#dbbc7f','#e69875','#d699b6']},
 };
-const S = {ico:'colour',istep:'',inet:true,ttab:'proc',notices:false,calc:false,dlay:'pv',dsel:0,voice:'auto',clip:false,cap:false,rem:false,copy:false,gsel:'main',ps:'logo',cfg:'',pick:false,fsel:'img',wall:'theme',bare:false,ktab:'dash',fnd:'home',spage:'windows',sys:'coder',scene:'desk',pal:'kavat',mode:'dark',acc:0,rad:.9,gap:.7,blur:true,oled:false};
+const S = {ico:'colour',istep:'',inet:true,ttab:'proc',notices:false,calc:false,dlay:'pv',dsel:0,voice:'auto',clip:false,cap:false,rem:false,copy:false,gsel:'main',ps:'logo',cfg:'',pick:false,fsel:'img',wall:'theme',bare:false,ktab:'dash',fnd:'home',afind:false,spage:'windows',sys:'coder',scene:'desk',pal:'kavat',mode:'dark',acc:0,rad:.9,gap:.7,blur:true,oled:false};
 location.hash.slice(1).split('&').forEach(kv=>{const [k,v]=kv.split('=');if(k in S)S[k]=isNaN(v)?(v==='true'?true:v==='false'?false:v):+v});
 
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1166,7 +1180,7 @@ function apply(){
   root.dataset.mode=m;
 
   const ov={agent:'agent',themes:'themes',kav:'kav',top:'top',auth:'auth',browser:'browser',settings:'settings',editor:'editor',claude:'editor',files:'files',find:'find',notes:'notes',note:'editor',albums:'browser',launcher:'launcher'}[S.scene]||'';
-  screen_.dataset.ov=ov;
+  screen_.dataset.ov=ov;screen_.dataset.afind=S.afind;
   const sc=['login','install','grub','boot'].includes(S.scene)?S.scene:'desk';
   $$('.scene').forEach(s=>s.classList.toggle('on',s.id===sc));
   $$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.scene===S.scene));
@@ -1254,6 +1268,8 @@ document.addEventListener('click',e=>{
     else if(a==='cap'){S.scene='desk';S.cap=true;S.rem=true}
     else if(a==='capoff'||a==='clipoff'){}
     else if(a==='clip'){S.scene='browser';S.clip=true}
+    else if(a==='afind'){S.scene='agent';S.afind=true}
+    else if(a==='find')S.scene='find';
     else if(a==='grub')S.scene='grub';
     else if(a==='plymouth'||a==='boot')S.scene='boot';
     else if(a==='gowall'){S.scene='settings';S.spage='wallpaper'}
@@ -1276,7 +1292,7 @@ document.addEventListener('click',e=>{
   else if(t.dataset.fnd)S.fnd=t.dataset.fnd;
   else if(t.dataset.spage)S.spage=t.dataset.spage;
   else if(t.dataset.sys)S.sys=t.dataset.sys;
-  else if(t.dataset.scene){S.scene=t.dataset.scene;S.pick=false;S.cfg='';S.copy=false;S.cap=false;S.rem=false;S.clip=false}
+  else if(t.dataset.scene){S.scene=t.dataset.scene;S.afind=false;S.pick=false;S.cfg='';S.copy=false;S.cap=false;S.rem=false;S.clip=false}
   else if(t.dataset.mode)S.mode=t.dataset.mode;
   else if(t.dataset.pal){S.pal=t.dataset.pal;S.acc=0}
   else if(t.dataset.acc)S.acc=+t.dataset.acc;

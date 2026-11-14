@@ -25,6 +25,7 @@ done
 # name|state of the mockup (the part of the address after #bare=true&)
 shots=(
   "agent|scene=agent"
+  "agent-find|scene=agent&afind=true"
   "agent-voice|scene=voice&voice=speak"
   "boot-menu|scene=grub&gsel=safe"
   "browser|scene=browser"

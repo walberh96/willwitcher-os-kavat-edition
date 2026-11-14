@@ -496,7 +496,7 @@ What files say is not indexed, only their names.
 - **The terminal.** `kavat-find` opens the search full screen: type to filter, a preview of the file on the right, `Enter` opens it, `Ctrl+O` opens its folder in Yazi and `Ctrl+Y` copies its path. `Ctrl+F` goes round the three sources: your files, the whole disk and text inside files. A result of a text search opens in Neovim at that line.
 - **zsh.** `Tab` shows the completions in the same picker instead of zsh's own menu, with a preview: files, folders, options, processes. This is the `fzf-tab` plugin, packaged in `[kavat]` if Arch's repositories do not have it. `Ctrl+R` searches the history, `Ctrl+T` pastes a file's path into the command, `Alt+C` jumps to a folder and `Ctrl+G` searches text inside files.
 - **Neovim.** `fzf-lua` is the one picker: files, text, buffers, recent files, help. It takes the place of Telescope, which did the same more slowly. `<leader>ff`, `fg`, `fb` and `fr` stay as they are.
-- **The desktop and Kavat.** `Super+Shift+F` opens the search as a floating window from anywhere, and the palette gets a files mode. In phase 4 Kavat gets a `find_files` tool that asks the same engine, so a file can be asked for by voice.
+- **The desktop and Kavat.** `Super+Shift+F` opens the search as a floating window from anywhere, and the palette gets a files mode. In phase 4 Kavat gets a `files.find` tool that asks the same engine, so a file can be asked for by typing or by voice: it answers with the files it found and offers to open one, show it in Yazi or hand the whole list to the search. Finding is a read; opening a file is a reversible action, like the rest of its tools.
 
 ## Notes
 
