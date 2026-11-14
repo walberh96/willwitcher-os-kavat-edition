@@ -1,6 +1,6 @@
 pkgname=kavat-greeter
 pkgver=4.0.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Willwitcher-OS Kavat Edition: the login screen, a fork of web-greeter with the system's own page"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

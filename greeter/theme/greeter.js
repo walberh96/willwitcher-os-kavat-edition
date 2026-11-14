@@ -9,19 +9,13 @@
     "use strict";
 
     const TEXTS = {
-        en: {
-            session: "Session", keyboard: "Keyboard", wrong: "That password is not right",
-            suspend: "Suspend", restart: "Restart", shutdown: "Switch off", battery: "Battery",
-        },
-        es: {
-            session: "Sesión", keyboard: "Teclado", wrong: "Esa contraseña no es correcta",
-            suspend: "Suspender", restart: "Reiniciar", shutdown: "Apagar", battery: "Batería",
-        },
+        session: "Session", keyboard: "Keyboard", wrong: "That password is not right",
+        suspend: "Suspend", restart: "Restart", shutdown: "Switch off", battery: "Battery",
     };
 
     const $ = (id) => document.getElementById(id);
     const state = {
-        texts: TEXTS.en,
+        texts: TEXTS,
         locale: "en-US",
         people: [],
         person: null,
@@ -127,10 +121,7 @@
 
     function locale() {
         const language = (lightdm.language && lightdm.language.code) || navigator.language || "en";
-        const short = language.slice(0, 2).toLowerCase();
-        state.texts = TEXTS[short] || TEXTS.en;
         state.locale = language.replace("_", "-").replace(/[.@].*$/, "") || "en-US";
-        document.documentElement.lang = short;
         try { new Date().toLocaleDateString(state.locale); } catch { state.locale = "en-US"; }
     }
 

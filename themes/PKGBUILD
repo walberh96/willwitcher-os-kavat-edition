@@ -1,6 +1,6 @@
 pkgname=kavat-theme
 pkgver=0.1.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Willwitcher-OS Kavat Edition: the theme system, with its palettes and its templates"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

@@ -5,7 +5,9 @@ Distribución personal basada en Arch Linux. Las fases 1 y 2 están cerradas: ha
 ## Idiomas
 
 - Con el usuario se habla en español.
-- `README.md` y el mockup van en inglés. `docs/DESIGN.md`, `docs/PENDING.md` y `reports/` van en español.
+- Todo lo que se escribe en el repo y en el sistema va en inglés: código, comentarios, mensajes, textos de la interfaz, commits y documentos. El sistema no lleva textos propios en otro idioma.
+- `docs/DESIGN.md`, `docs/PENDING.md`, `reports/` y este archivo se escribieron en español antes de esa regla, del 13 de noviembre de 2026, y están pendientes de pasar a inglés. Hasta entonces, lo que se les añada sigue su idioma, para no dejarlos a medias.
+- Teclados: `us` por defecto y `es`. Ninguno más.
 
 ## Dónde vive el diseño
 

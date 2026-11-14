@@ -9,9 +9,7 @@
   <vendor_url>https://github.com/walberh96/willwitcher-os-kavat-edition</vendor_url>
   <action id="org.kavat.theme.boot">
     <description>Give the boot menu, the loading screen and the login screen the look of the desktop</description>
-    <description xml:lang="es">Dar al menú de arranque, a la pantalla de carga y al login el aspecto del escritorio</description>
     <message>The boot menu, the loading screen and the login screen are files of the system. Your password lets them take the look of your desktop.</message>
-    <message xml:lang="es">El menú de arranque, la pantalla de carga y el login son archivos del sistema. Tu contraseña les deja tomar el aspecto de tu escritorio.</message>
     <defaults>
       <allow_any>auth_admin</allow_any>
       <allow_inactive>auth_admin</allow_inactive>

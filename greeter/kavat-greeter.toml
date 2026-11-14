@@ -3,7 +3,7 @@
 
 # Keyboard layouts to offer on the login screen, by their xkb names. With fewer than two,
 # the login screen does not offer to change it.
-layouts = ["us", "es", "latam"]
+layouts = ["us", "es"]
 
 [greeter]
 # the page to show, a folder in /usr/share/kavat-greeter/themes
