@@ -1,0 +1,323 @@
+diff --git a/example.toml b/example.toml
+index cec1227..3f62472 100644
+--- a/example.toml
++++ b/example.toml
+@@ -15,7 +15,6 @@ time_format           = "{:%H:%M}"  # default shell UI time format
+ date_format           = "%A, %x"    # default shell UI date format
+ offline_mode          = false        # block all outgoing HTTP when true
+ # panel_anchor_bar   = "main"        # bar panels attach to without a source bar; omit = first enabled bar
+-telemetry_enabled     = false        # send an anonymous startup ping
+ niri_overview_type_to_launch_enabled = false # opt in to type-to-launch from niri overview
+ polkit_agent          = false
+ password_style        = "default"    # default | random
+diff --git a/meson.build b/meson.build
+index 3767c76..b2e2650 100644
+--- a/meson.build
++++ b/meson.build
+@@ -754,7 +754,6 @@ _noctalia_sources = files(
+   'src/shell/session/session_panel.cpp',
+   'src/shell/setup_wizard/setup_wizard_panel.cpp',
+   'src/shell/surface/shadow.cpp',
+-  'src/system/telemetry_service.cpp',
+   'src/shell/settings/bar_widget_editor.cpp',
+   'src/shell/settings/color_spec_picker.cpp',
+   'src/shell/settings/config_export_dialog_modal.cpp',
+diff --git a/src/app/application.cpp b/src/app/application.cpp
+index b14d440..1b8cb04 100644
+--- a/src/app/application.cpp
++++ b/src/app/application.cpp
+@@ -223,9 +223,6 @@ void Application::run(const std::function<void()>& startupReadyCallback) {
+     m_hookManager.reload(m_configService.config().hooks);
+     m_hookManager.fire(HookKind::Started);
+   });
+-  runStartupPhase("telemetry enqueue", [this] {
+-    m_telemetryService.maybeSend(m_configService, m_httpClient, m_wayland);
+-  });
+ 
+ #ifdef __GLIBC__
+   runStartupPhase("allocator_trim", [] {
+diff --git a/src/app/application.h b/src/app/application.h
+index 61b5855..5b843eb 100644
+--- a/src/app/application.h
++++ b/src/app/application.h
+@@ -76,7 +76,6 @@
+ #include "system/lock_keys_poll_source.h"
+ #include "system/lock_keys_service.h"
+ #include "system/screen_time_service.h"
+-#include "system/telemetry_service.h"
+ #include "system/weather_poll_source.h"
+ #include "system/weather_service.h"
+ #include "theme/community_palettes.h"
+@@ -342,7 +341,6 @@ private:
+   std::uint64_t m_umbrielAudioListener = 0;
+   std::shared_ptr<SoundPlayer> m_soundPlayer;
+ 
+-  TelemetryService m_telemetryService;
+   ScreenTimeService m_screenTimeService;
+ 
+   GlSharedContext m_glShared;
+diff --git a/src/config/config_types.h b/src/config/config_types.h
+index 881cecf..a00f701 100644
+--- a/src/config/config_types.h
++++ b/src/config/config_types.h
+@@ -1354,7 +1354,6 @@ struct ShellConfig {
+   std::string panelAnchorBar;
+   /// Resolve and show the connection's external (WAN) IP in the Control Center network tab.
+   bool externalIpEnabled = false;
+-  bool telemetryEnabled = false;
+   bool setupWizardEnabled = true;
+   bool niriOverviewTypeToLaunchEnabled = false;
+   bool umbrielOverviewTypeToLaunchEnabled = false;
+diff --git a/src/config/schema/config_schema.cpp b/src/config/schema/config_schema.cpp
+index 65af38c..e5ef660 100644
+--- a/src/config/schema/config_schema.cpp
++++ b/src/config/schema/config_schema.cpp
+@@ -1814,7 +1814,6 @@ namespace noctalia::config::schema {
+         field(&ShellConfig::offlineMode, "offline_mode"),
+         stringIfNonEmptyField(&ShellConfig::panelAnchorBar, "panel_anchor_bar"),
+         field(&ShellConfig::externalIpEnabled, "external_ip_enabled"),
+-        field(&ShellConfig::telemetryEnabled, "telemetry_enabled"),
+         field(&ShellConfig::setupWizardEnabled, "setup_wizard_enabled"),
+         field(&ShellConfig::niriOverviewTypeToLaunchEnabled, "niri_overview_type_to_launch_enabled"),
+         field(&ShellConfig::umbrielOverviewTypeToLaunchEnabled, "umbriel_overview_type_to_launch_enabled"),
+diff --git a/src/shell/settings/settings_registry.cpp b/src/shell/settings/settings_registry.cpp
+index 39c41ba..311cde6 100644
+--- a/src/shell/settings/settings_registry.cpp
++++ b/src/shell/settings/settings_registry.cpp
+@@ -1742,11 +1742,6 @@ namespace settings {
+         tr("settings.schema.shell.external-ip.description"), {"shell", "external_ip_enabled"},
+         ToggleSetting{cfg.shell.externalIpEnabled}, "wan external ip public address network resolve"
+     ));
+-    entries.push_back(makeEntry(
+-        SettingsSection::Security, "network", tr("settings.schema.shell.telemetry.label"),
+-        tr("settings.schema.shell.telemetry.description"), {"shell", "telemetry_enabled"},
+-        ToggleSetting{cfg.shell.telemetryEnabled}, "analytics ping privacy"
+-    ));
+     entries.push_back(makeEntry(
+         SettingsSection::Security, "authentication", tr("settings.schema.shell.polkit-agent.label"),
+         tr("settings.schema.shell.polkit-agent.description"), {"shell", "polkit_agent"},
+diff --git a/src/shell/setup_wizard/setup_wizard_panel.cpp b/src/shell/setup_wizard/setup_wizard_panel.cpp
+index 930d333..295c389 100644
+--- a/src/shell/setup_wizard/setup_wizard_panel.cpp
++++ b/src/shell/setup_wizard/setup_wizard_panel.cpp
+@@ -182,38 +182,6 @@ void SetupWizardPanel::create() {
+ 
+   content->addChild(ui::separator());
+ 
+-  // Telemetry
+-  {
+-    auto card = makeCard(scale, panelCardOpacity());
+-
+-    auto row = makeRow(scale);
+-    {
+-      auto col = makeTextColumn();
+-      col->addChild(makeLabel(
+-          i18n::tr("settings.schema.shell.telemetry.label"), Style::fontSizeBody * scale,
+-          colorSpecFromRole(ColorRole::OnSurface), FontWeight::Bold
+-      ));
+-      auto description = makeLabel(
+-          i18n::tr("settings.schema.shell.telemetry.description"), Style::fontSizeCaption * scale,
+-          colorSpecFromRole(ColorRole::OnSurfaceVariant)
+-      );
+-      description->setMaxLines(8);
+-      col->addChild(std::move(description));
+-      row->addChild(std::move(col));
+-    }
+-    {
+-      row->addChild(
+-          ui::toggle({
+-              .out = &m_telemetryToggle,
+-              .checked = cfg.shell.telemetryEnabled,
+-              .scale = scale,
+-          })
+-      );
+-    }
+-    card->addChild(std::move(row));
+-    content->addChild(std::move(card));
+-  }
+-
+   // Wallpaper
+   {
+     auto card = makeCard(scale, panelCardOpacity());
+@@ -482,9 +450,6 @@ void SetupWizardPanel::configureThemeOptionSelect() {
+ }
+ 
+ void SetupWizardPanel::commit() {
+-  if (m_telemetryToggle != nullptr) {
+-    m_config->setOverride({"shell", "telemetry_enabled"}, m_telemetryToggle->checked());
+-  }
+   // Theme/palette overrides are written live by the select callbacks only when
+   // the user actually changes them, so commit must not force any defaults here.
+   if (m_config != nullptr) {
+diff --git a/src/shell/setup_wizard/setup_wizard_panel.h b/src/shell/setup_wizard/setup_wizard_panel.h
+index e030a8e..60ac985 100644
+--- a/src/shell/setup_wizard/setup_wizard_panel.h
++++ b/src/shell/setup_wizard/setup_wizard_panel.h
+@@ -36,7 +36,6 @@ private:
+   ConfigService* m_config = nullptr;
+   Flex* m_root = nullptr;
+   Image* m_logo = nullptr;
+-  Toggle* m_telemetryToggle = nullptr;
+   Select* m_modeSelect = nullptr;
+   Select* m_themeSourceSelect = nullptr;
+   Label* m_themeOptionLabel = nullptr;
+diff --git a/src/system/telemetry_service.cpp b/src/system/telemetry_service.cpp
+deleted file mode 100644
+index 539ba82..0000000
+--- a/src/system/telemetry_service.cpp
++++ /dev/null
+@@ -1,135 +0,0 @@
+-#include "system/telemetry_service.h"
+-
+-#include "config/config_service.h"
+-#include "core/log.h"
+-#include "net/http_client.h"
+-#include "system/distro_info.h"
+-#include "system/hardware_info.h"
+-#include "util/file_utils.h"
+-#include "util/string_utils.h"
+-#include "wayland/wayland_connection.h"
+-
+-#include <cstdio>
+-#include <filesystem>
+-#include <format>
+-#include <fstream>
+-#include <nlohmann/json.hpp>
+-#include <string>
+-
+-namespace {
+-
+-  constexpr Logger kLog("telemetry");
+-
+-  std::string instanceIdPath() {
+-    const std::string dir = FileUtils::stateDir();
+-    if (dir.empty()) {
+-      return {};
+-    }
+-    return dir + "/instance.id";
+-  }
+-
+-  std::string loadOrCreateInstanceId() {
+-    const std::string path = instanceIdPath();
+-    if (path.empty()) {
+-      return {};
+-    }
+-
+-    {
+-      std::ifstream in(path);
+-      if (in.is_open()) {
+-        std::string id;
+-        std::getline(in, id);
+-        if (!id.empty()) {
+-          return id;
+-        }
+-      }
+-    }
+-
+-    std::string id = StringUtils::generateUuid();
+-    if (id.empty()) {
+-      return {};
+-    }
+-
+-    std::error_code ec;
+-    std::filesystem::create_directories(std::filesystem::path(path).parent_path(), ec);
+-    std::ofstream out(path);
+-    if (out.is_open()) {
+-      out << id;
+-    }
+-    return id;
+-  }
+-
+-  int memoryTotalGb() {
+-    std::ifstream file("/proc/meminfo");
+-    if (!file.is_open()) {
+-      return 0;
+-    }
+-    std::string line;
+-    while (std::getline(file, line)) {
+-      if (!line.starts_with("MemTotal:")) {
+-        continue;
+-      }
+-      const std::size_t start = line.find_first_of("0123456789");
+-      if (start == std::string::npos) {
+-        return 0;
+-      }
+-      const std::size_t end = line.find_first_not_of("0123456789", start);
+-      try {
+-        const auto kb = std::stoull(line.substr(start, end - start));
+-        return static_cast<int>((kb + 524288) / 1048576);
+-      } catch (...) {
+-        return 0;
+-      }
+-    }
+-    return 0;
+-  }
+-
+-} // namespace
+-
+-void TelemetryService::maybeSend(
+-    const ConfigService& config, HttpClient& httpClient, const WaylandConnection& wayland
+-) {
+-  if (m_sent) {
+-    return;
+-  }
+-  m_sent = true;
+-
+-  const auto& cfg = config.config().shell;
+-  if (!cfg.telemetryEnabled) {
+-    kLog.info("telemetry disabled");
+-    return;
+-  }
+-
+-  const std::string instanceId = loadOrCreateInstanceId();
+-  if (instanceId.empty()) {
+-    kLog.warn("failed to load or create instance ID");
+-    return;
+-  }
+-
+-  nlohmann::json monitors = nlohmann::json::array();
+-  for (const auto& output : wayland.outputs()) {
+-    if (!output.done) {
+-      continue;
+-    }
+-    monitors.push_back({{"width", output.width}, {"height", output.height}, {"scale", output.scale}});
+-  }
+-
+-  nlohmann::json payload = {
+-      {"instanceId", instanceId},
+-      {"version", std::string("v") + NOCTALIA_VERSION},
+-      {"compositor", compositorLabel()},
+-      {"os", distroLabel()},
+-      {"ramGb", memoryTotalGb()},
+-      {"monitors", monitors},
+-      {"ui", {{"scaleRatio", config.config().accessibility.uiScale}}},
+-  };
+-
+-  kLog.info("sending anonymous ping");
+-  httpClient.post("https://api.noctalia.dev/ping", payload.dump(), "application/json", [](bool success) {
+-    if (success) {
+-      kLog.debug("ping sent");
+-    } else {
+-      kLog.debug("ping failed");
+-    }
+-  });
+-}
+diff --git a/src/system/telemetry_service.h b/src/system/telemetry_service.h
+deleted file mode 100644
+index 12df3c0..0000000
+--- a/src/system/telemetry_service.h
++++ /dev/null
+@@ -1,13 +0,0 @@
+-#pragma once
+-
+-class ConfigService;
+-class HttpClient;
+-class WaylandConnection;
+-
+-class TelemetryService {
+-public:
+-  void maybeSend(const ConfigService& config, HttpClient& httpClient, const WaylandConnection& wayland);
+-
+-private:
+-  bool m_sent = false;
+-};

@@ -83,6 +83,8 @@ def main():
         time.sleep(2)
         _, output = user('hyprctl --instance 0 clients | grep -c "^Window"; hyprctl --instance 0 layers | grep -c -i -E "wizard|setup"')
         checks.report(output == '1\n0', 'nothing else opens on a first login: no news, no first-run dialog', output)
+        status, output = machine.run('pacman -Qq kavat-shell && ! grep -a -c -E "noctalia.dev/ping|telemetry_enabled" /usr/bin/noctalia')
+        checks.report(status == 0, "the shell is the system's fork, with nothing in it to send a ping", output)
         dark = light_at(BAR)
         checks.report(dark < 60, "the shell's bar is dark on the screen", f'lightness {dark} of 255')
         machine.screen.picture(f'{pictures}/theme-dark.png')

@@ -1,13 +1,13 @@
 pkgname=kavat-hyprland
 pkgver=0.1.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Willwitcher-OS Kavat Edition: the system's Hyprland configuration"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # Hyprland, the shell it starts, the theme its look comes from, and every program its
 # shortcuts open
-depends=('hyprland' 'noctalia' 'kavat-theme' 'kavat-kitty' 'yazi' 'hyprlock' 'hyprpicker' 'grim' 'slurp' 'wl-clipboard')
+depends=('hyprland' 'kavat-shell' 'kavat-theme' 'kavat-kitty' 'yazi' 'hyprlock' 'hyprpicker' 'grim' 'slurp' 'wl-clipboard')
 source=('hyprland.lua')
 sha256sums=('SKIP')
 

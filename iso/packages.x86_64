@@ -42,11 +42,12 @@ rtkit
 # Graphics: Mesa comes with Hyprland; this is the Vulkan driver of the target machine
 vulkan-radeon
 
-# Desktop: Hyprland and Noctalia as Arch ships them, with the configuration from [kavat].
+# Desktop: Hyprland as Arch ships it, and kavat-shell, the system's fork of Noctalia, with
+# the configuration from [kavat].
 # kavat-hyprland brings what its shortcuts open: Kitty, Yazi, hyprlock and the capture tools,
 # and the theme system, kavat-theme, that gives all of them their look.
 hyprland
-noctalia
+kavat-shell
 kavat-hyprland
 
 # Login screen of the installed system: LightDM with the system's own greeter, which draws

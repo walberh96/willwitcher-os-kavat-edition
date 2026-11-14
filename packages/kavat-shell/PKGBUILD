@@ -1,0 +1,95 @@
+pkgname=kavat-shell
+pkgver=5.4.1
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: the desktop shell, a fork of Noctalia that sends nothing about you"
+arch=('x86_64')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+# Noctalia is MIT, and so is what this package changes in it
+license=('MIT')
+# It is Noctalia under its own name: what asks for noctalia gets this, and the two do not
+# live together. The program is still called noctalia.
+provides=("noctalia=$pkgver")
+conflicts=('noctalia')
+# From here to the end of package(), Arch's own recipe for Noctalia 5.4.1, with the patch added.
+depends=(
+  'bash'
+  'cairo'
+  'curl'
+  'fontconfig'
+  'freetype2'
+  'git'
+  'glib2'
+  'glibc'
+  'harfbuzz'
+  'hicolor-icon-theme'
+  'jemalloc'
+  'libgcc'
+  'libglvnd'
+  'libical'
+  'libjxl'
+  'libpipewire'
+  'libqalculate'
+  'librsvg'
+  'libsecret'
+  'libsndfile'
+  'libsodium'
+  'libstdc++'
+  'libwebp'
+  'libwireplumber'
+  'libxkbcommon'
+  'libxml2'
+  'md4c'
+  'pam'
+  'polkit'
+  'pango'
+  'sdbus-cpp'
+  'tomlplusplus'
+  'wayland'
+)
+optdepends=(
+  'ddcutil: monitor brightness control'
+  'power-profiles-daemon: power profile management'
+  'upower: battery and power device integration'
+)
+
+makedepends=(
+  'meson'
+  'ninja'
+  'nlohmann-json'
+  'pkgconf'
+  'stb'
+  'wayland-protocols'
+)
+source=("noctalia-$pkgver.tar.gz::https://github.com/noctalia-dev/noctalia/archive/refs/tags/v$pkgver.tar.gz"
+        'no-ping.patch')
+sha256sums=('6069d922e9d72488c74e4ce335314ce2203f08bd4641380bfe1bd137004597fa'
+            'SKIP')
+options=('!debug')
+
+# The fork, for now, is one change: Noctalia's "anonymous startup ping" is gone. The code
+# that sent it, its switch in the settings and the offer of it in the first-run dialog are
+# taken out, so there is nothing left to switch on.
+prepare() {
+  cd "noctalia-$pkgver"
+  patch -p1 < "$srcdir/no-ping.patch"
+}
+
+build() {
+  CXXFLAGS+=" -Wno-unused-result"
+  arch-meson "noctalia-$pkgver" build-release \
+    -Db_ndebug=true \
+    -Dtests=disabled
+  meson compile -C build-release
+  for shell in bash fish zsh; do
+    build-release/noctalia completions "$shell" > "${shell}-completion"
+  done
+}
+
+package() {
+  meson install -C build-release --destdir "$pkgdir"
+
+  install -Dm644 "noctalia-$pkgver/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 bash-completion "$pkgdir/usr/share/bash-completion/completions/noctalia"
+  install -Dm644 fish-completion "$pkgdir/usr/share/fish/vendor_completions.d/noctalia.fish"
+  install -Dm644 zsh-completion "$pkgdir/usr/share/zsh/site-functions/_noctalia"
+}
