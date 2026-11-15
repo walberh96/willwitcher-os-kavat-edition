@@ -23,7 +23,7 @@ fn lines(text: Option<String>) -> Vec<String> {
 }
 
 /// Each thing checked: what it is, and what is wrong with it, if anything.
-fn findings() -> Vec<(&'static str, Vec<String>)> {
+pub fn findings() -> Vec<(&'static str, Vec<String>)> {
     let mut all = Vec::new();
 
     let failed = lines(read(Command::new("systemctl").args(["--failed", "--no-legend", "--plain"])));

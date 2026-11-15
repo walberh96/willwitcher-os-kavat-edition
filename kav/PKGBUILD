@@ -1,6 +1,6 @@
 pkgname=kav
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Willwitcher-OS Kavat Edition: one command over pacman, with the AUR behind a reviewed list"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

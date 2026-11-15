@@ -44,6 +44,41 @@ package() {
   curl -fsSL https://get.example.net/install | sh
 }
 '''
+# A terminal that is not there: kav is run in it with no arguments, keys are typed, and what
+# it drew is searched for the words given after the keys. It prints the words it did not
+# find, and how kav ended.
+SCREEN = r'''
+import fcntl, os, pty, re, select, struct, sys, termios, time
+keys, words = sys.argv[1].split(","), sys.argv[2].split(",")
+pid, fd = pty.fork()
+if pid == 0:
+    os.environ["TERM"] = "xterm-256color"
+    os.execv("/usr/bin/kav", ["kav"])
+fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 30, 110, 0, 0))
+drawn = b""
+def watch(seconds):
+    global drawn
+    end = time.time() + seconds
+    while time.time() < end:
+        if select.select([fd], [], [], 0.1)[0]:
+            try:
+                drawn += os.read(fd, 65536)
+            except OSError:
+                return
+watch(4)
+for key in keys:
+    os.write(fd, key.replace("ENTER", "\r").encode())
+    watch(1.5)
+text = re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b" ", drawn).decode("utf-8", "replace")
+for _ in range(2):  # the first closes what is open over the screen, the second leaves
+    try:
+        os.write(fd, b"q")
+    except OSError:
+        break
+    watch(1)
+print("missing:", ",".join(word for word in words if word not in text))
+print("ended:", os.waitstatus_to_exitcode(os.waitpid(pid, 0)[1]))
+'''
 # kav as a normal user, pointed at the folder that stands in for the AUR
 AS_USER = f'runuser -u {USER} -- env HOME=/home/{USER} KAV_AUR=file://{AUR} '
 
@@ -128,6 +163,14 @@ def main():
                                      f'cat /home/{USER}/.cache/kav/aur/{FAKE}/PKGBUILD')
         checks.report('at the commit reviewed on' in output and 'curl' not in output.split('at the commit reviewed on')[-1],
                       'what it takes to build is the approved commit, not the newest', output)
+
+        machine.run(f"cat > /var/tmp/screen.py << 'END'\n{SCREEN}END\nchmod 644 /var/tmp/screen.py")
+        status, output = machine.run(f'{AS_USER} python3 /var/tmp/screen.py "6,4,3,/,{PACKAGE},ENTER,ENTER,x,?" '
+                                     f'"Dashboard,Last snapshot,Installed,Health,Recent activity,Doctor,ok ,{FAKE},looking for,{PACKAGE},Version,Help"', 60)
+        checks.report(output == 'missing: \nended: 0',
+                      'kav with no arguments opens everything on one screen: its tabs, a search, a record and the help', output)
+        status, output = machine.run('kav < /dev/null | head -n 1')
+        checks.report('usage: kav' in output, 'and away from a terminal it says how it is used', output)
 
         status, output = machine.run('kav doctor')
         checks.report(status == 0 and 'FAIL' not in output, 'kav doctor finds the system healthy', output)

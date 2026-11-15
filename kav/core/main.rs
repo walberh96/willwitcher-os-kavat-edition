@@ -10,6 +10,7 @@ mod aur;
 mod doctor;
 mod review;
 mod system;
+mod tui;
 
 use allowlist::{Allowlist, Entry};
 use std::io::{IsTerminal, Write};
@@ -17,7 +18,8 @@ use std::process::Command;
 use system::{Paths, as_root, read, run};
 
 const USAGE: &str = "\
-usage: kav <command>
+usage: kav             in a terminal: everything below on one screen
+       kav <command>
 
   install <package>…   install packages: from Arch's repositories, from [kavat], or from the
                        AUR when the package is on the reviewed list
@@ -408,6 +410,8 @@ fn command(arguments: &[String]) -> Result<(), String> {
         ["undo"] => undo(false),
         ["undo", "--yes"] => undo(true),
         ["doctor"] => doctor::check(),
+        // with nothing asked and a person at the terminal: everything on one screen
+        [] if std::io::stdin().is_terminal() && std::io::stdout().is_terminal() => tui::run(paths),
         [] | ["help"] | ["--help"] | ["-h"] => {
             println!("{USAGE}");
             Ok(())
