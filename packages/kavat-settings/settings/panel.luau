@@ -13,21 +13,21 @@ local PALETTES = "/usr/share/kavat/themes/palettes"
 -- and, for the ones still to come, what they wait for
 local PAGES = {
   { id = "appearance", name = "Appearance" },
-  { id = "wallpaper", name = "Wallpaper", waits = "the wallpapers, images and video" },
-  { id = "accessibility", name = "Accessibility", waits = "the accessibility settings" },
+  { id = "wallpaper", name = "Wallpaper" },
+  { id = "accessibility", name = "Accessibility" },
   { id = "windows", name = "Windows", about = "Hyprland" },
-  { id = "keys", name = "Keybindings", waits = "the shortcut editor" },
-  { id = "displays", name = "Displays", waits = "the displays page" },
+  { id = "keys", name = "Keybindings" },
+  { id = "displays", name = "Displays" },
   { id = "gpu", name = "GPU", waits = "the graphics card's controls" },
-  { id = "sound", name = "Sound", waits = "the sound page; the shell's own control center has the volume today" },
-  { id = "network", name = "Network", about = "& Bluetooth", waits = "the network page; the shell's own control center has it today" },
-  { id = "terminal", name = "Terminal", about = "Kitty", waits = "Kitty's settings page" },
-  { id = "editor", name = "Editor", about = "Neovim", waits = "the editor's settings page" },
-  { id = "files", name = "Files", about = "Yazi", waits = "the files' settings page" },
+  { id = "sound", name = "Sound" },
+  { id = "network", name = "Network", about = "& Bluetooth" },
+  { id = "terminal", name = "Terminal", about = "Kitty" },
+  { id = "editor", name = "Editor", about = "Neovim" },
+  { id = "files", name = "Files", about = "Yazi" },
   { id = "notes", name = "Notes", about = "nb" },
   { id = "shell", name = "Shell", about = "zsh", waits = "the terminal shell's settings page" },
   { id = "browser", name = "Browser", waits = "the browser" },
-  { id = "bar", name = "Bar & widgets", waits = "the bar's page; the shell's own settings have it today" },
+  { id = "bar", name = "Bar & widgets" },
   { id = "modes", name = "Modes", waits = "the system modes" },
   { id = "projects", name = "Projects", waits = "the projects" },
   { id = "agent", name = "Agent & voice", waits = "the local agent" },
@@ -37,7 +37,7 @@ local PAGES = {
   { id = "privacy", name = "Privacy & network", waits = "the privacy page" },
   { id = "boot", name = "Boot", about = "GRUB" },
   { id = "login", name = "Login & lock" },
-  { id = "language", name = "Language & region", waits = "the language page; the installer sets it today" },
+  { id = "language", name = "Language & region" },
 }
 
 local page = "appearance"
@@ -49,6 +49,9 @@ local busy = false
 local packages = { installed = "…", updates = "…" }
 local due = "…"
 local boot_said = ""
+local conf = {}        -- what kavat-conf says each page's settings are, by page and name
+local shortcuts = {}   -- the desktop's shortcuts: keys, what they do, their group
+local displays = {}    -- the screens, as Hyprland lists them
 
 local render
 
@@ -127,6 +130,16 @@ local function set(...)
   end)
 end
 
+-- The mode: light, dark, or by the hour, which a small program of the theme's looks after
+local function set_mode(mode)
+  if mode == "auto" then
+    set("auto.follow", "true")
+  else
+    set("auto.follow", "false", "mode", mode)
+  end
+  noctalia.runAsync("sleep 1; /usr/lib/kavat/theme-auto", function() read_theme() end)
+end
+
 local function read_packages()
   noctalia.runAsync("pacman -Qq | wc -l; pacman -Qu 2>/dev/null | wc -l", function(result)
     local installed, updates = result.stdout:match("(%d+)%s+(%d+)")
@@ -140,6 +153,45 @@ local function read_notes()
     due = trim(result.stdout) ~= "" and result.stdout or "Nothing is due."
     render()
   end)
+end
+
+-- The settings an app keeps in its own file are read and changed by kavat-conf, which
+-- knows the file, how a line of it is written and what each setting may be.
+local function read_conf(name)
+  noctalia.runAsync({ "kavat-conf", "show", name }, function(result)
+    conf[name] = {}
+    for line in result.stdout:gmatch("[^\n]+") do
+      local key, value = line:match("^(%S+) (.*)$")
+      if key then
+        conf[name][key] = value
+      end
+    end
+    render()
+  end)
+end
+
+local function set_conf(name, key, value)
+  busy = true
+  said = ""
+  render()
+  noctalia.runAsync({ "kavat-conf", "set", name, key, value }, function(result)
+    busy = false
+    if result.exitCode ~= 0 then
+      said = trim(result.stderr ~= "" and result.stderr or result.stdout)
+    end
+    read_conf(name)
+  end)
+end
+
+local function read_shortcuts()
+  shortcuts = {}
+  local text = noctalia.readFile("/usr/share/kavat/hypr/shortcuts.tsv") or ""
+  for line in text:gmatch("[^\n]+") do
+    local keys, what, group = line:match("^([^#\t][^\t]*)\t([^\t]*)\t(.*)$")
+    if keys then
+      shortcuts[#shortcuts + 1] = { keys = keys, what = what, group = group }
+    end
+  end
 end
 
 -- The pieces every page is made of ------------------------------------------------------
@@ -185,6 +237,34 @@ end
 
 local function note(text)
   return ui.label({ text = text, color = "on_surface_variant", fontSize = 12, maxWidth = 440 })
+end
+
+-- A setting kept by kavat-conf, as a switch: on is one value in the file and off another
+local function conf_toggle(name, key, on, off)
+  local now = (conf[name] or {})[key]
+  return ui.row({ justify = "end", flexGrow = 1 }, {
+    ui.toggle({ checked = now == on, enabled = not busy and now ~= nil,
+      onChange = function(checked) set_conf(name, key, checked == "true" and on or off) end }),
+  })
+end
+
+-- The same, as a choice of a few side by side; each choice is { value, text }
+local function conf_choice(name, key, choices)
+  local now, list = (conf[name] or {})[key], {}
+  for _, choice in ipairs(choices) do
+    list[#list + 1] = { text = choice[2], on = now == choice[1], pick = function() set_conf(name, key, choice[1]) end }
+  end
+  return segmented(list)
+end
+
+-- And as a list to pick from
+local function conf_select(name, key, choices)
+  local now, values, texts = (conf[name] or {})[key], {}, {}
+  for _, choice in ipairs(choices) do
+    values[#values + 1] = choice[1]
+    texts[#texts + 1] = choice[2]
+  end
+  return select(texts, index_of(values, now), function(index) set_conf(name, key, values[index]) end)
 end
 
 -- The pages ---------------------------------------------------------------------------
@@ -242,22 +322,33 @@ local function appearance()
   local scale_names = { "90%", "100%", "110%", "125%", "150%" }
   local scale = string.format("%.2f", tonumber(theme["fonts.scale"]) or 1):gsub("0$", "")
   local dark, tone = theme.mode == "dark", theme.tone
+  local auto = theme["auto.follow"] == "true"
+  local style, size = theme["icons.style"] or "colour", theme["cursor.size"] or "24"
 
   local left = {
     section("Palette"),
     ui.column({ gap = 10 }, cards),
     section("Mode"),
     ui.row({}, { segmented({
-      { text = "Light", on = not dark, pick = function() set("mode", "light") end },
-      { text = "Dark", on = dark, pick = function() set("mode", "dark") end },
-      { text = "Auto", on = false },
+      { text = "Light", on = not dark and not auto, pick = function() set_mode("light") end },
+      { text = "Dark", on = dark and not auto, pick = function() set_mode("dark") end },
+      { text = "Auto", on = auto, pick = function() set_mode("auto") end },
     }) }),
+    note(auto and ("Light from " .. (theme["auto.light_from"] or "7") .. ":00, dark from " .. (theme["auto.dark_from"] or "19") .. ":00. The hours are in the theme's file.") or ""),
     section("Accent"),
     ui.row({ gap = 8 }, dots),
     section("Icons and cursor"),
-    row("Icon style", segmented({ { text = "Colour", on = true, pick = function() end }, { text = "Tinted", on = false }, { text = "Line", on = false } })),
-    row("Cursor size", segmented({ { text = "24", on = true, pick = function() end }, { text = "32", on = false }, { text = "48", on = false } })),
-    note("The folders and the cursor follow the palette, the mode and the accent. The other icon styles and cursor sizes are not built yet."),
+    row("Icon style", segmented({
+      { text = "Colour", on = style == "colour", pick = function() set("icons.style", "colour") end },
+      { text = "Tinted", on = style == "tinted", pick = function() set("icons.style", "tinted") end },
+      { text = "Line", on = style == "line", pick = function() set("icons.style", "line") end },
+    })),
+    row("Cursor size", segmented({
+      { text = "24", on = size == "24", pick = function() set("cursor.size", "24") end },
+      { text = "32", on = size == "32", pick = function() set("cursor.size", "32") end },
+      { text = "48", on = size == "48", pick = function() set("cursor.size", "48") end },
+    })),
+    note("Colour leaves each app its own colours and puts the accent on the folders. Tinted paints every app's icon with the palette. Line draws the folders, and the apps that have one, as outlines."),
   }
   local right = {
     section("Tone & contrast"),
@@ -344,6 +435,9 @@ local function boot()
   } }
 end
 
+local MINUTES = { { "0", "Never" }, { "1", "1 minute" }, { "5", "5 minutes" }, { "10", "10 minutes" }, { "15", "15 minutes" },
+  { "30", "30 minutes" }, { "60", "1 hour" } }
+
 local function login()
   return { title = "Login & lock", sub = "kavat-greeter · hyprlock", file = "/etc/kavat/theme.toml", left = {
     section("Look"),
@@ -352,7 +446,9 @@ local function login()
     ui.label({ text = boot_said, color = "on_surface_variant", maxWidth = 440 }),
   }, right = {
     section("Lock"),
-    note("The lock screen and its timings are not on this page yet."),
+    row("Lock after", conf_select("lock", "lock_after", MINUTES)),
+    row("Screen off after", conf_select("lock", "screen_off_after", MINUTES)),
+    note("Super+Shift+L locks at once. The lock screen wears the theme, with the same picture as the login."),
   } }
 end
 
@@ -401,7 +497,218 @@ local function notes()
   } }
 end
 
-local BUILT = { appearance = appearance, windows = windows, boot = boot, login = login, packages = pages_packages, notes = notes }
+local function terminal()
+  local padding = tonumber((conf.terminal or {}).window_padding_width) or 0
+  return { title = "Terminal", sub = "Kitty · changes apply live", file = "~/.config/kitty/kitty.conf", left = {
+    section("Cursor"),
+    row("Shape", conf_choice("terminal", "cursor_shape", { { "block", "Block" }, { "beam", "Beam" }, { "underline", "Underline" } })),
+    row("Blinks", conf_toggle("terminal", "cursor_blink_interval", "-1", "0")),
+    section("Window"),
+    row("Margin", ui.slider({ min = 0, max = 24, step = 1, value = padding, flexGrow = 1, controlSize = "sm", enabled = not busy,
+      onDragEnd = function(now) set_conf("terminal", "window_padding_width", tostring(math.floor(tonumber(now) + 0.5))) end })),
+    row("Tabs", conf_select("terminal", "tab_bar_style", { { "fade", "Fade" }, { "separator", "Separator" }, { "powerline", "Powerline" }, { "hidden", "Hidden" } })),
+    note("The font, its size and how much the background lets through come from Appearance."),
+  }, right = {
+    section("History"),
+    row("Lines kept", conf_select("terminal", "scrollback_lines", { { "2000", "2,000" }, { "10000", "10,000" }, { "50000", "50,000" }, { "200000", "200,000" } })),
+    section("Behaviour"),
+    row("Bell", conf_toggle("terminal", "enable_audio_bell", "yes", "no")),
+    row("Ask before closing", conf_toggle("terminal", "confirm_os_window_close", "-1", "0")),
+  } }
+end
+
+local function editor()
+  return { title = "Editor", sub = "Neovim · from the next time it opens", file = "~/.config/kavat/editor.json", left = {
+    section("Typing"),
+    row("Opens ready to type", conf_toggle("editor", "start_typing", "true", "false")),
+    row("Format on saving", conf_toggle("editor", "format_on_save", "true", "false")),
+    row("Indent", conf_choice("editor", "indent", { { "2", "2" }, { "4", "4" }, { "8", "8" } })),
+  }, right = {
+    section("View"),
+    row("Wrap long lines", conf_toggle("editor", "wrap", "true", "false")),
+    row("Relative line numbers", conf_toggle("editor", "relative_numbers", "true", "false")),
+    note("The shortcut presets, the language packs, the plugins and the side panels are not on this page yet. Your own init.lua has the last word."),
+  } }
+end
+
+local function files()
+  return { title = "Files", sub = "Yazi · from the next time it opens", file = "~/.config/yazi/yazi.toml", left = {
+    section("List"),
+    row("Hidden files", conf_toggle("files", "mgr.show_hidden", "true", "false")),
+    row("Folders first", conf_toggle("files", "mgr.sort_dir_first", "true", "false")),
+    row("Sort by", conf_select("files", "mgr.sort_by", { { "natural", "Name" }, { "alphabetical", "Name, letter by letter" }, { "mtime", "Date changed" }, { "size", "Size" }, { "extension", "Kind" } })),
+    row("Beside each name", conf_select("files", "mgr.linemode", { { "none", "Nothing" }, { "size", "Size" }, { "mtime", "Date changed" }, { "permissions", "Permissions" } })),
+  }, right = {
+    section("The window apps pick files with"),
+    note("Every app opens and saves files with Yazi, in a floating window. Dragging is Yazi's own, with the mouse."),
+    note("The copy window, what a download does and the apps each kind of file opens with are not on this page yet."),
+  } }
+end
+
+-- One of the shell's own panels, opened in the place of this one
+local function shell_panel(text, what)
+  return ui.button({ text = text, variant = "outline", onClick = function()
+    panel.close()
+    noctalia.runAsync("kavat-shell msg " .. what)
+  end })
+end
+
+local function wallpaper()
+  return { title = "Wallpaper", sub = "the desktop's background", file = "~/.config/kavat/theme.toml", left = {
+    section("The theme's picture"),
+    note("The background is the same picture as the boot and the login, in the colours of the theme, and changes with it."),
+    ui.row({ gap = 8 }, {
+      ui.button({ text = "Use the theme's picture", variant = "primary", onClick = function()
+        -- with no picture of your own in place, the theme's is put back
+        noctalia.runAsync("kavat-shell msg wallpaper-set \"$(ls ${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/wallpaper/*.svg | head -n 1)\"")
+      end }),
+    }),
+  }, right = {
+    section("A picture of your own"),
+    note("A picture you choose stays when the theme changes."),
+    ui.row({ gap = 8 }, { shell_panel("Choose a picture", "panel-toggle wallpaper") }),
+    note("Video backgrounds and a picture for each screen are not built yet."),
+  } }
+end
+
+local function accessibility()
+  local scales, scale_names = { "1.0", "1.1", "1.25", "1.5" }, { "100%", "110%", "125%", "150%" }
+  local scale = string.format("%.2f", tonumber(theme["fonts.scale"]) or 1):gsub("0$", "")
+  local still = (tonumber(theme["effects.animations"]) or 1) == 0
+  return { title = "Accessibility", sub = "easier to look at", file = "~/.config/kavat/theme.toml", left = {
+    section("Motion"),
+    row("Reduce motion", ui.row({ justify = "end", flexGrow = 1 }, {
+      ui.toggle({ checked = still, enabled = not busy, onChange = function(now) set("effects.animations", now == "true" and "0" or "1.0") end }),
+    })),
+    section("Text"),
+    row("Text scale", select(scale_names, index_of(scales, scale), function(index) set("fonts.scale", scales[index]) end)),
+  }, right = {
+    section("Contrast"),
+    row("High contrast", ui.row({ justify = "end", flexGrow = 1 }, {
+      ui.toggle({ checked = theme.contrast == "high", enabled = not busy, onChange = function(now) set("contrast", now == "true" and "high" or "normal") end }),
+    })),
+    row("Bigger cursor", segmented({
+      { text = "24", on = (theme["cursor.size"] or "24") == "24", pick = function() set("cursor.size", "24") end },
+      { text = "32", on = theme["cursor.size"] == "32", pick = function() set("cursor.size", "32") end },
+      { text = "48", on = theme["cursor.size"] == "48", pick = function() set("cursor.size", "48") end },
+    })),
+    note("These are the theme's own settings, also on Appearance: here they are together."),
+  } }
+end
+
+local function sound()
+  return { title = "Sound", sub = "PipeWire", left = {
+    section("Volume and devices"),
+    note("The output, the input and the volume of each app are in the shell's control center."),
+    ui.row({ gap = 8 }, { shell_panel("Open the sound controls", "panel-toggle control-center audio") }),
+  }, right = {
+    section("Not built yet"),
+    note("Noise suppression for the microphone."),
+  } }
+end
+
+local function network()
+  return { title = "Network", sub = "NetworkManager · BlueZ", left = {
+    section("Connections"),
+    note("Cable, Wi-Fi and VPNs are in the shell's control center."),
+    ui.row({ gap = 8 }, { shell_panel("Open the network", "panel-toggle control-center network") }),
+  }, right = {
+    section("Bluetooth"),
+    note("Devices and their battery."),
+    ui.row({ gap = 8 }, { shell_panel("Open Bluetooth", "panel-toggle control-center bluetooth") }),
+  } }
+end
+
+local function bar()
+  return { title = "Bar & widgets", sub = "Kavat Shell", file = "~/.config/kavat-shell/config.toml", left = {
+    section("The bar, the launcher and the notifications"),
+    note("Where the bar is, its widgets and their order, the launcher and the notifications are in the shell's own settings window."),
+    ui.row({ gap = 8 }, { shell_panel("Open the shell's settings", "settings-open") }),
+  }, right = {
+    section("Mind the theme"),
+    note("The shell's settings have a page for colours too. The system's colours are set on Appearance: what is changed there is put back at the next change of theme."),
+  } }
+end
+
+local function language()
+  local first = (conf.language or {}).keyboard_first
+  return { title = "Language & region", sub = "the keyboard", file = "~/.config/kavat/desktop.json", left = {
+    section("Keyboard"),
+    row("The one in use first", segmented({
+      { text = "English (US)", on = first == "us", pick = function() set_conf("language", "keyboard_first", "us") end },
+      { text = "Spanish", on = first == "es", pick = function() set_conf("language", "keyboard_first", "es") end },
+    })),
+    note("Alt+Shift goes to the other one and back. The system has these two keyboards."),
+  }, right = {
+    section("Language"),
+    note("The system's own texts are in English. The language of the other apps, the formats of dates and numbers and the time zone are set when the system is installed; changing them here is not built yet."),
+  } }
+end
+
+local function read_displays()
+  noctalia.runAsync("hyprctl monitors 2>/dev/null || hyprctl --instance 0 monitors", function(result)
+    displays = {}
+    local current
+    for line in result.stdout:gmatch("[^\n]+") do
+      local name = line:match("^Monitor (%S+)")
+      if name then
+        current = { name = name, mode = "", scale = "", what = "" }
+        displays[#displays + 1] = current
+      elseif current then
+        current.mode = line:match("^%s+(%d+x%d+@[%d.]+)") or current.mode
+        current.scale = line:match("^%s+scale: ([%d.]+)") or current.scale
+        current.what = line:match("^%s+description: (.*)") or current.what
+      end
+    end
+    render()
+  end)
+end
+
+local function pages_displays()
+  local list = {}
+  for _, display in ipairs(displays) do
+    local size, rate = display.mode:match("^(%d+x%d+)@([%d.]+)")
+    list[#list + 1] = ui.column({ key = "display-" .. display.name, gap = 2, padding = 12, radius = 10, fill = "surface_container" }, {
+      ui.label({ text = display.name, fontWeight = "bold" }),
+      ui.label({ text = display.what, color = "on_surface_variant", fontSize = 12, maxWidth = 420 }),
+      ui.label({ text = (size or "?") .. " · " .. string.format("%.0f", tonumber(rate) or 0) .. " Hz · scale " .. display.scale, fontFamily = "JetBrains Mono", fontSize = 12 }),
+    })
+  end
+  if #list == 0 then
+    list[1] = note("Hyprland lists no screen.")
+  end
+  return { title = "Displays", sub = "Hyprland", file = "/usr/share/kavat/hypr/hyprland.lua", left = { section("Connected now"), ui.column({ gap = 8 }, list) }, right = {
+    section("Not built yet"),
+    note("Placing the screens by dragging them, the resolution, the refresh rate, the scale and the rotation of each, and night light. Today every screen is used at its own best mode, side by side."),
+  } }
+end
+
+local function keys()
+  -- the shortcuts in two columns, group by group; each group is a tight list of its own
+  local columns, rows, last = { {}, {} }, nil, nil
+  local half = 0
+  for index, shortcut in ipairs(shortcuts) do
+    if shortcut.group ~= last then
+      -- a group goes whole to the second column once the first has half of them
+      local column = columns[half * 2 < #shortcuts and 1 or 2]
+      rows = {}
+      column[#column + 1] = section(shortcut.group)
+      column[#column + 1] = ui.column({ key = "group-" .. shortcut.group, gap = 2 }, rows)
+      last = shortcut.group
+    end
+    rows[#rows + 1] = ui.row({ key = "key-" .. shortcut.keys, align = "center", gap = 12, minHeight = 24 }, {
+      ui.column({ width = 180, minWidth = 180 }, { ui.label({ text = shortcut.keys, fontFamily = "JetBrains Mono", fontSize = 12, color = "primary" }) }),
+      ui.label({ text = shortcut.what, fontSize = 13 }),
+    })
+    half = index
+  end
+  return { title = "Keybindings", sub = "the desktop's shortcuts · Super+/ opens this list", file = "/usr/share/kavat/hypr/hyprland.lua",
+    left = columns[1], right = columns[2] }
+end
+
+local BUILT = { appearance = appearance, wallpaper = wallpaper, accessibility = accessibility, windows = windows, keys = keys,
+  displays = pages_displays, sound = sound, network = network, terminal = terminal, editor = editor, files = files, notes = notes,
+  bar = bar, packages = pages_packages, boot = boot, login = login, language = language }
 
 local function waiting(entry)
   return { title = entry.name, sub = entry.about or "", left = {
@@ -423,7 +730,7 @@ function render()
     end
     if search == "" or (entry.name .. " " .. (entry.about or "")):lower():find(search, 1, true) then
       nav[#nav + 1] = ui.row({ key = "nav-" .. entry.id, align = "center", paddingH = 12, minHeight = 26, radius = 6,
-        fill = entry.id == page and "surface_container_highest" or nil, onClick = function() open_page(entry.id) end }, {
+        fill = entry.id == page and "surface_container_highest" or "surface_container_low", onClick = function() open_page(entry.id) end }, {
         ui.label({ text = entry.name, flexGrow = 1, fontWeight = entry.id == page and "medium" or "regular",
           color = BUILT[entry.id] and "on_surface" or "on_surface_variant" }),
         ui.label({ text = entry.about or "", fontSize = 11, color = "on_surface_variant" }),
@@ -473,12 +780,23 @@ function open_page(id)
   page = id
   said = ""
   render()
-  if id == "appearance" or id == "windows" then
+  if id == "appearance" or id == "windows" or id == "accessibility" then
     read_theme()
+  elseif id == "language" then
+    read_conf("language")
+  elseif id == "displays" then
+    read_displays()
   elseif id == "packages" then
     read_packages()
   elseif id == "notes" then
     read_notes()
+  elseif id == "terminal" or id == "editor" or id == "files" then
+    read_conf(id)
+  elseif id == "login" then
+    read_conf("lock")
+  elseif id == "keys" then
+    read_shortcuts()
+    render()
   end
 end
 

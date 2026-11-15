@@ -84,6 +84,7 @@ def main():
 
         machine.screen.click(*LIGHT)
         until('pressing Light there turns the whole system light', 'kavat-theme get mode', 'light', 8)
+        time.sleep(2)  # the panel takes no press while a change is being applied
         machine.screen.click(*NORD)
         until('and pressing a palette changes it', 'kavat-theme get palette', 'nord', 8)
         time.sleep(2)
@@ -94,6 +95,49 @@ def main():
         user('kavat-shell msg panel-open kavat/settings:panel windows')
         time.sleep(3)
         machine.screen.picture(f'{pictures}/settings-windows.png')
+
+        print('the settings each app keeps in its own file', flush=True)
+        status, output = user('kavat-conf set terminal cursor_shape beam && kavat-conf set terminal window_padding_width 6 && '
+                              'kavat-conf show terminal | head -n 3; cat ~/.config/kitty/kitty.conf')
+        checks.report(status == 0 and 'cursor_shape beam' in output and output.count('window_padding_width 6') == 2,
+                      "a setting of the terminal is changed in Kitty's own file, and read back from it", output)
+        status, output = user('kavat-conf set files mgr.show_hidden true && grep -c "^show_hidden = true" ~/.config/yazi/yazi.toml; '
+                              'grep -c "^# Your Yazi settings" ~/.config/yazi/yazi.toml; kavat-conf set files mgr.sort_by backwards 2>&1')
+        checks.report(output.splitlines()[:2] == ['1', '1'] and 'mgr.sort_by takes' in output,
+                      "one of Yazi's changes only its own line, and a value it cannot take is refused", output)
+        status, output = user('kavat-conf show lock; kavat-conf set lock lock_after 5 && kavat-conf show lock && pgrep -c -x hypridle')
+        checks.report(output.split() == ['lock_after', '10', 'screen_off_after', '15', 'lock_after', '5', 'screen_off_after', '15', '1'],
+                      'the screen locks after ten minutes unless another time is set, and hypridle takes the new one', output)
+        status, output = user('kavat-conf show language; kavat-conf set language keyboard_first es && '
+                              'hyprctl --instance 0 getoption input:kb_layout | head -n 1; kavat-conf set language keyboard_first us && '
+                              'hyprctl --instance 0 getoption input:kb_layout | head -n 1; hyprctl --instance 0 getoption input:kb_options | head -n 1')
+        lines = output.splitlines() + [''] * 4
+        checks.report(lines[0] == 'keyboard_first us' and 'es,us' in lines[1] and 'us,es' in lines[2] and 'grp:alt_shift_toggle' in lines[3],
+                      'the keyboard is the one of the installation, with the other behind it, and the first can be changed', output)
+        # every page that is built has to draw: one that fails leaves a line in the shell's log
+        pages = 'wallpaper accessibility windows displays sound network terminal editor files notes bar packages boot login language'
+        status, output = user(f'for page in {pages}; do kavat-shell msg panel-open kavat/settings:panel $page > /dev/null; sleep 1.2; done; '
+                              'grep -c -i "kavat/settings.*error\\|luau.*error\\|panel.luau:" ~/.cache/kavat-shell/kavat-shell.log', 60)
+        checks.report(output == '0', 'each of the pages that are built is drawn without a failure', output)
+        machine.screen.picture(f'{pictures}/settings-language.png')
+        user('kavat-shell msg panel-open kavat/settings:panel keys')
+        time.sleep(3)
+        machine.screen.picture(f'{pictures}/settings-keys.png')
+        user('kavat-shell msg panel-close kavat/settings:panel')
+
+        print('the lock screen', flush=True)
+        machine.screen.press('super', 'shift', 'l')
+        until('Super+Shift+L locks the screen', 'pgrep -c -x hyprlock', '1')
+        time.sleep(3)
+        machine.screen.picture(f'{pictures}/lock.png')
+        machine.screen.type('not-the-password')
+        machine.screen.press('enter')
+        time.sleep(4)
+        status, output = user('pgrep -c -x hyprlock')
+        checks.report(output == '1', 'a wrong password leaves it locked', output)
+        machine.screen.type(PASSWORD)
+        machine.screen.press('enter')
+        until('and the right one opens it', 'pgrep -c -x hyprlock; echo open', '0\nopen')
         status, output = user('hyprctl --instance 0 configerrors')
         checks.report(status == 0 and not output, "Hyprland's configuration loads without errors", output)
         if checks.failed:

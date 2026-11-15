@@ -1,0 +1,236 @@
+#!/usr/bin/env python3
+"""kavat-conf: read and change the settings the settings panel shows, in each app's own file.
+
+usage: kavat-conf show <page>                 the settings of a page and their values, one to a line
+       kavat-conf set <page> <setting> <value>
+       kavat-conf file <page>                 the file a page's settings are kept in
+
+The pages: terminal (Kitty), editor (Neovim), files (Yazi), language (the keyboard) and lock
+(the lock screen).
+
+Each setting lives in one place, the file of its app: this only changes that setting's
+line there, and leaves the rest of the file, comments and all, as it was. A setting that
+is not in the file yet is added; the file is made when it is not there. After a change the
+app is told to read its file again, when it can be told.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+
+HOME = os.path.expanduser('~')
+CONFIG = os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config'
+
+# Each page: the file, how a line of it is written, and its settings. A setting is its
+# name in the file, what it may be, and what it is when the file does not say.
+#   kitty   "name value"
+#   toml    "name = value" under a [section]; the setting's name is section.name
+#   json    one object; true and false are written as such
+#   idle    hypridle's file, which is written whole from its two times
+PAGES = {
+    'terminal': {
+        'file': f'{CONFIG}/kitty/kitty.conf', 'style': 'kitty',
+        'reload': ['pkill', '-USR1', '-U', str(os.getuid()), '-x', 'kitty'],
+        'settings': {
+            'cursor_shape': (['block', 'beam', 'underline'], 'block'),
+            'cursor_blink_interval': (['0', '-1'], '-1'),
+            'window_padding_width': (range(0, 41), '0'),
+            'scrollback_lines': (['2000', '10000', '50000', '200000'], '2000'),
+            'tab_bar_style': (['fade', 'separator', 'powerline', 'hidden'], 'fade'),
+            'enable_audio_bell': (['yes', 'no'], 'yes'),
+            'confirm_os_window_close': (['0', '-1'], '-1'),
+        },
+    },
+    'editor': {
+        'file': f'{CONFIG}/kavat/editor.json', 'style': 'json', 'reload': None,
+        'settings': {
+            'start_typing': (['true', 'false'], 'true'),
+            'format_on_save': (['true', 'false'], 'true'),
+            'relative_numbers': (['true', 'false'], 'false'),
+            'wrap': (['true', 'false'], 'false'),
+            'indent': (['2', '4', '8'], '4'),
+        },
+    },
+    'files': {
+        'file': f'{CONFIG}/yazi/yazi.toml', 'style': 'toml', 'reload': None,
+        'settings': {
+            'mgr.show_hidden': (['true', 'false'], 'false'),
+            'mgr.sort_by': (['natural', 'alphabetical', 'mtime', 'size', 'extension'], 'natural'),
+            'mgr.sort_dir_first': (['true', 'false'], 'true'),
+            'mgr.linemode': (['none', 'size', 'mtime', 'permissions'], 'size'),
+        },
+    },
+    'language': {
+        'file': f'{CONFIG}/kavat/desktop.json', 'style': 'json',
+        # Hyprland reads its configuration again, and with it this file
+        'reload': ['sh', '-c', 'hyprctl reload > /dev/null 2>&1 || hyprctl --instance 0 reload > /dev/null 2>&1'],
+        'settings': {
+            'keyboard_first': (['us', 'es'], 'us'),
+        },
+    },
+    'lock': {
+        'file': f'{CONFIG}/hypr/hypridle.conf', 'style': 'idle',
+        'reload': ['sh', '-c', 'pkill -x hypridle; setsid -f hypridle > /dev/null 2>&1'],
+        'settings': {
+            # minutes; 0 is never
+            'lock_after': (range(0, 241), '10'),
+            'screen_off_after': (range(0, 241), '15'),
+        },
+    },
+}
+
+IDLE = '''# Written by kavat-conf from the Login & lock page of the settings; change the times there,
+# or here: the page shows what this file says.
+
+general {{
+    lock_cmd = pidof hyprlock || hyprlock
+    before_sleep_cmd = loginctl lock-session
+    after_sleep_cmd = hyprctl dispatch dpms on
+}}
+{listeners}'''
+LOCK = '''
+# lock_after
+listener {{
+    timeout = {seconds}
+    on-timeout = loginctl lock-session
+}}
+'''
+DARK = '''
+# screen_off_after
+listener {{
+    timeout = {seconds}
+    on-timeout = hyprctl dispatch dpms off
+    on-resume = hyprctl dispatch dpms on
+}}
+'''
+
+
+def read(path):
+    try:
+        return open(path, encoding='utf-8').read()
+    except OSError:
+        return ''
+
+
+def values(page):
+    """What each setting of a page is: what the file says, or what it is with nothing said."""
+    text = read(page['file'])
+    found = {name: default for name, (_, default) in page['settings'].items()}
+    if page['style'] == 'kitty':
+        for line in text.splitlines():
+            words = line.split(None, 1)
+            if len(words) == 2 and words[0] in found:
+                found[words[0]] = words[1].strip()
+    elif page['style'] == 'toml':
+        section = ''
+        for line in text.splitlines():
+            header = re.match(r'\s*\[([\w.]+)\]', line)
+            pair = re.match(r'\s*(\w+)\s*=\s*(.*?)\s*(#.*)?$', line)
+            if header:
+                section = header.group(1)
+            elif pair and f'{section}.{pair.group(1)}' in found:
+                found[f'{section}.{pair.group(1)}'] = pair.group(2).strip('"')
+    elif page['style'] == 'json':
+        try:
+            kept = json.loads(text or '{}')
+        except ValueError:
+            kept = {}
+        for name in found:
+            if name in kept:
+                found[name] = json.dumps(kept[name]) if isinstance(kept[name], bool) else str(kept[name])
+        if 'keyboard_first' in found and 'keyboard_first' not in kept:
+            # until it is chosen here, the keyboard is the one chosen when the system was installed
+            chosen = re.search(r'XkbLayout"\s+"(\w+)', read('/etc/X11/xorg.conf.d/00-keyboard.conf')) or \
+                re.search(r'KEYMAP=(\w+)', read('/etc/vconsole.conf'))
+            found['keyboard_first'] = 'es' if chosen and chosen.group(1) == 'es' else 'us'
+    elif page['style'] == 'idle':
+        # hypridle's own file when the user has none; a time that is not there is never
+        text = text or read('/etc/xdg/hypr/hypridle.conf')
+        found = dict.fromkeys(found, '0')
+        for block in re.findall(r'listener\s*\{(.*?)\}', text, re.S):
+            seconds = re.search(r'timeout\s*=\s*(\d+)', block)
+            if seconds:
+                name = 'screen_off_after' if 'dpms off' in block else 'lock_after'
+                found[name] = str(int(seconds.group(1)) // 60)
+    return found
+
+
+def write(page, name, value):
+    path, text = page['file'], read(page['file'])
+    lines = text.splitlines()
+    if page['style'] == 'kitty':
+        for at, line in enumerate(lines):
+            if line.split(None, 1)[:1] == [name]:
+                lines[at] = f'{name} {value}'
+                break
+        else:
+            lines.append(f'{name} {value}')
+    elif page['style'] == 'toml':
+        wanted, key = name.rsplit('.', 1)
+        # a word is written in quotes; true, false and numbers are not
+        if value not in ('true', 'false') and not value.isdigit():
+            value = f'"{value}"'
+        section, start, done = '', None, False
+        for at, line in enumerate(lines):
+            header = re.match(r'\s*\[([\w.]+)\]', line)
+            if header:
+                section = header.group(1)
+                start = at if section == wanted else start
+            elif section == wanted and re.match(rf'\s*{key}\s*=', line):
+                comment = re.search(r'\s+#.*$', line)
+                lines[at] = f'{key} = {value}' + (comment.group() if comment else '')
+                done = True
+                break
+        if not done and start is not None:
+            lines.insert(start + 1, f'{key} = {value}')
+        elif not done:
+            lines += ['', f'[{wanted}]', f'{key} = {value}']
+    elif page['style'] == 'json':
+        try:
+            kept = json.loads(text or '{}')
+        except ValueError:
+            kept = {}
+        kept[name] = {'true': True, 'false': False}.get(value, int(value) if value.isdigit() else value)
+        lines = json.dumps(kept, indent=2).splitlines()
+    elif page['style'] == 'idle':
+        now = values(page)
+        now[name] = value
+        listeners = ''
+        if now['lock_after'] != '0':
+            listeners += LOCK.format(seconds=int(now['lock_after']) * 60)
+        if now['screen_off_after'] != '0':
+            listeners += DARK.format(seconds=int(now['screen_off_after']) * 60)
+        lines = IDLE.format(listeners=listeners).splitlines()
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    fresh = path + '.new'
+    with open(fresh, 'w', encoding='utf-8') as file:
+        file.write('\n'.join(lines) + '\n')
+    os.replace(fresh, path)
+
+
+def main():
+    arguments = sys.argv[1:]
+    if len(arguments) < 2 or arguments[0] not in ('show', 'set', 'file') or arguments[1] not in PAGES:
+        sys.exit(__doc__)
+    page = PAGES[arguments[1]]
+    if arguments[0] == 'file':
+        print(page['file'])
+    elif arguments[0] == 'show':
+        for name, value in values(page).items():
+            print(name, value)
+    else:
+        if len(arguments) != 4 or arguments[2] not in page['settings']:
+            sys.exit(f'kavat-conf: {arguments[1]} has these settings: ' + ', '.join(page['settings']))
+        name, value = arguments[2], arguments[3]
+        allowed = page['settings'][name][0]
+        if not (value in allowed or (isinstance(allowed, range) and value.isdigit() and int(value) in allowed)):
+            takes = f'a number from {allowed[0]} to {allowed[-1]}' if isinstance(allowed, range) else ', '.join(allowed)
+            sys.exit(f'kavat-conf: {name} takes {takes}')
+        write(page, name, value)
+        if page['reload']:
+            subprocess.run(page['reload'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=False)
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,34 @@
+# Willwitcher-OS Kavat Edition: the desktop's shortcuts, for the cheat sheet and the
+# Keybindings page of the settings: the keys, a tab, what they do, a tab, their group.
+# Every shortcut in hyprland.lua is here; tests/settings.py checks that none is missing.
+Super+Return	Terminal	Apps
+Super+E	Files	Apps
+Super+D	Launcher	Apps
+Super+T	Settings	Apps
+Super+U	kav, the packages	Apps
+Super+N	A quick note	Apps
+Super+Shift+N	The notes	Apps
+Super+Shift+F	File search	Apps
+Super+/	This list of shortcuts	Apps
+Super+Q	Close the window	Windows
+Super+F	Fullscreen	Windows
+Super+V	Float or tile the window	Windows
+Super+P	Pseudo-tile the window	Windows
+Super+J	Turn the split	Windows
+Super+Arrows	Go to the window on that side	Windows
+Super+Shift+Arrows	Move the window	Windows
+Super+Ctrl+Arrows	Resize the window	Windows
+Super+Left mouse	Drag the window	Windows
+Super+Right mouse	Resize the window	Windows
+Alt+Tab	Next window	Windows
+Super+1…0	Go to workspace 1 to 10	Workspaces
+Super+Shift+1…0	Send the window to workspace 1 to 10	Workspaces
+Super+Mouse wheel	Next or previous workspace	Workspaces
+Super+S	Show the scratchpad	Workspaces
+Super+Shift+S	Send the window to the scratchpad	Workspaces
+Super+Shift+V	Clipboard history	Tools
+Super+Shift+P	Colour picker	Tools
+Print	Screenshot of a region, to the clipboard	Tools
+Super+Shift+L	Lock the screen	Session
+Super+Escape	Power menu	Session
+Super+M	Leave the session	Session

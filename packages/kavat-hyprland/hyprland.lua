@@ -16,12 +16,19 @@ hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" 
 hl.on("hyprland.start", function()
     hl.exec_cmd("kavat-shell --daemon")
     -- The cursor and the icons are the theme's: the cursor is packed from what kavat-theme
-    -- wrote, and apps are told the name of the icon theme
+    -- wrote, and the icons of the style in force are made and the apps told
     hl.exec_cmd("kavat-cursor-apply")
-    hl.exec_cmd("gsettings set org.gnome.desktop.interface icon-theme Kavat")
+    -- the background is the theme's, unless you chose one of your own
+    hl.exec_cmd("/usr/lib/kavat/wallpaper")
+    -- light by day and dark by night, for who asked for it
+    hl.exec_cmd("/usr/lib/kavat/theme-auto")
+    hl.exec_cmd("kavat-icons-apply")
     -- The reminders written in the notes become timers of this session; those whose time
     -- passed while the computer was off are shown now
     hl.exec_cmd("kavat-notes sync")
+    -- The screen locks when nobody is there. Not on the live medium, whose user has no
+    -- password to come back with.
+    hl.exec_cmd("test -e /run/archiso || hypridle")
 end)
 
 hl.env("XCURSOR_SIZE", "24")
@@ -48,6 +55,31 @@ local function look()
     }
 end
 hl.config(look())
+
+-- The keyboard: the system's two, US and Spanish, with the one in use first; Alt+Shift goes
+-- to the other. Which is first is what the Language & region page of the settings wrote
+-- or, until then, the keyboard chosen when the system was installed.
+local function keyboards()
+    local first
+    local config = os.getenv("XDG_CONFIG_HOME")
+    if not config or config == "" then
+        config = os.getenv("HOME") .. "/.config"
+    end
+    local places = { config .. "/kavat/desktop.json", "/etc/X11/xorg.conf.d/00-keyboard.conf", "/etc/vconsole.conf" }
+    for _, place in ipairs(places) do
+        local file = io.open(place)
+        if file then
+            local text = file:read("a")
+            file:close()
+            first = text:match('"keyboard_first"%s*:%s*"(%a+)"') or text:match('XkbLayout"%s+"(%a+)') or text:match("KEYMAP=(%a+)")
+            if first then
+                break
+            end
+        end
+    end
+    return first == "es" and "es,us" or "us,es"
+end
+hl.config({ input = { kb_layout = keyboards(), kb_options = "grp:alt_shift_toggle" } })
 
 hl.config({
     general = {
@@ -132,6 +164,8 @@ hl.window_rule({
 -- The system's settings, on the page of the look; and kav, on its full screen
 hl.bind(mod .. " + T", hl.dsp.exec_cmd("kavat-shell msg panel-toggle kavat/settings:panel"))
 hl.bind(mod .. " + U", hl.dsp.exec_cmd("kitty --class kavat-kav -o remember_window_size=no kav"))
+-- The cheat sheet: every shortcut of this file, on the Keybindings page of the settings
+hl.bind(mod .. " + slash", hl.dsp.exec_cmd("kavat-shell msg panel-open kavat/settings:panel keys"))
 hl.window_rule({
     name   = "kav",
     match  = { class = "^kavat-kav$" },
@@ -156,7 +190,16 @@ hl.window_rule({
     name   = "notes",
     match  = { class = "^kavat-notes$" },
     float  = true,
-    size   = "(monitor_w*0.7) (monitor_h*0.7)",
+    size   = "(monitor_w*0.75) (monitor_h*0.75)",
+    center = true,
+})
+
+-- The installer, on the live medium: a window in the middle, the size it is drawn for
+hl.window_rule({
+    name   = "installer",
+    match  = { class = "^io\\.calamares\\.calamares$" },
+    float  = true,
+    size   = "1280 800",
     center = true,
 })
 
