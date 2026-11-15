@@ -1,0 +1,8 @@
+# The lights of the keyboard and the tower: they take the theme's accent, through OpenRGB,
+# when OpenRGB is installed. The colour is left in a file, and a small helper hands it to
+# OpenRGB; it is started and left to it, since the lights take a moment.
+reload = [["setsid", "-f", "/usr/lib/kavat/lights"]]
+
+[[file]]
+from = "colour"
+to = "lights/colour"

@@ -146,6 +146,17 @@ def main():
                       "an app's icon is drawn in other colours than Papirus', with none left to fill in, and the cursor's size is the one asked for", output)
         user('kavat-theme set icons.style colour cursor.size 24')
 
+        print('profiles, and a palette brought in', flush=True)
+        status, output = user('kavat-theme profile save green-night && kavat-theme set palette kavat accent default mode light && kavat-theme profile save day && '
+                              'kavat-theme profile | tr "\\n" ";"; echo; kavat-theme profile green-night && kavat-theme get palette && kavat-theme get mode && '
+                              'kavat-theme profile | tr "\\n" ";"; kavat-theme profile nowhere 2>&1')
+        checks.report(output.split('\n')[:4] == ['* day;  green-night;', 'nord', 'dark', '  day;* green-night;kavat-theme: there is no profile called nowhere; `kavat-theme profile` lists them'],
+                      'the look is kept under a name, and worn again by that name', output)
+        follows("a profile changes the desktop as a setting does", lambda: border('active'), 'a3be8c', 2)
+        status, output = user('sed "s/^name = .*/name = \\"Brought\\"/" /usr/share/kavat/themes/palettes/nord.toml > /tmp/Brought.toml && kavat-theme add /tmp/Brought.toml && '
+                              'kavat-theme list | grep -c "^brought"; kavat-theme add /etc/hostname 2>&1 | head -n 1 | grep -c "is not a palette"; kavat-theme profile delete day; kavat-theme profile delete green-night')
+        checks.report(output.split('\n')[1:] == ['1', '1'], 'a palette someone made is brought in from its file, and a file that is not one is refused', output)
+
         print('the mode by the hour, and the terminal tools', flush=True)
         status, output = user('now=$(date +%-H); kavat-theme set auto.follow true auto.light_from $now auto.dark_from $(((now + 1) % 24)) && /usr/lib/kavat/theme-auto; '
                               'kavat-theme get mode; systemctl --user list-timers --no-legend kavat-theme-auto.timer | wc -l')

@@ -21,6 +21,11 @@ usage: kavat-theme <command>
   boot                     give the boot menu, the loading screen and the login screen the
                            look in force; they are system files, so it asks for a password
   list                     the palettes, each with its accents
+  profile                  the profiles you saved, with a * on the one in force
+  profile save <name>      keep the settings in force under a name: work, night, presenting
+  profile <name>           wear a profile
+  profile delete <name>    forget one
+  add <file or address>    bring a palette someone made, a single file, into yours
   tokens                   every colour and value the templates can use
 
 The settings and what each one takes are in /usr/share/kavat/themes/theme.toml.";
@@ -125,6 +130,83 @@ fn boot(pairs: &[String]) -> Result<(), String> {
     apply::install(&paths, &plan)
 }
 
+/// A name that can be a file's: letters, digits, `-` and `_`.
+fn file_name(name: &str) -> Result<&str, String> {
+    if !name.is_empty() && name.len() <= 40 && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_') {
+        Ok(name)
+    } else {
+        Err(format!("{name} cannot be a name: letters, digits, - and _ are what one takes"))
+    }
+}
+
+/// A profile is the settings file as it was when the profile was saved, kept beside it.
+fn profile(paths: &Paths, arguments: &[&str]) -> Result<(), String> {
+    let folder = paths.config.join("kavat/profiles");
+    let problem = |error: std::io::Error| format!("{}: {error}", folder.display());
+    let now = std::fs::read_to_string(paths.user_file()).unwrap_or_default();
+    match arguments {
+        [] | ["list"] => {
+            let mut names: Vec<String> = std::fs::read_dir(&folder)
+                .map(|entries| entries.flatten().filter_map(|entry| entry.file_name().to_str()?.strip_suffix(".toml").map(str::to_string)).collect())
+                .unwrap_or_default();
+            names.sort();
+            for name in names {
+                let kept = std::fs::read_to_string(folder.join(format!("{name}.toml"))).unwrap_or_default();
+                say(&format!("{} {name}", if kept == now { '*' } else { ' ' }));
+            }
+            Ok(())
+        }
+        ["save", name] => {
+            std::fs::create_dir_all(&folder).map_err(problem)?;
+            std::fs::write(folder.join(format!("{}.toml", file_name(name)?)), now).map_err(problem)
+        }
+        ["delete", name] => std::fs::remove_file(folder.join(format!("{}.toml", file_name(name)?))).map_err(|_| format!("there is no profile called {name}")),
+        [name] => {
+            let kept = folder.join(format!("{}.toml", file_name(name)?));
+            let document = apply::read_document(&kept)?.ok_or_else(|| format!("there is no profile called {name}; `kavat-theme profile` lists them"))?;
+            // worked out whole before it takes the place of the settings in force
+            apply(paths, Some(&document), false)?;
+            let file = paths.user_file();
+            let problem = |error: std::io::Error| format!("{}: {error}", file.display());
+            std::fs::create_dir_all(file.parent().unwrap()).map_err(problem)?;
+            let fresh = file.with_extension("toml.new");
+            std::fs::write(&fresh, document.to_string()).map_err(problem)?;
+            std::fs::rename(&fresh, &file).map_err(problem)?;
+            apply(paths, None, true).map(drop)
+        }
+        _ => Err("profile takes: nothing, save <name>, delete <name>, or the name of one to wear".into()),
+    }
+}
+
+/// A palette someone made is one file. It is read from a file or fetched from an address,
+/// checked to be a palette, and kept among the user's under the name of the file.
+fn add(paths: &Paths, source: &str) -> Result<(), String> {
+    let text = if source.starts_with("https://") || source.starts_with("http://") {
+        let fetched = std::process::Command::new("curl")
+            .args(["--fail", "--silent", "--show-error", "--location", "--max-time", "30", "--max-filesize", "200000", "--", source])
+            .output()
+            .map_err(|error| format!("curl: {error}"))?;
+        if !fetched.status.success() {
+            return Err(format!("{source} could not be fetched: {}", String::from_utf8_lossy(&fetched.stderr).trim()));
+        }
+        String::from_utf8(fetched.stdout).map_err(|_| format!("{source} is not text"))?
+    } else {
+        std::fs::read_to_string(source).map_err(|error| format!("{source}: {error}"))?
+    };
+    let document: toml_edit::DocumentMut = text.parse().map_err(|problem| format!("{source} is not a palette: {problem}"))?;
+    if document.get("name").and_then(|name| name.as_str()).is_none() || !(document.contains_table("dark") || document.contains_table("light")) {
+        return Err(format!("{source} is not a palette: one has a name and a [dark] or a [light] side"));
+    }
+    let stem = source.rsplit('/').next().unwrap_or(source).trim_end_matches(".toml").to_lowercase();
+    let id = file_name(&stem)?.to_string();
+    let folder = paths.config.join("kavat/palettes");
+    let problem = |error: std::io::Error| format!("{}: {error}", folder.display());
+    std::fs::create_dir_all(&folder).map_err(problem)?;
+    std::fs::write(folder.join(format!("{id}.toml")), text).map_err(problem)?;
+    say(&format!("kavat-theme: {id} is among your palettes: kavat-theme set palette {id}"));
+    Ok(())
+}
+
 fn run(arguments: &[String]) -> Result<(), String> {
     if arguments.first().is_some_and(|command| command == "boot") {
         return boot(&arguments[1..]);
@@ -147,6 +229,8 @@ fn run(arguments: &[String]) -> Result<(), String> {
             say(&show(settings.get(key)));
             Ok(())
         }
+        ["profile", rest @ ..] => profile(&paths, rest),
+        ["add", source] => add(&paths, source),
         ["list"] => {
             let folders = paths.palette_folders();
             for id in theme::available(&folders) {

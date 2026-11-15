@@ -1,0 +1,12 @@
+#!/bin/sh
+# Part of kavat-theme: give the lights of the keyboard and the tower the theme's accent.
+#
+# kavat-theme runs it after a change of theme, and the session when it starts. It does
+# something only when OpenRGB is installed: every device it knows is set to one still colour.
+command -v openrgb > /dev/null || exit 0
+colour=$(cat "${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/lights/colour" 2> /dev/null) || exit 0
+case "$colour" in
+  [0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]) ;;
+  *) exit 0 ;;
+esac
+exec openrgb --mode static --color "$colour" > /dev/null 2>&1
