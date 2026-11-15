@@ -1,0 +1,57 @@
+#!/bin/bash
+# kavat-browser: the system's browser.
+#
+# usage: kavat-browser [address ...]            open the browser, or a tab in the one that is open
+#        kavat-browser --private [address ...]  a window that keeps nothing
+#        kavat-browser command "<name>" [what]  ask the open browser for a command of its console:
+#                                               "sleep other tabs", "zen mode", "new tab"…
+#
+# It is Chromium, as Arch builds it, made a piece of the system from the outside: its own
+# settings folder, the system's policies, the blocker and the Kavat extension loaded from
+# the system's own files, and Widevine for protected video. In Incognito mode every window
+# it opens is a private one.
+set -u
+data="${XDG_CONFIG_HOME:-$HOME/.config}/kavat-browser"
+# The two extensions come with the system, but Chromium writes beside an extension it loads
+# from a folder, so they are loaded from a copy in your own, made again when the system's change.
+system=/usr/share/kavat-browser
+extensions="${XDG_DATA_HOME:-$HOME/.local/share}/kavat-browser/extensions"
+if ! cmp -s "$system/version" "$extensions/version" 2> /dev/null; then
+  # only ever this folder of yours is emptied
+  [[ $extensions == */kavat-browser/extensions ]] && rm -rf "$extensions"
+  mkdir -p "$(dirname "$extensions")"
+  cp -r "$system/extensions" "$extensions"
+  chmod -R u+w "$extensions"
+  cp "$system/version" "$extensions/version"
+fi
+runtime="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+
+if [[ ${1:-} == command ]]; then
+  [[ -n ${2:-} ]] || { echo 'kavat-browser: command takes the name of one: kavat-browser command "zen mode"' >&2; exit 2; }
+  pgrep -u "$(id -u)" -f "user-data-dir=$data" > /dev/null || { echo 'kavat-browser: the browser is not open' >&2; exit 1; }
+  mkdir -p -m 700 "$runtime/kavat-browser"
+  python3 -c 'import json, sys; print(json.dumps({"name": sys.argv[1], "given": sys.argv[2] if len(sys.argv) > 2 else None}))' "${@:2}" \
+    > "$runtime/kavat-browser/$(date +%s%N).json"
+  exit 0
+fi
+
+flags=(
+  --user-data-dir="$data"
+  --class=kavat-browser
+  # on Wayland when the session is one, which every session of the system is
+  ${WAYLAND_DISPLAY:+--ozone-platform=wayland}
+  --load-extension="$extensions/ublock,$extensions/kavat"
+  # Chromium asks nobody whether it is the default browser, and shows no first-run pages
+  --no-default-browser-check --no-first-run
+  # loading an extension from a folder is being taken out of Chromium's own builds: kept on
+  --disable-features=DisableLoadExtensionCommandLineSwitch
+)
+if [[ ${1:-} == --private ]]; then
+  flags+=(--incognito)
+  shift
+elif [[ $(kavat-mode 2> /dev/null) == incognito ]]; then
+  flags+=(--incognito)
+fi
+# the window apps pick files with is the system's, Yazi
+export GTK_USE_PORTAL=1
+exec chromium "${flags[@]}" "$@"

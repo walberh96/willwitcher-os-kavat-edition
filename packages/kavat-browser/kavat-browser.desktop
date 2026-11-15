@@ -1,0 +1,16 @@
+[Desktop Entry]
+Type=Application
+Name=Kavat Browser
+GenericName=Web Browser
+Comment=The system's browser
+Exec=kavat-browser %U
+Icon=kavat-browser
+Terminal=false
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;x-scheme-handler/http;x-scheme-handler/https;application/pdf;
+StartupWMClass=kavat-browser
+Actions=private;
+
+[Desktop Action private]
+Name=New private window
+Exec=kavat-browser --private

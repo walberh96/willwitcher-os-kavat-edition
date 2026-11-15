@@ -1,0 +1,6 @@
+# Part of kavat-browser: what opens a link or a web page, unless you choose otherwise.
+[Default Applications]
+text/html=kavat-browser.desktop
+application/xhtml+xml=kavat-browser.desktop
+x-scheme-handler/http=kavat-browser.desktop
+x-scheme-handler/https=kavat-browser.desktop

@@ -1,0 +1,24 @@
+{
+  "MetricsReportingEnabled": false,
+  "UrlKeyedAnonymizedDataCollectionEnabled": false,
+  "BrowserSignin": 0,
+  "DefaultBrowserSettingEnabled": false,
+  "BackgroundModeEnabled": false,
+  "PromotionsEnabled": false,
+  "ShoppingListEnabled": false,
+  "PrivacySandboxPromptEnabled": false,
+  "PrivacySandboxAdTopicsEnabled": false,
+  "PrivacySandboxSiteEnabledAdsEnabled": false,
+  "PrivacySandboxAdMeasurementEnabled": false,
+  "HomepageIsNewTabPage": true,
+  "3rdparty": {
+    "extensions": {
+      "ofdabgbaeilkjjdadjindcdlfonikhmo": {
+        "disableFirstRunPage": true,
+        "defaultFiltering": "optimal"
+      }
+    }
+  },
+  "NTPFooterExtensionAttributionEnabled": false,
+  "NTPFooterManagementNoticeEnabled": false
+}

@@ -1,0 +1,12 @@
+# Your own commands for the browser's console (Ctrl+Shift+K). Each is a name, what it is,
+# and either an address to open or one of the console's own commands to run.
+#
+# [[command]]
+# name  = "mail"
+# about = "My mail"
+# open  = "https://mail.proton.me"
+#
+# [[command]]
+# name  = "quiet"
+# about = "Put the other tabs to sleep"
+# run   = "sleep other tabs"

@@ -1,0 +1,31 @@
+# Widevine, which plays protected video in the browser. It is Google's and cannot be given
+# to others: this file is all the repository holds of it, and the module itself is fetched
+# from Google when the package is built. Google retires old versions: when this one stops
+# working, the three values below are the ones to bring up to date.
+pkgname=kavat-widevine
+pkgver=4.10.3112.0
+_release_id=acqexsh26ysyu3zxeotqtsp63idq
+_file_id=ad7kyx4q7wx7xknykmkbonbbmnwq
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: Widevine, for protected video in the browser"
+arch=('x86_64')
+url='https://www.widevine.com/'
+license=('LicenseRef-Widevine')
+depends=('gcc-libs' 'glib2' 'glibc' 'nspr' 'nss')
+options=('!strip')
+source=("widevine-$pkgver.zip::https://www.google.com/dl/release2/chrome_component/${_release_id}_${pkgver}/oimompecagnajdejgnnjijobebaeigek_${pkgver}_linux64_${_file_id}.crx3")
+noextract=("widevine-$pkgver.zip")
+sha256sums=('1bf1f200dcccd461b2d029d000d0fcf800f0571c932db31467b9d5d301e0a98f')
+
+prepare() {
+  # the file is a zip with a few bytes before it, which bsdtar steps over
+  mkdir -p widevine
+  bsdtar -xf "widevine-$pkgver.zip" -C widevine
+}
+
+package() {
+  install -Dm755 widevine/_platform_specific/linux_x64/libwidevinecdm.so \
+    "$pkgdir/usr/lib/chromium/WidevineCdm/_platform_specific/linux_x64/libwidevinecdm.so"
+  install -Dm644 widevine/manifest.json "$pkgdir/usr/lib/chromium/WidevineCdm/manifest.json"
+  install -Dm644 widevine/LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

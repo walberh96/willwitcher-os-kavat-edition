@@ -1,0 +1,22 @@
+<!doctype html>
+<!-- The start page: the clock, a place to search, and the sites you go to most. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>New tab</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="start">
+  <div id="mode" class="mode muted" hidden></div>
+  <main>
+    <div>
+      <div id="clock" class="clock"></div>
+      <div id="day" class="day"></div>
+    </div>
+    <form id="search"><input id="words" type="text" placeholder="Search, or type an address" autofocus spellcheck="false" autocomplete="off"></form>
+    <div id="sites" class="sites"></div>
+  </main>
+  <div class="hint muted"><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>K</kbd> the command console · <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd> save the page to the notes</div>
+  <script type="module" src="start.js"></script>
+</body>
+</html>

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Kavat",
+  "version": "0.1.0",
+  "description": "What makes the browser a piece of Willwitcher-OS Kavat Edition: the command console, the start page, clippings to the notes, and the system's modes.",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoFLzz2lpxTXfjQqYc4PzXQD5Ss9K9cBODrK7+rTGeUvzWaRGuC/kutiT65yagMhLbO/M96OcIWeTpUUm5wjYnR/IU0t6nC72aGIMEXANTDAIRxnuIOr16MOkV8+Lw8prhgEAKqaJOxLb9jJuMXBYFPqqsEwR0LBDVHrNo/Y1LmWXd8vT/+Z9hkqU4t2mFOPNBy6Pq5D84hSo7WKlobUodIqihdOz7DRpuB+9AoA4vZ1yZaLkBhXm0QE1igem2tBRNt7LfL7pnjjOf2VtCJrszEgv399zy+ciLmd4pzw3MwCXW+aWYw6sWc6LqgLJtpMWz7zIdirBGa/QrLmhAqx44wIDAQAB",
+  "permissions": ["tabs", "nativeMessaging", "storage", "scripting", "activeTab", "contextMenus", "downloads", "bookmarks", "topSites", "search", "favicon"],
+  "host_permissions": ["<all_urls>"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Kavat: the command console", "default_popup": "popup.html" },
+  "chrome_url_overrides": { "newtab": "start.html" },
+  "commands": {
+    "_execute_action": {
+      "suggested_key": { "default": "Ctrl+Shift+K" },
+      "description": "Open the command console"
+    },
+    "clip-page": {
+      "suggested_key": { "default": "Ctrl+Shift+S" },
+      "description": "Save the page to the notes, with what is selected as a quote"
+    },
+    "zen": {
+      "suggested_key": { "default": "Ctrl+Shift+Z" },
+      "description": "Zen mode: the page and nothing else"
+    }
+  },
+  "icons": { "48": "icon.png", "128": "icon.png" }
+}

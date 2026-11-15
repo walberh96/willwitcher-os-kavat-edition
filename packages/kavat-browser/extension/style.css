@@ -1,0 +1,44 @@
+/* The look of the extension's own pages: the console and the start page. The colours are
+   the system theme's, which the host hands over and theme.js puts in these variables; what
+   is here is Kavat's own dark and light, for the moment before they arrive. */
+:root {
+  color-scheme: dark light;
+  --bg: #0d0f14; --surface: #151821; --surface2: #1e2230; --text: #e8e6df; --muted: #8b90a0;
+  --border: #2a2f3f; --accent: #f2a93b; --on-accent: #14110a; --radius: 10px;
+  --ui: Inter, system-ui, sans-serif; --mono: "JetBrains Mono", monospace;
+}
+@media (prefers-color-scheme: light) {
+  :root { --bg: #f4f1ea; --surface: #fbf9f4; --surface2: #ece8df; --text: #1d1b16; --muted: #6b675e; --border: #d9d4c7; --accent: #b87412; --on-accent: #fff; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 var(--ui); }
+input { font: inherit; color: inherit; background: var(--surface2); border: 1px solid var(--border); border-radius: calc(var(--radius) * 0.7); padding: 0.6em 0.8em; outline: none; width: 100%; }
+input:focus { border-color: var(--accent); }
+.muted { color: var(--muted); }
+kbd { font: 11px var(--mono); color: var(--muted); border: 1px solid var(--border); border-radius: 4px; padding: 0 0.4em; }
+
+/* the console */
+body.console { width: 460px; padding: 10px; background: var(--surface); }
+.console ul { list-style: none; margin: 8px 0 0; padding: 0; max-height: 380px; overflow-y: auto; }
+.console li { display: flex; gap: 0.8em; align-items: baseline; padding: 0.45em 0.7em; border-radius: calc(var(--radius) * 0.6); cursor: pointer; }
+.console li.on { background: var(--accent); color: var(--on-accent); }
+.console li.on .muted { color: inherit; opacity: 0.8; }
+.console li b { font-weight: 600; white-space: nowrap; }
+.console li span { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.console .said { margin: 8px 2px 0; font-size: 12px; min-height: 1.4em; }
+.console .said.failed { color: #e5534b; }
+
+/* the start page */
+body.start { min-height: 100vh; display: grid; place-items: center; }
+.start main { width: min(720px, 90vw); display: grid; gap: 28px; justify-items: center; margin-top: -8vh; }
+.start .clock { font-size: 72px; font-weight: 300; letter-spacing: -0.02em; line-height: 1; }
+.start .day { color: var(--muted); margin-top: 6px; text-align: center; }
+.start form { width: 100%; }
+.start form input { font-size: 16px; padding: 0.85em 1.1em; border-radius: var(--radius); background: var(--surface); }
+.start .sites { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; width: 100%; }
+.start .sites a { display: flex; gap: 0.7em; align-items: center; padding: 0.7em 0.9em; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); color: inherit; text-decoration: none; overflow: hidden; }
+.start .sites a:hover { border-color: var(--accent); }
+.start .sites img { width: 16px; height: 16px; flex: none; }
+.start .sites span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
+.start .mode { position: fixed; top: 14px; right: 18px; font-size: 12px; padding: 0.25em 0.8em; border-radius: 99px; background: var(--surface); border: 1px solid var(--border); }
+.start .hint { position: fixed; bottom: 14px; left: 0; right: 0; text-align: center; font-size: 12px; }

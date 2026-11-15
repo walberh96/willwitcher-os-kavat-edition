@@ -1,0 +1,54 @@
+# The system's browser: Chromium as Arch builds it, made a piece of the system from the
+# outside. The blocker is uBlock Origin Lite, as its authors released it, with its lists
+# inside; the Kavat extension is this package's own.
+pkgname=kavat-browser
+pkgver=0.1.0
+pkgrel=4
+_ubol=2026.1110.1816
+pkgdesc="Willwitcher-OS Kavat Edition: the browser, with the blocker, the command console and the system's modes"
+arch=('any')
+url="https://github.com/walberh96/willwitcher-os-kavat-edition"
+license=('LicenseRef-AllRightsReserved' 'GPL-3.0-or-later')
+depends=('chromium' 'kavat-widevine' 'kavat-theme' 'kavat-modes' 'kavat-notes' 'kavat-files' 'python' 'xdg-user-dirs' 'xdg-desktop-portal')
+makedepends=('librsvg' 'python')
+source=(kavat-browser browser-host dev.kavat.browser.json policies.json kavat-browser.desktop mimeapps.list commands.toml icon.svg
+        "uBOLite_$_ubol.chromium.zip::https://github.com/uBlockOrigin/uBOL-home/releases/download/$_ubol/uBOLite_$_ubol.chromium.zip")
+noextract=("uBOLite_$_ubol.chromium.zip")
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+            '85fe5909366e8ada66c5b331bbdbf69cf5100245ed6161b1e4e2f1f848ec7d03')
+
+build() {
+  rsvg-convert -w 128 -h 128 -o icon.png icon.svg
+}
+
+package() {
+  install -Dm755 kavat-browser "$pkgdir/usr/bin/kavat-browser"
+  install -Dm755 browser-host "$pkgdir/usr/lib/kavat/browser-host"
+  # only the Kavat extension may start the host
+  install -Dm644 dev.kavat.browser.json "$pkgdir/etc/chromium/native-messaging-hosts/dev.kavat.browser.json"
+  install -Dm644 policies.json "$pkgdir/etc/chromium/policies/managed/kavat.json"
+  install -Dm644 kavat-browser.desktop "$pkgdir/usr/share/applications/kavat-browser.desktop"
+  install -Dm644 mimeapps.list "$pkgdir/usr/share/applications/mimeapps.list"
+  install -Dm644 icon.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/kavat-browser.svg"
+  install -Dm644 commands.toml "$pkgdir/etc/skel/.config/kavat/browser/commands.toml"
+
+  # the two extensions, loaded from here by the launcher
+  install -d "$pkgdir/usr/share/kavat-browser/extensions/ublock" "$pkgdir/usr/share/kavat-browser/extensions/kavat"
+  bsdtar -xf "uBOLite_$_ubol.chromium.zip" -C "$pkgdir/usr/share/kavat-browser/extensions/ublock"
+  cp -r "$startdir"/extension/. "$pkgdir/usr/share/kavat-browser/extensions/kavat/"
+  install -Dm644 icon.png "$pkgdir/usr/share/kavat-browser/extensions/kavat/icon.png"
+  # The extension's version is the package's: Chromium keeps the script of an extension it
+  # has loaded before, and only reads it again when the version is another.
+  sed -i "s/\"version\": \"[0-9.]*\"/\"version\": \"$pkgver.$pkgrel\"/" "$pkgdir/usr/share/kavat-browser/extensions/kavat/manifest.json"
+  # the blocker gets a name that does not depend on the folder it is loaded from, so that
+  # the policies can speak to it: a key in its manifest, which is all that names an extension
+  python3 - "$pkgdir/usr/share/kavat-browser/extensions/ublock/manifest.json" << 'END'
+import json, sys
+manifest = json.load(open(sys.argv[1]))
+manifest["key"] = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxC5eQhmzwuSpNaORA0twrAcAJFTKym4YqjaCQRm5q6qiZwQeNmpyjJotm5q8+u7ojW9RSdYJBdlI1kM+4ARCA1EiQMpKBW318hNgXX2ETD3bUOpFrNfZHGpilM4XN5lY9PGheqEfp7yRWDknw4rWjr+k6C/olbSJ0HRGMsOxnr80NUTQ0/hJvC69GQBHI1d0bhCAfwkLHLIncM6XM0+Sohqmdv1HuVQGR4l2Ci5hs+0eKl0nXr/dQcfx7o/k7M9nmoqAkZOknEkyUFKyonQsp/LDUuqTAot2vQHoZbV2bNGSQKZdDWbci3Wlf/ZeI4VHNkPpk8kDovGlw3H+gg4piQIDAQAB"
+json.dump(manifest, open(sys.argv[1], "w"), indent=2)
+END
+  # what tells a user's copy of the extensions that the system's changed
+  echo "$pkgver-$pkgrel $_ubol" > "$pkgdir/usr/share/kavat-browser/version"
+  chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat-browser"
+}

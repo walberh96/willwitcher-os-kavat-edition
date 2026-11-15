@@ -1,0 +1,9 @@
+{
+  "name": "dev.kavat.browser",
+  "description": "The browser's line to Willwitcher-OS Kavat Edition",
+  "path": "/usr/lib/kavat/browser-host",
+  "type": "stdio",
+  "allowed_origins": [
+    "chrome-extension://aelpfjkmocfiooliocnpmmbgcmbpjcne/"
+  ]
+}
