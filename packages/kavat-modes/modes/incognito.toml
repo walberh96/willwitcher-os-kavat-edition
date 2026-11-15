@@ -1,0 +1,11 @@
+# A private session. Everything goes out through the VPN chosen for it, and nothing goes
+# out when the VPN drops; the mode is not entered until the VPN is up.
+name  = "Incognito"
+about = "Private session"
+
+vpn = true
+# true: the browser's windows that are open are put out of sight until the mode is left;
+# the windows it opens while in the mode are private ones, which is the browser's own doing
+hide_browser = true
+# false: the terminal keeps no history, and the clipboard is emptied on leaving
+history = false

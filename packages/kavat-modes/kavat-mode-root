@@ -1,0 +1,108 @@
+#!/usr/bin/env python3
+"""The part of kavat-mode that is root's: units of the system, and the guard of Incognito.
+
+usage: mode-root stop <unit>...      stop the units that are running, and say which were
+       mode-root start <unit>...     start units again
+       mode-root guard <connection>  let nothing out but through that VPN
+       mode-root unguard             take the guard down
+
+It is run through pkexec by kavat-mode, without a password for the person at the machine,
+so it does little: it only touches units that a mode of the system names, in
+/usr/share/kavat/modes or /etc/kavat/modes, and the guard is one table of nftables.
+"""
+import glob
+import ipaddress
+import re
+import socket
+import subprocess
+import sys
+import tomllib
+
+TABLE = 'kavat_incognito'
+
+
+def named_units():
+    """The units the system's own modes may stop: a mode in a home folder cannot add to them."""
+    units = set()
+    for path in glob.glob('/usr/share/kavat/modes/*.toml') + glob.glob('/etc/kavat/modes/*.toml'):
+        try:
+            with open(path, 'rb') as file:
+                units.update(tomllib.load(file).get('stop', []))
+        except (OSError, tomllib.TOMLDecodeError):
+            pass
+    return units
+
+
+def out(*command):
+    done = subprocess.run(command, capture_output=True, text=True, check=False)
+    return done.stdout.strip() if done.returncode == 0 else ''
+
+
+def addresses(host):
+    """The addresses of a name, or the address itself."""
+    try:
+        return {str(ipaddress.ip_address(host))}
+    except ValueError:
+        pass
+    try:
+        return {found[4][0] for found in socket.getaddrinfo(host, None)}
+    except OSError:
+        return set()
+
+
+def guard(connection):
+    """One table: out through the VPN's device, to the VPN's server, and nowhere else."""
+    kind = out('nmcli', '-g', 'connection.type', 'connection', 'show', connection)
+    device = out('nmcli', '-g', 'GENERAL.IP-IFACE', 'connection', 'show', connection) or \
+        out('nmcli', '-g', 'connection.interface-name', 'connection', 'show', connection)
+    if kind not in ('wireguard', 'vpn') or not re.fullmatch(r'[\w.-]{1,15}', device or ''):
+        sys.exit(f'mode-root: {connection} is not a VPN that is up')
+    servers = set()
+    if kind == 'wireguard':
+        for line in out('wg', 'show', device, 'endpoints').splitlines():
+            servers |= addresses(line.split()[-1].rsplit(':', 1)[0].strip('[]'))
+    else:
+        data = out('nmcli', '-g', 'vpn.data', 'connection', 'show', connection)
+        for remote in re.findall(r'(?:remote|gateway)\s*=\s*([^,]+)', data):
+            for one in remote.replace('\\', '').split():
+                servers |= addresses(one.split(':')[0].strip())
+    four = sorted(address for address in servers if ':' not in address)
+    six = sorted(address for address in servers if ':' in address)
+    rules = [f'oifname "lo" accept', f'oifname "{device}" accept']
+    if four:
+        rules.append('ip daddr { ' + ', '.join(four) + ' } accept')
+    if six:
+        rules.append('ip6 daddr { ' + ', '.join(six) + ' } accept')
+    # the rest is counted before it is dropped, so that it can be seen that the guard works
+    rules.append('counter drop')
+    script = (f'table inet {TABLE}\ndelete table inet {TABLE}\n'
+              f'table inet {TABLE} {{\n  chain out {{\n    type filter hook output priority 0; policy drop;\n    '
+              + '\n    '.join(rules) + '\n  }\n}\n')
+    done = subprocess.run(['nft', '-f', '-'], input=script, text=True, check=False)
+    sys.exit(done.returncode)
+
+
+def main():
+    what, rest = (sys.argv[1:2] or [''])[0], sys.argv[2:]
+    if what in ('stop', 'start') and rest:
+        allowed = named_units()
+        for unit in rest:
+            if unit not in allowed:
+                sys.exit(f'mode-root: no mode of the system names {unit}')
+        if what == 'stop':
+            running = [unit for unit in rest if out('systemctl', 'is-active', unit) == 'active']
+            if running:
+                subprocess.run(['systemctl', 'stop', *running], check=False)
+            print(' '.join(running))
+        else:
+            subprocess.run(['systemctl', 'start', *rest], check=False)
+    elif what == 'guard' and len(rest) == 1:
+        guard(rest[0])
+    elif what == 'unguard' and not rest:
+        subprocess.run(['nft', 'delete', 'table', 'inet', TABLE], stderr=subprocess.DEVNULL, check=False)
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()

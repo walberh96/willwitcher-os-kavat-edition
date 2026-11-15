@@ -1,0 +1,17 @@
+# Everything for the game. What is stopped here starts again on leaving the mode.
+name  = "Gamer"
+about = "Everything for the game"
+
+# the processor's profile, as power-profiles-daemon names them
+power = "performance"
+# off: do not disturb
+notifications = "off"
+# the system's units that are stopped while in the mode, when they are running: containers,
+# the index of the disk and the scheduled snapshots
+stop = ["docker.service", "docker.socket", "plocate-updatedb.timer", "snapper-timeline.timer", "snapper-cleanup.timer"]
+# The browser puts the tabs that are not in view to sleep by itself when this mode is
+# entered: it is told of the mode, and nothing is asked of it here.
+# true: a video that plays as the background is stopped where it is
+pause_wallpaper = true
+# the user's own units, the same way
+stop_user = []

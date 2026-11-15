@@ -1,0 +1,17 @@
+# Part of kavat-shell: the system's mode, on the bar.
+id          = "kavat/modes"
+name        = "Kavat modes"
+version     = "0.1.0"
+plugin_api  = 43
+author      = "kavat"
+license     = "LicenseRef-AllRightsReserved"
+icon        = "toggle-right"
+description = "The mode of the system on the bar: Coder, Gamer, Incognito and your own."
+
+[[widget]]
+id    = "mode"
+entry = "widget.luau"
+hover_highlight = false
+
+  [widget.actions]
+  middle = "none"

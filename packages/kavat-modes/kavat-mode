@@ -1,0 +1,314 @@
+#!/usr/bin/env python3
+"""kavat-mode: switch the whole machine between its modes.
+
+usage: kavat-mode                 the mode in force
+       kavat-mode <mode>          change to it: coder, gamer, incognito, or one of your own
+       kavat-mode next            the one after the one in force
+       kavat-mode list            every mode: its word, its name, what it is, and a * on the one in force
+       kavat-mode show <mode>     what a mode does, one thing to a line
+       kavat-mode vpn [<name>]    the VPN Incognito uses, or choose it; `kavat-mode vpn none` forgets it
+       kavat-mode vpns            the VPNs NetworkManager knows
+       kavat-mode auto [on|off]   whether a game started from Steam enters Gamer by itself
+       kavat-mode restore         at the start of a session: back to Coder, undoing what was left
+
+A mode is a file: the system's are in /usr/share/kavat/modes, the machine's in
+/etc/kavat/modes and yours in ~/.config/kavat/modes; a file of the same name in a later
+folder takes the place of the earlier one. What a mode changes on entering is written down,
+and undone on leaving it: the units it stopped start again, the processor's profile and the
+notifications go back to what they were, the VPN it brought up comes down.
+"""
+import glob
+import json
+import os
+import subprocess
+import sys
+import time
+import tomllib
+
+HOME = os.path.expanduser('~')
+CONFIG = os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config'
+STATE = (os.environ.get('XDG_STATE_HOME') or f'{HOME}/.local/state') + '/kavat/mode.json'
+SETTINGS = f'{CONFIG}/kavat/modes.json'
+RUNTIME = os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'
+FOLDERS = ['/usr/share/kavat/modes', '/etc/kavat/modes', f'{CONFIG}/kavat/modes']
+ROOT = ['pkexec', '/usr/lib/kavat/mode-root']
+# the terminal's shell looks for this file before each prompt: while it is there, it keeps no history
+NO_HISTORY = f'{RUNTIME}/kavat-no-history'
+
+
+def modes():
+    """Every mode by its word, the file's name: a later folder has the last say."""
+    found = {}
+    for folder in FOLDERS:
+        for path in sorted(glob.glob(f'{folder}/*.toml')):
+            try:
+                with open(path, 'rb') as file:
+                    found[os.path.basename(path)[:-5]] = tomllib.load(file)
+            except (OSError, tomllib.TOMLDecodeError) as error:
+                print(f'kavat-mode: {path} is left out: {error}', file=sys.stderr)
+    # Coder first, as the one everything goes back to; the rest by their word
+    return dict(sorted(found.items(), key=lambda item: (item[0] != 'coder', item[0])))
+
+
+def load(path, default):
+    try:
+        with open(path, encoding='utf-8') as file:
+            return json.load(file)
+    except (OSError, ValueError):
+        return default
+
+
+def save(path, value):
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path + '.new', 'w', encoding='utf-8') as file:
+        json.dump(value, file, indent=2)
+        file.write('\n')
+    os.replace(path + '.new', path)
+
+
+def run(*command, timeout=20):
+    """What a command printed, or None when it failed."""
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout.strip() if done.returncode == 0 else None
+
+
+def hyprctl(*arguments):
+    """Hyprland's answer; from outside the session it is asked by its number."""
+    return run('hyprctl', *arguments) or run('hyprctl', '--instance', '0', *arguments)
+
+
+def windows():
+    try:
+        return json.loads(hyprctl('clients', '-j') or '[]')
+    except ValueError:
+        return []
+
+
+def tell(text):
+    run('notify-send', '--app-name', 'Modes', '--icon', 'preferences-system', 'Mode', text, timeout=5)
+
+
+def shell_knows():
+    """The bar's widget and the panel read the state again when they are told."""
+    run('kavat-shell', 'msg', 'plugin', 'kavat/modes:mode', 'all', 'changed', timeout=5)
+
+
+def vpns():
+    lines = run('nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show') or ''
+    return [line.rsplit(':', 1)[0].replace('\\:', ':') for line in lines.splitlines()
+            if line.rsplit(':', 1)[-1] in ('vpn', 'wireguard')]
+
+
+def enter(word, mode):
+    """Do what a mode asks for, and give back what has to be undone on leaving it."""
+    undo = {}
+    if mode.get('vpn'):
+        name = load(SETTINGS, {}).get('vpn')
+        if not name or name not in vpns():
+            sys.exit(f'kavat-mode: {mode.get("name", word)} needs a VPN, and none is chosen: `kavat-mode vpn <name>`, '
+                     'from the ones `kavat-mode vpns` lists, or the Modes page of the settings.')
+        was_up = name in (run('nmcli', '-t', '-f', 'NAME', 'connection', 'show', '--active') or '').splitlines()
+        if not was_up and run('nmcli', 'connection', 'up', 'id', name, timeout=45) is None:
+            sys.exit(f'kavat-mode: the VPN {name} did not come up, so the mode is not entered.')
+        # nothing goes out from here on but through the VPN, also when it drops
+        if run(*ROOT, 'guard', name) is None:
+            if not was_up:
+                run('nmcli', 'connection', 'down', 'id', name)
+            sys.exit('kavat-mode: the guard that lets nothing out but through the VPN could not be put up, so the mode is not entered.')
+        undo['vpn'] = {'name': name, 'bring_down': not was_up}
+    if mode.get('power'):
+        before = run('powerprofilesctl', 'get')
+        if before and before != mode['power'] and run('powerprofilesctl', 'set', mode['power']) is not None:
+            undo['power'] = before
+    if mode.get('notifications') == 'off':
+        before = run('kavat-shell', 'msg', 'notification-dnd-status')
+        if before is not None and 'true' not in before and 'on' not in before.split():
+            run('kavat-shell', 'msg', 'notification-dnd-set', 'true')
+            undo['notifications'] = True
+    if mode.get('stop'):
+        stopped = run(*ROOT, 'stop', *mode['stop'])
+        if stopped:
+            undo['units'] = stopped.split()
+    running = [unit for unit in mode.get('stop_user', []) if run('systemctl', '--user', 'is-active', unit) == 'active']
+    if running:
+        run('systemctl', '--user', 'stop', *running)
+        undo['user_units'] = running
+    if mode.get('pause_wallpaper'):
+        run('kavat-wallpaper', 'pause')
+        undo['wallpaper'] = True
+    if mode.get('hide_browser'):
+        hidden = []
+        for window in windows():
+            if window.get('class') == 'kavat-browser' and not str(window.get('workspace', {}).get('name', '')).startswith('special'):
+                hyprctl('dispatch', f'hl.dsp.window.move({{ workspace = "special:kavat-hidden", window = "address:{window["address"]}", follow = false }})')
+                hidden.append([window['address'], window['workspace']['name']])
+        if hidden:
+            undo['browser'] = hidden
+    if mode.get('history') is False:
+        open(NO_HISTORY, 'w').close()
+        undo['history'] = True
+    return undo
+
+
+def leave(undo):
+    if undo.get('history'):
+        try:
+            os.remove(NO_HISTORY)
+        except OSError:
+            pass
+        # What was copied in the mode does not stay behind. The shell keeps the clipboard
+        # and offers it again when it is only cleared, so it is written over first.
+        run('kavat-shell', 'msg', 'clipboard-copy', ' ')
+        run('kavat-shell', 'msg', 'clipboard-clear')
+    if undo.get('wallpaper'):
+        run('kavat-wallpaper', 'resume')
+    for address, workspace in undo.get('browser', []):
+        # a workspace is its number, or its name in quotes
+        where = workspace if str(workspace).lstrip('-').isdigit() else json.dumps(str(workspace))
+        hyprctl('dispatch', f'hl.dsp.window.move({{ workspace = {where}, window = "address:{address}", follow = false }})')
+    if undo.get('user_units'):
+        run('systemctl', '--user', 'start', *undo['user_units'])
+    if undo.get('units'):
+        run(*ROOT, 'start', *undo['units'])
+    if undo.get('notifications'):
+        run('kavat-shell', 'msg', 'notification-dnd-set', 'false')
+    if undo.get('power'):
+        run('powerprofilesctl', 'set', undo['power'])
+    if undo.get('vpn'):
+        run(*ROOT, 'unguard')
+        if undo['vpn'].get('bring_down'):
+            run('nmcli', 'connection', 'down', 'id', undo['vpn']['name'])
+
+
+def change(word, quiet=False):
+    known = modes()
+    if word not in known:
+        sys.exit(f'kavat-mode: there is no mode called {word}; there are: ' + ', '.join(known))
+    state = load(STATE, {'mode': 'coder', 'undo': {}})
+    if state['mode'] == word:
+        return
+    # the new mode is entered from a clean machine: what the old one did is undone first
+    leave(state.get('undo', {}))
+    save(STATE, {'mode': 'coder', 'undo': {}})
+    try:
+        undo = enter(word, known[word])
+    except SystemExit:
+        shell_knows()
+        raise
+    save(STATE, {'mode': word, 'undo': undo, 'since': int(time.time())})
+    shell_knows()
+    if not quiet:
+        tell(f'{known[word].get("name", word)}: {known[word].get("about", "")}'.rstrip(': '))
+
+
+def describe(word, mode):
+    """What a mode does, in words, for the panel and for `show`."""
+    lines = []
+    if mode.get('vpn'):
+        name = load(SETTINGS, {}).get('vpn')
+        lines.append(f'All traffic through the VPN{": " + name if name else ", once one is chosen"}')
+        lines.append('Nothing goes out if the VPN drops')
+    else:
+        lines.append('Network direct')
+    if mode.get('power'):
+        lines.append(f'Processor on {mode["power"]}')
+    if mode.get('notifications') == 'off':
+        lines.append('Do not disturb')
+    units = [unit.rsplit('.', 1)[0] for unit in mode.get('stop', []) + mode.get('stop_user', [])]
+    if units:
+        lines.append('Stopped while in it: ' + ', '.join(dict.fromkeys(units)))
+    if mode.get('pause_wallpaper'):
+        lines.append('A video background is paused')
+    if mode.get('hide_browser'):
+        lines.append('The browser opens private windows; the ones that were open are hidden until you leave')
+    if mode.get('history') is False:
+        lines.append('The terminal keeps no history; the clipboard is emptied on leaving')
+    if len(lines) == 1 and word == 'coder':
+        lines.append('Everything running')
+    return lines
+
+
+def watch():
+    """Gamer by itself: entered when Steam starts a game, left when the game is over.
+
+    Steam runs every game under a process called reaper, with SteamLaunch among its words."""
+    entered_from = None
+    while True:
+        on = load(SETTINGS, {}).get('auto_gamer', True)
+        game = False
+        if on:
+            for path in glob.glob('/proc/[0-9]*/cmdline'):
+                try:
+                    with open(path, 'rb') as file:
+                        words = file.read().split(b'\0')
+                except OSError:
+                    continue
+                if os.path.basename(words[0]) == b'reaper' and b'SteamLaunch' in words:
+                    game = True
+                    break
+        now = load(STATE, {'mode': 'coder'})['mode']
+        if game and entered_from is None and now != 'gamer' and 'gamer' in modes():
+            entered_from = now
+            change('gamer')
+        elif not game and entered_from is not None:
+            if now == 'gamer':
+                change(entered_from if entered_from in modes() else 'coder')
+            entered_from = None
+        time.sleep(3)
+
+
+def main():
+    arguments = sys.argv[1:]
+    state = load(STATE, {'mode': 'coder', 'undo': {}})
+    if not arguments:
+        print(state['mode'])
+    elif arguments == ['list']:
+        for word, mode in modes().items():
+            print(f'{"*" if word == state["mode"] else " "} {word}\t{mode.get("name", word)}\t{mode.get("about", "")}')
+    elif arguments[0] == 'show' and len(arguments) == 2 and arguments[1] in modes():
+        print('\n'.join(describe(arguments[1], modes()[arguments[1]])))
+    elif arguments == ['next']:
+        words = list(modes())
+        change(words[(words.index(state['mode']) + 1) % len(words)] if state['mode'] in words else 'coder')
+    elif arguments == ['vpns']:
+        print('\n'.join(vpns()))
+    elif arguments[0] == 'vpn' and len(arguments) <= 2:
+        settings = load(SETTINGS, {})
+        if len(arguments) == 1:
+            print(settings.get('vpn', ''))
+        elif arguments[1] == 'none':
+            settings.pop('vpn', None)
+            save(SETTINGS, settings)
+        elif arguments[1] in vpns():
+            settings['vpn'] = arguments[1]
+            save(SETTINGS, settings)
+        else:
+            sys.exit(f'kavat-mode: NetworkManager has no VPN called {arguments[1]}; it has: ' + (', '.join(vpns()) or 'none'))
+    elif arguments[0] == 'auto' and len(arguments) <= 2:
+        settings = load(SETTINGS, {})
+        if len(arguments) == 1:
+            print('on' if settings.get('auto_gamer', True) else 'off')
+        elif arguments[1] in ('on', 'off'):
+            settings['auto_gamer'] = arguments[1] == 'on'
+            save(SETTINGS, settings)
+        else:
+            sys.exit('kavat-mode: auto takes on or off')
+    elif arguments == ['restore']:
+        # a session that ended in another mode left things undone
+        if state['mode'] != 'coder' or state.get('undo'):
+            leave(state.get('undo', {}))
+            save(STATE, {'mode': 'coder', 'undo': {}})
+        shell_knows()
+    elif arguments == ['watch']:
+        watch()
+    elif len(arguments) == 1 and not arguments[0].startswith('-') and arguments[0] not in ('help', 'show', 'vpn', 'auto'):
+        change(arguments[0])
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()

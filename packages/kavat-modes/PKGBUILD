@@ -1,0 +1,20 @@
+# The system's modes: Coder, Gamer and Incognito, switched from the bar.
+pkgname=kavat-modes
+pkgver=0.1.0
+pkgrel=5
+pkgdesc="Willwitcher-OS Kavat Edition: the modes of the system, and their switch on the bar"
+arch=('any')
+url="https://github.com/walberh96/willwitcher-os-kavat-edition"
+license=('LicenseRef-AllRightsReserved')
+depends=('python' 'kavat-shell' 'power-profiles-daemon' 'networkmanager' 'nftables' 'wireguard-tools'
+         'polkit' 'libnotify' 'wl-clipboard')
+source=(kavat-mode kavat-mode-root org.kavat.mode.policy)
+sha256sums=('SKIP' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm755 kavat-mode "$pkgdir/usr/bin/kavat-mode"
+  install -Dm755 kavat-mode-root "$pkgdir/usr/lib/kavat/mode-root"
+  install -Dm644 org.kavat.mode.policy "$pkgdir/usr/share/polkit-1/actions/org.kavat.mode.policy"
+  install -Dm644 -t "$pkgdir/usr/share/kavat/modes" "$startdir"/modes/*.toml
+  install -Dm644 -t "$pkgdir/usr/share/kavat/shell-plugins/modes" "$startdir"/shell/*
+}

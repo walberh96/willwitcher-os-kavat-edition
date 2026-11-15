@@ -1,0 +1,4 @@
+# The everyday mode: nothing is stopped and nothing is changed. It is the one the session
+# starts in, and the one the others go back to.
+name  = "Coder"
+about = "Everyday mode"
