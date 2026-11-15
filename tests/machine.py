@@ -197,7 +197,10 @@ class Screen:
                       + chunk(b'IDAT', zlib.compress(rows, 6)) + chunk(b'IEND', b''))
 
     def _press(self, sock, keys):
-        codes = [KEYS[key] if key in KEYS else ord(key) for key in keys]
+        # With shift held a letter is sent as its capital, as a keyboard would: QEMU takes a
+        # small letter under shift to mean that caps lock is on, and undoes the shift.
+        shifted = 'shift' in keys
+        codes = [KEYS[key] if key in KEYS else ord(key.upper() if shifted and key.isalpha() else key) for key in keys]
         for code in codes:
             sock.sendall(struct.pack('>BBxxI', 4, 1, code))
             time.sleep(0.03)
