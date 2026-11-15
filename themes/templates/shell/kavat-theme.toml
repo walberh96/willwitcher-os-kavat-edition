@@ -1,0 +1,50 @@
+# Made by kavat-theme from the theme's settings; what is changed here is lost.
+# The settings are in ~/.config/kavat/theme.toml.
+
+[theme]
+source         = "custom"
+custom_palette = "Kavat"
+mode           = "{{ mode }}"
+
+[theme.templates]
+enable_builtin_templates   = false
+enable_community_templates = false
+
+[shell]
+corner_radius_scale = {{ radius_scale }}
+font_family         = "{{ font_ui }}"
+# The first-run dialog the shell inherited picks a palette and a mode of its own, which
+# would take the theme away from the system's.
+setup_wizard_enabled = false
+# When something asks for the password of an administrator, as kavat-theme boot does, the
+# shell draws the dialog, with the theme. Nothing else in the system does.
+polkit_agent = true
+
+# The system's own panels are plugins of the shell, in a folder that comes with the system.
+# Noctalia's two lists of plugins on the network are named here, off, so that they can be
+# turned on in the shell's settings: a list that is on is fetched on every start.
+[plugins]
+enabled     = ["kavat/settings"]
+auto_update = "none"
+
+[[plugins.source]]
+name     = "official"
+kind     = "git"
+location = "https://github.com/noctalia-dev/official-plugins"
+enabled  = false
+
+[[plugins.source]]
+name     = "community"
+kind     = "git"
+location = "https://github.com/noctalia-dev/community-plugins"
+enabled  = false
+
+[[plugins.source]]
+name     = "kavat"
+kind     = "path"
+location = "/usr/share/kavat/shell-plugins"
+enabled  = true
+
+[shell.animation]
+enabled = {{ animations }}
+speed   = {{ animation_speed }}

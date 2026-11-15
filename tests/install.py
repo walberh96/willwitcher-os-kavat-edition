@@ -37,18 +37,29 @@ SUBVOLUMES = {'/': '/@', '/home': '/@home', '/games': '/@games', '/var/log': '/@
 
 # where the installer's side bar names each step, on a 1920x1080 screen; the one it is on
 # is painted in the accent colour
+NEXT_BUTTON = (1754, 1039)  # where the installer's Next is, on a 1920x1080 screen
+LIVE = 'runuser -u live -- env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1'
 STEPS = {'location': 195, 'keyboard': 234, 'partitions': 273, 'users': 312, 'summary': 351}
 
 
-def next_page(screen, step, timeout=120):
+def next_page(screen, step, timeout=120, machine=None):
     """Press Next and wait until the installer shows that step. True when it does.
 
     Some pages take a while to come up, and keys typed before they do are lost. So is, now
     and then, the press of Next itself: it is pressed again when nothing has moved for a while.
     """
     deadline = time.time() + timeout
+    tries = 0
     while time.time() < deadline:
-        screen.press('alt', 'n')
+        tries += 1
+        if tries > 2:
+            # the keys are not reaching the window: say where they go, and use the mouse
+            if machine is not None:
+                print(f'Next pressed {tries - 1} times for {step}; the keyboard is on:',
+                      machine.run(f'{LIVE} hyprctl --instance 0 activewindow | head -n 12; {LIVE} hyprctl --instance 0 layers | grep -i -B1 -A3 "keyboard\\|interactiv"')[1], flush=True)
+            screen.click(*NEXT_BUTTON)
+        else:
+            screen.press('alt', 'n')
         again = time.time() + 12
         while time.time() < min(again, deadline):
             time.sleep(1)
@@ -62,7 +73,7 @@ def next_page(screen, step, timeout=120):
 def install(machine, checks, pictures, encrypt):
     """Run the installer on the live session. True when it says it finished well."""
     live = 'runuser -u live -- env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1'
-    status, output = machine.wait_until('pgrep -u live -x noctalia', 120)
+    status, output = machine.wait_until('pgrep -u live -x kavat-shell', 120)
     if not checks.report(status == 0, 'the live session is up', output):
         return False
 
@@ -73,7 +84,7 @@ def install(machine, checks, pictures, encrypt):
     time.sleep(3)
 
     screen = machine.screen
-    shown = all(next_page(screen, step) for step in ('location', 'keyboard', 'partitions'))
+    shown = all(next_page(screen, step, machine=machine) for step in ('location', 'keyboard', 'partitions'))
     # the disk page, where erasing the disk is already chosen
     if encrypt:
         # Encrypt system, then the recovery password twice. The box is clicked: its letter, C,
@@ -86,7 +97,7 @@ def install(machine, checks, pictures, encrypt):
         screen.type(DISK_PASSWORD)
         time.sleep(1)
     screen.picture(f'{pictures}/install-disk.png')
-    shown = shown and next_page(screen, 'users')
+    shown = shown and next_page(screen, 'users', machine=machine)
     # the users page: name, then login name and computer name already filled in, then the password twice
     screen.type(USER)
     for _ in range(3):
@@ -95,9 +106,10 @@ def install(machine, checks, pictures, encrypt):
     screen.press('tab')
     screen.type(PASSWORD)
     time.sleep(1)
-    shown = shown and next_page(screen, 'summary')
+    shown = shown and next_page(screen, 'summary', machine=machine)
     screen.picture(f'{pictures}/install-summary.png')
     if not checks.report(shown, 'the installer goes through its pages'):
+        print(machine.run(f'tail -n 40 {LOG}')[1])
         return False
     # Install, which asks to confirm, with Install now chosen. A busy machine can lose either
     # key, so both are pressed again until the work starts.

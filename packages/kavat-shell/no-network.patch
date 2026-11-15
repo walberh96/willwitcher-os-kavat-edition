@@ -1,0 +1,126 @@
+diff --git a/src/app/application_services.cpp b/src/app/application_services.cpp
+index 9198a97..1ebc387 100644
+--- a/src/app/application_services.cpp
++++ b/src/app/application_services.cpp
+@@ -586,10 +586,14 @@ void Application::initStyleThemeAndWayland() {
+     m_themeService.onConfigReload();
+     m_settingsWindow.onExternalOptionsChanged();
+   });
+-  m_communityPaletteService.sync();
++  // Kavat Shell: the catalogue of community palettes is fetched only when the theme is set
++  // to take one of them, not on every start.
++  if (m_configService.config().theme.source == PaletteSource::Community) {
++    m_communityPaletteService.sync();
++  }
+   m_configService.addReloadCallback(
+       [this] {
+-        if (m_configService.lastChange().theme) {
++        if (m_configService.lastChange().theme && m_configService.config().theme.source == PaletteSource::Community) {
+           m_communityPaletteService.sync();
+         }
+       },
+diff --git a/src/config/config_types.cpp b/src/config/config_types.cpp
+index c0b4132..1b2739d 100644
+--- a/src/config/config_types.cpp
++++ b/src/config/config_types.cpp
+@@ -60,12 +60,16 @@ std::vector<ShortcutConfig> defaultControlCenterShortcuts() {
+ 
+ std::vector<PluginSourceConfig> defaultPluginSources() {
+   return {
++      // Kavat Shell: Noctalia's two lists of plugins are known, and off until they are
++      // turned on: an enabled one is fetched from the network on every start.
+       {.kind = PluginSourceKind::Git,
+        .name = "official",
+-       .location = "https://github.com/noctalia-dev/official-plugins"},
++       .location = "https://github.com/noctalia-dev/official-plugins",
++       .enabled = false},
+       {.kind = PluginSourceKind::Git,
+        .name = "community",
+-       .location = "https://github.com/noctalia-dev/community-plugins"},
++       .location = "https://github.com/noctalia-dev/community-plugins",
++       .enabled = false},
+   };
+ }
+ 
+diff --git a/src/config/config_types.h b/src/config/config_types.h
+index a00f701..3f16433 100644
+--- a/src/config/config_types.h
++++ b/src/config/config_types.h
+@@ -1237,7 +1237,7 @@ struct ShellConfig {
+     // Desktop entry IDs shown in manual order in the Pinned view.
+     std::vector<std::string> pinned;
+     /// When true, refresh currency exchange rates from libqalculate's online sources.
+-    bool fetchExchangeRates = true;
++    bool fetchExchangeRates = false; // Kavat Shell: nothing is fetched unless asked for
+     std::string providerPrefix = "/";
+     /// Paste shortcut after a copy-style launcher activation (calculator, emoji, …).
+     ClipboardAutoPasteMode autoPaste = ClipboardAutoPasteMode::Auto;
+@@ -1405,7 +1405,7 @@ struct ShellConfig {
+ };
+ 
+ struct WeatherConfig {
+-  bool enabled = true;
++  bool enabled = false; // Kavat Shell: nothing is fetched unless asked for
+   bool effects = true;
+   std::int32_t refreshMinutes = 30;
+   std::string unit = "metric";
+@@ -1837,7 +1837,7 @@ struct ThemeConfig {
+   struct TemplatesConfig {
+     bool enableBuiltinTemplates = true;
+     std::vector<std::string> builtinIds;
+-    bool enableCommunityTemplates = true;
++    bool enableCommunityTemplates = false; // Kavat Shell: nothing is fetched unless asked for
+     std::vector<std::string> communityIds;
+     std::vector<TemplateColorConfig> customColors;
+     std::vector<UserTemplateConfig> userTemplates;
+@@ -1947,7 +1947,7 @@ struct PluginSourceConfig {
+ struct PluginsConfig {
+   std::vector<PluginSourceConfig> sources;
+   std::vector<std::string> enabled; // active plugin ids ("author/plugin"); opt-in for every source
+-  PluginAutoUpdateMode autoUpdate = PluginAutoUpdateMode::All; // background auto-update scope (startup + every 6h)
++  PluginAutoUpdateMode autoUpdate = PluginAutoUpdateMode::None; // Kavat Shell: off unless asked for; // background auto-update scope (startup + every 6h)
+   // Plugin-level setting overrides, keyed by plugin id then setting key. Seeded
+   // into every entry runtime of the plugin (widget/shortcut/service). Open-ended
+   // (validated against the manifest schema), so compared via configEqual rather
+diff --git a/src/dbus/mpris/mpris_art.cpp b/src/dbus/mpris/mpris_art.cpp
+index 57fa1ff..48b5ad2 100644
+--- a/src/dbus/mpris/mpris_art.cpp
++++ b/src/dbus/mpris/mpris_art.cpp
+@@ -8,6 +8,9 @@
+ #include <string_view>
+ 
+ namespace {
++  // Kavat Shell: see resolveArtworkSource
++  constexpr bool kNeverFetchRemoteArt = true;
++
+ 
+   constexpr std::string_view kGoogleArtSizeSuffix = "=w544-h544-l90-rj";
+ 
+@@ -173,6 +176,11 @@ namespace mpris {
+     std::string path = cachedArtworkPath(artUrl);
+     if (!path.empty() || !isRemoteArtUrl(artUrl) || httpClient == nullptr)
+       return path;
++    // Kavat Shell: a cover that is on the network is not fetched: the address comes from
++    // whatever is playing, and asking for it tells that host what is being listened to.
++    // A cover that is a file of this machine is shown as before.
++    if (kNeverFetchRemoteArt)
++      return {};
+     const std::string key(artUrl);
+     if (!pending.insert(key).second)
+       return {};
+diff --git a/src/shell/notification/notification_toast.cpp b/src/shell/notification/notification_toast.cpp
+index 1eefbef..c2ce6d1 100644
+--- a/src/shell/notification/notification_toast.cpp
++++ b/src/shell/notification/notification_toast.cpp
+@@ -3105,7 +3105,10 @@ std::string NotificationToast::resolveNotificationIconPath(const PopupEntry& ent
+       return cachedPath;
+     }
+ 
+-    if (m_httpClient != nullptr && !m_pendingRemoteIconDownloads.contains(iconValue)) {
++    // Kavat Shell: an icon that is on the network is not fetched: any app that sends a
++    // notification could otherwise make the shell ask a host of its choosing for a file.
++    constexpr bool kFetchRemoteIcons = false;
++    if (kFetchRemoteIcons && m_httpClient != nullptr && !m_pendingRemoteIconDownloads.contains(iconValue)) {
+       std::filesystem::create_directories(cached.parent_path(), ec);
+       if (ec) {
+         kLog.warn(

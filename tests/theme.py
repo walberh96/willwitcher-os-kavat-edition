@@ -26,7 +26,7 @@ BAR = (300, 17)  # a point of the shell's bar with nothing on it, on a 1920x1080
 # commands as the user, inside the user's session
 SESSION = (f'runuser -u {USER} -- env HOME=/home/{USER} XDG_RUNTIME_DIR=/run/user/$(id -u {USER}) '
            f'WAYLAND_DISPLAY=wayland-1 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u {USER})/bus sh -c ')
-RUNNING = 'pgrep -x Hyprland; pgrep -x noctalia; pgrep -x kitty'
+RUNNING = 'pgrep -x Hyprland; pgrep -x kavat-shell; pgrep -x kitty'
 
 
 def main():
@@ -73,8 +73,8 @@ def main():
         checks.report(status == 0 and output == 'dark', 'the user has no theme file, and the mode is dark', output)
         follows("Hyprland's active border is the accent of Kavat", lambda: border('active'), 'f2a93b')
         follows("Hyprland's other borders are Kavat's border colour", lambda: border('inactive'), '2a2f3f')
-        follows('the shell uses the palette of the theme', lambda: user('noctalia msg color-scheme-get')[1], 'custom Kavat')
-        follows('the shell is in dark mode', lambda: user('noctalia msg theme-mode-get')[1], 'dark')
+        follows('the shell uses the palette of the theme', lambda: user('kavat-shell msg color-scheme-get')[1], 'custom Kavat')
+        follows('the shell is in dark mode', lambda: user('kavat-shell msg theme-mode-get')[1], 'dark')
         user(f'hyprctl --instance 0 eval \'hl.exec_cmd("kitty -o allow_remote_control=yes --listen-on unix:{KITTY}")\'')
         status, output = machine.wait_until(f'test -S {KITTY}', 30)
         checks.report(status == 0, 'Kitty opens', output)
@@ -83,8 +83,21 @@ def main():
         time.sleep(2)
         _, output = user('hyprctl --instance 0 clients | grep -c "^Window"; hyprctl --instance 0 layers | grep -c -i -E "wizard|setup"')
         checks.report(output == '1\n0', 'nothing else opens on a first login: no news, no first-run dialog', output)
-        status, output = machine.run('pacman -Qq kavat-shell && ! grep -a -c -E "noctalia.dev/ping|telemetry_enabled" /usr/bin/noctalia')
-        checks.report(status == 0, "the shell is the system's fork, with nothing in it to send a ping", output)
+        status, output = machine.run('pacman -Qq kavat-shell && ! grep -a -c -E "noctalia.dev/ping|telemetry_enabled" /usr/bin/kavat-shell')
+        checks.report(status == 0, "the shell is the system's own, with nothing in it to send a ping", output)
+        status, output = user('pgrep -x noctalia; ls ~/.config/noctalia ~/.cache/noctalia 2>/dev/null; '
+                              'grep -c -i -E "download failed|could not resolve|plugin source" ~/.cache/kavat-shell/kavat-shell.log')
+        checks.report(output == '0', 'it runs under its own name, and asked the network for nothing when it started', output)
+        folder = '~/.local/share/icons/Kavat/64x64/places/folder.svg'
+        follows('apps are told the icon theme is the system\'s',
+                lambda: user('gsettings get org.gnome.desktop.interface icon-theme')[1], "'Kavat'", 10)
+        status, output = user(f'grep -c "#f2a93b" {folder}; grep -c "^Inherits=Papirus-Dark" ~/.local/share/icons/Kavat/index.theme')
+        checks.report(output.split() == ['1', '1'], "its folders are drawn in Kavat's accent, and the rest is Papirus", output)
+        status, output = machine.wait_until(f'test -e /home/{USER}/.local/share/icons/Kavat-cursor/.drawings', 15)
+        status, output = user('ls ~/.local/share/icons/Kavat-cursor/hyprcursors | wc -l; hyprctl --instance 0 setcursor Kavat 24; '
+                              'cat ~/.local/share/icons/Kavat-cursor/.drawings')
+        cursor_before = output.splitlines()[-1] if output else ''
+        checks.report(output.splitlines()[:2] == ['56', 'ok'], "the cursor is packed from the theme, and Hyprland takes it", output)
         dark = light_at(BAR)
         checks.report(dark < 60, "the shell's bar is dark on the screen", f'lightness {dark} of 255')
         machine.screen.picture(f'{pictures}/theme-dark.png')
@@ -99,7 +112,7 @@ def main():
         follows("Hyprland's borders turn to the light border colour", lambda: border('inactive'), 'd2cbba', 2)
         follows("Kitty's background turns to paper", lambda: kitty('background'), '#fbf9f4', 2)
         follows("Kitty's text turns dark", lambda: kitty('foreground'), '#1d1f26', 2)
-        follows('the shell turns to light mode', lambda: user('noctalia msg theme-mode-get')[1], 'light', 2)
+        follows('the shell turns to light mode', lambda: user('kavat-shell msg theme-mode-get')[1], 'light', 2)
         follows('GTK apps are asked for their light side',
                 lambda: user('gsettings get org.gnome.desktop.interface color-scheme')[1], "'prefer-light'", 2)
         time.sleep(1)
@@ -116,7 +129,10 @@ def main():
         checks.report(status == 0, 'kavat-theme changes palette, accent and mode at once', output)
         follows("Hyprland's active border is Nord's green", lambda: border('active'), 'a3be8c', 2)
         follows("Kitty's background is Nord's dark surface", lambda: kitty('background'), '#2e3440', 2)
-        follows('the shell is back in dark mode', lambda: user('noctalia msg theme-mode-get')[1], 'dark', 2)
+        follows('the shell is back in dark mode', lambda: user('kavat-shell msg theme-mode-get')[1], 'dark', 2)
+        follows("the folders are drawn in Nord's green", lambda: user(f'grep -c "#a3be8c" {folder}')[1], '1', 2)
+        follows('and the cursor is packed again',
+                lambda: str(user('cat ~/.local/share/icons/Kavat-cursor/.drawings')[1] not in ('', cursor_before)), 'True', 5)
         time.sleep(1)
         machine.screen.picture(f'{pictures}/theme-nord.png')
 

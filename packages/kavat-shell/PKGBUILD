@@ -1,16 +1,15 @@
 pkgname=kavat-shell
 pkgver=5.4.1
-pkgrel=1
-pkgdesc="Willwitcher-OS Kavat Edition: the desktop shell, a fork of Noctalia that sends nothing about you"
+pkgrel=2
+pkgdesc="Willwitcher-OS Kavat Edition: Kavat Shell, the desktop shell; it began as Noctalia and asks the network for nothing by itself"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 # Noctalia is MIT, and so is what this package changes in it
 license=('MIT')
-# It is Noctalia under its own name: what asks for noctalia gets this, and the two do not
-# live together. The program is still called noctalia.
-provides=("noctalia=$pkgver")
-conflicts=('noctalia')
-# From here to the end of package(), Arch's own recipe for Noctalia 5.4.1, with the patch added.
+# It began as Noctalia 5.4.1 and is the system's own program now, with its own name: the
+# command is kavat-shell. The two can be installed side by side, since no file is shared.
+# The dependencies and the build are Arch's own recipe for Noctalia 5.4.1; python runs the
+# renaming.
 depends=(
   'bash'
   'cairo'
@@ -61,17 +60,24 @@ makedepends=(
   'wayland-protocols'
 )
 source=("noctalia-$pkgver.tar.gz::https://github.com/noctalia-dev/noctalia/archive/refs/tags/v$pkgver.tar.gz"
-        'no-ping.patch')
+        'no-ping.patch' 'no-network.patch' 'rename.py')
 sha256sums=('6069d922e9d72488c74e4ce335314ce2203f08bd4641380bfe1bd137004597fa'
-            'SKIP')
+            'SKIP' 'SKIP' 'SKIP')
 options=('!debug')
 
-# The fork, for now, is one change: Noctalia's "anonymous startup ping" is gone. The code
-# that sent it, its switch in the settings and the offer of it in the first-run dialog are
-# taken out, so there is nothing left to switch on.
+# What the fork changes, in this order:
+#   no-ping.patch      Noctalia's "anonymous startup ping" is gone: the code that sent it, its
+#                      switch in the settings and the offer of it in the first-run dialog.
+#   no-network.patch   nothing is fetched from the network unless it is asked for: the lists
+#                      of plugins, the community's palettes and templates, exchange rates and
+#                      the weather are off until turned on, and covers and notification
+#                      icons that are on the network are not fetched at all.
+#   rename.py          the name: the command, the folders, the D-Bus names and every text.
 prepare() {
   cd "noctalia-$pkgver"
   patch -p1 < "$srcdir/no-ping.patch"
+  patch -p1 < "$srcdir/no-network.patch"
+  python "$srcdir/rename.py" .
 }
 
 build() {
@@ -81,7 +87,7 @@ build() {
     -Dtests=disabled
   meson compile -C build-release
   for shell in bash fish zsh; do
-    build-release/noctalia completions "$shell" > "${shell}-completion"
+    build-release/kavat-shell completions "$shell" > "${shell}-completion"
   done
 }
 
@@ -89,7 +95,7 @@ package() {
   meson install -C build-release --destdir "$pkgdir"
 
   install -Dm644 "noctalia-$pkgver/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-  install -Dm644 bash-completion "$pkgdir/usr/share/bash-completion/completions/noctalia"
-  install -Dm644 fish-completion "$pkgdir/usr/share/fish/vendor_completions.d/noctalia.fish"
-  install -Dm644 zsh-completion "$pkgdir/usr/share/zsh/site-functions/_noctalia"
+  install -Dm644 bash-completion "$pkgdir/usr/share/bash-completion/completions/kavat-shell"
+  install -Dm644 fish-completion "$pkgdir/usr/share/fish/vendor_completions.d/kavat-shell.fish"
+  install -Dm644 zsh-completion "$pkgdir/usr/share/zsh/site-functions/_kavat-shell"
 }

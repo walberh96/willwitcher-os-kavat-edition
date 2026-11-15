@@ -1,6 +1,6 @@
 pkgname=kavat-boot
 pkgver=0.1.0
-pkgrel=7
+pkgrel=8
 pkgdesc="Willwitcher-OS Kavat Edition: the boot menu's entries, safe mode, the recovery console, the boot that remembers whether the last one failed, and GRUB opening an encrypted disk"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
