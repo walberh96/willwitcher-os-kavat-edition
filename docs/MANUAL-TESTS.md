@@ -111,6 +111,20 @@ With the network:
 
 For each line that failed: its number, what you did, what you saw. A photo of the screen is enough for anything before the login. After the login, `journalctl -b > ~/log.txt` right after it happens.
 
+## Found on the first pass
+
+The user went through this list on the PC on 14 November 2026. Everything worked except what follows. None of it is urgent: it is written down to be done in its turn.
+
+| What | What was seen | What it needs |
+| --- | --- | --- |
+| Installer | It shows one still picture while it installs, it does not look like the mockup's installer, and the mockup's step for choosing the theme does not exist | Screenshots of the system as a slideshow; the installer drawn after the mockup; the theme step |
+| Desktop background | It is the picture the shell inherited from Noctalia | A background of the system's own |
+| Settings, Appearance | Icon style and Cursor size cannot be changed: only the first choice can be pressed | The Tinted and Line icon styles and the cursor sizes 32 and 48, which are not built |
+| `kav`, installing from Browse | After `i` it is not clear that it waits for the password | A window over the screen, or a plain line that says what it waits for |
+| Notes, reminder | Typing a note with a time made the note and nothing else: no notification came | To be looked into. In the virtual machine the notification does come up, with its five buttons, so it is something of the real session |
+| Notes, `Ctrl+D` | An error flashes, too fast to read, and the list is empty, 0/0 | To be looked into, together with the reminder: what is due may never have been written |
+| Login, two monitors | Only one screen shows anything; the design has the clock on the others | Nothing: it looks good as it is. The design is to say one screen |
+
 ## Known and not built
 
 These are not failures: they are listed in the design document as left for later.
