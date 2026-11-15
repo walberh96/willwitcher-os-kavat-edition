@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition — What to try by hand
 
-Written on 14 November 2026 and brought up to date on 15 November, twice, for phase 3 · [Design document](DESIGN.md) · [Pending decisions](PENDING.md)
+Written on 14 November 2026 and brought up to date on 15 November, three times, for phase 3 · [Design document](DESIGN.md) · [Pending decisions](PENDING.md)
 
 The automatic tests run in a virtual machine with one screen, no network and a keyboard that types through a remote console. This is the list of what they cannot see: the real graphics card, two monitors, the mouse, the network, and how things feel. It is meant to be gone through once, from top to bottom, after one installation.
 
@@ -184,7 +184,48 @@ With the network:
 - [ ] **The lights**, if your keyboard or tower has them: `kav install openrgb`, then change the theme's accent: they take it. *Never tried: it depends on OpenRGB knowing your devices.*
 - [ ] **Privacy & network page**: it says the firewall is closed. "Turn it on" installs OpenSnitch; open a few apps and answer its questions. Say whether you want it on from the start.
 
-## 14. What has not changed, once more
+## 14. The browser's colours, its profiles and its albums
+
+- [ ] **Its bars wear the palette.** Open the browser, then change the palette on Appearance: the bar of tabs and the address bar change with the browser open, in a second or so. Try Light too. *Seen in the virtual machine; on the PC, look at whether any text on the bars is hard to read with some palette, and say which.* The settings and history pages of the browser keep their own colours: that is known.
+- [ ] **Other GTK 3 apps** now wear the palette through a theme called Kavat. If an app you install looks wrong (unreadable buttons or menus), note which.
+- [ ] **A profile for a mode**: in `~/.config/kavat/browser/browser.toml`, take the `#` off `gamer = "Gaming"`. Enter Gamer and press `Super+B`: the window is another profile's, with no history and none of your sessions. Leave the mode and press `Super+B`: yours again.
+- [ ] **An album**: on a site, `Ctrl+Shift+K`, type `add to album recipes`, Enter. Do it on two more sites. Then `albums` in the console: the page shows them as thumbnails. "Open all" opens the three; the ✕ on a card takes it out; "Show on the start page" puts the album under the search of every new tab.
+- [ ] **Read later**: `Ctrl+Shift+L` on a page; on the albums' page, in `read-later`, the ✓ puts it away. *If `Ctrl+Shift+L` does nothing, look in `chrome://extensions/shortcuts`: Chromium gives a key to an extension only when nothing else has it.*
+- [ ] **Tabs to album**: with several tabs open, `tabs to album trip` in the console; `open album trip` in a new window brings them back.
+- [ ] **The right button**: on a page, "Add to the album of favourites" and "Read later"; on an image, "Save the image to the album of images".
+- [ ] **Notes about this site**: after clipping a page of a site, go to another page of it, and `notes about this site` in the console, or on the right button: a panel at the side lists the clipping; a press opens it in the editor. Go to another tab: the panel follows.
+- [ ] **A clipping has its picture**: clip a page, then open the note from `Super+Shift+N`: in Kitty, the picture of the page is drawn inside the note. Clip another selection of the same page: it is added to the same note. *The picture inside the editor was never seen with the real ImageMagick and Kitty.*
+- [ ] **The sandbox**: on Privacy & network, turn on "The browser" under Sandbox, close the browser and open it again. Everything should work as before: the theme, the console, a clipping, a download to Downloads, a video. Then try to upload a file from `~/Documents`: Yazi lets you pick it, and the browser cannot read it; that is the sandbox, and a file in Downloads can be uploaded. *Tried in the virtual machine without sound, a camera or a real graphics card: note anything that stops working, above all video, the microphone in a call and Widevine.* Turn it off if it gets in the way.
+- [ ] **An Electron app in a sandbox**, if you install one (Vesktop, say): `kavat-sandbox app vesktop`, then open it from the launcher: it starts with a home folder of its own, signed out. `kavat-sandbox app vesktop off` lets it out. *Never tried with a real app.*
+
+## 15. Dragging the displays, games, names and the shell
+
+- [ ] **Drag a display**: with the two monitors, on the Displays page drag one rectangle to the other side of the other, above it, and half way down its side: its edges catch the other's as it moves, and when dropped the real screens follow; "Keep" keeps it, and without it everything goes back in ten seconds. Turn one to 90° and drag it again. *The control was tried in the virtual machine with made-up rectangles; with two real displays it has never run. Note whether the rectangle jumps back for a moment when dropped.*
+- [ ] **A game's profile**: on the GPU page, type `test 1245620` (a name, and the game's number in Steam: it is in the address of its page in the shop) and press "New profile"; "Edit" opens its file: set `fps_limit = 60`. Install MangoHud (`kav install mangohud gamescope`). In Steam, in the game's properties, set the launch options to `kavat-game run %command%`, and start it: the monitor is over the game and it does not go above 60. Take the `#` off the `[gamescope]` lines and try again. *Never tried with a real game. `gpu_profile` needs LACT and a profile made in it; the two commands it uses, `lact cli profile get` and `set`, were not tried: if the card's profile does not change, say so.*
+- [ ] **Encrypted DNS**: on Privacy & network, "Turn it on": it asks for your password. Sites still open; `resolvectl status` says `+DNSOverTLS` and names Quad9. Change to Cloudflare. Enter Incognito with your VPN: sites still open there too. "Turn it off": back to your router's server (`cat /etc/resolv.conf`). *Never tried with a network.*
+- [ ] **The Shell page**: set the prompt to Full and open a terminal inside a git repository with changes: the prompt shows them. Turn the suggestions off: a new terminal offers none. Press "Open them in Neovim" under Aliases, write `alias hi='echo hello'`, save, open a terminal: `hi` works.
+- [ ] **Default apps**: in Yazi, Enter on an image opens imv, on a PDF zathura, on a video mpv.
+- [ ] **A palette for the terminal alone**: `kavat theme set terminal.palette nord`: Kitty turns to Nord and the rest stays. `kavat theme set terminal.palette system` puts it back. The same with `editor.palette`.
+- [ ] **The mode by the sun**: `kavat theme set auto.sun true auto.latitude <yours> auto.longitude <yours> auto.follow true` (west is below zero). `systemctl --user list-timers` shows the next change at today's sunset or tomorrow's sunrise, to within a few minutes.
+- [ ] **A rule**: save two profiles on Appearance, `day` and `night`. Write `~/.config/kavat/theme-rules.toml` with a rule `profile = "night"`, `from = <this hour>`, `to = <the next>`, and a last rule with only `profile = "day"`. Within five minutes, or at once with `/usr/lib/kavat/theme-rules`, the look is `night`; `/usr/lib/kavat/theme-rules show` marks the rule that holds.
+
+## 16. The notes and `kav`, what is new
+
+- [ ] **The bar's count**: with a note due today or overdue, a number shows on the bar beside the notifications; a press opens the notes; with nothing due it is not there. *Never seen: it was not run in a shell before this build.*
+- [ ] **Albums in the notes**: `Super+Shift+N`, then `6`: the albums the browser made. `Enter` opens a site, `O` the whole album, `R` marks read, `x` removes. On the other tabs, `b` and `B` choose a notebook; `a` adds to it.
+- [ ] **Templates**: `n` on the notes' screen offers meeting, bug, idea and daily; `D` opens today's note. In a terminal, `kavat-notes new meeting "Monday"` opens the editor on it.
+- [ ] **Chips**: open a note that has a reminder, a day it is due and tags: they are drawn as chips under its title, and again after saving.
+- [ ] **A reminder waits in Gamer**: enter Gamer, set a reminder for two minutes from now: nothing shows; leave the mode: it shows. A note with `urgent: true` in its front matter shows at once.
+- [ ] **`kav` with the mouse**: in `kav`, click a tab, a card of the Dashboard, a row; the wheel moves the list.
+- [ ] **Browse**: `f` goes through installed, explicit, orphans and AUR.
+- [ ] **Updates**: `kav check`, then the Updates tab: what waits, with its sizes and a mark on what asks for a restart. `systemctl start kav-check.service` with updates waiting leaves a notice.
+- [ ] **Snapshots tab**: Enter on one says what its change did; `c` compares it with now; `p` pins it; `d` deletes one you do not need, after asking.
+- [ ] **`kav update` inside Hyprland**: the desktop does not flicker or reload in the middle, and reloads once at the end. *The call that holds Hyprland back was tried by hand in the virtual machine; a whole update with a network never ran with it.*
+- [ ] **A news item that asks for hands**, when Arch publishes one: `kav update` shows it, shows the commands, and asks before each. *Tried with a made-up item only.*
+- [ ] **Firmware**: `kav install fwupd`, then `kav update`: it lists firmware when there is some. *The answer of fwupd was read from memory of its shape, not from a real one: if `kav update` says something odd at that step, send what `fwupdmgr get-updates --json` prints.*
+- [ ] **`kav set cache 2`** leaves two versions of each package in `/var/cache/pacman/pkg`.
+
+## 17. What has not changed, once more
 
 - [ ] A snapshot boots from the menu and `kavat-rollback` goes back to it.
 - [ ] Recovery in the boot menu ends in its own menu.
@@ -212,15 +253,15 @@ The user went through this list on the PC on 14 November 2026. Everything worked
 
 These are not failures: they are listed in the design document as left for later.
 
-- The settings panel has twenty-three pages of twenty-six; the rest wait for the agent, or are the terminal's shell.
-- The theme following the sun instead of the clock, and rules that change the profile.
+- The settings panel has twenty-four pages of twenty-six; the other two wait for the agent.
+- The boot following the desktop's theme by itself, and the theme for Qt apps.
 - In the modes: all that waits for the agent and the browser, and the VPN's state on the bar.
-- Displays: placing by dragging, the main display, and a background for each display.
-- In the browser: the palette's colours on its own bars, a profile for each mode, albums, and the agent's panel.
-- A profile for each game, encrypted DNS, the sandbox profiles, and placing the displays by dragging.
+- Displays: the main display, the workspaces of each display, and a background for each display.
+- In the browser: the palette on the pages Chromium draws itself, hiding its native panels, and the agent's panel.
+- Your aliases and functions from Endgame: they wait for you to go over them.
 - In the installer: the programs that are only in the AUR, and repeating an installation from its answer file.
 - In Yazi: the wallpaper action, and the indicator of a copy that works out of sight.
 - `kavat-fetch` and `kavat-top` are fastfetch and btop with the theme, not the forks of the design yet.
-- In the notes: the Albums tab, the index, images inside notes, and the bar's count.
+- In the notes: the permanent index, the calendar's marks, and a picture's preview in the Albums tab.
 - Neovim's marketplace, the side panels with Claude, and the Editor page.
-- In `kav`: most of the Settings tab, and Arch's news.
+- In `kav`: the signing of the reviewed list, choosing the mirrors, and how much room each snapshot takes.
