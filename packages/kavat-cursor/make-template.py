@@ -27,10 +27,14 @@ TEMPLATE = '''# The cursor: its body follows the mode and its edge is the accent
 # kavat-cursor from Bibata, one entry for each drawing.
 #
 # hyprcursor wants a theme packed, so kavat-cursor-apply packs these and tells Hyprland.
-reload = [["kavat-cursor-apply"]]
+# It is started and left to it: the packing takes a moment.
+reload = [["setsid", "-f", "kavat-cursor-apply"]]
 
 [[file]]
 from = "Kavat/manifest.hl"
+
+[[file]]
+from = "size"
 '''
 
 
@@ -67,6 +71,7 @@ def main():
         open(f'{out}/{folder}/meta.hl', 'w', encoding='utf-8').write('\n'.join(meta) + '\n')
         rules.append(f'\n[[file]]\nfrom = "{folder}/meta.hl"\n')
     open(f'{out}/Kavat/manifest.hl', 'w', encoding='utf-8').write(MANIFEST)
+    open(f'{out}/size', 'w', encoding='utf-8').write('{{ cursor_size }}\n')
     open(f'{out}/template.toml', 'w', encoding='utf-8').write(''.join(rules))
     print(f'{len(cursors)} cursors, {made} drawings')
 

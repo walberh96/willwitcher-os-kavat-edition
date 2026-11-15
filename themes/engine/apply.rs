@@ -155,8 +155,11 @@ pub fn plan(paths: &Paths, tokens: &Tokens) -> Result<Plan, String> {
             let problem = |what: String| format!("{}: {what}", rule.from.display());
             let text = fs::read_to_string(&rule.from).map_err(|error| problem(error.to_string()))?;
             let filled = render(&text, tokens).map_err(problem)?;
-            if plan.files.insert(rule.to.clone(), filled).is_some() {
-                return Err(format!("two templates write {}", rule.to));
+            // a file's name can carry a value too, for an app that only looks again at a
+            // file when it is called something else
+            let to = render(&rule.to, tokens).map_err(problem)?;
+            if plan.files.insert(to.clone(), filled).is_some() {
+                return Err(format!("two templates write {to}"));
             }
             // where a link named in a template is: in the user's configuration or data folder
             let place = |link: &str| match link.strip_prefix("data:") {
@@ -167,10 +170,10 @@ pub fn plan(paths: &Paths, tokens: &Tokens) -> Result<Plan, String> {
                 return Err(problem("a template for the boot cannot leave links".into()));
             }
             if let Some(link) = &rule.link {
-                plan.links.push((place(link), rule.to.clone()));
+                plan.links.push((place(link), to.clone()));
             }
             if let Some(link) = &rule.folder_link {
-                let folder = Path::new(&rule.to).parent().map(|folder| folder.to_string_lossy().into_owned()).unwrap_or_default();
+                let folder = Path::new(&to).parent().map(|folder| folder.to_string_lossy().into_owned()).unwrap_or_default();
                 plan.links.push((place(link), folder));
             }
         }

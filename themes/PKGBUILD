@@ -1,6 +1,6 @@
 pkgname=kavat-theme
 pkgver=0.1.0
-pkgrel=15
+pkgrel=19
 pkgdesc="Willwitcher-OS Kavat Edition: the theme system, with its palettes and its templates"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -32,5 +32,7 @@ package() {
   install -Dm644 "$startdir/theme.toml" "$pkgdir/usr/share/kavat/themes/theme.toml"
   install -Dm644 "$startdir/org.kavat.theme.policy" "$pkgdir/usr/share/polkit-1/actions/org.kavat.theme.policy"
   cp -r "$startdir/palettes" "$startdir/templates" "$startdir/boot" "$pkgdir/usr/share/kavat/themes/"
+  install -Dm755 "$startdir/kavat-wallpaper" "$pkgdir/usr/lib/kavat/wallpaper"
+  install -Dm755 "$startdir/kavat-theme-auto" "$pkgdir/usr/lib/kavat/theme-auto"
   chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat"
 }

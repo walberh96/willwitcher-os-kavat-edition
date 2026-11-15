@@ -1,0 +1,8 @@
+# btop, the system monitor: its colours. kavat-top points btop at this theme.
+#
+# btop reads its theme when it opens, so there is nothing to reload: a monitor that is
+# open keeps its colours until it is opened again.
+
+[[file]]
+from = "kavat.theme"
+link = "config:btop/themes/kavat.theme"

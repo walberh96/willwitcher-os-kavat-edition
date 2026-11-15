@@ -1,0 +1,30 @@
+#!/bin/sh
+# Part of kavat-theme: tell the shell to show the theme's background, and keep a copy of
+# it for the lock screen.
+#
+# kavat-theme runs it after a change of theme, and the session when it starts. A background
+# you chose yourself is left alone: only the one the shell came with, or an earlier one of
+# the theme's, is replaced. The shell may still be starting, so it is asked a few times.
+picture="$(ls "${XDG_STATE_HOME:-$HOME/.local/state}"/kavat/theme/current/wallpaper/*.svg 2> /dev/null | head -n 1)"
+[ -n "$picture" ] || exit 0
+
+# The lock screen shows the same picture, but cannot read the drawing as it is: a copy it
+# can read is kept, one for the look in force.
+lock="${XDG_CACHE_HOME:-$HOME/.cache}/kavat/lock"
+copy="$lock/$(basename "$picture" .svg).png"
+if [ ! -e "$copy" ]; then
+  mkdir -p "$lock"
+  rm -f "$lock"/*.png
+  rsvg-convert -w 2560 -h 1440 -o "$copy" "$picture" 2> /dev/null
+fi
+
+tries=0
+until now="$(kavat-shell msg wallpaper-get 2> /dev/null)"; do
+  tries=$((tries + 1))
+  [ "$tries" -lt 20 ] || exit 0
+  sleep 0.5
+done
+case "$now" in
+  "$picture") ;;
+  '' | */kavat/theme/* | */kavat-shell-wallpaper.png) kavat-shell msg wallpaper-set "$picture" > /dev/null 2>&1 ;;
+esac

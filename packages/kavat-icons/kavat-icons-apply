@@ -1,0 +1,42 @@
+#!/bin/bash
+# Part of kavat-icons: make the icons of the style the theme asks for, and tell the apps.
+#
+# kavat-theme runs it after a change of theme, and the session when it starts. The Colour
+# style needs nothing made: its folders are written by kavat-theme itself. The Tinted and
+# the Line styles are thousands of drawings, kept in /usr/share/kavat/icons with marks where
+# their colours go: this fills the colours in, once for each look, into the user's folder.
+set -u
+colours="${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/icons/colours"
+drawings=/usr/share/kavat/icons
+icons="${XDG_DATA_HOME:-$HOME/.local/share}/icons"
+[[ -e $colours ]] || exit 0
+
+style=$(awk '$1 == "style" { print $2 }' "$colours")
+case $style in
+  tinted) name=Kavat-Tinted ;;
+  line) name=Kavat-Line ;;
+  *) name=Kavat ;;
+esac
+
+if [[ $name != Kavat && -d $drawings/$style ]]; then
+  look=$(sha256sum < "$colours")
+  if [[ $(cat "$icons/$name/.look" 2> /dev/null) != "$look" ]]; then
+    fresh=$(mktemp -d "$icons/.kavat-XXXXXX") || exit 1
+    cp -a "$drawings/$style/." "$fresh/"
+    # each mark and its colour, as a change for sed: @BLUE_D@ becomes #2f5f9e
+    changes=()
+    while read -r mark colour; do
+      [[ $mark == [A-Z]* ]] && changes+=(-e "s/@$mark@/$colour/g")
+    done < "$colours"
+    changes+=(-e "s/@MODE@/$(awk '$1 == "mode" { print $2 }' "$colours")/g")
+    find "$fresh" -type f \( -name '*.svg' -o -name index.theme \) -print0 | xargs -0 -r sed -i "${changes[@]}"
+    echo "$look" > "$fresh/.look"
+    rm -rf "${icons:?}/$name"
+    mv "$fresh" "$icons/$name"
+  fi
+fi
+
+# Apps look at the drawings again when the name they are given changes, so it is changed
+# and changed back.
+gsettings set org.gnome.desktop.interface icon-theme Papirus > /dev/null 2>&1
+gsettings set org.gnome.desktop.interface icon-theme "$name" > /dev/null 2>&1 || true

@@ -1,0 +1,13 @@
+#!/bin/sh
+# kavat-fetch: what machine this is, with the system's logo, in the theme's colours.
+#
+# It is fastfetch with the lines and colours kavat-theme writes. A file of your own,
+# ~/.config/fastfetch/config.jsonc, is used in their place when it is there.
+own="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch/config.jsonc"
+theme="${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/fastfetch/config.jsonc"
+if [ -e "$own" ]; then
+  exec fastfetch "$@"
+elif [ -e "$theme" ]; then
+  exec fastfetch --config "$theme" "$@"
+fi
+exec fastfetch "$@"

@@ -1,0 +1,32 @@
+// Made by kavat-theme from the theme's settings; what is changed here is lost.
+// The settings are in ~/.config/kavat/theme.toml. To have lines of your own, copy this
+// file to ~/.config/fastfetch/config.jsonc, which kavat-fetch uses when it is there.
+{
+  "$schema": "https://github.com/fastfetch-cli/fastfetch/raw/dev/doc/json_schema.json",
+  "logo": {
+    "type": "file",
+    "source": "~/.local/state/kavat/theme/current/fastfetch/logo.txt",
+    "color": { "1": "{{ accent_text }}", "2": "{{ text }}" },
+    "padding": { "top": 1, "left": 2, "right": 3 }
+  },
+  "display": {
+    "separator": "  ",
+    "color": { "keys": "{{ accent_text }}", "title": "{{ accent_text }}" }
+  },
+  "modules": [
+    "title",
+    { "type": "os", "key": "System", "format": "Willwitcher-OS Kavat Edition" },
+    { "type": "kernel", "key": "Kernel" },
+    { "type": "wm", "key": "Windows" },
+    { "type": "command", "key": "Shell", "text": "echo \"Kavat Shell · $(basename \"$SHELL\")\"" },
+    { "type": "command", "key": "Theme", "text": "echo \"$(kavat-theme get palette) · $(kavat-theme get mode)\"" },
+    { "type": "command", "key": "Packages", "text": "echo \"$(pacman -Qq | wc -l), $(pacman -Qmq | wc -l) from the AUR\"" },
+    { "type": "cpu", "key": "CPU" },
+    { "type": "gpu", "key": "GPU" },
+    { "type": "memory", "key": "Memory" },
+    { "type": "disk", "key": "Disk", "folders": "/" },
+    { "type": "uptime", "key": "Up for" },
+    "break",
+    { "type": "colors", "symbol": "circle" }
+  ]
+}

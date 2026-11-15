@@ -1,0 +1,11 @@
+#!/bin/sh
+# kavat-top: what is running, in the theme's colours.
+#
+# It is btop. The first time, btop is told to use the theme kavat-theme writes; after that
+# its settings are yours, in ~/.config/btop/btop.conf.
+settings="${XDG_CONFIG_HOME:-$HOME/.config}/btop/btop.conf"
+if [ ! -e "$settings" ]; then
+  mkdir -p "$(dirname "$settings")"
+  printf 'color_theme = "kavat"\ntheme_background = False\nrounded_corners = True\n' > "$settings"
+fi
+exec btop "$@"

@@ -40,6 +40,11 @@ pub const KEYS: &[(&str, Kind)] = &[
     ("fonts.ui", Kind::Text),
     ("fonts.mono", Kind::Text),
     ("fonts.scale", Kind::Number(0.5, 2.0)),
+    ("icons.style", Kind::OneOf(&["colour", "tinted", "line"])),
+    ("cursor.size", Kind::OneOf(&["24", "32", "48"])),
+    ("auto.follow", Kind::Flag),
+    ("auto.light_from", Kind::Whole(0, 23)),
+    ("auto.dark_from", Kind::Whole(0, 23)),
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -419,6 +424,9 @@ pub fn resolve(settings: &Settings, palette: &Palette) -> Result<Tokens, String>
     colour("on_accent3", ink(accent3));
     for (name, value) in HUES.iter().zip(hues) {
         colour(name, value);
+        // a lighter and a deeper shade of each, for drawings that are shaded in one hue
+        colour(&format!("{name}_light"), value.lighten(0.1));
+        colour(&format!("{name}_deep"), value.lighten(-0.12));
     }
     colour("ok", green);
     colour("warn", yellow);
@@ -478,6 +486,8 @@ pub fn resolve(settings: &Settings, palette: &Palette) -> Result<Tokens, String>
     value("animation_speed", Token::Number(if speed > 0.0 { speed } else { 1.0 }));
     value("font_ui", Token::Text(settings.text("fonts.ui").to_string()));
     value("font_mono", Token::Text(settings.text("fonts.mono").to_string()));
+    value("icon_style", Token::Text(settings.text("icons.style").to_string()));
+    value("cursor_size", Token::Text(settings.text("cursor.size").to_string()));
     let scale = settings.number("fonts.scale");
     value("font_scale", Token::Number(scale));
     value("font_size", Token::Number((11.0 * scale * 2.0).round() / 2.0));

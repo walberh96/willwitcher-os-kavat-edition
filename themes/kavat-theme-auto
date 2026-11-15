@@ -1,0 +1,25 @@
+#!/bin/bash
+# Part of kavat-theme: the mode by the hour, light by day and dark by night.
+#
+# It does something only when the theme's auto.follow is on: it sets the mode the hour
+# asks for and leaves a timer of the session for the next change. The session runs it when
+# it starts, and the settings panel when Auto is chosen or left.
+set -u
+systemctl --user stop kavat-theme-auto.timer > /dev/null 2>&1
+[[ $(kavat-theme get auto.follow) == true ]] || exit 0
+
+light=$(kavat-theme get auto.light_from)
+dark=$(kavat-theme get auto.dark_from)
+hour=$(date +%-H)
+if ((light < dark ? hour >= light && hour < dark : hour >= light || hour < dark)); then
+  wanted=light next=$dark
+else
+  wanted=dark next=$light
+fi
+[[ $(kavat-theme get mode) == "$wanted" ]] || kavat-theme set mode "$wanted"
+
+# the next change: that hour today, or tomorrow when it has already gone by
+day=today
+((hour >= next)) && day=tomorrow
+systemd-run --user --quiet --unit kavat-theme-auto --on-calendar "$(date -d "$day $next:00" '+%Y-%m-%d %H:%M:00')" \
+  --description "The theme's mode by the hour" /usr/lib/kavat/theme-auto > /dev/null 2>&1 || true

@@ -98,6 +98,8 @@ def main():
                               'cat ~/.local/share/icons/Kavat-cursor/.drawings')
         cursor_before = output.splitlines()[-1] if output else ''
         checks.report(output.splitlines()[:2] == ['56', 'ok'], "the cursor is packed from the theme, and Hyprland takes it", output)
+        follows("the desktop's background is the theme's own picture",
+                lambda: user('kavat-shell msg wallpaper-get | grep -c "/kavat/theme/current/wallpaper/kavat-0d0f14-f2a93b.svg"')[1], '1', 15)
         dark = light_at(BAR)
         checks.report(dark < 60, "the shell's bar is dark on the screen", f'lightness {dark} of 255')
         machine.screen.picture(f'{pictures}/theme-dark.png')
@@ -130,7 +132,34 @@ def main():
         follows("Hyprland's active border is Nord's green", lambda: border('active'), 'a3be8c', 2)
         follows("Kitty's background is Nord's dark surface", lambda: kitty('background'), '#2e3440', 2)
         follows('the shell is back in dark mode', lambda: user('kavat-shell msg theme-mode-get')[1], 'dark', 2)
+        follows('the background is drawn again in the new colours',
+                lambda: user('kavat-shell msg wallpaper-get | grep -c "/kavat/theme/current/wallpaper/kavat-0d0f14-f2a93b.svg"')[1], '0', 5)
         follows("the folders are drawn in Nord's green", lambda: user(f'grep -c "#a3be8c" {folder}')[1], '1', 2)
+        status, output = user('kavat-theme set icons.style tinted cursor.size 32')
+        checks.report(status == 0, 'the icons are asked for in the palette\'s colours, and a bigger cursor', output)
+        follows('apps are told of the tinted icons', lambda: user('gsettings get org.gnome.desktop.interface icon-theme')[1], "'Kavat-Tinted'", 10)
+        status, output = user('grep -c "@" ~/.local/share/icons/Kavat-Tinted/apps/firefox.svg; '
+                              'cmp -s ~/.local/share/icons/Kavat-Tinted/apps/firefox.svg /usr/share/icons/Papirus/48x48/apps/firefox.svg; echo $?; '
+                              'gsettings get org.gnome.desktop.interface cursor-size')
+        lines = output.split()
+        checks.report(len(lines) == 3 and lines[0] == '0' and lines[1] != '0' and lines[2] == '32',
+                      "an app's icon is drawn in other colours than Papirus', with none left to fill in, and the cursor's size is the one asked for", output)
+        user('kavat-theme set icons.style colour cursor.size 24')
+
+        print('the mode by the hour, and the terminal tools', flush=True)
+        status, output = user('now=$(date +%-H); kavat-theme set auto.follow true auto.light_from $now auto.dark_from $(((now + 1) % 24)) && /usr/lib/kavat/theme-auto; '
+                              'kavat-theme get mode; systemctl --user list-timers --no-legend kavat-theme-auto.timer | wc -l')
+        checks.report(output.split() == ['light', '1'], 'with the mode following the hour, it is light in the hours of the day, and a timer waits for the next change', output)
+        status, output = user('now=$(date +%-H); kavat-theme set auto.light_from $(((now + 1) % 24)) auto.dark_from $now && /usr/lib/kavat/theme-auto; kavat-theme get mode; '
+                              'kavat-theme set auto.follow false auto.light_from 7 auto.dark_from 19 && /usr/lib/kavat/theme-auto; '
+                              'systemctl --user list-timers --no-legend kavat-theme-auto.timer | wc -l')
+        checks.report(output.split() == ['dark', '0'], 'dark in the hours of the night, and with it off no timer is left', output)
+        status, output = user('kavat-fetch --pipe 2> /dev/null | grep -c -E "Theme|Packages|Kernel"; '
+                              'grep -c "a3be8c\\|88c0d0\\|2e3440" ~/.local/state/kavat/theme/current/btop/kavat.theme; '
+                              'readlink ~/.config/btop/themes/kavat.theme')
+        lines = output.split()
+        checks.report(len(lines) == 3 and lines[0] == '3' and lines[1] != '0' and lines[2].endswith('/kavat/theme/current/btop/kavat.theme'),
+                      "kavat-fetch says the theme, the packages and the kernel, and btop's colours are the palette's", output)
         follows('and the cursor is packed again',
                 lambda: str(user('cat ~/.local/share/icons/Kavat-cursor/.drawings')[1] not in ('', cursor_before)), 'True', 5)
         time.sleep(1)

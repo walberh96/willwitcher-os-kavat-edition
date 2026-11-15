@@ -1,25 +1,26 @@
 pkgname=kavat-icons
 pkgver=0.1.0
-pkgrel=1
-pkgdesc="Willwitcher-OS Kavat Edition: Papirus, with the folders in the accent of the theme"
+pkgrel=3
+pkgdesc="Willwitcher-OS Kavat Edition: Papirus in the colours of the theme, in three styles"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 # the drawings are Papirus', changed; they keep its license
 license=('GPL-3.0-only')
 # Papirus, which the rest of the icons come from, and the theme system, which fills the
 # colours in
-depends=('papirus-icon-theme' 'kavat-theme')
+depends=('papirus-icon-theme' 'kavat-theme' 'bash' 'dconf')
 makedepends=('python')
-source=('make-template.py')
-sha256sums=('SKIP')
+source=('make-template.py' 'kavat-icons-apply')
+sha256sums=('SKIP' 'SKIP')
 
 build() {
-  rm -rf "$srcdir/icons"
-  python make-template.py /usr/share/icons/Papirus "$srcdir/icons"
+  python make-template.py /usr/share/icons/Papirus "$srcdir/icons" "$srcdir/styles"
 }
 
 package() {
   install -d "$pkgdir/usr/share/kavat/themes/templates"
   cp -r "$srcdir/icons" "$pkgdir/usr/share/kavat/themes/templates/icons"
+  cp -a "$srcdir/styles" "$pkgdir/usr/share/kavat/icons"
   chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat"
+  install -Dm755 kavat-icons-apply "$pkgdir/usr/bin/kavat-icons-apply"
 }

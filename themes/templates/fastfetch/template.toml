@@ -1,0 +1,8 @@
+# fastfetch, which says what machine this is: its logo, its lines and its colours.
+# kavat-fetch points fastfetch at these files.
+
+[[file]]
+from = "config.jsonc"
+
+[[file]]
+from = "logo.txt"

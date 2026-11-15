@@ -5,7 +5,9 @@
 # is skipped when the drawings are the ones already packed.
 state="${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/cursor/Kavat"
 packed="${XDG_DATA_HOME:-$HOME/.local/share}/icons/Kavat-cursor"
-size="${XCURSOR_SIZE:-24}"
+# the size is the theme's, 24 when it does not say
+size="$(cat "$state/../size" 2> /dev/null)"
+size="${size:-24}"
 
 [ -e "$state/manifest.hl" ] || exit 0
 
@@ -25,3 +27,5 @@ if [ "$(cat "$packed/.drawings" 2> /dev/null)" != "$drawings" ]; then
 fi
 
 hyprctl setcursor Kavat "$size" > /dev/null 2>&1 || hyprctl --instance 0 setcursor Kavat "$size" > /dev/null 2>&1 || true
+# apps that draw their own cursor are told the size too
+gsettings set org.gnome.desktop.interface cursor-size "$size" > /dev/null 2>&1 || true

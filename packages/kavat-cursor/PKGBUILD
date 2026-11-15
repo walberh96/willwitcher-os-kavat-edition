@@ -1,6 +1,6 @@
 pkgname=kavat-cursor
 pkgver=0.1.0
-pkgrel=1
+pkgrel=3
 pkgdesc="Willwitcher-OS Kavat Edition: a cursor in the colours of the theme"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

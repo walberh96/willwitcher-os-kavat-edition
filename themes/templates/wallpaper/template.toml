@@ -1,0 +1,11 @@
+# The desktop's background: the same picture as the boot menu, the loading screen and the
+# login, in the colours of the theme, so nothing jumps on the way to the desktop.
+#
+# The shell only looks again at a picture when its name changes, so the name carries the
+# colours. The shell is told about it unless the background in place is one you chose.
+# It is started and left to it: the copy for the lock screen takes a second to make.
+reload = [["setsid", "-f", "/usr/lib/kavat/wallpaper"]]
+
+[[file]]
+from = "background.svg"
+to = "wallpaper/kavat-{{ bg | hex }}-{{ accent | hex }}.svg"
