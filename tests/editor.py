@@ -23,7 +23,7 @@ from machine import BOOT_TIMEOUT, Checks, Machine, check_desktop, log_in, over_i
 
 USER, PASSWORD = 'tester', 'kavat-123'  # as tests/install.py made them
 HOME = f'/home/{USER}'
-PLUGINS = 15  # as editor/PKGBUILD lists them
+PLUGINS = 17  # as editor/PKGBUILD lists them
 SOCKET = '/tmp/nvim-test'  # where the test's Neovim listens
 # commands as the user, inside the user's session
 SESSION = (f'runuser -u {USER} -- env HOME={HOME} XDG_RUNTIME_DIR=/run/user/$(id -u {USER}) '

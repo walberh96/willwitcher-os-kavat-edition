@@ -1,6 +1,6 @@
 pkgname=kavat-nvim
 pkgver=0.1.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Willwitcher-OS Kavat Edition: Neovim set up, with VS Code-style shortcuts and its plugins inside"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -29,6 +29,8 @@ _plugins=(
   'folke/which-key.nvim 3aab2147e74890957785941f0c1ad87d0a44c15a'
   'jake-stewart/multicursor.nvim c574bfc1f7e63dfea3e64b8453c9f7c660127238'
   'MeanderingProgrammer/render-markdown.nvim 8801162e041e34c64d0d1397cd1f353a14b01950'
+  'alex-popov-tech/store.nvim 61af79fcf80c621afe2577a891dd74a937937dfb'
+  'OXY2DEV/markview.nvim aadb6d817577d553bbef61e8b9073f1bf4b87e08'
 )
 source=('init.lua' 'build-parsers.lua' 'parsers.txt')
 sha256sums=('SKIP' 'SKIP' 'SKIP'
@@ -46,7 +48,9 @@ sha256sums=('SKIP' 'SKIP' 'SKIP'
             'afcc0ab3d45d6806dd85ec3bdd494a297830e146ee90edc9978c7145f0201738'
             'd4d6d65ecf699b57d8f08519563c3ac09a34e525e55956d9eb5902327b3f6a07'
             '7496f2bebb162b389e6423e718328c82e7e05fec0316d05af46578619e282889'
-            '742e2d6d6a1ee0d674daa0e37294558696057ab42a435b93be2c5bd1edda14fc')
+            '742e2d6d6a1ee0d674daa0e37294558696057ab42a435b93be2c5bd1edda14fc'
+            'adc3c10e046bd8c4bfe1b63572361c9c0f87e88a966ddfc4aafb3c5706bca8a2'
+            '8d04f649479be64c081a5b3d94ad4bbbf456bc2cf54925e314129984c67e93b9')
 for _plugin in "${_plugins[@]}"; do
   _repo=${_plugin% *} _commit=${_plugin#* }
   source+=("${_repo#*/}-$_commit.tar.gz::https://github.com/$_repo/archive/$_commit.tar.gz")

@@ -170,6 +170,16 @@ local function specs(dir)
             },
         }),
 
+        -- The marketplace: plugins to look for, read about and install, on Ctrl+Shift+X. It
+        -- asks the network for its list when it is opened, not before, and what it installs
+        -- is a file of yours in lua/plugins/, which lazy.nvim fetches. Its count of what is
+        -- looked at and installed, sent to its author's server, is turned off.
+        plugin("store.nvim", {
+            cmd = "Store",
+            dependencies = { plugin("markview.nvim", { lazy = true, opts = {} }) },
+            opts = { telemetry = false },
+        }),
+
         -- Git: what changed, beside the line numbers
         plugin("gitsigns.nvim", {
             event = { "BufReadPre", "BufNewFile" },

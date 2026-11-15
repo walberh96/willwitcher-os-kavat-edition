@@ -85,6 +85,7 @@ map(everywhere, "<C-S-Tab>", "<Cmd>BufferLineCyclePrev<CR>", { desc = "Previous 
 map(everywhere, "<C-p>", picker("files"), { desc = "Find a file" })
 map(everywhere, "<C-S-p>", picker("commands"), { desc = "Command palette" })
 map(everywhere, "<C-S-f>", picker("live_grep"), { desc = "Find in the project" })
+map(everywhere, "<C-S-x>", "<Cmd>Store<CR>", { desc = "The marketplace of plugins" })
 map(everywhere, "<C-b>", "<Cmd>NvimTreeToggle<CR>", { desc = "Explorer" })
 map({ "n", "i", "x", "s", "t" }, "<C-`>", "<Cmd>ToggleTerm<CR>", { desc = "Terminal" })
 
