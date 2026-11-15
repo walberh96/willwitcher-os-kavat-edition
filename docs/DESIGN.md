@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition — Design document
 
-Updated on 14 November 2026 · [Interactive mockup](mockup/index.html) · [Screenshots](screenshots/) · [README](../README.md)
+Updated on 15 November 2026 · [Interactive mockup](mockup/index.html) · [Screenshots](screenshots/) · [README](../README.md)
 
 ## Vision
 
@@ -67,6 +67,14 @@ The default language is English, with Spanish as the second option in the select
 5. **Software**: programs that are added to the base system, checked one by one by category, and whether the agent is installed with its model. It needs network; the details are below.
 6. **Appearance**: theme, light or dark mode and accent hue, with a live preview of the installer itself.
 7. **Summary and installation**: exact list of what is going to be done and a progress bar with slides.
+
+**How it is built.** In `installer/`, and checked by `tests/install.py`. Decided on 14 November 2026, after you saw it on the PC: it has to look like the mockup, show the system while it installs, and have the Appearance step.
+
+- **The look** is Kavat's dark side. The steps down the left are drawn by `calamares-sidebar.qml`, with a check on the ones done and the number of the one in view in the accent; the pages Calamares draws itself take their colours from `stylesheet.qss`. The buttons are Calamares' own, so that `Alt` with a letter presses them from anywhere. The window floats in the middle of the screen, 1280 by 800.
+- **Appearance** is a page of the installer's own, `appearance.qml`: the palettes of `kavat-theme` as cards, the mode, the accents of the palette chosen, and a small desktop drawn with those colours. The `kavat-look` step writes what was chosen as the settings of the machine, `/etc/kavat/theme.toml`, before the boot loader's step: the boot menu, the loading screen and the login wear it, and every user starts from it.
+- **While it installs** it shows eight pictures of the system, one after another, each with a line that says what it is. They are the mockup's screenshots, copied to `installer/branding/kavat/slides/`.
+- **The steps are Calamares' own nine**, not the seven of the list above: Welcome, Location, Keyboard, Partitions, Users, Appearance, Summary, Install and Finish. Hardware and Software are not built.
+- **Left for later**: the Hardware and Software steps, the answer file, the top bar that says whether there is a network, and "Auto" and "From wallpaper" on the Appearance page.
 
 Our own ideas on top of stock Calamares:
 
@@ -164,9 +172,11 @@ Decided on 14 November 2026: greetd, with the system's own greeter drawing its p
 
 - **greetd** asks for the password and starts the session. What it shows to log in is a small Hyprland session of its own, as its own user, with nothing in it but the login page; when someone logs in, that session ends and theirs starts. No X server runs at any point.
 - **`kavat-greeter`** is the system's own program, in `greeter/`: a couple of hundred lines of Python on Arch's Qt that show the page on every screen and stand between the page and greetd. The page can read files of this machine and nothing else.
-- **The page** is HTML, CSS and JavaScript, in `greeter/page/`: clock, avatar and password. Session, keyboard, suspend, reboot and shut down appear when you move the mouse down to the bottom edge. With several users, the others appear as small avatars. On the machine's other screens only the clock appears. The text is in English; the clock and the date follow the system format. It offers two keyboards, `us` and `es`.
+- **The page** is HTML, CSS and JavaScript, in `greeter/page/`: clock, avatar and password. Session, keyboard, suspend, reboot and shut down appear when you move the mouse down to the bottom edge. With several users, the others appear as small avatars. On a machine with two screens the login shows on one: you tried it on 14 November 2026 and it is good as it is. The text is in English; the clock and the date follow the system format. It offers two keyboards, `us` and `es`.
 - **It follows the system theme**: it reads the colors, the corners and the fonts that `kavat-theme boot` leaves, and uses the same background as the menu and the loading screen.
-- **Left for later**: the network status and the pending updates, which need `kavatd`; each user's own theme; and the screen lock with hyprlock with this same design.
+- **The desktop has that background too**, in the colours of the user's theme: `kavat-theme` writes it and the shell is told, unless the background in place is one you chose yourself.
+- **The lock screen** is hyprlock with this same design: the picture, the clock, the day, a circle with the first letter of your name, and the place for the password. `kavat-theme` writes its file, in your theme's colours. `Super+Shift+L` locks at once; hypridle locks after ten minutes and turns the screen off after fifteen, times that are changed on the Login & lock page. It does not run on the live medium, whose user has no password to come back with.
+- **Left for later**: the network status and the pending updates, which need `kavatd`; and each user's own theme on the login.
 
 ## Desktop
 
@@ -353,11 +363,14 @@ How it works:
 **How it is built.** Since phase 3, in `packages/kavat-settings/`, and checked by `tests/settings.py`. These are the first pages. Decided on 14 November 2026 (D37): what counts is that the panel ends up as the mockup draws it; it is a plugin as far as a plugin reaches that, and C++ inside the shell where it does not.
 
 - **The panel is a plugin of the shell**, `kavat/settings`: a folder with its description and one script. `kavat-theme` writes, in the shell's settings, where that folder is and that the plugin is on, so it is there from the first login.
-- **`Super+T`** opens it. The pages: **Appearance**, with every setting of the theme, each applied as it is changed; **Boot and login**, which gives those screens the look in force; **Packages**, with what is installed and what waits, and buttons that open `kav`; **Notes**, with what is due; and **About**.
+- **`Super+T`** opens it. Seventeen pages of the twenty-six are built: **Appearance** and **Windows**, with every setting of the theme, each applied as it is changed; **Wallpaper**, which puts the theme's picture back or opens the shell's chooser for one of your own; **Accessibility**, which gathers less motion, the size of the text, high contrast and the size of the cursor; **Keybindings**, the desktop's shortcuts, which `Super+/` opens as a cheat sheet; **Displays**, which shows each screen as Hyprland has it; **Sound**, **Network** and **Bar & widgets**, which open the shell's own controls for them; **Terminal**, **Editor** and **Files**, with settings of Kitty, Neovim and Yazi; **Notes**, with what is due; **Packages**, with what is installed and what waits; **Boot**, which gives the screens before the desktop the look in force; **Login & lock**, with the times of the lock; and **Language & region**, with which keyboard comes first. The other nine are listed and say what they wait for.
+- **A setting an app keeps in its own file is changed there**, by `kavat-conf`: it knows each page's file, how a line of it is written and what each setting may be, changes only that setting's line and tells the app. The Editor's are in `~/.config/kavat/editor.json`, which `kavat-nvim` reads; your own `init.lua` has the last word.
+- **The shortcuts' list** is `shortcuts.tsv`, kept beside Hyprland's configuration in `kavat-hyprland`.
 - **Nothing is kept in the panel.** Each page asks its program what is in force and changes it by running that program: `kavat-theme`, `kav`, `kavat-notes`. A value changed by hand shows the next time the panel opens, and a value the program refuses is not applied and its reason is shown.
 - **The shell's two lists of plugins on the network are off** until you turn them on in its settings: as Noctalia they were fetched on every start and every six hours.
 - **`Super+U`** opens `kav` on its full screen, in a floating window.
-- **Left for later**: every other page of the table, the search, the undo and its history, the shortcut editor, export and import, and the guaranteed dependencies.
+- **The keyboard** is the one chosen in the installer, with the other of the two, `us` and `es`, behind it: `Alt+Shift` changes between them. The Language & region page changes which comes first; it is kept in `~/.config/kavat/desktop.json`, which Hyprland's configuration reads.
+- **Left for later**: the other nine pages, changing a screen's resolution or place, searching inside the pages, the undo and its history, changing a shortcut, export and import, and the guaranteed dependencies.
 
 Rule for the forks: an app is forked when it does not allow changing its configuration live or does not allow including a generated file. Hyprland and Kitty allow both, so today no further fork is needed; this is confirmed when implementing it in phase 3.
 
@@ -497,12 +510,15 @@ Yazi is in the official Arch repos. The portal backend is in the AUR, so it come
 **How it is built.** Since phase 3, in `packages/kavat-files/`, and checked by `tests/files.py`:
 
 - **Your settings start as the system's.** Yazi reads its settings from your folder only, so `yazi.toml`, `keymap.toml`, `init.lua` and two small plugins are put in `~/.config/yazi/` when your user is created, and are yours from then on.
-- **The keys of any file manager**, before Yazi's own, which all stay: `Enter` goes into a folder or opens a file, `Backspace` goes up, `Ctrl+C`, `Ctrl+X` and `Ctrl+V`, `Delete` to the trash and `Shift+Delete` for good, `F2` to rename, `Ctrl+N` new, `Ctrl+F` filter, `Ctrl+H` hidden files, `Ctrl+T` and `Ctrl+W` for tabs. The system's own: `Ctrl+P` opens the file search, `e` the editor, `T` a terminal here, `C` compresses the selection and `g` `t` goes to the trash.
+- **The keys of any file manager**, before Yazi's own, which all stay: `Enter` goes into a folder or opens a file, `Backspace` goes up, `Ctrl+C`, `Ctrl+X` and `Ctrl+V`, `Delete` to the trash and `Shift+Delete` for good, `F2` to rename, `Ctrl+N` new, `Ctrl+F` filter, `Ctrl+H` hidden files, `Ctrl+T` and `Ctrl+W` for tabs. The system's own: `Ctrl+P` opens the file search, `e` the editor, `T` a terminal here, `C` compresses the selection, `M` the disks and `g` `t` goes to the trash.
 - **The theme**: Yazi draws with the terminal's colours, which Kitty takes from the theme and changes live; the few that are the theme's own, like the accent of the mode and the tabs, are written by `kavat-theme` and read when Yazi opens.
 - **Drag and drop**: Yazi 26.9 drags and takes drops by itself with the mouse, through Kitty, so nothing is added for it.
 - **The window apps pick files with**: `xdg-desktop-portal-termfilechooser`, built in `[kavat]`, runs `/usr/lib/kavat/file-picker`, which opens Yazi in a Kitty of class `kavat-picker`; Hyprland floats it in the middle, and its title says what is being asked for.
 - **"Show in folder"**: `/usr/lib/kavat/show-in-folder` answers to `org.freedesktop.FileManager1` and opens Yazi at the file. D-Bus starts it when an app asks.
-- **Left for later**: the copy window with its conflicts, mounting disks with `M`, the wallpaper action, the opening rules from the panel's default apps, the Files page, the browser's part and Kavat's skills.
+- **`M` opens the disks**: Yazi's own mount manager, which mounts, unmounts and ejects with udisks, as in Endgame.
+- **The copy window** is a plugin, `paste.yazi`, on `Ctrl+V`. It does the copy itself, one item after another, with `cp` and `mv`, and follows it by looking at what has arrived: each item has its bar, the total has its own with the speed and the time left. A copy that is over at once never shows the window. When a name is taken it says what is there, its size and its date, and asks: `r` replaces, `s` skips, `k` keeps both with a number after the name, and `a` makes the answer hold for the rest. A folder over a folder is filled, not emptied first. `Esc` leaves the copy working out of sight, and a notice says when it is done; `c` cancels, and the half-copied item is taken away. On the same disk a copy shares the data with the original, so it is instant.
+- **What is copied is on the clipboard too**: `Ctrl+C` and `Ctrl+X` are `copy.yazi`, which also leaves the files on the system's clipboard as a list of files, so they can be pasted into another program.
+- **Left for later**: the indicator in the status bar while a copy works out of sight, and the line that says how many items are ready to paste; the wallpaper action, the opening rules from the panel's default apps, the Files page, the browser's part and Kavat's skills.
 
 ## File search
 
@@ -654,11 +670,12 @@ A clipping saves what you are looking at to a note:
 **How it is built.** Since phase 3, in `packages/kavat-notes/`, and checked by `tests/notes.py`. This is the first part; the rest is listed at the end.
 
 - **The fork is one patch on `nb` 7.25.6**: the notes live in `~/Notes`, the system's plugins are read from `/usr/share/kavat/nb/plugins/`, git is given your user's name when you have not set one, and the editor is Neovim when none is named, so `nb` never stops to ask.
-- **`kavat-notes`** is what the system adds around it, in one script. `kavat-notes add "call the bank #money tomorrow 9:00"` saves a note to the inbox with its tag and its reminder; the date is read by `date`, without a model. `nb remind` and `nb due` are plugins that call it.
+- **`kavat-notes`** is what the system adds around it, in one script. `kavat-notes add "call the bank #money tomorrow 9:00"` saves a note to the inbox with its tag and its reminder; the date is read by `date`, without a model, and can be said in the usual ways: "in 5 min", "in two minutes", "in half an hour", "at 9", "tomorrow at 9", "friday 17:00", "9pm", "dec 1". The notification that says the note was saved says the time of the reminder, or that the line had none. `nb remind` and `nb due` are plugins that call it.
 - **A reminder** is the `remind:` line of the note; `repeat:` takes `daily`, `weekly` or `monthly`. Each one still to come is a timer of your session. When it goes off, the notification offers to open the note, put it off 10 minutes, an hour or until tomorrow, or mark it as done. The timers are set again at login and whenever a note is saved, and a reminder whose time passed while the computer was off is shown then.
-- **`Super+N`** opens the quick note, one line in a floating window; **`Super+Shift+N`** opens the notes in the picker, newest first, with `Ctrl+D` for what is due and `Ctrl+N` for a new note.
+- **`Super+N`** opens the quick note, one line in a floating window.
+- **`Super+Shift+N`** opens the notes on their own screen, `kavat-notes-tui`, a Rust program drawn after the mockup: Today, with what is overdue, due today and upcoming; Inbox; Notes; To-do; and Reminders. The notebooks and the tags are on the left and what the note says on the right. `Enter` opens the note in Neovim, `a` adds one, `Space` marks a task as done, `t` makes a note a task, `r` sets a reminder, `d` the day it is due, `o` opens the folder it points to in Yazi and `/` filters. It changes nothing itself: each of those keys runs `kavat-notes`.
 - **In Neovim**, render-markdown.nvim shows the notes with their formatting and `Ctrl+K V` switches to plain text; `Enter` on a link opens it, a folder in Yazi and `file:line` at that line, and on a checkbox checks it. Marksman completes and follows the links between notes.
-- **Left for later**: the TUI in Rust with its task views, the permanent index, the chips at the top of a note, images inside notes, templates, the bar's count and the calendar's marks, the reminders that wait in Gamer mode, the Notes page of the panel, the palette, the browser's clippings and albums, and the agent's tools.
+- **Left for later**: the Albums tab and choosing a notebook on the screen, the permanent index, the chips at the top of a note, images inside notes, templates, the bar's count and the calendar's marks, the reminders that wait in Gamer mode, the Notes page of the panel, the palette, the browser's clippings and albums, and the agent's tools.
 
 **What goes in the fork and what goes outside.** The `nb` fork is small: it understands the new fields, adds the `nb remind` and `nb due` commands, opens the links to folders and notifies the index on every change. The TUI, the index and the reminders are new pieces in Rust, like `kav`, that read the same files. The notes come in phase 3 and the agent's tools in phase 4. It remains to be verified that stock `nb` still reads a task that has front matter correctly.
 
@@ -690,6 +707,12 @@ Two terminal tools become pieces of the system, each with its fork: the one that
 - **How it is launched**: with `kavat top` or from the launcher. Its configuration lives in `~/.config/btop/btop.conf` and is adjusted on the Terminal page of the panel.
 
 The two forks follow the rule of the others: they are small and carry their `PATCHES.md`.
+
+**How it is built.** Since phase 3, in `packages/kavat-shell-config/` and in two templates of the theme. This is the first part, and it is not forks yet:
+
+- **`kavat-fetch`** is fastfetch, unchanged, run with the file `kavat-theme` writes: the cat in characters, in the accent, and the system, the kernel, the window manager, the shell, the terminal, the theme with its mode, the packages, the processor, the graphics card, the memory and the disk. A `~/.config/fastfetch/config.jsonc` of your own is used in its place.
+- **`kavat-top`** is btop, unchanged, with a colour theme `kavat-theme` writes, `kavat`. The first time it is run it tells btop to use that theme; from then on btop's settings are yours. btop reads its theme when it opens, so an open one keeps its colours until it is opened again.
+- **Left for later**: the forks themselves and all they are for: the cat as an image, the agent and health lines, asking Kavat about a process, the groups, the GPU box, the services, the history and the warning.
 
 ## Package manager
 
@@ -736,7 +759,10 @@ Planned commands: `kav install`, `remove`, `update`, `search`, `info`, `review`,
 - **`kav doctor`** looks at failed services, orphan packages, `.pacnew` and `.pacsave` files, disk space, that the snapshots are still being taken and that the pacman database was not left locked.
 - **Freshly installed**, pacman does not have its package lists yet, and `kav` says so instead of treating a package as nonexistent: `kav update` downloads them.
 - **`kav` with no arguments**, in a terminal, opens the full screen, in `kav/core/tui.rs`, with ratatui, drawn after the mockup: the Dashboard has its four numbers, the health, the recent activity read from pacman's log and the keys at the bottom; then Browse, Updates, AUR, Snapshots, Doctor and Settings. The numbers and `Tab` change tab, `/` looks for a package, `Enter` shows its full record, `i` installs it and `x` removes it; `u` updates, `r` reviews an AUR package and `z` goes back to before the last change. Nothing changes the system from inside the screen: each of those keys runs kav's own command in the open, with its questions and its refusals, and comes back. The accent is the theme's.
-- **Left for later in this phase**: changing anything in the Settings tab, Arch's news, the filters of Browse, the versions' sizes in Updates, comparing and deleting snapshots, fixing from Doctor, the mouse, the signing of the list, an AUR package depending on another AUR package, the Arch news with its guided interventions, the migrations, the transaction guards and the firmware. Really building an AUR package needs a network, and the test machine has none: the test goes as far as checking which commit would be built.
+- **`kav fix`** mends what `kav doctor` found: it removes the packages nothing needs, takes away pacman's lock when pacman is not running, cleans the cache, starts a failed service again after showing why it failed, and opens a settings file beside the package's new one to merge them. On the Doctor tab, `f` does it for the line under the cursor.
+- **`kav set`** changes the two settings that are real today, each in the file of the tool that uses it: `kav set downloads 8` is how many packages pacman downloads at once, and `kav set snapshots 20` how many snapshots snapper keeps. With nothing after it, it says what each is. On the Settings tab, Enter on one of them changes it to its next value.
+- **Before a key changes the system**, a window over the screen says what it will run and that the password is asked for in the terminal, and waits for Enter; `sudo`'s line says what the password is for.
+- **Left for later in this phase**: the rest of the Settings tab, Arch's news, the filters of Browse, the versions' sizes in Updates, comparing and deleting snapshots, the mouse, the signing of the list, an AUR package depending on another AUR package, the Arch news with its guided interventions, the migrations, the transaction guards and the firmware. Really building an AUR package needs a network, and the test machine has none: the test goes as far as checking which commit would be built.
 
 **Terminal interface.** `kav` with no arguments opens a full-screen TUI. The commands still exist for scripts and for the agent; TUI and commands share the same Rust core (the TUI with ratatui).
 
@@ -801,7 +827,8 @@ How it works:
 - **Boot and login** have their own templates, in `themes/boot/`, and are applied separately with `kavat-theme boot`, because they are system files: the "Boot" section covers it.
 - **Today the theme is followed by** Hyprland (borders, corners, gaps, blur, shadows and animations), Kitty (colors, font and opacity; in light mode it lets less of the background through, so it does not turn gray), Kavat Shell (palette, mode, corners and font; its templates for other apps and its first-run wizard stay off) and GTK (colors and the light or dark preference). Hyprland asks for the theme when it loads its configuration, so the first login and safe mode already come up with it.
 - **Text never becomes code**: a font or palette name only accepts letters, digits, spaces and `- _ . #`, because it ends up inside the configuration files of other apps.
-- **Left for later in this phase**: the automatic mode by time, profiles and rules, the theme from the wallpaper, the per-app override, `kavat-theme add`, having boot follow the desktop theme on its own, and the templates for the rest: Qt, Neovim, Yazi, hyprlock and the installer.
+- **The mode by the hour**: with `auto.follow` on, the mode is light from `auto.light_from` to `auto.dark_from`, 7 and 19 as they come, and dark the rest. `/usr/lib/kavat/theme-auto` sets it when the session starts and leaves a timer of the session for the next change. Auto, beside Light and Dark on the Appearance page, turns it on; choosing Light or Dark turns it off.
+- **Left for later in this phase**: the mode by the sun instead of the clock, profiles and rules, the theme from the wallpaper, the per-app override, `kavat-theme add`, having boot follow the desktop theme on its own, and the templates for the rest: Qt and the installer.
 
 **Icons and cursor.** They also come from the tokens, so they change with the palette, the mode and the accent.
 
@@ -818,7 +845,9 @@ How it works:
 - **The icons** are a small icon theme, Kavat, that `kavat-theme` writes in your folder: Papirus' folders, redrawn with the accent where Papirus has its blue, in the sizes folders are shown at. Every other icon comes from Papirus, dark or light with the mode. The package makes the drawings from Papirus when it is built, so they follow Papirus' updates.
 - **The cursor** is drawn after Bibata Modern, whose drawings are free to change: the body takes the text colour, so it is light on a dark theme and dark on a light one, and the edge takes the accent. `kavat-theme` writes the drawings, `kavat-cursor-apply` packs them as Hyprland wants them and tells Hyprland, which changes the cursor at once.
 - **Both follow a change of theme**: the folders by being written again and the apps told, the cursor by being packed again.
-- **Left for later**: the Tinted and Line styles, the cursor sizes other than 24, the file icons of Yazi and Neovim in the palette's colours, the tray in one colour, and the cursor for apps that draw their own (they keep Adwaita's).
+- **The three icon styles** are the `icons.style` setting. Colour needs nothing more. Tinted is every app's icon of Papirus with each of its colours replaced by the palette's colour of the same hue, lighter or deeper as the drawing had it; Line is Papirus' own outline drawings, which exist for the folders and for a couple of hundred apps, in the colour of the text. Those two are thousands of drawings, so they are not written on every change of theme: the package keeps them with marks where the colours go, and `kavat-icons-apply` fills them in, once for each look, when one of the two styles is chosen.
+- **The cursor's size** is the `cursor.size` setting: 24, 32 or 48.
+- **Left for later**: outline drawings for the apps that Papirus has none for, the file icons of Yazi and Neovim in the palette's colours, the tray in one colour, and the cursor for apps that draw their own (they keep Adwaita's).
 
 Our own ideas:
 
