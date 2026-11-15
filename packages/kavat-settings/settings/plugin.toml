@@ -1,0 +1,18 @@
+# Part of kavat-shell: the system's settings, as a panel of the shell.
+id          = "kavat/settings"
+name        = "Kavat settings"
+version     = "0.1.0"
+plugin_api  = 43
+author      = "kavat"
+license     = "LicenseRef-AllRightsReserved"
+icon        = "settings"
+description = "The settings of Willwitcher-OS Kavat Edition, as the design draws them."
+
+[[panel]]
+id             = "panel"
+entry          = "panel.luau"
+width          = 1280
+height         = 810
+placement      = "floating"
+position       = "center"
+keyboard_focus = "on_demand"
