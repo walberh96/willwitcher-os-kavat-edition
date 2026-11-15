@@ -1,0 +1,25 @@
+#!/bin/bash
+# Part of kavat-settings: what the graphics card says of itself right now, one thing to a
+# line, for the GPU page of the panel. It reads the kernel's files for the card; a card
+# that has none of them, as in a virtual machine, gives only its name.
+shopt -s nullglob
+for card in /sys/class/drm/card[0-9]; do
+  device=$card/device
+  [[ -e $device/vendor ]] || continue
+  name=$(lspci -s "$(basename "$(readlink -f "$device")")" 2> /dev/null | sed 's/^[^:]*:[^:]*: //; s/ (rev .*//')
+  echo "name ${name:-$(basename "$card")}"
+  read_number() { [[ -r $1 ]] && cat "$1" 2> /dev/null; }
+  busy=$(read_number "$device/gpu_busy_percent")
+  [[ -n $busy ]] && echo "usage $busy"
+  used=$(read_number "$device/mem_info_vram_used") total=$(read_number "$device/mem_info_vram_total")
+  [[ -n $used && -n $total ]] && echo "memory $((used / 1048576)) $((total / 1048576))"
+  for sensors in "$device"/hwmon/hwmon*; do
+    temperature=$(read_number "$sensors/temp1_input")
+    [[ -n $temperature ]] && echo "temperature $((temperature / 1000))"
+    fan=$(read_number "$sensors/fan1_input") most=$(read_number "$sensors/fan1_max")
+    [[ -n $fan ]] && echo "fan $fan ${most:-0}"
+    power=$(read_number "$sensors/power1_average") cap=$(read_number "$sensors/power1_cap")
+    [[ -n $power ]] && echo "power $((power / 1000000)) $(( ${cap:-0} / 1000000 ))"
+  done
+  break
+done

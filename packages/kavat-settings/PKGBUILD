@@ -1,19 +1,21 @@
 pkgname=kavat-settings
 pkgver=0.1.0
-pkgrel=5
+pkgrel=10
 pkgdesc="Willwitcher-OS Kavat Edition: the system's settings, as a panel of the shell"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # the shell that draws the panel, and the programs its pages show and change
-depends=('kavat-shell' 'kavat-theme' 'kav' 'kavat-notes' 'kitty' 'python')
-source=('kavat-conf')
-sha256sums=('SKIP')
+depends=('kavat-shell' 'kavat-theme' 'kav' 'kavat-notes' 'kitty' 'python' 'pciutils')
+source=('kavat-conf' 'gpu-state')
+sha256sums=('SKIP' 'SKIP')
 
 # A plugin of the shell, in a folder the shell is pointed at by the theme's settings for it.
 package() {
   install -d "$pkgdir/usr/share/kavat/shell-plugins"
   cp -r "$startdir/settings" "$pkgdir/usr/share/kavat/shell-plugins/settings"
+  cp -r "$startdir/palette" "$pkgdir/usr/share/kavat/shell-plugins/palette"
   chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat"
   install -Dm755 kavat-conf "$pkgdir/usr/bin/kavat-conf"
+  install -Dm755 gpu-state "$pkgdir/usr/lib/kavat/gpu-state"
 }

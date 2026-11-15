@@ -5,8 +5,8 @@ usage: kavat-conf show <page>                 the settings of a page and their v
        kavat-conf set <page> <setting> <value>
        kavat-conf file <page>                 the file a page's settings are kept in
 
-The pages: terminal (Kitty), editor (Neovim), files (Yazi), language (the keyboard) and lock
-(the lock screen).
+The pages: terminal (Kitty), editor (Neovim), files (Yazi), language (the keyboard), sound (the
+microphone) and lock (the lock screen).
 
 Each setting lives in one place, the file of its app: this only changes that setting's
 line there, and leaves the rest of the file, comments and all, as it was. A setting that
@@ -28,6 +28,7 @@ CONFIG = os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config'
 #   toml    "name = value" under a [section]; the setting's name is section.name
 #   json    one object; true and false are written as such
 #   idle    hypridle's file, which is written whole from its two times
+#   link    the file is a link to one of the system's while the setting is on, and is not there while it is off
 PAGES = {
     'terminal': {
         'file': f'{CONFIG}/kitty/kitty.conf', 'style': 'kitty',
@@ -69,6 +70,14 @@ PAGES = {
             'keyboard_first': (['us', 'es'], 'us'),
         },
     },
+    'sound': {
+        'file': f'{CONFIG}/pipewire/pipewire.conf.d/kavat-noise.conf', 'style': 'link',
+        'reload': ['systemctl', '--user', 'restart', 'pipewire.service'],
+        'settings': {
+            # on is a link to the system's file, which adds the microphone without its noise
+            'noise_suppression': (['on', 'off'], 'off'),
+        },
+    },
     'lock': {
         'file': f'{CONFIG}/hypr/hypridle.conf', 'style': 'idle',
         'reload': ['sh', '-c', 'pkill -x hypridle; setsid -f hypridle > /dev/null 2>&1'],
@@ -79,6 +88,9 @@ PAGES = {
         },
     },
 }
+
+# what a setting that is a link points to
+LINKS = {'noise_suppression': '/usr/share/kavat/pipewire-noise.conf'}
 
 IDLE = '''# Written by kavat-conf from the Login & lock page of the settings; change the times there,
 # or here: the page shows what this file says.
@@ -144,6 +156,8 @@ def values(page):
             chosen = re.search(r'XkbLayout"\s+"(\w+)', read('/etc/X11/xorg.conf.d/00-keyboard.conf')) or \
                 re.search(r'KEYMAP=(\w+)', read('/etc/vconsole.conf'))
             found['keyboard_first'] = 'es' if chosen and chosen.group(1) == 'es' else 'us'
+    elif page['style'] == 'link':
+        found = dict.fromkeys(found, 'on' if os.path.lexists(page['file']) else 'off')
     elif page['style'] == 'idle':
         # hypridle's own file when the user has none; a time that is not there is never
         text = text or read('/etc/xdg/hypr/hypridle.conf')
@@ -158,6 +172,13 @@ def values(page):
 
 def write(page, name, value):
     path, text = page['file'], read(page['file'])
+    if page['style'] == 'link':
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        if os.path.lexists(path):
+            os.remove(path)
+        if value == 'on':
+            os.symlink(LINKS[name], path)
+        return
     lines = text.splitlines()
     if page['style'] == 'kitty':
         for at, line in enumerate(lines):

@@ -1,0 +1,45 @@
+# Part of kavat-shell: the system's own things in the launcher, each behind its word.
+id          = "kavat/palette"
+name        = "Kavat palette"
+version     = "0.1.0"
+plugin_api  = 43
+author      = "kavat"
+license     = "LicenseRef-AllRightsReserved"
+icon        = "command"
+description = "Settings pages, files, projects, modes, packages and notes in the launcher: /s, /f, /pr, /m, /k and /n."
+
+[[launcher_provider]]
+id     = "settings"
+entry  = "settings.luau"
+prefix = "s"
+glyph  = "settings"
+
+[[launcher_provider]]
+id     = "files"
+entry  = "files.luau"
+prefix = "f"
+glyph  = "file-search"
+
+[[launcher_provider]]
+id     = "projects"
+entry  = "projects.luau"
+prefix = "pr"
+glyph  = "folders"
+
+[[launcher_provider]]
+id     = "modes"
+entry  = "modes.luau"
+prefix = "m"
+glyph  = "toggle-right"
+
+[[launcher_provider]]
+id     = "packages"
+entry  = "packages.luau"
+prefix = "k"
+glyph  = "package"
+
+[[launcher_provider]]
+id     = "notes"
+entry  = "notes.luau"
+prefix = "n"
+glyph  = "notes"
