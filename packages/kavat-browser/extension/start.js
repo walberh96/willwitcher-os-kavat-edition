@@ -1,5 +1,7 @@
-// The start page: the clock, the search, and the sites most gone to. Nothing on it comes
-// from the network: the sites are the browser's own list, and their icons the ones it keeps.
+// The start page: the clock, the search, the sites most gone to, and an album when one was
+// chosen for it. Nothing on it comes from the network: the sites are the browser's own
+// list, their icons the ones it keeps, and the album a folder of the notes.
+import { grid } from './grid.js';
 import { theme } from './theme.js';
 
 function tick() {
@@ -48,7 +50,17 @@ async function mode() {
   }
 }
 
+// the album chosen for the start page, on the albums' page or in the browser's settings file
+async function album() {
+  const answer = await chrome.runtime.sendMessage({ ask: 'settings' });
+  const name = answer && answer.settings && answer.settings.start_album;
+  if (name) {
+    document.body.classList.add('with-album');
+    grid(document.getElementById('album'), name);
+  }
+}
 theme();
+album();
 tick();
 setInterval(tick, 5000);
 sites();

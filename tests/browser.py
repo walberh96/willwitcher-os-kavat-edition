@@ -52,6 +52,32 @@ print(ask({"ask": "clip", "number": 4, "title": "A page  worth keeping", "url": 
 print(ask({"ask": "clip", "number": 5, "title": "Not a page", "url": "file:///etc/passwd"}))
 host.stdin.close()
 '''
+# The albums, asked of the host the same way: a site is added twice and is there once, with
+# its picture; the start page's album is a line of the settings file; the notes about a site.
+ALBUMS = r'''
+import base64, json, struct, subprocess, sys
+host = subprocess.Popen(["/usr/lib/kavat/browser-host"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+def ask(message):
+    data = json.dumps(message).encode()
+    host.stdin.write(struct.pack("=I", len(data)) + data); host.stdin.flush()
+    length = struct.unpack("=I", host.stdout.read(4))[0]
+    return json.loads(host.stdout.read(length))
+picture = "data:image/png;base64," + base64.b64encode(open("/tmp/album.png", "rb").read()).decode()
+print(ask({"ask": "album-add", "number": 1, "name": "reading", "title": "A site", "url": "https://example.org/site", "picture": picture}).get("said"))
+ask({"ask": "album-add", "number": 2, "name": "reading", "title": "A site, again", "url": "https://example.org/site"})
+print([album for album in ask({"ask": "albums", "number": 3})["albums"] if album["name"] == "reading"])
+sites = ask({"ask": "album", "number": 4, "name": "reading"})["sites"]
+print(len(sites), sites[0]["title"], sites[0]["url"])
+print(ask({"ask": "album-picture", "number": 5, "file": sites[0]["picture"]}).get("picture", "")[:23])
+print(ask({"ask": "album-picture", "number": 6, "file": "/etc/passwd"}).get("failed"))
+print(ask({"ask": "start-album", "number": 7, "name": "reading"})["settings"])
+print(sorted({note["kind"] for note in ask({"ask": "about", "number": 8, "url": "https://example.org/other"})["notes"]}))
+ask({"ask": "album-remove", "number": 9, "name": "reading", "url": "https://example.org/site"})
+print(len(ask({"ask": "album", "number": 10, "name": "reading"})["sites"]))
+host.stdin.close()
+'''
+# the colour of a point of the screen, as six letters
+POINT = 'grim -g "{x},{y} 1x1" -t ppm - | tail -c 3 | od -An -tx1 | tr -d " \\n"'
 
 
 def main():
@@ -106,12 +132,45 @@ def main():
                       and lines[5] == '1' and '# A page worth keeping' in lines[6] and '> first line|> second line' in lines[6] and '#clip' in lines[6],
                       "the system's side answers with the mode, the theme and your commands, and keeps a clipping as a note with its quote", output)
         before = user(OPEN + ' | grep -c "^page "')[1]
-        status, output = user('kavat-browser command "new tab"; sleep 3; ' + OPEN + ' | grep -c "^page "; ' + OPEN + f' | grep -c "^page chrome-extension://{KAVAT}/start.html\\|^page chrome://newtab"')
+        # the host looks for what was asked once a second, and the tab takes a moment to be there
+        status, output = user('kavat-browser command "new tab"; for n in 1 2 3 4 5 6 7 8 9 10; do sleep 1.5; [ "$(' + OPEN + ' | grep -c "^page ")" != "' + before + '" ] && break; done; '
+                              + OPEN + ' | grep -c "^page "; ' + OPEN + f' | grep -c "^page chrome-extension://{KAVAT}/start.html\\|^page chrome://newtab"')
         lines = output.split()
         checks.report(len(lines) == 2 and lines[0].isdigit() and before.isdigit() and int(lines[0]) == int(before) + 1 and lines[1] != '0',
                       'a command asked for from outside reaches the open browser, and a new tab is the start page of the system', f'{before} before\n{output}')
         time.sleep(2)
         machine.screen.picture(f'{pictures}/browser-tab.png')
+
+        print('albums, its colours, a profile for a mode, the sandbox', flush=True)
+        status, output = user('ffmpeg -v error -y -f lavfi -i color=c=red:s=800x500 -frames:v 1 /tmp/album.png; cat > /tmp/albums.py << "END"\n' + ALBUMS + 'END\npython3 /tmp/albums.py; '
+                              'grep -c "^start_album = \\"reading\\"" ~/.config/kavat/browser/browser.toml', 90)
+        lines = output.split('\n')
+        checks.report(len(lines) == 9 and lines[0] == 'Added to reading' and "'count': '1'" in lines[1] and lines[2] == '1 A site, again https://example.org/site'
+                      and lines[3] == 'data:image/jpeg;base64,' and lines[4] == 'there is no such picture' and "'start_album': 'reading'" in lines[5]
+                      and lines[6] == "['album', 'clip']" and lines[7] == '0' and lines[8] == '1',
+                      'a site goes into an album once, with its picture; the start page takes an album; the notes about a site are found', output)
+        # the browser's own bars are the palette's: the frame behind the tabs is the theme's background, and follows a change
+        frame = POINT.format(x=1500, y=70)
+        status, output = user(f'kavat-theme tokens | grep "^bg " | cut -c5-; {frame}; echo; kavat-theme set palette nord accent default > /dev/null; sleep 4; '
+                              f'kavat-theme tokens | grep "^bg " | cut -c5-; {frame}; echo; kavat-theme set palette kavat accent default > /dev/null', 60)
+        lines = output.split()
+        checks.report(len(lines) == 4 and lines[0] == lines[1] and lines[2] == lines[3] and lines[0] != lines[2],
+                      "the browser's own bars wear the palette, and change with it while the browser is open", output)
+        status, output = user('sed -i "s/^# gamer = /gamer = /" ~/.config/kavat/browser/browser.toml; kavat-mode gamer > /dev/null; '
+                              'setsid -f kavat-browser > /dev/null 2>&1; sleep 8; kavat-mode coder > /dev/null; '
+                              'grep -c "\\"system_theme\\":1" ~/.config/kavat-browser/Gaming/Preferences; ls ~/.config/kavat-browser/Gaming | grep -c -x History', 60)
+        checks.report(output.split() == ['1', '1'], 'a window opened in a mode that has a profile of its own is that profile\'s', output)
+        status, output = user('pkill -x chromium; sleep 3; mkdir -p ~/private && echo kept > ~/private/key; kavat-sandbox on browser; '
+                              'kavat-sandbox run browser -- sh -c "ls ~/private 2>&1 | grep -c \\"No such\\"; ls -d ~/Notes ~/.config/kavat-browser | wc -l; '
+                              'gdbus call --session -d org.freedesktop.systemd1 -o /org/freedesktop/systemd1 -m org.freedesktop.systemd1.Manager.ListUnits 2>&1 | grep -c -i \\"error\\""; '
+                              'setsid -f kavat-browser --remote-debugging-port=9222 --remote-allow-origins=* > /dev/null 2>&1; sleep 10; '
+                              f'pgrep -c -x bwrap; {OPEN} | grep -c "service_worker chrome-extension://{KAVAT}/"; '
+                              'kavat-browser http://127.0.0.1:9/second > /dev/null 2>&1; sleep 4; ' + OPEN + ' | grep -c "127.0.0.1:9/second"; '
+                              'kavat-sandbox off browser; pkill -x chromium; sleep 3; pgrep -c -x bwrap; '
+                              'setsid -f kavat-browser --remote-debugging-port=9222 --remote-allow-origins=* > /dev/null 2>&1; sleep 8; rm -r ~/private', 120)
+        lines = output.split()
+        checks.report(len(lines) == 7 and lines[:3] == ['1', '2', '1'] and lines[3] != '0' and lines[4] != '0' and lines[5] == '1' and lines[6] == '0',
+                      'in its sandbox the browser sees its own folders and the notes and nothing else of the home folder, cannot speak to the session\'s manager, and a second window joins the first', output)
 
         print('the modes', flush=True)
         status, output = user('mkdir -p ~/.config/kavat/modes && printf "name = \\"Quiet\\"\\nabout = \\"The browser out of sight\\"\\nhide_browser = true\\n" > ~/.config/kavat/modes/quiet.toml; '

@@ -8,8 +8,10 @@
 #
 # It is Chromium, as Arch builds it, made a piece of the system from the outside: its own
 # settings folder, the system's policies, the blocker and the Kavat extension loaded from
-# the system's own files, and Widevine for protected video. In Incognito mode every window
-# it opens is a private one.
+# the system's own files, and Widevine for protected video. Its bars wear the system theme:
+# it is set to take its colours from GTK, whose theme is the system's. In Incognito mode
+# every window it opens is a private one, and a mode can have a profile of its own, named in
+# ~/.config/kavat/browser/browser.toml: a window opened in that mode is that profile's.
 set -u
 data="${XDG_CONFIG_HOME:-$HOME/.config}/kavat-browser"
 # The two extensions come with the system, but Chromium writes beside an extension it loads
@@ -46,12 +48,41 @@ flags=(
   # loading an extension from a folder is being taken out of Chromium's own builds: kept on
   --disable-features=DisableLoadExtensionCommandLineSwitch
 )
+mode=$(kavat-mode 2> /dev/null)
 if [[ ${1:-} == --private ]]; then
   flags+=(--incognito)
   shift
-elif [[ $(kavat-mode 2> /dev/null) == incognito ]]; then
+elif [[ $mode == incognito ]]; then
   flags+=(--incognito)
+fi
+# The profile: the one asked for, as a project does, or the one the settings give the mode
+# in force; with neither, the browser's first.
+profile=
+for word in "$@"; do
+  [[ $word == --profile-directory=* ]] && profile=${word#--profile-directory=}
+done
+if [[ -z $profile ]]; then
+  profile=$(python3 - "${XDG_CONFIG_HOME:-$HOME/.config}/kavat/browser/browser.toml" "${mode:-coder}" << 'END' 2> /dev/null
+import re, sys, tomllib
+try:
+    name = tomllib.load(open(sys.argv[1], 'rb')).get('profiles', {}).get(sys.argv[2], '')
+except (OSError, tomllib.TOMLDecodeError):
+    name = ''
+print(name if isinstance(name, str) and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ._-]{0,40}', name) else '')
+END
+  )
+  [[ -n $profile ]] && flags+=(--profile-directory="$profile")
+fi
+# A profile that is new is set to take its colours from GTK, which wears the system theme,
+# before the browser first opens it; after that the setting is the browser's own to keep.
+if [[ ! -e $data/${profile:-Default}/Preferences ]]; then
+  mkdir -p "$data/${profile:-Default}"
+  echo '{"extensions":{"theme":{"system_theme":1}}}' > "$data/${profile:-Default}/Preferences"
 fi
 # the window apps pick files with is the system's, Yazi
 export GTK_USE_PORTAL=1
+# with the browser's sandbox on, it runs inside it: `kavat-sandbox on browser`
+if kavat-sandbox is browser 2> /dev/null; then
+  exec kavat-sandbox run browser -- chromium "${flags[@]}" "$@"
+fi
 exec chromium "${flags[@]}" "$@"

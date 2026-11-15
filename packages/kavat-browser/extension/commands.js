@@ -18,6 +18,15 @@ async function selection(tab) {
   }
 }
 
+// a picture of what the tab shows; nothing when the browser will not give one
+async function shot(tab) {
+  try {
+    return await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 70 });
+  } catch (error) {
+    return '';
+  }
+}
+
 export const COMMANDS = {
   'new tab': { about: 'Open a new tab', run: () => chrome.tabs.create({}) },
   'close other tabs': {
@@ -75,8 +84,56 @@ export const COMMANDS = {
     about: 'This page in the notes, with what is selected as a quote',
     run: async (send) => {
       const tab = await current();
-      return send({ ask: 'clip', title: tab.title, url: tab.url, quote: await selection(tab) });
+      return send({ ask: 'clip', title: tab.title, url: tab.url, quote: await selection(tab), picture: await shot(tab) });
     },
+  },
+  'add to album': {
+    about: 'This site in an album: type its name after the command, or it goes to favourites',
+    takes: 'album',
+    run: async (send, album) => {
+      const tab = await current();
+      return send({ ask: 'album-add', name: album || 'favourites', title: tab.title, url: tab.url, picture: await shot(tab) });
+    },
+  },
+  'read later': {
+    about: 'This page in the album of what waits to be read',
+    run: async (send) => {
+      const tab = await current();
+      return send({ ask: 'album-add', name: 'read-later', title: tab.title, url: tab.url, picture: await shot(tab) });
+    },
+  },
+  'tabs to album': {
+    about: "Every tab of this window in an album: type its name after the command, or it is today's",
+    takes: 'album',
+    run: async (send, album) => {
+      const name = album || `tabs-${new Date().toISOString().slice(0, 10)}`;
+      const tabs = (await chrome.tabs.query({ currentWindow: true })).filter((tab) => /^https?:/.test(tab.url || ''));
+      for (const tab of tabs) {
+        const answer = await send({ ask: 'album-add', name, title: tab.title, url: tab.url, picture: tab.active ? await shot(tab) : '' });
+        if (answer.failed) {
+          return answer;
+        }
+      }
+      return { said: `${tabs.length} tabs in ${name}` };
+    },
+  },
+  'albums': { about: 'Your albums of sites', run: () => chrome.tabs.create({ url: chrome.runtime.getURL('albums.html') }) },
+  'open album': {
+    about: 'Every site of an album, each in a tab: type its name after the command',
+    takes: 'album',
+    run: async (send, album) => {
+      const answer = await send({ ask: 'album', name: album || 'favourites' });
+      for (const site of answer.sites || []) {
+        await chrome.tabs.create({ url: site.url, active: false });
+      }
+      return { said: `${(answer.sites || []).length} sites opened` };
+    },
+  },
+  'notes about this site': {
+    about: 'What your notes already have from this site, in a panel at the side',
+    // the browser allows it only at a press of yours: from the console and from the right
+    // button it opens; asked for from outside the browser, it is refused, and that is said
+    run: async () => chrome.sidePanel.open({ windowId: (await chrome.windows.getLastFocused()).id }),
   },
   'downloads': { about: 'The downloads folder, in Yazi', run: (send) => send({ ask: 'folder', which: 'downloads' }) },
   'history': { about: 'Where you have been', run: () => chrome.tabs.create({ url: 'chrome://history' }) },

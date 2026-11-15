@@ -1,0 +1,21 @@
+<!doctype html>
+<!-- The albums: your collections of sites, each a folder of bookmarks in the notes. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Albums</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="albums">
+  <header>
+    <h1>Albums</h1>
+    <nav id="names"></nav>
+    <span class="grow"></span>
+    <button id="all" title="Every site of this album, each in a tab">Open all</button>
+    <button id="start" title="Show this album on the start page"></button>
+  </header>
+  <div id="sites" class="grid"></div>
+  <p id="empty" class="muted" hidden>Nothing here yet. <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>K</kbd> and “add to album” keeps the site you are on; “tabs to album” keeps every tab of the window.</p>
+  <script type="module" src="albums.js"></script>
+</body>
+</html>

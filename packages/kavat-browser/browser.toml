@@ -1,0 +1,11 @@
+# The browser's settings that are the system's own.
+
+# The album the start page shows under its sites; the albums' page sets it too.
+# start_album = "favourites"
+
+# A profile of the browser for a mode: a window opened while that mode is in force is that
+# profile's, with its own history, its own sessions and its own passwords. A mode with no
+# line here uses the browser's first profile.
+[profiles]
+# gamer = "Gaming"
+# incognito = "Private"

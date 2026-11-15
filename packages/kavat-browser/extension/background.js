@@ -71,6 +71,8 @@ async function mode(now) {
 chrome.commands.onCommand.addListener((name) => {
   if (name === 'clip-page') {
     run('save to notes', send).then(tell);
+  } else if (name === 'read-later') {
+    run('read later', send).then(tell);
   } else if (name === 'zen') {
     run('zen mode', send);
   }
@@ -86,10 +88,41 @@ function tell(result) {
 
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.create({ id: 'clip', title: 'Save to the notes', contexts: ['page', 'selection', 'link'] });
+  chrome.contextMenus.create({ id: 'album', title: 'Add to the album of favourites', contexts: ['page', 'link'] });
+  chrome.contextMenus.create({ id: 'later', title: 'Read later', contexts: ['page', 'link'] });
+  chrome.contextMenus.create({ id: 'image', title: 'Save the image to the album of images', contexts: ['image'] });
+  chrome.contextMenus.create({ id: 'about', title: 'Notes about this site', contexts: ['page'] });
 });
+
+// An image of a page, as the text a message can carry; nothing when it cannot be fetched.
+async function fetched(address) {
+  try {
+    const blob = await (await fetch(address)).blob();
+    if (!/^image\/(png|jpeg|webp)$/.test(blob.type) || blob.size > 5000000) {
+      return '';
+    }
+    const bytes = new Uint8Array(await blob.arrayBuffer());
+    let text = '';
+    for (let at = 0; at < bytes.length; at += 0x8000) {
+      text += String.fromCharCode(...bytes.subarray(at, at + 0x8000));
+    }
+    return `data:${blob.type};base64,${btoa(text)}`;
+  } catch (error) {
+    return '';
+  }
+}
 chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   if (info.menuItemId === 'clip') {
     tell(await send({ ask: 'clip', title: tab.title, url: info.linkUrl || tab.url, quote: info.selectionText || '' }));
+  } else if (info.menuItemId === 'about') {
+    // asked for before anything is waited for: the browser opens a panel only at a press
+    chrome.sidePanel.open({ windowId: tab.windowId });
+  } else if (info.menuItemId === 'album' || info.menuItemId === 'later') {
+    const name = info.menuItemId === 'album' ? 'favourites' : 'read-later';
+    tell(await send({ ask: 'album-add', name, title: info.linkUrl ? info.linkUrl : tab.title, url: info.linkUrl || tab.url }));
+  } else if (info.menuItemId === 'image') {
+    // the image, with the page it came from
+    tell(await send({ ask: 'album-add', name: 'images', title: tab.title, url: tab.url, picture: await fetched(info.srcUrl) }));
   }
 });
 

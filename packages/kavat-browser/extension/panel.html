@@ -1,0 +1,21 @@
+<!doctype html>
+<!-- The panel at the side: what your notes already have from the site you are on. -->
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Notes about this site</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="panel">
+  <h1 id="site"></h1>
+  <ul id="notes"></ul>
+  <p id="none" class="muted" hidden>Your notes have nothing from this site yet.</p>
+  <div class="row">
+    <button id="clip" title="Save this page to the notes, with what is selected as a quote">Save page</button>
+    <button id="album" title="Keep this site in the album of favourites">Add to album</button>
+    <button id="later" title="Keep this page for later">Read later</button>
+  </div>
+  <p id="said" class="muted"></p>
+  <script type="module" src="panel.js"></script>
+</body>
+</html>

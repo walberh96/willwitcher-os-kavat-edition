@@ -3,7 +3,7 @@
 # inside; the Kavat extension is this package's own.
 pkgname=kavat-browser
 pkgver=0.1.0
-pkgrel=4
+pkgrel=5
 _ubol=2026.1110.1816
 pkgdesc="Willwitcher-OS Kavat Edition: the browser, with the blocker, the command console and the system's modes"
 arch=('any')
@@ -11,10 +11,10 @@ url="https://github.com/walberh96/willwitcher-os-kavat-edition"
 license=('LicenseRef-AllRightsReserved' 'GPL-3.0-or-later')
 depends=('chromium' 'kavat-widevine' 'kavat-theme' 'kavat-modes' 'kavat-notes' 'kavat-files' 'python' 'xdg-user-dirs' 'xdg-desktop-portal')
 makedepends=('librsvg' 'python')
-source=(kavat-browser browser-host dev.kavat.browser.json policies.json kavat-browser.desktop mimeapps.list commands.toml icon.svg
+source=(kavat-browser browser-host dev.kavat.browser.json policies.json kavat-browser.desktop mimeapps.list commands.toml browser.toml icon.svg
         "uBOLite_$_ubol.chromium.zip::https://github.com/uBlockOrigin/uBOL-home/releases/download/$_ubol/uBOLite_$_ubol.chromium.zip")
 noextract=("uBOLite_$_ubol.chromium.zip")
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
             '85fe5909366e8ada66c5b331bbdbf69cf5100245ed6161b1e4e2f1f848ec7d03')
 
 build() {
@@ -31,6 +31,7 @@ package() {
   install -Dm644 mimeapps.list "$pkgdir/usr/share/applications/mimeapps.list"
   install -Dm644 icon.svg "$pkgdir/usr/share/icons/hicolor/scalable/apps/kavat-browser.svg"
   install -Dm644 commands.toml "$pkgdir/etc/skel/.config/kavat/browser/commands.toml"
+  install -Dm644 browser.toml "$pkgdir/etc/skel/.config/kavat/browser/browser.toml"
 
   # the two extensions, loaded from here by the launcher
   install -d "$pkgdir/usr/share/kavat-browser/extensions/ublock" "$pkgdir/usr/share/kavat-browser/extensions/kavat"

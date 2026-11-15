@@ -9,10 +9,18 @@ const said = document.getElementById('said');
 let all = [];    // each: name, about, run (the name of a built-in), given
 let shown = [];
 let lit = 0;
+let here = null;  // the browser window this console was opened over
 
 function draw() {
-  const words = find.value.toLowerCase().split(/\s+/).filter(Boolean);
+  const typed = find.value.toLowerCase().trimStart();
+  const words = typed.split(/\s+/).filter(Boolean);
   shown = all.filter((command) => words.every((word) => `${command.name} ${command.about}`.toLowerCase().includes(word)));
+  // a command that takes something: what is typed after its name is given to it
+  for (const command of all) {
+    if (command.takes && typed.startsWith(`${command.name} `) && typed.length > command.name.length + 1) {
+      shown = [{ ...command, given: find.value.trimStart().slice(command.name.length + 1).trim(), about: `${command.takes}: ${find.value.trimStart().slice(command.name.length + 1).trim()}` }];
+    }
+  }
   lit = Math.min(lit, Math.max(0, shown.length - 1));
   list.replaceChildren(...shown.map((command, at) => {
     const item = document.createElement('li');
@@ -35,6 +43,13 @@ function draw() {
 async function go() {
   const command = shown[lit];
   if (!command) {
+    return;
+  }
+  // The browser opens a panel at its side only at a press of yours, and this window is
+  // where the press is: the panel is opened from here, not through the background.
+  if (command.run === 'notes about this site' && here !== null) {
+    await chrome.sidePanel.open({ windowId: here });
+    window.close();
     return;
   }
   const result = await chrome.runtime.sendMessage({ run: command.run, given: command.given });
@@ -60,7 +75,8 @@ find.addEventListener('keydown', (event) => {
 
 async function start() {
   theme();
-  all = Object.entries(COMMANDS).filter(([, command]) => !command.hidden).map(([name, command]) => ({ name, about: command.about, run: name }));
+  chrome.windows.getCurrent().then((found) => { here = found.id; });
+  all = Object.entries(COMMANDS).filter(([, command]) => !command.hidden).map(([name, command]) => ({ name, about: command.about, run: name, takes: command.takes }));
   draw();
   // your own, from the file the host reads
   const answer = await chrome.runtime.sendMessage({ ask: 'commands' });
