@@ -1,25 +1,86 @@
-#!/bin/bash
-# Part of kavat-theme: the mode by the hour, light by day and dark by night.
-#
-# It does something only when the theme's auto.follow is on: it sets the mode the hour
-# asks for and leaves a timer of the session for the next change. The session runs it when
-# it starts, and the settings panel when Auto is chosen or left.
-set -u
-systemctl --user stop kavat-theme-auto.timer > /dev/null 2>&1
-[[ $(kavat-theme get auto.follow) == true ]] || exit 0
+#!/usr/bin/env python3
+"""Part of kavat-theme: the mode by the hour or by the sun, light by day and dark by night.
 
-light=$(kavat-theme get auto.light_from)
-dark=$(kavat-theme get auto.dark_from)
-hour=$(date +%-H)
-if ((light < dark ? hour >= light && hour < dark : hour >= light || hour < dark)); then
-  wanted=light next=$dark
-else
-  wanted=dark next=$light
-fi
-[[ $(kavat-theme get mode) == "$wanted" ]] || kavat-theme set mode "$wanted"
+It does something only when the theme's auto.follow is on: it sets the mode the moment
+asks for and leaves a timer of the session for the next change. The session runs it when
+it starts, and the settings panel when Auto is chosen or left.
 
-# the next change: that hour today, or tomorrow when it has already gone by
-day=today
-((hour >= next)) && day=tomorrow
-systemd-run --user --quiet --unit kavat-theme-auto --on-calendar "$(date -d "$day $next:00" '+%Y-%m-%d %H:%M:00')" \
-  --description "The theme's mode by the hour" /usr/lib/kavat/theme-auto > /dev/null 2>&1 || true
+By the clock, the day goes from auto.light_from to auto.dark_from. By the sun, with
+auto.sun on, it goes from sunrise to sunset where the machine is: auto.latitude and
+auto.longitude say where, and the two moments are worked out here, from the date, without
+asking anybody.
+"""
+import datetime
+import math
+import subprocess
+
+
+def get(key):
+    try:
+        return subprocess.run(['kavat-theme', 'get', key], capture_output=True, text=True, timeout=10, check=False).stdout.strip()
+    except (OSError, subprocess.TimeoutExpired):
+        return ''
+
+
+def sun(day, latitude, longitude):
+    """Sunrise and sunset of a day at a place, as local times; None for a day without one
+    of them, as near the poles. The usual sunrise equation, good to a couple of minutes."""
+    days = (datetime.datetime(day.year, day.month, day.day, 12, tzinfo=datetime.timezone.utc)
+            - datetime.datetime(2000, 1, 1, 12, tzinfo=datetime.timezone.utc)).days
+    noon = days - longitude / 360
+    anomaly = math.radians((357.5291 + 0.98560028 * noon) % 360)
+    centre = 1.9148 * math.sin(anomaly) + 0.02 * math.sin(2 * anomaly) + 0.0003 * math.sin(3 * anomaly)
+    ecliptic = math.radians((math.degrees(anomaly) + centre + 180 + 102.9372) % 360)
+    transit = noon + 0.0053 * math.sin(anomaly) - 0.0069 * math.sin(2 * ecliptic)
+    declination = math.asin(math.sin(ecliptic) * math.sin(math.radians(23.4397)))
+    reach = (math.sin(math.radians(-0.833)) - math.sin(math.radians(latitude)) * math.sin(declination)) \
+        / (math.cos(math.radians(latitude)) * math.cos(declination))
+    if not -1 <= reach <= 1:
+        return None
+    half = math.degrees(math.acos(reach)) / 360
+    start = datetime.datetime(2000, 1, 1, 12, tzinfo=datetime.timezone.utc)
+    return tuple((start + datetime.timedelta(days=moment)).astimezone() for moment in (transit - half, transit + half))
+
+
+def day_of(now):
+    """When the light part of today starts and ends, as two moments of today."""
+    if get('auto.sun') == 'true':
+        try:
+            found = sun(now.date(), float(get('auto.latitude')), float(get('auto.longitude')))
+        except ValueError:
+            found = None
+        if found:
+            return found
+    light, dark = int(get('auto.light_from') or 7), int(get('auto.dark_from') or 19)
+    return now.replace(hour=light, minute=0, second=0, microsecond=0), now.replace(hour=dark, minute=0, second=0, microsecond=0)
+
+
+def main():
+    subprocess.run(['systemctl', '--user', 'stop', 'kavat-theme-auto.timer'], capture_output=True, check=False)
+    if get('auto.follow') != 'true':
+        return
+    now = datetime.datetime.now().astimezone()
+    light, dark = day_of(now)
+    if light <= dark:
+        wanted = 'light' if light <= now < dark else 'dark'
+    else:
+        # a day that is set to start after it ends: light outside the two hours
+        wanted = 'dark' if dark <= now < light else 'light'
+    if get('mode') != wanted:
+        subprocess.run(['kavat-theme', 'set', 'mode', wanted], check=False)
+    # the next change: the first of the two moments still to come today, or tomorrow's first
+    ahead = sorted(moment for moment in (light, dark) if moment > now)
+    if ahead:
+        following = ahead[0]
+    else:
+        following = min(day_of(now + datetime.timedelta(days=1)))
+    # the timer is set for the start of the minute after the moment, never for one that
+    # has just gone by
+    following += datetime.timedelta(minutes=1)
+    subprocess.run(['systemd-run', '--user', '--quiet', '--unit', 'kavat-theme-auto',
+                    '--on-calendar', following.strftime('%Y-%m-%d %H:%M:00'),
+                    '--description', "The theme's mode by the hour", '/usr/lib/kavat/theme-auto'], capture_output=True, check=False)
+
+
+if __name__ == '__main__':
+    main()

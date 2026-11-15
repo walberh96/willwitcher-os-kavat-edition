@@ -140,17 +140,48 @@ impl Step {
     }
 }
 
+/// The apps that can wear a palette of their own: the setting that names it, and the
+/// template that is filled with it.
+const OWN_PALETTE: &[(&str, &str)] = &[("terminal.palette", "kitty"), ("editor.palette", "nvim")];
+
 pub fn tokens(paths: &Paths, settings: &Settings) -> Result<Tokens, String> {
-    let palette = match settings.get("palette") {
-        crate::theme::Token::Text(id) => Palette::load(id, &paths.palette_folders())?,
+    let load = |settings: &Settings| match settings.get("palette") {
+        crate::theme::Token::Text(id) => Palette::load(id, &paths.palette_folders()),
         _ => unreachable!(),
     };
-    resolve(settings, &palette)
+    let mut tokens = resolve(settings, &load(settings)?)?;
+    // An app with a palette of its own gets every token again, made from that palette and
+    // kept under the template's name: `kitty/bg`. Its template is filled with those.
+    for (setting, template) in OWN_PALETTE {
+        match settings.get(setting) {
+            crate::theme::Token::Text(id) if id != "system" => {
+                let own = settings.with_palette(id);
+                for (name, token) in resolve(&own, &load(&own)?)? {
+                    tokens.insert(format!("{template}/{name}"), token);
+                }
+            }
+            _ => {}
+        }
+    }
+    Ok(tokens)
+}
+
+/// The tokens a template is filled with: the system's, with the template's own over them.
+fn tokens_of(template: &str, tokens: &Tokens) -> Tokens {
+    let prefix = format!("{template}/");
+    let mut own: Tokens = tokens.iter().filter(|(name, _)| !name.contains('/')).map(|(name, token)| (name.clone(), token.clone())).collect();
+    for (name, token) in tokens {
+        if let Some(plain) = name.strip_prefix(&prefix) {
+            own.insert(plain.to_string(), token.clone());
+        }
+    }
+    own
 }
 
 pub fn plan(paths: &Paths, tokens: &Tokens) -> Result<Plan, String> {
     let mut plan = Plan { files: BTreeMap::new(), links: Vec::new(), reload: Vec::new() };
     for template in paths.templates()? {
+        let tokens = &tokens_of(&template.name, tokens);
         for rule in &template.files {
             let problem = |what: String| format!("{}: {what}", rule.from.display());
             let text = fs::read_to_string(&rule.from).map_err(|error| problem(error.to_string()))?;
@@ -424,12 +455,24 @@ mod tests {
     }
 
     #[test]
+    fn an_app_can_wear_a_palette_of_its_own() {
+        let paths = paths("own-palette");
+        write(paths.user_file(), "[terminal]\npalette = \"nord\"\n");
+        assert_eq!(apply(&paths), Ok(true));
+        // the terminal is Nord's, the rest is still the system's Kavat
+        let terminal = fs::read_to_string(paths.state.join("current/kitty/theme.conf")).unwrap();
+        assert!(terminal.contains("#242933") && !terminal.contains("#0d0f14"), "{terminal}");
+        let windows = fs::read_to_string(paths.state.join("current/gtk/gtk-4.0.css")).unwrap();
+        assert!(windows.contains("#f2a93b") && !windows.contains("#242933"), "{windows}");
+    }
+
+    #[test]
     fn a_file_of_the_user_where_a_link_would_go_is_left_alone() {
         let paths = paths("own");
         write(paths.config.join("gtk-4.0/gtk.css"), "/* mine */\n");
         assert_eq!(apply(&paths), Ok(true));
         assert_eq!(fs::read_to_string(paths.config.join("gtk-4.0/gtk.css")).unwrap(), "/* mine */\n");
-        assert!(fs::read_link(paths.config.join("gtk-3.0/gtk.css")).is_ok());
+        assert!(fs::read_link(paths.user_data.join("themes/Kavat/gtk-3.0")).is_ok());
     }
 
     #[test]

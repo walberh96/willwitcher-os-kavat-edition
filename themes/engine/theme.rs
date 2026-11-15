@@ -42,9 +42,14 @@ pub const KEYS: &[(&str, Kind)] = &[
     ("fonts.scale", Kind::Number(0.5, 2.0)),
     ("icons.style", Kind::OneOf(&["colour", "tinted", "line"])),
     ("cursor.size", Kind::OneOf(&["24", "32", "48"])),
+    ("terminal.palette", Kind::Text),
+    ("editor.palette", Kind::Text),
     ("auto.follow", Kind::Flag),
     ("auto.light_from", Kind::Whole(0, 23)),
     ("auto.dark_from", Kind::Whole(0, 23)),
+    ("auto.sun", Kind::Flag),
+    ("auto.latitude", Kind::Number(-90.0, 90.0)),
+    ("auto.longitude", Kind::Number(-180.0, 180.0)),
 ];
 
 #[derive(Clone, Debug, PartialEq)]
@@ -179,6 +184,17 @@ impl Settings {
 
     pub fn get(&self, key: &str) -> &Token {
         &self.0[key]
+    }
+
+    /// These settings with another palette, for an app that wears its own. An accent that
+    /// is a name belongs to the palette it was chosen in, so the other palette's own is used.
+    pub fn with_palette(&self, palette: &str) -> Settings {
+        let mut values = self.0.clone();
+        values.insert("palette", Token::Text(palette.to_string()));
+        if !self.text("accent").starts_with('#') {
+            values.insert("accent", Token::Text("default".to_string()));
+        }
+        Settings(values)
     }
 
     fn text(&self, key: &str) -> &str {
@@ -465,6 +481,8 @@ pub fn resolve(settings: &Settings, palette: &Palette) -> Result<Tokens, String>
     };
     value("mode", Token::Text(mode.to_string()));
     value("mode_title", Token::Text(if dark { "Dark" } else { "Light" }.to_string()));
+    // GTK 3's own theme, which the system's is laid over, is a file for each mode
+    value("gtk_base", Token::Text(if dark { "gtk-contained-dark.css" } else { "gtk-contained.css" }.to_string()));
     value("palette", Token::Text(palette.id.clone()));
     value("palette_name", Token::Text(palette.name.clone()));
     let radius = settings.number("shape.radius");

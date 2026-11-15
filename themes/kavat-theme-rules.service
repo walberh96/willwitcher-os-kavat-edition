@@ -1,0 +1,9 @@
+# The rules that wear a profile of the theme by themselves: looked at when the session
+# starts and every five minutes. With no rules file it does nothing.
+[Unit]
+Description=Wear the theme profile the rules ask for
+ConditionPathExists=%h/.config/kavat/theme-rules.toml
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/kavat/theme-rules

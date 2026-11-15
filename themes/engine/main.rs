@@ -247,7 +247,8 @@ fn run(arguments: &[String]) -> Result<(), String> {
         }
         ["tokens"] => {
             let settings = apply::settings(&paths, None)?;
-            for (name, token) in apply::tokens(&paths, &settings)? {
+            // an app's own tokens, kept under its template's name, are not the system's
+            for (name, token) in apply::tokens(&paths, &settings)?.into_iter().filter(|(name, _)| !name.contains('/')) {
                 say(&format!("{name} {}", show(&token)));
             }
             Ok(())

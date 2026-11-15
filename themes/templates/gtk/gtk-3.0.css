@@ -1,5 +1,11 @@
 /* Made by kavat-theme from the theme's settings; what is changed here is lost.
-   The settings are in ~/.config/kavat/theme.toml. */
+   The settings are in ~/.config/kavat/theme.toml.
+
+   This is a whole theme of GTK 3's, Kavat: GTK's own, with the palette over it. An app
+   that is open reads a theme again only when its name changes, so it is kept under two
+   names and the system goes from one to the other at each change. */
+
+@import url("resource:///org/gtk/libgtk/theme/Adwaita/{{ gtk_base }}");
 
 @define-color theme_bg_color {{ surface }};
 @define-color theme_fg_color {{ text }};
@@ -21,3 +27,54 @@
 @define-color warning_color {{ warn }};
 @define-color error_color {{ danger }};
 @define-color success_color {{ ok }};
+
+/* GTK 3's own theme does not read the names above, so what a window is made of is
+   painted here. The browser takes the colours of its bars from these too. */
+window, .background, dialog, messagedialog {
+  background-color: {{ surface }};
+  color: {{ text }};
+}
+headerbar, .titlebar, headerbar:backdrop, .titlebar:backdrop {
+  background-color: {{ bg }};
+  background-image: none;
+  color: {{ text }};
+  border-color: {{ border }};
+  box-shadow: none;
+}
+headerbar:backdrop, .titlebar:backdrop { color: {{ muted }}; }
+label { color: {{ text }}; }
+label:disabled { color: {{ muted }}; }
+entry, .view, textview text, iconview {
+  background-color: {{ surface2 }};
+  background-image: none;
+  color: {{ text }};
+  border-color: {{ border }};
+  caret-color: {{ accent }};
+}
+button {
+  background-color: {{ surface2 }};
+  background-image: none;
+  color: {{ text }};
+  border-color: {{ border }};
+  box-shadow: none;
+  text-shadow: none;
+}
+button:hover { background-color: {{ hover }}; }
+button.suggested-action, button:checked {
+  background-color: {{ accent }};
+  color: {{ on_accent }};
+}
+menubar, menu, .menu, .context-menu, popover, popover.background {
+  background-color: {{ surface }};
+  color: {{ text }};
+  border-color: {{ border }};
+}
+menuitem:hover, menu menuitem:hover { background-color: {{ hover }}; color: {{ text }}; }
+tooltip, tooltip.background { background-color: {{ surface2 }}; color: {{ text }}; border-color: {{ border }}; }
+separator { background-color: {{ border }}; }
+scrollbar slider { background-color: {{ muted }}; }
+selection, *:selected, .view:selected, entry selection, label selection {
+  background-color: {{ accent }};
+  color: {{ on_accent }};
+}
+link, *:link { color: {{ accent_text }}; }

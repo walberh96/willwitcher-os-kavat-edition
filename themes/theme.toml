@@ -32,9 +32,21 @@ style = "colour"       # colour: each app its own colours; tinted: the palette's
 [cursor]
 size = "24"            # 24, 32, 48
 
+# A palette of its own for the terminal or for the editor; "system" is the system's.
+[terminal]
+palette = "system"
+
+[editor]
+palette = "system"
+
 # The mode by the hour: light by day and dark by night, when follow is on. The hours are
-# those of the clock, from 0 to 23.
+# those of the clock, from 0 to 23. With sun on, the day is from sunrise to sunset where
+# the machine is instead, which latitude and longitude say, in degrees: north and east
+# are above zero.
 [auto]
 follow     = false
 light_from = 7
 dark_from  = 19
+sun        = false
+latitude   = 0.0
+longitude  = 0.0

@@ -1,0 +1,9 @@
+[Unit]
+Description=Look at the theme's rules every five minutes
+
+[Timer]
+OnStartupSec=20s
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target

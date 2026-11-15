@@ -1,6 +1,6 @@
 pkgname=kavat-theme
 pkgver=0.1.0
-pkgrel=22
+pkgrel=24
 pkgdesc="Willwitcher-OS Kavat Edition: the theme system, with its palettes and its templates"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -35,5 +35,10 @@ package() {
   install -Dm755 "$startdir/kavat-wallpaper" "$pkgdir/usr/lib/kavat/wallpaper"
   install -Dm755 "$startdir/kavat-theme-auto" "$pkgdir/usr/lib/kavat/theme-auto"
   install -Dm755 "$startdir/kavat-lights" "$pkgdir/usr/lib/kavat/lights"
+  # the rules that wear a profile by themselves, looked at by a timer of every session
+  install -Dm755 "$startdir/kavat-theme-rules" "$pkgdir/usr/lib/kavat/theme-rules"
+  install -Dm644 -t "$pkgdir/usr/lib/systemd/user" "$startdir/kavat-theme-rules.service" "$startdir/kavat-theme-rules.timer"
+  install -d "$pkgdir/usr/lib/systemd/user/timers.target.wants"
+  ln -s ../kavat-theme-rules.timer "$pkgdir/usr/lib/systemd/user/timers.target.wants/kavat-theme-rules.timer"
   chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat"
 }

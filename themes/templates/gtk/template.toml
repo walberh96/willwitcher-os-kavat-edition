@@ -1,7 +1,13 @@
 # GTK apps: their colours, and whether they are asked for their dark or their light side.
 #
-# GTK reads gtk.css from the user's folder, so each file is reached through a link there.
-reload = [["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", "prefer-{{ mode }}"]]
+# GTK 4 reads gtk.css from the user's folder, so that file is reached through a link there.
+# GTK 3 reads its user's file once, when an app starts, so its colours are a theme of their
+# own instead, Kavat, kept under two names: going from one name to the other is what makes
+# an app that is open, the browser among them, read the colours again.
+reload = [
+  ["gsettings", "set", "org.gnome.desktop.interface", "color-scheme", "prefer-{{ mode }}"],
+  ["sh", "-c", "case $(gsettings get org.gnome.desktop.interface gtk-theme) in \"'Kavat'\") next=Kavat-2 ;; *) next=Kavat ;; esac; gsettings set org.gnome.desktop.interface gtk-theme $next"],
+]
 
 [[file]]
 from = "gtk-4.0.css"
@@ -9,4 +15,10 @@ link = "config:gtk-4.0/gtk.css"
 
 [[file]]
 from = "gtk-3.0.css"
-link = "config:gtk-3.0/gtk.css"
+to = "gtk/Kavat/gtk-3.0/gtk.css"
+folder_link = "data:themes/Kavat/gtk-3.0"
+
+[[file]]
+from = "gtk-3.0.css"
+to = "gtk/Kavat-2/gtk-3.0/gtk.css"
+folder_link = "data:themes/Kavat-2/gtk-3.0"

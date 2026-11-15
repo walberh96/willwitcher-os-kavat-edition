@@ -1,0 +1,104 @@
+#!/usr/bin/env python3
+"""Part of kavat-theme: rules that wear a profile of the theme by themselves.
+
+usage: theme-rules          wear the profile the rules ask for now, when it is another than last time
+       theme-rules show     the rules, with a * on the one that holds now
+
+The rules are in ~/.config/kavat/theme-rules.toml, read from the top: the first that holds
+names the profile, one of those `kavat-theme profile save <name>` kept. A rule holds when
+everything it says does:
+
+  [[rule]]
+  profile = "night"
+  from = 21            # the hours of the clock, from 21:00 to 7:00
+  to = 7
+
+  [[rule]]
+  profile = "presenting"
+  display = "Epson"    # a display whose description has this in it is connected
+
+  [[rule]]
+  profile = "saving"
+  battery = true       # the machine runs on its battery
+
+  [[rule]]
+  profile = "work"     # a rule that says nothing always holds: the profile for the rest
+
+A profile is worn only when the rule that holds changes, so a change you make by hand
+stays until then. The session runs this when it starts and every five minutes.
+"""
+import datetime
+import glob
+import json
+import os
+import subprocess
+import sys
+import tomllib
+
+HOME = os.path.expanduser('~')
+FILE = (os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config') + '/kavat/theme-rules.toml'
+LAST = (os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}') + '/kavat-theme-rule'
+
+
+def rules():
+    try:
+        with open(FILE, 'rb') as file:
+            return [rule for rule in tomllib.load(file).get('rule', []) if isinstance(rule, dict) and isinstance(rule.get('profile'), str)]
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+
+
+def displays():
+    for instance in ([], ['--instance', '0']):
+        try:
+            done = subprocess.run(['hyprctl', *instance, 'monitors', '-j'], capture_output=True, text=True, timeout=10, check=False)
+            return [f'{display.get("description", "")} {display.get("name", "")}'.lower() for display in json.loads(done.stdout)]
+        except (OSError, ValueError, subprocess.TimeoutExpired):
+            continue
+    return []
+
+
+def on_battery():
+    """True when there is a battery and no charger feeds the machine."""
+    chargers = [open(path).read().strip() for path in glob.glob('/sys/class/power_supply/*/online')]
+    return bool(glob.glob('/sys/class/power_supply/BAT*')) and chargers != [] and '1' not in chargers
+
+
+def holds(rule, hour, connected, battery):
+    if isinstance(rule.get('from'), int) and isinstance(rule.get('to'), int):
+        start, end = rule['from'], rule['to']
+        if not (start <= hour < end if start < end else hour >= start or hour < end):
+            return False
+    if 'display' in rule and not any(str(rule['display']).lower() in display for display in connected):
+        return False
+    if 'battery' in rule and bool(rule['battery']) != battery:
+        return False
+    return True
+
+
+def main():
+    listed = rules()
+    hour, connected, battery = datetime.datetime.now().hour, displays(), on_battery()
+    held = next((number for number, rule in enumerate(listed) if holds(rule, hour, connected, battery)), None)
+    if sys.argv[1:] == ['show']:
+        for number, rule in enumerate(listed):
+            when = ', '.join(f'{key} {rule[key]}' for key in ('from', 'to', 'display', 'battery') if key in rule) or 'always'
+            print(f'{"*" if number == held else " "} {rule["profile"]}\t{when}')
+        return
+    if held is None:
+        return
+    mark = f'{held} {listed[held]["profile"]}'
+    try:
+        if open(LAST, encoding='utf-8').read() == mark:
+            return
+    except OSError:
+        pass
+    done = subprocess.run(['kavat-theme', 'profile', listed[held]['profile']], capture_output=True, text=True, check=False)
+    if done.returncode != 0:
+        print(f'theme-rules: {done.stderr.strip()}', file=sys.stderr)
+    with open(LAST, 'w', encoding='utf-8') as file:
+        file.write(mark)
+
+
+if __name__ == '__main__':
+    main()
