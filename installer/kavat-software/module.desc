@@ -1,0 +1,6 @@
+# The installer's own step: the programs checked on the Software page. See main.py.
+---
+type: "job"
+name: "kavat-software"
+interface: "python"
+script: "main.py"

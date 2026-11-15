@@ -1,6 +1,6 @@
 pkgname=kavat-installer
 pkgver=0.1.0
-pkgrel=11
+pkgrel=15
 pkgdesc="Willwitcher-OS Kavat Edition: the installer's configuration and looks"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -49,6 +49,7 @@ package() {
   chmod -R u=rwX,go=rX "$pkgdir/etc/calamares/branding"
   install -Dm644 -t "$pkgdir/usr/lib/calamares/modules/luks-keys" "$startdir"/luks-keys/*
   install -Dm644 -t "$pkgdir/usr/lib/calamares/modules/kavat-look" "$startdir"/kavat-look/*
+  install -Dm644 -t "$pkgdir/usr/lib/calamares/modules/kavat-software" "$startdir"/kavat-software/*
   install -Dm755 kavat-installer "$pkgdir/usr/bin/kavat-installer"
   install -Dm755 finish-system "$pkgdir/usr/lib/kavat-installer/finish-system"
   install -Dm755 install-bootloader "$pkgdir/usr/lib/kavat-installer/install-bootloader"

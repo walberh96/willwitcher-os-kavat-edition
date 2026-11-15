@@ -39,7 +39,8 @@ SUBVOLUMES = {'/': '/@', '/home': '/@home', '/games': '/@games', '/var/log': '/@
 # is painted in the accent colour
 NEXT_BUTTON = (1419, 935)  # where the installer's Next is, on a 1920x1080 screen
 LIVE = 'runuser -u live -- env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1'
-STEPS = {'location': 292, 'keyboard': 328, 'partitions': 364, 'users': 400, 'appearance': 436, 'summary': 472}
+STEPS = {'location': 292, 'keyboard': 328, 'partitions': 364, 'users': 400, 'software': 436, 'appearance': 472, 'summary': 508}
+FIRST_PROGRAM = (900, 307)  # the first program of the Software page's first category
 STEP_DOT = 353  # how far across the screen the mark of each step is
 
 
@@ -107,6 +108,12 @@ def install(machine, checks, pictures, encrypt):
     screen.press('tab')
     screen.type(PASSWORD)
     time.sleep(1)
+    # the Software page: one program checked. The machine has no network, so it is left out
+    # and written down, and the installation goes on.
+    shown = shown and next_page(screen, 'software', machine=machine)
+    screen.click(*FIRST_PROGRAM)
+    time.sleep(1)
+    screen.picture(f'{pictures}/install-software.png')
     # the Appearance page, left as it comes: the system's own look
     shown = shown and next_page(screen, 'appearance', machine=machine)
     screen.picture(f'{pictures}/install-appearance.png')
@@ -209,6 +216,9 @@ def check_installed(machine, checks):
     checks.report(output == '644 755', 'what the installer wrote can be read by everyone', output)
     status, output = machine.run('grep -c -E "^(palette = \\"kavat\\"|mode = \\"dark\\"|accent = \\"amber\\")$" /etc/kavat/theme.toml')
     checks.report(output == '3', 'the look chosen on the Appearance page is the settings of the machine', output)
+    status, output = machine.run("tr -d ' \\042' < /etc/kavat/kavat-install.toml | grep -c -E '^(asked|left_out)=\\[firefox\\]$|^installed=\\[\\]$|nonetwork'; "
+                                 'pacman -Qq firefox 2>&1 | grep -c "was not found"')
+    checks.report(output.split() == ['4', '1'], 'what was checked on the Software page could not be downloaded, and is written down for later', output)
 
 
 def boot_with_password(disk, firmware, checks, pictures):
