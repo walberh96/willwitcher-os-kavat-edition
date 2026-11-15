@@ -23,3 +23,4 @@ __pycache__/
 # What cargo builds
 themes/target/
 kav/target/
+packages/kavat-notes/tui/target/

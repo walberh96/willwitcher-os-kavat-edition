@@ -1,12 +1,15 @@
 #!/bin/bash
 # kavat-notes: what the system adds around nb, the notes program.
 #
-# usage: kavat-notes                       look through the notes, in the picker
+# usage: kavat-notes                       the notes, on one screen
 #        kavat-notes quick                 one line to type a note in; Enter saves it to the inbox
 #        kavat-notes add <text>            save that text as a note in the inbox
 #        kavat-notes due                   the tasks and reminders: overdue, today and upcoming
 #        kavat-notes remind <note> <when>  set a reminder on a note: "tomorrow 9:00", "friday 17:00"
 #        kavat-notes remind --off <note>   take the reminder off a note
+#        kavat-notes done <note>           mark a task as done, or as open again
+#        kavat-notes todo <note>           make a note a task, or a task a note again
+#        kavat-notes due <note> <day>      give a task the day it is due: "friday", "2026-12-01"
 #        kavat-notes sync                  set the timers for every reminder written in the notes
 #
 # A note is a Markdown file in ~/Notes, as nb keeps it. A reminder is a line in the note's
@@ -92,19 +95,27 @@ keep() {
 when_in() {
   local -a words
   read -r -a words <<< "$1"
-  local count=${#words[@]} start ending
-  for ((start = 1; start < count; start++)); do
-    ending="${words[*]:start}"
-    # only an ending that names a day or a time: a bare number is not a date
-    [[ ${ending,,} =~ ^(at\ |on\ |next\ |in\ [0-9]+\ (minutes?|hours?|days?|weeks?)|today|tonight|tomorrow|mon|tue|wed|thu|fri|sat|sun|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}:[0-9]{2}) ]] || continue
-    ending=${ending#at }
-    ending=${ending#on }
-    ending=${ending/#tonight/today 21:00}
-    ending=${ending/#in /+}
-    if ending=$(date -d "$ending" '+%Y-%m-%d %H:%M' 2> /dev/null); then
-      printf '%s\t%s\n' "$((count - start))" "$ending"
-      return 0
+  local count=${#words[@]} start ending found now
+  now=$(date '+%Y-%m-%d %H:%M')
+  for ((start = 0; start < count; start++)); do
+    # as date reads it: "at 9" is 9:00, "in 5 min" and "in five minutes" are five minutes
+    # from now; quotes around a time are dropped
+    ending=$(tr '[:upper:]' '[:lower:]' <<< "${words[*]:start}" | tr -d '"“”' | sed -E "s/^'|'\$//g" | sed -E '
+      s/\bhalf an hour\b/30 minutes/; s/\b(an?|one) (minute|hour|day|week)\b/1 \2/
+      s/\btwo\b/2/; s/\bthree\b/3/; s/\bfour\b/4/; s/\bfive\b/5/; s/\bsix\b/6/; s/\bseven\b/7/; s/\beight\b/8/
+      s/\bnine\b/9/; s/\bten\b/10/; s/\beleven\b/11/; s/\btwelve\b/12/; s/\bfifteen\b/15/; s/\btwenty\b/20/
+      s/\bthirty\b/30/; s/\bforty[- ]five\b/45/; s/\bsixty\b/60/
+      s/(^| )at ([0-9]{1,2})$/\1\2:00/; s/ at / /g; s/^(at|on) //
+      s/([0-9]+) ?(mins?|m)\b/\1 minutes/; s/([0-9]+) ?(hrs?|h)\b/\1 hours/; s/^tonight/today 21:00/; s/\bnoon\b/12:00/; s/^in /+/')
+    # only an ending that names a day or a time: a bare number or a plain word is not a date
+    [[ $ending =~ ^(\+[0-9]+\ (minutes?|hours?|days?|weeks?)|next\ |today|tomorrow|mon|tue|wed|thu|fri|sat|sun|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}:[0-9]{2}|[0-9]{1,2}\ ?(am|pm)) ]] || continue
+    found=$(date -d "$ending" '+%Y-%m-%d %H:%M' 2> /dev/null) || continue
+    # an hour alone that has already gone by today is tomorrow's
+    if [[ $ending =~ ^[0-9:\ apm]+$ && ! $found > $now ]]; then
+      found=$(date -d "tomorrow ${found#* }" '+%Y-%m-%d %H:%M')
     fi
+    printf '%s\t%s\n' "$((count - start))" "$found"
+    return 0
   done
   return 1
 }
@@ -122,9 +133,12 @@ add() {
     [[ $when == *" 00:00" ]] && when="${when% *} 09:00"
   fi
   # the tags stay in the note, under its title
-  title=$(sed -E 's/(^| )#[[:alnum:]_-]+//g; s/^ +//; s/ +$//' <<< "$text")
+  title=$(sed -E 's/(^| )#[[:alnum:]_-]+//g; s/^[ "“]+//; s/[ "”]+$//' <<< "$text")
   body=$(grep -oE '(^| )#[[:alnum:]_-]+' <<< "$text" | tr -d ' ' | tr '\n' ' ')
-  [[ -n $title ]] || title="Note of $(date '+%Y-%m-%d %H:%M')"
+  if [[ -z $title ]]; then
+    # a line that was only a time is a reminder with nothing to say
+    [[ -n $when ]] && title="Reminder" || title="Note of $(date '+%Y-%m-%d %H:%M')"
+  fi
   name="$(date '+%Y%m%d%H%M%S').md"
   if [[ -n $when ]]; then
     printf -- '---\nremind: %s\n---\n# [ ] %s\n' "$when" "$title" > "$notes/inbox/${name%.md}.todo.md"
@@ -143,15 +157,16 @@ add() {
 }
 
 quick() {
-  local look text file
+  local look text file said
   look="${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/fzf/options"
   [[ -z ${FZF_DEFAULT_OPTS_FILE:-} && -e $look ]] && export FZF_DEFAULT_OPTS_FILE=$look
   text=$(fzf --print-query --prompt 'Note ❯ ' --no-info --layout reverse --border none \
     --footer $'Enter saves it to the inbox   #tag adds a tag\n"tomorrow 9:00" at the end sets a reminder   Esc leaves' < /dev/null | head -n 1)
   [[ -n ${text// /} ]] || return 0
   if file=$(add "$text" 2> "$fired.said"); then
+    said=$(cat "$fired.said")
     notify-send --app-name Notes --icon accessories-text-editor "Saved to the inbox" \
-      "$(title_of "$file")$(sed 's/^/\n/' "$fired.said")" 2> /dev/null || true
+      "$(title_of "$file")"$'\n'"${said:-No reminder: the line ends in no day or time.}" 2> /dev/null || true
   fi
   rm -f "$fired.said"
 }
@@ -272,6 +287,54 @@ finish() {
   keep "$file" "Done"
 }
 
+# Mark a task as done, or a done one as open again
+toggle_done() {
+  local file
+  file=$(file_of "${1:-}")
+  [[ -n $file && -f $file ]] || { echo "kavat-notes: there is no note called ${1:-}" >&2; return 1; }
+  if grep -q -m 1 '^# \[[xX]\]' "$file"; then
+    sed -i -E '0,/^# \[[xX]\]/s//# [ ]/' "$file"
+    keep "$file" "Open again"
+  else
+    grep -q -m 1 '^# \[ \]' "$file" || sed -i -E '0,/^# /s//# [ ] /' "$file"
+    finish "$file"
+  fi
+  sync_timers
+}
+
+# Make a note a task, by giving its title a box, or take the box away
+toggle_task() {
+  local file
+  file=$(file_of "${1:-}")
+  [[ -n $file && -f $file ]] || { echo "kavat-notes: there is no note called ${1:-}" >&2; return 1; }
+  if grep -q -m 1 '^# \[[ xX]\] ' "$file"; then
+    sed -i -E '0,/^# \[[ xX]\] /s//# /' "$file"
+  else
+    sed -i -E '0,/^# /s//# [ ] /' "$file"
+  fi
+  keep "$file" "Task"
+}
+
+# Write the day a task is due, under its own heading, where nb keeps it
+due_date() {
+  local file day
+  file=$(file_of "${1:-}")
+  [[ -n $file && -f $file ]] || { echo "kavat-notes: there is no note called ${1:-}" >&2; return 1; }
+  day=$(date -d "${*:2}" '+%Y-%m-%d' 2> /dev/null) || {
+    echo "kavat-notes: \"${*:2}\" does not read as a day; try \"friday\" or 2026-12-01" >&2
+    return 1
+  }
+  grep -q -m 1 '^# \[[ xX]\] ' "$file" || sed -i -E '0,/^# /s//# [ ] /' "$file"
+  if grep -q '^## Due' "$file"; then
+    awk -v day="$day" '/^## Due/ { print; print ""; print day; skip = 1; next }
+      skip && /^#/ { skip = 0; print "" } !skip { print }' "$file" > "$file.new" && mv "$file.new" "$file"
+  else
+    printf '\n## Due\n\n%s\n' "$day" >> "$file"
+  fi
+  keep "$file" "Due"
+  echo "$(title_of "$file"): due $(date -d "$day" '+%A %-d %B')"
+}
+
 fire() {
   local file=$1 when unit choice
   [[ -f $file ]] || return 0
@@ -298,7 +361,7 @@ fire() {
 listed() {
   local file
   while IFS= read -r file; do
-    printf '%s\t%s\n' "${file#"$notes"/}" "$(title_of "$file")"
+    printf '%s\t%s\t  \e[2m%s\e[0m\n' "$file" "$(title_of "$file")" "${file#"$notes"/}"
   done < <(find "$notes" -name .git -prune -o -name '.*' -prune -o -type f -name '*.md' -printf '%T@ %p\n' 2> /dev/null | sort -rn | cut -d ' ' -f 2-)
 }
 
@@ -307,14 +370,13 @@ browse() {
   ready
   look="${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/fzf/options"
   [[ -z ${FZF_DEFAULT_OPTS_FILE:-} && -e $look ]] && export FZF_DEFAULT_OPTS_FILE=$look
-  SHELL=/bin/bash fzf --ansi --layout reverse --info inline-right --prompt '❯ ' --delimiter '\t' --with-nth 2,1 \
+  SHELL=/bin/bash fzf --ansi --layout reverse --info inline-right --prompt '❯ ' --delimiter '\t' --with-nth 2,3 \
     --border none --list-border top --list-label ' Notes · newest first ' --list-label-pos 2 \
-    --preview "bat --theme ansi --color always --style plain --language markdown -- '$notes'/{1}" \
-    --preview-window 'right,55%,border-left' \
-    --footer $'↵ open   Ctrl+N a new note with what is typed   Ctrl+D what is due\nCtrl+A all the notes   Esc close' \
+    --preview "$self --preview {1}" --preview-window 'right,55%,border-left' \
+    --footer $'↵ open   Ctrl+N a new note with what is typed\nCtrl+D what is due   Ctrl+A all the notes   Esc close' \
     --bind "start:reload:$self --listed" \
-    --bind "ctrl-a:change-list-label( Notes · newest first )+change-preview(bat --theme ansi --color always --style plain --language markdown -- '$notes'/{1})+reload:$self --listed" \
-    --bind "ctrl-d:change-list-label( Due · overdue, today, upcoming )+change-preview(bat --theme ansi --color always --style plain --language markdown -- {1})+reload:$self --due-listed" \
+    --bind "ctrl-a:change-list-label( Notes · newest first )+reload:$self --listed" \
+    --bind "ctrl-d:change-list-label( Due · overdue, today, upcoming )+reload:$self --due-listed" \
     --bind "ctrl-n:become:$self --new {q}" \
     --bind "enter:become:$self --open {1}"
   local status=$?
@@ -323,29 +385,47 @@ browse() {
 }
 
 case ${1:-} in
-  '') browse ;;
+  '')
+    # the notes' own screen, when it is there and this is a terminal; the picker otherwise
+    if [[ -t 0 && -t 1 ]] && command -v kavat-notes-tui > /dev/null; then exec kavat-notes-tui; fi
+    browse
+    ;;
   quick) quick ;;
   add) shift; add "$@" ;;
-  due) due ;;
+  due)
+    if (($# > 1)); then due_date "${@:2}"; else due; fi
+    ;;
+  done) toggle_done "${2:-}" ;;
+  todo) toggle_task "${2:-}" ;;
+  browse) browse ;;
   remind) shift; remind "$@" ;;
   sync) sync_timers ;;
   fire) fire "${2:-}" ;;
   --listed) listed ;;
   --due-listed)
-    dated | while IFS=$'\t' read -r when kind file; do
-      printf '%s\t%s  %s\n' "$file" "$(date -d "$when" '+%a %-d %b %H:%M')" "$(title_of "$file")"
-    done
+    found=$(dated)
+    if [[ -z $found ]]; then
+      # a line that is no note: Enter on it does nothing
+      printf '\tNothing is due.\t  \e[2mA day or a time at the end of a quick note sets a reminder: "call the bank tomorrow 9:00"\e[0m\n'
+    else
+      while IFS=$'\t' read -r when kind file; do
+        printf '%s\t%s  %s\t  \e[2m%s\e[0m\n' "$file" "$(date -d "$when" '+%a %-d %b %H:%M')" "$(title_of "$file")" "${file#"$notes"/}"
+      done <<< "$found"
+    fi
+    ;;
+  --preview)
+    [[ -f ${2:-} ]] && exec bat --theme ansi --color always --style plain --language markdown -- "$2"
     ;;
   --open)
-    file=$2
-    [[ $file == /* ]] || file="$notes/$file"
+    file=${2:-}
+    [[ -f $file ]] || exit 0
     exec "${EDITOR:-nvim}" "$file"
     ;;
   --new)
     file=$(add "${@:2}") && exec "${EDITOR:-nvim}" "$file"
     ;;
   *)
-    sed -n '2,19s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,22s/^# \{0,1\}//p' "$0" >&2
     exit 2
     ;;
 esac

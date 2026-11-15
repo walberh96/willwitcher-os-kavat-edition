@@ -5,9 +5,18 @@ local M = {}
 M.dir = vim.env.KAVAT_NVIM_DIR or "/usr/share/kavat/nvim"
 
 --- Set Neovim up the system's way.
---- @param opts? { start_typing?: boolean, format_on_save?: boolean }
+--- @param opts? { start_typing?: boolean, format_on_save?: boolean, relative_numbers?: boolean, wrap?: boolean, indent?: number }
 function M.setup(opts)
     opts = opts or {}
+    -- what the Editor page of the settings wrote, under what is said here in the call
+    local file = io.open((vim.env.XDG_CONFIG_HOME or (vim.env.HOME .. "/.config")) .. "/kavat/editor.json")
+    if file then
+        local read, values = pcall(vim.json.decode, file:read("a"))
+        file:close()
+        if read and type(values) == "table" then
+            opts = vim.tbl_extend("keep", opts, values)
+        end
+    end
     vim.g.mapleader = " "
     vim.g.maplocalleader = " "
     if opts.format_on_save ~= nil then
@@ -15,6 +24,16 @@ function M.setup(opts)
     end
 
     require("kavat.options")
+    if opts.relative_numbers ~= nil then
+        vim.opt.relativenumber = opts.relative_numbers
+    end
+    if opts.wrap ~= nil then
+        vim.opt.wrap = opts.wrap
+    end
+    if type(opts.indent) == "number" then
+        vim.opt.shiftwidth = opts.indent
+        vim.opt.tabstop = opts.indent
+    end
     require("kavat.plugins").setup(M.dir)
     require("kavat.keys")
     require("kavat.notes").setup()

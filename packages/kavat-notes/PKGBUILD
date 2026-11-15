@@ -1,14 +1,17 @@
 pkgname=kavat-notes
 pkgver=7.25.6
-pkgrel=1
+pkgrel=5
 pkgdesc="Willwitcher-OS Kavat Edition: notes in Markdown, on a fork of nb, with reminders and a quick note"
-arch=('any')
+arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 # nb's license, which the fork keeps
 license=('AGPL-3.0-or-later')
 # nb is one Bash script that keeps each notebook in git; the picker and what draws its
 # preview; the notifications of the reminders; and the editor notes open in
-depends=('bash' 'git' 'fzf' 'bat' 'libnotify' 'systemd' 'neovim' 'kitty')
+depends=('bash' 'git' 'fzf' 'bat' 'libnotify' 'systemd' 'neovim' 'kitty' 'gcc-libs')
+# the notes' own screen is a Rust program
+makedepends=('cargo')
+options=('!debug')
 provides=("nb=$pkgver")
 conflicts=('nb')
 source=("nb-$pkgver.tar.gz::https://github.com/xwmx/nb/archive/refs/tags/$pkgver.tar.gz"
@@ -24,7 +27,19 @@ prepare() {
   patch -p1 < "$srcdir/kavat.patch"
 }
 
+# The screen is built where it is, from the versions its Cargo.lock fixes.
+build() {
+  cd "$startdir/tui"
+  CARGO_HOME="$srcdir/cargo" CARGO_TARGET_DIR="$srcdir/target" cargo build --release --locked
+}
+
+check() {
+  cd "$startdir/tui"
+  CARGO_HOME="$srcdir/cargo" CARGO_TARGET_DIR="$srcdir/target" cargo test --release --locked
+}
+
 package() {
+  install -Dm755 "$srcdir/target/release/kavat-notes-tui" "$pkgdir/usr/bin/kavat-notes-tui"
   cd "nb-$pkgver"
   install -Dm755 nb "$pkgdir/usr/bin/nb"
   install -Dm644 etc/nb-completion.bash "$pkgdir/usr/share/bash-completion/completions/nb"

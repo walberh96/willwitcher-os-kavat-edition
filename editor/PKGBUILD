@@ -1,6 +1,6 @@
 pkgname=kavat-nvim
 pkgver=0.1.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Willwitcher-OS Kavat Edition: Neovim set up, with VS Code-style shortcuts and its plugins inside"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
