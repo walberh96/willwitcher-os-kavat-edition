@@ -1,0 +1,10 @@
+# snapper's list of configurations is a file of another package.
+post_install() {
+  if ! grep -q '^SNAPPER_CONFIGS=.*\<home\>' etc/conf.d/snapper; then
+    sed -i 's/^SNAPPER_CONFIGS="\(.*\)"$/SNAPPER_CONFIGS="\1 home"/; s/^SNAPPER_CONFIGS=" home"$/SNAPPER_CONFIGS="home"/' etc/conf.d/snapper
+  fi
+}
+
+post_upgrade() {
+  post_install
+}

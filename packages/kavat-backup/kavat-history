@@ -1,0 +1,147 @@
+#!/bin/bash
+# kavat-history: every change of your settings, kept, so that any of them can be undone.
+#
+# usage: kavat-history save [what was done]   keep the settings as they are now, when they changed
+#        kavat-history list [n]               the last changes: its mark, when, and what was done
+#        kavat-history show <mark>            what a change changed
+#        kavat-history undo                   take the last change back
+#        kavat-history back <mark>            put the settings as they were after that change
+#        kavat-history browse                 the changes in the system's picker; Enter goes back to one
+#        kavat-history export [file]          the settings as one file, to carry to another machine
+#        kavat-history import <file>          wear the settings of such a file
+#        kavat-history remote [address]       where the history is sent: a private git repository
+#        kavat-history push                   send it there
+#        kavat-history clone <address>        on a new machine: bring the history from there and wear it
+#
+# The history is a git repository of its own, ~/.local/share/kavat/history.git, that keeps
+# the files of your settings where they are, in your home folder: the system's own, and
+# those of Hyprland, the shell, Kitty, Yazi, Neovim, btop, fastfetch and zsh. Keys and
+# passwords are not settings and are left out. Changing back writes the files and tells
+# the theme and Hyprland to read them again.
+set -u
+store="${XDG_DATA_HOME:-$HOME/.local/share}/kavat/history.git"
+# what is a setting, from the home folder
+kept=(.config/kavat .config/hypr .config/kavat-shell .config/kitty .config/yazi .config/nvim .config/btop
+      .config/fastfetch .config/starship.toml .config/udiskie .config/systemd/user .zshrc)
+g() { git --git-dir="$store" --work-tree="$HOME" "$@"; }
+
+start() {
+  [[ -d $store ]] && return
+  mkdir -p "$(dirname "$store")"
+  git init --quiet --bare --initial-branch=main "$store"
+  g config user.name "$(id -un)"
+  g config user.email "$(id -un)@$(cat /etc/hostname 2> /dev/null || echo kavat)"
+  g config core.bare false
+  g config status.showUntrackedFiles no
+  # never in the history: what opens something
+  printf '%s\n' '.config/kavat/backup.key' '*.key' '*.pem' '*secret*' '*token*' '*.sock' > "$store/info/exclude"
+}
+
+save() {
+  start
+  local here=()
+  for path in "${kept[@]}"; do [[ -e $HOME/$path || -L $HOME/$path ]] && here+=("$path"); done
+  ((${#here[@]})) && g add --all -- "${here[@]}" 2> /dev/null
+  # what was kept before and is gone now
+  g ls-files -z --deleted | xargs -0 -r git --git-dir="$store" --work-tree="$HOME" rm --quiet --cached -- 2> /dev/null
+  g diff --cached --quiet && return 1
+  g commit --quiet -m "${1:-Changed by hand}"
+}
+
+# after files were put back: the programs that read them at a change read them again
+wear() {
+  kavat-theme apply > /dev/null 2>&1
+  { hyprctl reload || hyprctl --instance 0 reload; } > /dev/null 2>&1
+  kavat-shell msg config-reload > /dev/null 2>&1
+  return 0
+}
+
+case "${1:-}" in
+  save)
+    save "${2:-}" && echo "kavat-history: kept." || echo "kavat-history: nothing changed."
+    ;;
+  list)
+    start
+    g log --max-count="${2:-20}" --date=format:'%a %d %b %H:%M' --pretty='%h%x09%ad%x09%s' 2> /dev/null
+    ;;
+  show)
+    [[ -n ${2:-} ]] || { echo "kavat-history: show which change? \`kavat-history list\` has their marks." >&2; exit 2; }
+    g show --stat --patch --format='%s%n%ad%n' --date=format:'%A %d %B %Y, %H:%M' "$2" --
+    ;;
+  undo)
+    start
+    save "Changed by hand" > /dev/null
+    # each undo goes one change further back: the ones already undone are stepped over
+    undone=0
+    while [[ $(g log --max-count=1 --skip=$undone --pretty=%s 2> /dev/null) == "Undone: "* ]]; do undone=$((undone + 1)); done
+    last=$(g log --max-count=1 --skip=$((2 * undone)) --pretty=%s 2> /dev/null)
+    before=$(g rev-parse --quiet --verify "HEAD~$((2 * undone + 1))") || { echo "kavat-history: there is nothing before the first change." >&2; exit 1; }
+    g read-tree -u --reset "$before" && g commit --quiet --allow-empty -m "Undone: $last"
+    wear
+    echo "kavat-history: undone: $last"
+    ;;
+  back)
+    start
+    [[ -n ${2:-} ]] && g cat-file -e "$2^{commit}" 2> /dev/null || { echo "kavat-history: there is no change with that mark." >&2; exit 2; }
+    save "Changed by hand" > /dev/null
+    what=$(g log --max-count=1 --pretty='%s, %ad' --date=format:'%d %b %H:%M' "$2")
+    # the files as they were then: what came later is taken away, what was there is put back
+    g read-tree -u --reset "$2" && g commit --quiet --allow-empty -m "Back to: $what"
+    wear
+    echo "kavat-history: back to: $what"
+    ;;
+  browse)
+    start
+    chosen=$("$0" list 200 | fzf --delimiter '\t' --with-nth 2,3 --no-sort --reverse --border --border-label ' The history of your settings ' \
+      --header 'Enter  put the settings back as they were after it      Esc  leave' \
+      --preview "$0 show {1} | bat --language diff --style plain --color always 2> /dev/null || $0 show {1}" --preview-window 'right,62%') || exit 0
+    "$0" back "$(cut -f1 <<< "$chosen")"
+    read -r -n 1 -s -p 'Any key closes.'
+    ;;
+  export)
+    start
+    save "Changed by hand" > /dev/null
+    file=${2:-$HOME/kavat-settings-$(date +%Y-%m-%d).tar.gz}
+    g archive --format=tar.gz --output="$file" HEAD && echo "$file"
+    ;;
+  import)
+    [[ -f ${2:-} ]] || { echo "kavat-history: import which file?" >&2; exit 2; }
+    start
+    save "Changed by hand" > /dev/null
+    tar -xzf "$2" -C "$HOME" && save "Imported from $(basename "$2")" > /dev/null
+    wear
+    echo "kavat-history: the settings of $(basename "$2") are worn."
+    ;;
+  remote)
+    start
+    if [[ -z ${2:-} ]]; then
+      g remote get-url origin 2> /dev/null
+    else
+      g remote remove origin 2> /dev/null
+      g remote add origin "$2"
+    fi
+    ;;
+  push)
+    start
+    save "Changed by hand" > /dev/null
+    g remote get-url origin > /dev/null 2>&1 || { echo "kavat-history: no place to send it to: \`kavat-history remote <address>\`." >&2; exit 1; }
+    g push --quiet --set-upstream origin main && echo "kavat-history: sent to $(g remote get-url origin)."
+    ;;
+  clone)
+    [[ -n ${2:-} ]] || { echo "kavat-history: clone from which address?" >&2; exit 2; }
+    start
+    save "Before bringing the history from $2" > /dev/null
+    g remote remove origin 2> /dev/null
+    g remote add origin "$2"
+    g fetch --quiet origin main || exit 1
+    # this machine's settings from before are kept aside, in a branch of their own
+    g branch --force before-clone HEAD 2> /dev/null
+    g reset --quiet --hard origin/main || exit 1
+    wear
+    echo "kavat-history: the settings from $2 are worn."
+    ;;
+  *)
+    sed -n '2,/^set -u/{/^set -u/d;s/^# \{0,1\}//;p}' "$0"
+    exit 2
+    ;;
+esac

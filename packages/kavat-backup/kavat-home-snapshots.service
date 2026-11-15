@@ -1,0 +1,15 @@
+# Part of kavat-backup: makes the place the snapshots of /home are kept in, the first time.
+[Unit]
+Description=The place for the snapshots of the home folders
+ConditionPathExists=!/home/.snapshots
+ConditionPathIsMountPoint=/home
+Before=snapper-timeline.timer
+
+[Service]
+Type=oneshot
+ExecCondition=/usr/bin/sh -c '[ "$(findmnt -n -o FSTYPE /home)" = btrfs ]'
+ExecStart=/usr/bin/btrfs subvolume create /home/.snapshots
+ExecStart=/usr/bin/chmod 750 /home/.snapshots
+
+[Install]
+WantedBy=multi-user.target

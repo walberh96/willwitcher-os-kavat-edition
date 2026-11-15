@@ -1,0 +1,27 @@
+# What keeps your work safe: snapshots of the home folders every hour, the history of your
+# settings, and encrypted copies off the computer.
+pkgname=kavat-backup
+pkgver=0.1.0
+pkgrel=2
+pkgdesc="Willwitcher-OS Kavat Edition: hourly snapshots of /home, the history of the settings, and backups off the computer"
+arch=('any')
+url="https://github.com/walberh96/willwitcher-os-kavat-edition"
+license=('LicenseRef-AllRightsReserved')
+depends=('snapper' 'btrfs-progs' 'git' 'restic' 'fzf' 'bat' 'yazi' 'libnotify' 'openssh')
+backup=('etc/snapper/configs/home')
+install=kavat-backup.install
+source=(snapper-home.conf kavat-home-snapshots.service previous-versions kavat-history kavat-backup
+        kavat-history.service kavat-history.timer)
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  install -Dm640 snapper-home.conf "$pkgdir/etc/snapper/configs/home"
+  install -Dm644 kavat-home-snapshots.service "$pkgdir/usr/lib/systemd/system/kavat-home-snapshots.service"
+  install -Dm755 previous-versions "$pkgdir/usr/lib/kavat/previous-versions"
+  install -Dm755 kavat-history "$pkgdir/usr/bin/kavat-history"
+  install -Dm755 kavat-backup "$pkgdir/usr/bin/kavat-backup"
+  install -Dm644 -t "$pkgdir/usr/lib/systemd/user" kavat-history.service kavat-history.timer
+  # the history keeps itself for every user
+  install -d "$pkgdir/usr/lib/systemd/user/timers.target.wants"
+  ln -s ../kavat-history.timer "$pkgdir/usr/lib/systemd/user/timers.target.wants/kavat-history.timer"
+}

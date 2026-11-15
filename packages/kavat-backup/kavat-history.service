@@ -1,0 +1,8 @@
+# Part of kavat-backup: keeps the settings as they are, when something changed them.
+[Unit]
+Description=Keep the settings in their history
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/kavat-history save
+SuccessExitStatus=1

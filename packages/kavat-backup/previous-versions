@@ -1,0 +1,75 @@
+#!/bin/bash
+# Part of kavat-backup: the previous versions of a file or a folder, from the snapshots of
+# /home, in the system's picker. Yazi runs it for what is under the cursor, with V.
+#
+#   Enter    go to that version, in a new tab of Yazi: from there it is copied back
+#   Ctrl+R   put that version back beside the one of now, under a name with its date
+#
+# With --list before the path it only prints the versions, one to a line.
+#
+# It calls itself for its preview.
+set -u
+store=/home/.snapshots
+
+if [[ ${1:-} == --preview ]]; then
+  old=$2 now=$3
+  if [[ -d $old ]]; then
+    ls -la --color=always "$old"
+  elif [[ -e $now ]] && ! cmp -s "$old" "$now"; then
+    diff -u --label "then" --label "now" "$old" "$now" | bat --language diff --style plain --color always 2> /dev/null || diff -u "$old" "$now"
+  else
+    bat --style plain --color always "$old" 2> /dev/null || cat "$old"
+  fi
+  exit 0
+fi
+
+# --list: the versions as lines, with no picker, for a script
+listing=no
+[[ ${1:-} == --list ]] && listing=yes && shift
+target=$(realpath -s -- "${1:-$PWD}")
+if [[ $target != /home/* ]]; then
+  echo "Only what is under /home has previous versions."; read -r -n 1 -s; exit 0
+fi
+if ! ls "$store" > /dev/null 2>&1; then
+  echo "There are no snapshots of /home to look in yet: the first is taken within the hour."; read -r -n 1 -s; exit 0
+fi
+inside=${target#/home/}
+
+# each snapshot that has it, the newest first: its number, when, and whether it is as now
+versions=$(
+  for snapshot in $(ls "$store" | sort -rn); do
+    old="$store/$snapshot/snapshot/$inside"
+    [[ -e $old ]] || continue
+    when=$(sed -n 's:.*<date>\(.*\)</date>.*:\1:p' "$store/$snapshot/info.xml" 2> /dev/null)
+    when=$(date -d "$when UTC" '+%a %d %b %H:%M' 2> /dev/null || echo "$when")
+    if [[ ! -e $target ]]; then state="gone now"
+    elif [[ -d $old ]]; then state="folder"
+    elif cmp -s "$old" "$target"; then state="same as now"
+    else state="different"; fi
+    printf '%s\t%s\t%s\n' "$snapshot" "$when" "$state"
+  done
+)
+if [[ $listing == yes ]]; then
+  [[ -n $versions ]] && printf '%s\n' "$versions"
+  exit 0
+fi
+if [[ -z $versions ]]; then
+  echo "No snapshot has $(basename "$target")."; read -r -n 1 -s; exit 0
+fi
+
+chosen=$(fzf --delimiter '\t' --with-nth 2,3 --no-sort --reverse --border --border-label " Previous versions of ${target/#$HOME/\~} " \
+  --header 'Enter  go to it in Yazi      Ctrl+R  put it back beside the one of now' \
+  --preview "$0 --preview $(printf %q "$store")/{1}/snapshot/$(printf %q "$inside") $(printf %q "$target")" --preview-window 'right,60%' \
+  --expect ctrl-r <<< "$versions") || exit 0
+key=$(head -n 1 <<< "$chosen")
+snapshot=$(tail -n 1 <<< "$chosen" | cut -f1)
+when=$(tail -n 1 <<< "$chosen" | cut -f2)
+old="$store/$snapshot/snapshot/$inside"
+if [[ $key == ctrl-r ]]; then
+  stamp=$(date -d "$(sed -n 's:.*<date>\(.*\)</date>.*:\1:p' "$store/$snapshot/info.xml") UTC" '+%Y-%m-%d-%H%M')
+  name=$(basename "$target")
+  if [[ $name == ?*.* && ! -d $old ]]; then copy="$(dirname "$target")/${name%.*}.$stamp.${name##*.}"; else copy="$target.$stamp"; fi
+  cp -a --reflink=auto -T -- "$old" "$copy" && ya emit reveal "$copy" 2> /dev/null
+else
+  ya emit tab_create "$(dirname "$old")" 2> /dev/null && ya emit reveal "$old" 2> /dev/null
+fi

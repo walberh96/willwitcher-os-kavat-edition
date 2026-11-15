@@ -1,0 +1,10 @@
+# Part of kavat-backup: a change made by hand is in the history within ten minutes.
+[Unit]
+Description=Keep the settings in their history, every ten minutes
+
+[Timer]
+OnStartupSec=2min
+OnUnitActiveSec=10min
+
+[Install]
+WantedBy=timers.target

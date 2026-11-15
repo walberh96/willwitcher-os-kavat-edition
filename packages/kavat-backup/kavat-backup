@@ -1,0 +1,107 @@
+#!/bin/bash
+# kavat-backup: a copy of your home folder off the computer, encrypted.
+#
+# usage: kavat-backup                      where the copies go, when the last one was made and how it went
+#        kavat-backup to <place>           choose the place: a folder of an external disk, or sftp:user@host:/folder
+#        kavat-backup run                  make a copy now
+#        kavat-backup every <daily|weekly|never>   make them by themselves
+#        kavat-backup list                 the copies there are
+#        kavat-backup restore <copy> <file or folder> [where to]
+#                                          bring something back from a copy; `latest` is the last one
+#        kavat-backup key                  the key the copies are encrypted with: keep it somewhere else too
+#
+# The copies are made by restic: only what changed since the last one is sent, and nothing
+# can be read at the place without the key. The key is made the first time and kept in
+# ~/.config/kavat/backup.key; without it the copies cannot be opened, so write it down
+# off this machine. Caches, the trash and the Steam library are left out. The last week of
+# daily copies, a month of weekly ones and half a year of monthly ones are kept.
+set -u
+config="${XDG_CONFIG_HOME:-$HOME/.config}/kavat"
+state="${XDG_STATE_HOME:-$HOME/.local/state}/kavat/backup"
+units="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+key="$config/backup.key"
+place=$(cat "$config/backup.place" 2> /dev/null)
+export RESTIC_PASSWORD_FILE="$key" RESTIC_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/restic"
+
+need_place() {
+  [[ -n $place ]] || { echo "kavat-backup: no place is chosen for the copies: \`kavat-backup to <place>\`." >&2; exit 1; }
+  export RESTIC_REPOSITORY="$place"
+}
+
+say() { mkdir -p "$state"; printf '%s\t%s\n' "$(date '+%Y-%m-%d %H:%M')" "$1" > "$state/last"; }
+
+case "${1:-}" in
+  '')
+    echo "place: ${place:-none}"
+    echo "every: $(systemctl --user is-enabled kavat-backup.timer > /dev/null 2>&1 && sed -n 's/^OnCalendar=//p' "$units/kavat-backup.timer" || echo never)"
+    echo "last: $(cat "$state/last" 2> /dev/null | tr '\t' ' ' || true)"
+    ;;
+  to)
+    [[ -n ${2:-} ]] || { echo "kavat-backup: to which place?" >&2; exit 2; }
+    mkdir -p "$config"
+    if [[ ! -s $key ]]; then
+      (umask 077; head -c 24 /dev/urandom | base64 | tr -d '\n=+/' | cut -c1-28 > "$key")
+      echo "kavat-backup: a key was made, in $key. Keep a copy of it off this machine: \`kavat-backup key\` shows it."
+    fi
+    export RESTIC_REPOSITORY="$2"
+    # a place that already holds copies made with this key is used as it is
+    if ! restic cat config > /dev/null 2>&1; then
+      restic init > /dev/null || { echo "kavat-backup: $2 could not be made ready for copies." >&2; exit 1; }
+    fi
+    printf '%s\n' "$2" > "$config/backup.place"
+    echo "kavat-backup: the copies go to $2."
+    ;;
+  run)
+    need_place
+    if restic backup "$HOME" --quiet --one-file-system --exclude-caches \
+        --exclude "$HOME/.cache" --exclude "$HOME/.local/share/Trash" --exclude "$HOME/.local/share/Steam" \
+        --exclude "$HOME/.local/state/kavat/theme" --exclude '/home/*/.snapshots' \
+      && restic forget --quiet --keep-daily 7 --keep-weekly 4 --keep-monthly 6 --prune; then
+      say "done"
+      echo "kavat-backup: a copy was made in $place."
+    else
+      say "failed"
+      notify-send --app-name Backup --urgency critical 'The backup failed' "No copy could be made in $place. \`kavat-backup run\` in a terminal says why." 2> /dev/null
+      echo "kavat-backup: the copy failed." >&2
+      exit 1
+    fi
+    ;;
+  every)
+    case "${2:-}" in
+      daily | weekly)
+        mkdir -p "$units"
+        printf '%s\n' '# Written by kavat-backup: a copy of the home folder off the computer.' '[Unit]' 'Description=A backup of the home folder' \
+          '' '[Service]' 'Type=oneshot' 'ExecStart=/usr/bin/kavat-backup run' > "$units/kavat-backup.service"
+        printf '%s\n' '# Written by kavat-backup: when the copies are made by themselves.' '[Unit]' 'Description=Backups of the home folder' \
+          '' '[Timer]' "OnCalendar=$2" 'Persistent=true' 'RandomizedDelaySec=15min' '' '[Install]' 'WantedBy=timers.target' > "$units/kavat-backup.timer"
+        systemctl --user daemon-reload
+        systemctl --user enable --now --quiet kavat-backup.timer
+        ;;
+      never)
+        systemctl --user disable --now --quiet kavat-backup.timer 2> /dev/null
+        rm -f "$units/kavat-backup.timer" "$units/kavat-backup.service"
+        systemctl --user daemon-reload
+        ;;
+      *) echo "kavat-backup: every takes daily, weekly or never" >&2; exit 2 ;;
+    esac
+    ;;
+  list)
+    need_place
+    restic snapshots
+    ;;
+  restore)
+    need_place
+    [[ -n ${2:-} && -n ${3:-} ]] || { echo "kavat-backup: restore <copy> <file or folder> [where to]" >&2; exit 2; }
+    wanted=$(realpath -m -s -- "$3")
+    where=${4:-$HOME/Restored}
+    mkdir -p "$where"
+    restic restore "$2" --target "$where" --include "$wanted" && echo "kavat-backup: it is in $where$wanted."
+    ;;
+  key)
+    [[ -s $key ]] && cat "$key" || { echo "kavat-backup: there is no key yet: it is made when a place is chosen." >&2; exit 1; }
+    ;;
+  *)
+    sed -n '2,/^set -u/{/^set -u/d;s/^# \{0,1\}//;p}' "$0"
+    exit 2
+    ;;
+esac
