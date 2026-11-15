@@ -13,6 +13,12 @@ which marks its dangerous line; once it is approved, kav builds only the commit 
 approved, and refuses when the AUR does not have it. Then a package is removed with kav and
 brought back with kav undo. This is the other half of the gate of phase 3.
 
+Around those: the settings kav changes, each in the file of the tool that uses it; the
+filters of the lists; a package of the AUR that is held back; migrations, with made-up
+scripts, one of which fails; a file that no package owns in the way of a made-up package,
+which is moved aside; an item of the news gone through with a person, who is a terminal
+that is not there; and the snapshots of a change, compared, pinned and deleted.
+
 A system that was just installed has not fetched pacman's lists of packages, and kav has
 to say so. The test then gives the machine the lists of the day the system was built from,
 which tools/build-repo.sh leaves in its chroot.
@@ -33,6 +39,7 @@ PACKAGE = 'os-prober'  # removed and brought back; nothing else needs it
 AUR = '/var/tmp/aur'  # the folder that stands in for the AUR
 FAKE = 'kavat-made-up'  # a package that is only there
 NOWHERE = 'kavat-not-anywhere'  # and one that is nowhere
+NEEDS = 'kavat-needs-another'  # one more that is only there, and needs the first to be built
 # what the made-up package says; its second line is one a reviewer has to see
 PKGBUILD = r'''pkgname=kavat-made-up
 pkgver=1
@@ -66,9 +73,13 @@ def watch(seconds):
             except OSError:
                 return
 watch(4)
-for key in keys:
-    os.write(fd, key.replace("ENTER", "\r").encode())
+for number, key in enumerate(keys):
+    os.write(fd, key.replace("ENTER", "\r").replace("ESC", "\x1b").encode())
     watch(1.5)
+    # the screen only writes what changed, which can leave a word in pieces: another size
+    # of the window makes it write everything again
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 31 + number % 2, 110, 0, 0))
+    watch(0.8)
 text = re.sub(rb"\x1b\[[0-9;?]*[A-Za-z]", b" ", drawn).decode("utf-8", "replace")
 for _ in range(2):  # the first closes what is open over the screen, the second leaves
     try:
@@ -79,6 +90,24 @@ for _ in range(2):  # the first closes what is open over the screen, the second 
 print("missing:", ",".join(word for word in words if word not in text))
 print("ended:", os.waitstatus_to_exitcode(os.waitpid(pid, 0)[1]))
 '''
+# A package that is only a file of settings, made by hand: pacman takes it from a
+# repository that is a folder of the machine.
+WAY = 'kavat-in-the-way'
+ITS_FILE = '/usr/share/kavat-in-the-way/settings'
+PKGINFO = f'''pkgname = {WAY}
+pkgbase = {WAY}
+pkgver = 1-1
+pkgdesc = made up for the test
+url = https://example.org
+builddate = 1763200000
+packager = tester
+size = 7
+arch = any
+'''
+# an item of the news that asks for hands, and names one command
+GUIDED = ('<item><title>made-up needs manual intervention</title><link>https://archlinux.org/news/made-up/</link>'
+          '<description>&lt;p&gt;Before the update, run:&lt;/p&gt;&lt;pre&gt;&lt;code&gt;touch /var/tmp/guided&lt;/code&gt;&lt;/pre&gt;</description>'
+          '<pubDate>Sun, 15 Nov 2026 10:00:00 +0000</pubDate></item>')
 # kav as a normal user, pointed at the folder that stands in for the AUR
 AS_USER = f'runuser -u {USER} -- env HOME=/home/{USER} KAV_AUR=file://{AUR} '
 
@@ -120,6 +149,18 @@ def main():
         checks.report(output.split() == ['1', '1'], 'kav info and kav search find it', output)
         status, output = machine.run('kav list --aur')
         checks.report(status == 0 and 'The reviewed list is empty' in output, 'the reviewed list starts empty', output)
+
+        # the filters: what is installed, what was asked for by name, and what nothing needs
+        status, output = machine.run(f'kav list --installed | wc -l; pacman -Qq | wc -l; kav list --explicit | wc -l; pacman -Qeq | wc -l; '
+                                     f'kav list --explicit | grep -c "^{PACKAGE} "; kav list --orphans | grep -c "^{PACKAGE} "; '
+                                     f'pacman -D --asdeps {PACKAGE} > /dev/null; kav list --orphans | grep -c -v "^kav:"; pacman -Qdtq | wc -l; pacman -D --asexplicit {PACKAGE} > /dev/null')
+        lines = output.split()
+        # what nothing needs is what pacman says nothing needs: a package another one offers to use is not among them
+        checks.report(len(lines) == 8 and lines[0] == lines[1] and lines[2] == lines[3] and lines[4:6] == ['1', '0'] and lines[6] == lines[7],
+                      'kav list shows what is installed, what was asked for by name and what nothing needs', output)
+        status, output = machine.run('kav update --list')
+        checks.report(status == 0 and 'Nothing waits to be brought up to date.' in output,
+                      'kav update --list says what an update would bring, which is nothing', output)
 
         # the AUR, in a folder: one package with two commits, the second with a line to stop at
         machine.run(f"install -d -o {USER} {AUR} && cat > /var/tmp/PKGBUILD << 'END'\n{PKGBUILD}END")
@@ -164,11 +205,39 @@ def main():
         checks.report('at the commit reviewed on' in output and 'curl' not in output.split('at the commit reviewed on')[-1],
                       'what it takes to build is the approved commit, not the newest', output)
 
+        # a package of the AUR that needs another: its first commit also needs one that nobody approved
+        make = (f'cd {AUR} && git init -q --initial-branch=master {NEEDS}.git && cd {NEEDS}.git && '
+                'git config user.name tester && git config user.email tester@kavat && '
+                f"echo pkgname={NEEDS} > PKGBUILD && printf 'pkgbase = {NEEDS}\\n\\tdepends = glibc\\n\\tdepends = {FAKE}>=1\\n\\tmakedepends = {NOWHERE}\\n' > .SRCINFO && "
+                'git add PKGBUILD .SRCINFO && git commit -q -m first && git rev-parse HEAD && '
+                f'sed -i /{NOWHERE}/d .SRCINFO && git commit -q -a -m second && git rev-parse HEAD')
+        status, output = machine.run(f'runuser -u {USER} -- sh -c "{make}"')
+        commits = output.split()
+        if checks.report(status == 0 and len(commits) == 2, 'a second package in the folder needs the first', output):
+            status, output = machine.run(f'kav pin {NEEDS} {commits[0]} "needs another" && cd /var/tmp && {AS_USER} kav install {NEEDS} 2>&1')
+            checks.report(status != 0 and f'{NEEDS} needs {NOWHERE}, which is not in Arch' in output and f'kav request {NOWHERE}' in output,
+                          'a package of the AUR that needs one that is not approved is refused, by the name of what it needs', output)
+            status, output = machine.run(f'kav pin {NEEDS} {commits[1]} "needs another" && cd /var/tmp && {AS_USER} kav install {NEEDS} 2>&1')
+            checks.report(f'also from the AUR, because the above need them, each one reviewed by itself: {FAKE}' in output,
+                          'what it needs from the AUR is built before it, when that is approved too', output)
+
+        # only a package of the AUR can be held back; one that is, is written in kav's own file
+        status, output = machine.run(f'kav hold {PACKAGE} 2>&1 | head -n 1; kav hold {FAKE} && grep -c \'^hold = \\["{FAKE}"\\]\' /etc/kav/kav.toml; '
+                                     f'kav unhold {FAKE} && grep -c "^hold = \\[\\]" /etc/kav/kav.toml')
+        lines = output.splitlines()
+        checks.report(len(lines) == 5 and 'is not a package of the AUR' in lines[0] and lines[2] == '1' and lines[4] == '1',
+                      'kav hold keeps a package of the AUR as it is, and refuses one of Arch\'s', output)
+
         machine.run(f"cat > /var/tmp/screen.py << 'END'\n{SCREEN}END\nchmod 644 /var/tmp/screen.py")
         status, output = machine.run(f'{AS_USER} python3 /var/tmp/screen.py "6,4,3,/,{PACKAGE},ENTER,ENTER,x,?" '
                                      f'"Dashboard,Last snapshot,Installed,Health,Recent activity,Doctor,ok ,{FAKE},looking for,{PACKAGE},Version,Help"', 60)
         checks.report(output == 'missing: \nended: 0',
                       'kav with no arguments opens everything on one screen: its tabs, a search, a record and the help', output)
+        # the mouse: a click on the last tab, at its place in the first line
+        status, output = machine.run(f'{AS_USER} python3 /var/tmp/screen.py "ESC[<0;80;1M" "Looks for updates,The mirror in use,locked"', 60)
+        checks.report(output == 'missing: \nended: 0', 'a click of the mouse on a tab opens it, and Settings shows what is locked', output)
+        status, output = machine.run(f'{AS_USER} python3 /var/tmp/screen.py "2,f" "showing: installed"', 60)
+        checks.report(output == 'missing: \nended: 0', 'in Browse, f goes through the filters', output)
         status, output = machine.run('kav < /dev/null | head -n 1')
         checks.report('usage: kav' in output, 'and away from a terminal it says how it is used', output)
 
@@ -180,13 +249,64 @@ def main():
         checks.report(output.splitlines()[:2] == ['1', '0'] and 'kav fix takes' in output,
                       'kav fix mends what doctor found, and says what it can mend', output)
 
-        status, output = machine.run('kav set; kav set downloads 8 && grep -c "^ParallelDownloads = 8" /etc/pacman.conf; '
+        status, output = machine.run('kav set | head -n 2; kav set downloads 8 > /dev/null && grep -c "^ParallelDownloads = 8" /etc/pacman.conf; '
                                      'kav set snapshots 20 > /dev/null && grep -c \'^NUMBER_LIMIT="20"\' /etc/snapper/configs/root; '
                                      'kav set downloads 99 2>&1 | head -n 1; kav set downloads 5; kav set snapshots 10')
         lines = output.splitlines()
-        checks.report(len(lines) > 5 and lines[0].split()[::len(lines[0].split()) - 1] == ['downloads', '5'] and lines[1].split()[-1] == '10'
-                      and lines[3] == '1' and lines[4] == '1' and 'kav set takes' in lines[5],
+        checks.report(len(lines) > 4 and lines[0].split()[::len(lines[0].split()) - 1] == ['downloads', '5'] and lines[1].split()[-1] == '10'
+                      and lines[2] == '1' and lines[3] == '1' and 'kav set takes' in lines[4],
                       "kav set reads and changes pacman's downloads at once and snapper's snapshots kept, each in its own file", output)
+
+        # how often updates are looked for is the timer's own, in systemd's files
+        status, output = machine.run('kav set | grep "^check"; kav set check daily > /dev/null && grep -c "^OnCalendar=daily" /etc/systemd/system/kav-check.timer.d/kav.conf; '
+                                     'systemctl is-active kav-check.timer; kav set check never > /dev/null; systemctl is-enabled kav-check.timer; kav set | grep "^check"; '
+                                     'kav set check weekly > /dev/null; systemctl is-active kav-check.timer; kav set | grep "^check"; kav set check hourly 2>&1 | head -n 1')
+        lines = output.splitlines()
+        checks.report(len(lines) >= 8 and lines[0].split()[-1] == 'weekly' and lines[1:3] == ['1', 'active'] and lines[3] == 'masked' and lines[4].split()[-1] == 'never'
+                      and lines[5] == 'active' and lines[6].split()[-1] == 'weekly' and 'kav set takes' in lines[7],
+                      'kav set check changes how often the timer looks for updates, and never switches it off', output)
+        status, output = machine.run('kav check 2>&1; systemctl start kav-check.service 2>&1; systemctl is-failed kav-check.service', 180)
+        checks.report('the repositories could not be reached' in output and output.splitlines()[-1] == 'inactive',
+                      'without a network the look for updates says so, and its service does not count as failed', output)
+
+        # the versions kept in the cache and the processors of a build are kav's own, in its file
+        status, output = machine.run('cd /var/cache/pacman/pkg && touch made-up-1.0-1-any.pkg.tar.zst made-up-1.0-2-any.pkg.tar.zst made-up-1.0-10-any.pkg.tar.zst && '
+                                     'kav set cache 1 > /dev/null && ls made-up-*; grep -c "^cache = 1" /etc/kav/kav.toml; kav set jobs 4 > /dev/null; '
+                                     'kav set | grep -E "^(cache|jobs|mirror)" | sed "s/.* //"; kav set cache 3 > /dev/null; kav set jobs 0 > /dev/null; '
+                                     'kav set | grep "^jobs" | sed "s/.* //"; kav set | grep -c "always"; rm -f made-up-*')
+        lines = output.splitlines()
+        checks.report(len(lines) == 7 and lines[0] == 'made-up-1.0-10-any.pkg.tar.zst' and lines[1:4] == ['1', '1', '4'] and lines[4] != '' and lines[5:] == ['all', '4'],
+                      "kav set cache keeps only the newest versions in pacman's cache, kav set jobs is in kav's own file, and what protects the system is shown locked", output)
+
+        # migrations: the record starts with what is there, and each new script runs once, in order
+        there = '/usr/share/kavat/migrations'
+        status, output = machine.run(f'kav migrate && {AS_USER} kav migrate && ls -d /var/lib/kavat/migrations /home/{USER}/.local/state/kavat/migrations | wc -l')
+        checks.report(status == 0 and output.splitlines()[-1] == '2', 'the first time, kav migrate starts its records and runs nothing', output)
+        machine.run(f"cd {there} && echo 'touch /var/tmp/migrated-1' > 0001-made-up.sh && echo 'exit 3' > 0002-breaks.sh && "
+                    f"echo 'touch /var/tmp/migrated-3' > 0003-after.sh && echo 'touch $HOME/migrated-mine; id -un > $HOME/migrated-as' > user/0001-mine.sh")
+        status, output = machine.run('kav migrate --list | grep -c "waits$"; kav migrate; echo "status $?"; ls /var/tmp/migrated-1 /var/tmp/migrated-3 2>&1')
+        checks.report(output.splitlines()[0] == '3' and 'the migration 0002-breaks.sh failed' in output and 'The 1 after it wait' in output and 'status 1' in output
+                      and '/var/tmp/migrated-1\n' in output and "migrated-3': No such file" in output,
+                      'a migration runs as root; one that fails stops the ones after it, and is named', output)
+        status, output = machine.run(f'echo "exit 0" > {there}/0002-breaks.sh; rm /var/tmp/migrated-1; kav migrate && ls /var/tmp/migrated-1 /var/tmp/migrated-3 2>&1; '
+                                     f'{AS_USER} kav migrate && cat /home/{USER}/migrated-as; kav migrate; {AS_USER} kav migrate; kav migrate --list | grep -c "ran$"; '
+                                     f'rm {there}/000* {there}/user/000*')
+        lines = output.splitlines()
+        checks.report('/var/tmp/migrated-3' in lines and "migrated-1': No such file" in output and USER in lines and lines[-3:] == ['kav: no migration waits.'] * 2 + ['3'],
+                      'once mended it runs, then the one that waited; each runs once, and the person\'s run as the person', output)
+
+        # a file that no package owns, where a package wants to put its own
+        status, output = machine.run(f"mkdir -p /var/tmp/made/pkg{os.path.dirname(ITS_FILE)} /var/tmp/made/repo && cd /var/tmp/made/pkg && echo theirs > .{ITS_FILE} && "
+                                     f"cat > .PKGINFO << 'END'\n{PKGINFO}END\n"
+                                     f"bsdtar -czf ../repo/{WAY}-1-1-any.pkg.tar.gz .PKGINFO usr && cd ../repo && repo-add -q made.db.tar.gz {WAY}-1-1-any.pkg.tar.gz 2>&1 && "
+                                     "printf '[made]\\nSigLevel = Optional TrustAll\\nServer = file:///var/tmp/made/repo\\n' >> /etc/pacman.conf && "
+                                     f"cp made.db.tar.gz /var/lib/pacman/sync/made.db && mkdir -p {os.path.dirname(ITS_FILE)} && echo mine > {ITS_FILE} && pacman -Si {WAY} | head -n 1")
+        if checks.report(status == 0 and 'made' in output, 'a made-up package is in a repository that is a folder', output):
+            status, output = machine.run(f'yes | kav install {WAY} 2>&1; echo "status $?"; cat {ITS_FILE} /var/lib/kav/aside/*{ITS_FILE}; pacman -Qo {ITS_FILE}', 60)
+            checks.report('exists in filesystem' in output and 'Moving it aside, to /var/lib/kav/aside/' in output and 'status 0' in output
+                          and 'theirs\nmine\n' in output and f'is owned by {WAY}' in output,
+                          'a file that no package owns is moved out of a package\'s way, kept, and the change tried once more', output)
+        machine.run(f"sed -i '/^\\[made\\]$/,$d' /etc/pacman.conf; rm -f /var/lib/pacman/sync/made.db; pacman -Rns --noconfirm {WAY}")
 
         machine.run("printf '<rss><item><title>Old news</title><link>https://archlinux.org/news/old/</link><description>nothing</description>"
                     "<pubDate>Sat, 01 Nov 2026 10:00:00 +0000</pubDate></item></rss>' > /tmp/feed")
@@ -199,9 +319,43 @@ def main():
                       and 'status 1' in output and 'Run grub-install again.' in output and lines[-1] == 'kav: there is no news since the last time.',
                       "kav update waits for Arch's news to be read when an item asks for something to be done by hand", output)
 
+        # an item that asks for hands, with a person there: script gives kav a terminal, and the answers
+        machine.run(f"sed -i 's|<rss>|<rss>{GUIDED}|' /tmp/feed".replace('&', '\\&'))
+        guided = 'export KAV_NEWS=/tmp/feed; printf "{}" | script -qec "kav update" /dev/null 2>&1 | tr -d "\\r"; '
+        status, output = machine.run(guided.format('y\\nn\\n') + 'ls /var/tmp/guided; cat /var/lib/kav/interventions 2>&1', 60)
+        checks.report('The commands it names:' in output and 'Run `touch /var/tmp/guided` now, as root?' in output and 'kav: it ran.' in output
+                      and 'the update waits for: made-up needs manual intervention' in output and '/var/tmp/guided\n' in output and 'interventions: No such file' in output,
+                      'kav update goes through an item that asks for hands: it shows its command, runs it on a yes, and waits until the item is dealt with', output)
+        # the second time the command is left alone and the item is dealt with: the update goes on, as far as it can with no network
+        status, output = machine.run('rm /var/tmp/guided; ' + guided.format('n\\ny\\n') + 'ls /var/tmp/guided 2>&1; cat /var/lib/kav/interventions; kav news', 180)
+        checks.report("guided': No such file" in output and 'https://archlinux.org/news/made-up/\t' in output and 'synchronizing package databases' in output.lower()
+                      and output.splitlines()[-1] == 'kav: there is no news since the last time.',
+                      'a no runs nothing; once the item is dealt with that is kept, the update goes on, and it is not asked again', output)
+
         print('removing a package and going back', flush=True)
         status, output = machine.run(f'yes | kav remove {PACKAGE}', 120)
         checks.report(status == 0 and machine.run(f'pacman -Q {PACKAGE}')[0] != 0, f'kav remove takes {PACKAGE} out', output)
+
+        # the snapshots of that change: what it did, how the system differs from before it, pinning and deleting
+        status, output = machine.run('kav snapshots')
+        before = [line.split()[0] for line in output.splitlines() if f'before: removed {PACKAGE}' in line]
+        after = [line.split()[0] for line in output.splitlines() if f'after: removed {PACKAGE}' in line]
+        if checks.report(status == 0 and len(before) == 1 and len(after) == 1, 'kav snapshots says what the change of each snapshot did', output):
+            before, after = before[0], after[0]
+            status, output = machine.run(f'kav snapshots compare {before}; kav snapshots compare {after} | tail -n 1')
+            checks.report('installed' not in output and f'removed     {PACKAGE}' in output and '1 package differs' in output and 'no package differs' in output,
+                          'kav snapshots compare shows the packages that differ from the system now', output)
+            status, output = machine.run(f'kav snapshots pin {before} > /dev/null && kav snapshots | grep "^ *{before} "; '
+                                         f'kav snapshots unpin {before} > /dev/null && kav snapshots | grep "^ *{before} "')
+            lines = output.splitlines()
+            checks.report(len(lines) == 2 and lines[0].endswith('pinned') and not lines[1].endswith('pinned'),
+                          'a snapshot is pinned, so it is not cleaned away, and unpinned', output)
+            status, output = machine.run(f'kav snapshots delete {after} < /dev/null 2>&1 | tail -n 1; kav snapshots delete {after} --yes && kav snapshots | grep -c "^ *{after} "; '
+                                         'kav snapshots delete 0 2>&1')
+            checks.report('--yes' in output.splitlines()[0] and f'snapshot {after} is deleted' in output and output.splitlines()[-2] == '0'
+                          and 'is not the number of a snapshot' in output,
+                          'a snapshot is deleted only on a yes, and the system itself is not one', output)
+
         status, output = machine.run('kav undo --yes', 120)
         checks.report(status == 0 and f'pacman -Rns -- {PACKAGE}' in output and 'restart to be back there' in output,
                       'kav undo names the change and goes back to before it', output)

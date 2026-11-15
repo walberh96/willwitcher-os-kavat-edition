@@ -7,12 +7,22 @@
 
 mod allowlist;
 mod aur;
+mod browse;
+mod cache;
+mod config;
 mod doctor;
+mod firmware;
+mod guard;
+mod log;
+mod migrate;
 mod news;
 mod review;
 mod settings;
+mod snapshots;
 mod system;
 mod tui;
+mod updates;
+mod version;
 
 use allowlist::{Allowlist, Entry};
 use std::io::{IsTerminal, Write};
@@ -27,20 +37,30 @@ usage: kav             in a terminal: everything below on one screen
                        AUR when the package is on the reviewed list
   remove <package>…    remove packages, with what only they needed
   update               bring the whole system up to date, and the AUR packages whose
-                       reviewed commit moved
+                       reviewed commit moved; then the migrations and the firmware
+  update --list        what an update would bring, with its sizes; nothing is changed
+  check                look for updates without changing the system
+  hold <package>       leave an AUR package as it is when updating; unhold lets it go
   search <words>       look for a package in the repositories and on the reviewed list
   info <package>       what a package is, and where it would come from
   list --aur           the reviewed list, with what is installed from it and what is asked for
+  list --installed     what is installed; --explicit what was asked for by name, --orphans
+                       what nothing needs any more, --foreign what no repository has
   review <package>     read an AUR package, or what changed in it since it was reviewed,
                        with the lines worth a second look marked; then approve it or not
   request <package>    ask for an AUR package to be reviewed
   undo [--yes]         take the system back to before the last change of packages
+  snapshots            the snapshots, with what each change did; then compare <number> with
+                       the system now, delete <number>, pin <number> or unpin <number>
+  migrate [--list]     run the migrations that wait: what a new version changes that
+                       pacman does not manage
   news                 Arch's news since the last time: an update waits for it to be read
                        when an item asks for something to be done by hand
   doctor               check the health of the system
   fix <what>           mend what doctor found: orphans, lock, cache, service <unit>,
                        merge <file ending in .pacnew>
-  set [<what> <n>]     what kav can change, and changing it: downloads at once, snapshots kept
+  set [<what> <value>] what kav can change, and changing it: downloads at once, snapshots
+                       kept, check for updates, cache versions kept, jobs of a build
 
 The reviewed list is /usr/share/kav/allowlist.toml, and /etc/kav/allowlist.toml for what
 was approved on this machine.";
@@ -131,40 +151,72 @@ fn install(paths: &Paths, names: &[String]) -> Result<(), String> {
     if !refused.is_empty() {
         return Err(format!("{}\n     Nothing was installed.", refused.join("\nkav: ")));
     }
+    // what the AUR's packages need is settled before anything is installed
+    let builds = plan(paths, &from_aur, &list)?;
     if !from_pacman.is_empty() {
-        run(as_root("pacman").args(["-S", "--needed", "--"]).args(&from_pacman))?;
+        let mut arguments = vec!["-S", "--needed", "--"];
+        arguments.extend(&from_pacman);
+        guard::pacman(&arguments)?;
     }
-    for entry in &from_aur {
-        build_and_install(paths, entry)?;
+    build_and_install(paths, &builds, &from_aur)
+}
+
+/// Whether pacman can give a package without the AUR: it is installed, or something
+/// installed provides it, or a repository has it.
+fn settled(name: &str) -> bool {
+    Command::new("pacman").args(["-T", "--", name]).stdout(std::process::Stdio::null()).stderr(std::process::Stdio::null()).status().is_ok_and(|status| status.success()) || in_pacman(name).is_some()
+}
+
+/// The packages of the AUR to build for the ones asked for, in order: each is fetched, left
+/// at its reviewed commit and asked what it needs. Nothing is built here.
+fn plan(paths: &Paths, asked: &[Entry], list: &Allowlist) -> Result<Vec<Entry>, String> {
+    let needs = |entry: &Entry| -> Result<Vec<String>, String> {
+        println!("kav: {} comes from the AUR, at the commit reviewed on {}: {}", entry.name, entry.reviewed, &entry.commit[..12]);
+        let (folder, _) = aur::fetch(paths, &entry.name)?;
+        aur::check_out(&folder, entry)?;
+        Ok(aur::needs(&folder, &entry.commit))
+    };
+    let builds = aur::order(asked, list, &needs, &settled)?;
+    let brought: Vec<&str> = builds.iter().filter(|entry| !asked.contains(entry)).map(|entry| entry.name.as_str()).collect();
+    if !brought.is_empty() {
+        println!("kav: also from the AUR, because the above need them, each one reviewed by itself: {}", brought.join(", "));
+    }
+    Ok(builds)
+}
+
+/// Builds the packages of a plan, in its order, and installs each as it is built. The
+/// ones that were not asked for by name are installed as what another package needs.
+fn build_and_install(paths: &Paths, builds: &[Entry], asked: &[Entry]) -> Result<(), String> {
+    if builds.is_empty() {
+        return Ok(());
+    }
+    let jobs = config::Config::load(&paths.settings())?.jobs;
+    let mut built: Vec<std::path::PathBuf> = Vec::new();
+    for entry in builds {
+        let folder = paths.cache.join("aur").join(&entry.name);
+        aur::check_out(&folder, entry)?;
+        let packages = aur::build(paths, &folder, &built, jobs)?;
+        let files: Vec<String> = packages.iter().map(|package| package.to_string_lossy().into_owned()).collect();
+        let mut arguments = vec!["-U", "--needed"];
+        if !asked.contains(entry) && installed_version(&entry.name).is_none() {
+            arguments.push("--asdeps");
+        }
+        arguments.push("--");
+        arguments.extend(files.iter().map(String::as_str));
+        guard::pacman(&arguments)?;
+        system::write_as_root(&format!("/var/lib/kav/built/{}", entry.name), &format!("{}\n", entry.commit))?;
+        built.extend(packages);
     }
     Ok(())
-}
-
-/// Where kav keeps which commit each AUR package was built from, beside the package itself.
-fn built_commit(name: &str) -> Option<String> {
-    std::fs::read_to_string(format!("/var/lib/kav/built/{name}")).ok().map(|text| text.trim().to_string())
-}
-
-fn build_and_install(paths: &Paths, entry: &Entry) -> Result<(), String> {
-    println!("kav: {} comes from the AUR, at the commit reviewed on {}: {}", entry.name, entry.reviewed, &entry.commit[..12]);
-    let (folder, _) = aur::fetch(paths, &entry.name)?;
-    aur::check_out(&folder, entry)?;
-    let packages = aur::build(paths, &folder)?;
-    run(as_root("pacman").args(["-U", "--needed", "--"]).args(&packages))?;
-    run(as_root("install").args(["-D", "-m", "644", "/dev/stdin"]).arg(format!("/var/lib/kav/built/{}", entry.name)).stdin(text_as_input(&entry.commit)?))
-}
-
-/// A text for a command to read as its input.
-fn text_as_input(text: &str) -> Result<std::process::Stdio, String> {
-    let mut child = Command::new("printf").args(["%s\\n", text]).stdout(std::process::Stdio::piped()).spawn().map_err(|error| error.to_string())?;
-    child.stdout.take().map(std::process::Stdio::from).ok_or_else(|| "printf gave nothing".to_string())
 }
 
 fn remove(names: &[String]) -> Result<(), String> {
     if names.is_empty() || !names.iter().all(|name| allowlist::is_name(name)) {
         return Err("remove takes the names of the packages: kav remove firefox".into());
     }
-    run(as_root("pacman").args(["-Rns", "--"]).args(names))
+    let mut arguments = vec!["-Rns", "--"];
+    arguments.extend(names.iter().map(String::as_str));
+    guard::pacman(&arguments)
 }
 
 /// The packages installed from outside pacman's repositories, which is where the AUR's are.
@@ -173,21 +225,61 @@ fn foreign() -> Vec<String> {
 }
 
 fn update(paths: &Paths) -> Result<(), String> {
-    // news that asks for something to be done by hand stops the update until it is read
+    // news that asks for something to be done by hand stops the update until it is dealt with
     news::before_update(paths)?;
-    run(as_root("pacman").arg("-Syu"))?;
+    let held = config::Config::load(&paths.settings())?.hold;
+    let log_before = log::text().len();
+    guard::pacman(&["-Syu"])?;
     let list = Allowlist::load(&paths.lists)?;
+    let mut moved = Vec::new();
     for name in foreign() {
         match list.get(&name) {
-            Some(entry) if built_commit(&name).as_deref() != Some(entry.commit.as_str()) => build_and_install(paths, entry)?,
-            Some(_) => {}
+            Some(entry) if aur::built_commit(&name).as_deref() == Some(entry.commit.as_str()) => {}
+            Some(_) if held.contains(&name) => println!("kav: {name} is held back: it stays as it is. kav unhold {name} lets it go"),
+            Some(entry) => moved.push(entry.clone()),
             None => println!("kav: {name} is installed but not on the reviewed list: it stays as it is"),
         }
     }
+    let builds = plan(paths, &moved, &list)?;
+    build_and_install(paths, &builds, &moved)?;
+    // what the new version changes that pacman does not manage; one that fails is told at the end too
+    let migrated = migrate::after_update();
+    if let Err(problem) = &migrated {
+        println!("\nkav: {problem}");
+    }
+    if let Err(problem) = cache::clean(paths) {
+        println!("kav: pacman's cache was not cleaned: {problem}");
+    }
+    firmware::step();
     // the system is looked over after the change, while going back is one command away
     println!("\nkav: the system after the update:");
     if doctor::check().is_err() {
         println!("\nkav: something is not as it should be. `kav fix` mends what it can; `kav undo` takes the system back to before this update.");
+    }
+    let restart = updates::restart_after(log_before);
+    if !restart.is_empty() {
+        println!("\nkav: restart the machine when you can: {} changed, and what is running is still the old one.", restart.join(", "));
+    }
+    migrated.map_err(|_| "the update is in, but a migration failed: see above".to_string())
+}
+
+/// `kav hold <package>` and `kav unhold <package>`: only a package of the AUR can be held
+/// back. Arch's move all together.
+fn hold(paths: &Paths, name: &str, held: bool) -> Result<(), String> {
+    if !allowlist::is_name(name) {
+        return Err(format!("{name} is not the name of a package"));
+    }
+    let list = Allowlist::load(&paths.lists)?;
+    if list.get(name).is_none() && !foreign().iter().any(|other| other == name) {
+        return Err(format!("{name} is not a package of the AUR. Arch's packages are brought up to date all together:\n     Arch does not stand behind a system with some of them held back."));
+    }
+    if !system::is_root() {
+        return system::myself_as_root(&[if held { "hold" } else { "unhold" }, name]);
+    }
+    config::set_held(&paths.settings(), name, held)?;
+    match held {
+        true => println!("kav: {name} is held back: kav update leaves it as it is."),
+        false => println!("kav: {name} is not held back any more."),
     }
     Ok(())
 }
@@ -240,7 +332,7 @@ fn list_aur(paths: &Paths) -> Result<(), String> {
         println!("The reviewed list is empty: no package of the AUR has been approved.");
     }
     for entry in list.entries() {
-        let state = match (installed_version(&entry.name), built_commit(&entry.name)) {
+        let state = match (installed_version(&entry.name), aur::built_commit(&entry.name)) {
             (None, _) => "not installed".to_string(),
             (Some(version), Some(built)) if built == entry.commit => format!("installed, {version}"),
             (Some(version), _) => format!("installed, {version}; kav update builds the reviewed commit"),
@@ -415,6 +507,15 @@ fn command(arguments: &[String]) -> Result<(), String> {
         ["install", ..] => install(&paths, &arguments[1..]),
         ["remove", ..] => remove(&arguments[1..]),
         ["update"] => update(&paths),
+        ["update", "--list"] => updates::show(&paths),
+        ["check"] => updates::check(false),
+        ["check", "--notify"] => updates::check(true),
+        ["hold", name] => hold(&paths, name, true),
+        ["unhold", name] => hold(&paths, name, false),
+        ["list", filter @ ("--installed" | "--explicit" | "--orphans" | "--foreign")] => browse::show(filter),
+        ["snapshots", ..] => snapshots::command(&arguments[1..]),
+        ["migrate", ..] => migrate::command(&arguments[1..]),
+        ["aside", ..] => guard::aside(&arguments[1..]),
         ["search", ..] => search(&paths, &arguments[1..]),
         ["info", name] => info(&paths, name),
         ["list", "--aur"] => list_aur(&paths),
@@ -426,7 +527,7 @@ fn command(arguments: &[String]) -> Result<(), String> {
         ["doctor"] => doctor::check(),
         ["news"] => news::show(&paths),
         ["fix", ..] => doctor::fix(&arguments[1..]),
-        ["set", ..] => settings::set(&arguments[1..]),
+        ["set", ..] => settings::set(&paths, &arguments[1..]),
         // with nothing asked and a person at the terminal: everything on one screen
         [] if std::io::stdin().is_terminal() && std::io::stdout().is_terminal() => tui::run(paths),
         [] | ["help"] | ["--help"] | ["-h"] => {

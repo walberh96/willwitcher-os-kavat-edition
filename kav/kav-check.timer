@@ -1,0 +1,13 @@
+# Part of kav: how often it looks for updates. `kav set check daily|weekly|never` changes
+# it: it writes the time into /etc/systemd/system/kav-check.timer.d/kav.conf, or masks the
+# timer for never.
+[Unit]
+Description=Look for updates of the system, every week
+
+[Timer]
+OnCalendar=weekly
+RandomizedDelaySec=1h
+Persistent=true
+
+[Install]
+WantedBy=timers.target

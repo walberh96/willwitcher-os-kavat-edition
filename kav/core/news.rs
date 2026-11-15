@@ -4,7 +4,11 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-use crate::system::{read, Paths};
+use crate::system::{Paths, as_root, read, run, someone_there, write_as_root, yes};
+
+/// The items that asked for something by hand and were dealt with on this machine, each
+/// with the day: one line for each, the item's address first.
+const DEALT_WITH: &str = "/var/lib/kav/interventions";
 
 /// One item of the news.
 #[derive(Debug, PartialEq)]
@@ -13,6 +17,8 @@ pub struct Item {
     pub date: String,
     pub link: String,
     pub text: String,
+    /// the commands it names, as they are written in it
+    pub commands: Vec<String>,
 }
 
 impl Item {
@@ -41,7 +47,7 @@ fn inside<'a>(piece: &'a str, tag: &str) -> &'a str {
 
 /// Text as it reads: without the marks of a web page, and with its few escapes undone.
 fn plain(text: &str) -> String {
-    let text = text.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&");
+    let text = unescaped(text);
     let mut out = String::new();
     let mut in_mark = false;
     for letter in text.chars() {
@@ -58,6 +64,62 @@ fn plain(text: &str) -> String {
     out.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
+fn unescaped(text: &str) -> String {
+    text.replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"").replace("&#39;", "'").replace("&amp;", "&")
+}
+
+/// What is between each opening of a mark and its closing, and the text without those pieces.
+fn pieces(text: &str, mark: &str) -> (Vec<String>, String) {
+    let (open, close) = (format!("<{mark}>"), format!("</{mark}>"));
+    let (mut found, mut rest, mut left) = (Vec::new(), String::new(), text);
+    while let Some(start) = left.find(&open) {
+        let after = &left[start + open.len()..];
+        let Some(end) = after.find(&close) else { break };
+        rest.push_str(&left[..start]);
+        found.push(after[..end].to_string());
+        left = &after[end + close.len()..];
+    }
+    rest.push_str(left);
+    (found, rest)
+}
+
+/// Whether a piece of code reads as a command and not as a name or as what a program
+/// answered: it starts with a program that changes the system. In the running text it also
+/// has to say something after it, since there a bare word is a name.
+fn is_command(text: &str, alone: bool) -> bool {
+    const PROGRAMS: [&str; 30] = [
+        "pacman", "pacman-key", "systemctl", "rm", "mv", "cp", "ln", "mkdir", "touch", "chown", "chmod", "sed", "mkinitcpio", "grub-install", "grub-mkconfig",
+        "bootctl", "locale-gen", "paccache", "pacdiff", "usermod", "gpasswd", "dkms", "depmod", "update-ca-trust", "archlinux-keyring-wkd-sync", "sbctl", "efibootmgr",
+        "snapper", "btrfs", "fwupdmgr",
+    ];
+    let mut words = text.split_whitespace().skip_while(|word| *word == "sudo");
+    words.next().is_some_and(|program| PROGRAMS.contains(&program)) && (alone || words.next().is_some())
+}
+
+/// The commands an item names: the lines of its blocks of code, and the pieces of code in
+/// its running text, that read as commands. `description` is the item as the feed has it.
+fn commands_in(description: &str) -> Vec<String> {
+    let page = unescaped(description);
+    let (blocks, running) = pieces(&page, "pre");
+    let mut found: Vec<String> = Vec::new();
+    let mut add = |line: &str, alone: bool| {
+        // a line may be written after a prompt
+        let line = line.trim();
+        let line = line.strip_prefix("# ").or_else(|| line.strip_prefix("$ ")).unwrap_or(line).trim().to_string();
+        if is_command(&line, alone) && !found.contains(&line) {
+            found.push(line);
+        }
+    };
+    for block in blocks {
+        let block = block.replace("<code>", "").replace("</code>", "");
+        unescaped(&block).lines().for_each(|line| add(line, true));
+    }
+    for code in pieces(&running, "code").0 {
+        add(&unescaped(&code), false);
+    }
+    found
+}
+
 /// The items of a feed, the newest first, as the feed has them.
 pub fn items(feed: &str) -> Vec<Item> {
     feed.split("<item>")
@@ -67,6 +129,7 @@ pub fn items(feed: &str) -> Vec<Item> {
             date: inside(piece, "pubDate").split_whitespace().skip(1).take(3).collect::<Vec<_>>().join(" "),
             link: inside(piece, "link").trim().to_string(),
             text: plain(inside(piece, "description")),
+            commands: commands_in(inside(piece, "description")),
         })
         .filter(|item| !item.title.is_empty())
         .collect()
@@ -84,7 +147,12 @@ pub fn unread(paths: &Paths) -> Option<Vec<Item>> {
     let all = items(&feed);
     let file = read_file(paths);
     match std::fs::read_to_string(&file) {
-        Ok(known) => Some(all.into_iter().filter(|item| !known.lines().any(|line| line == item.link)).collect()),
+        Ok(known) => {
+            // what was dealt with on this machine is read for everyone who uses it
+            let dealt = std::fs::read_to_string(DEALT_WITH).unwrap_or_default();
+            let known = |item: &Item| known.lines().chain(dealt.lines().filter_map(|line| line.split('\t').next())).any(|line| line == item.link);
+            Some(all.into_iter().filter(|item| !known(item)).collect())
+        }
         Err(_) => {
             mark_read(paths, &all);
             Some(Vec::new())
@@ -116,13 +184,48 @@ pub fn show(paths: &Paths) -> Result<(), String> {
     }
     for item in &new {
         println!("{}\n{}{}\n{}\n\n{}\n", item.title, item.date, if item.asks_for_hands() { "  ·  asks for something to be done by hand" } else { "" }, item.link, item.text);
+        if item.asks_for_hands() && !item.commands.is_empty() {
+            println!("The commands it names:");
+            item.commands.iter().for_each(|command| println!("    {command}"));
+            println!("kav update, in a terminal, goes through them with you and runs none by itself.\n");
+        }
     }
     mark_read(paths, &new);
     Ok(())
 }
 
-/// Before an update: Ok when it may go ahead. News that asks for hands stops it until it
-/// has been read; the rest is only named.
+/// Goes through an item that asks for something by hand, with the person: the item
+/// whole, the commands found in it, each run only on a yes, and at the end whether the item
+/// is dealt with. Ok when it is; that is then kept for this machine.
+fn guide(item: &Item) -> Result<(), String> {
+    println!("\n{}\n{}\n{}\n\n{}\n", item.title, item.date, item.link, item.text);
+    if item.commands.is_empty() {
+        println!("kav found no command in it: what it asks for is done by hand, in another terminal.");
+    } else {
+        println!("The commands it names:");
+        item.commands.iter().for_each(|command| println!("    {command}"));
+        println!("\nkav runs none of them by itself. Some are for before the update, and some stand in\nfor it or come after it: the item says which. Each one is asked for.\n");
+        for command in &item.commands {
+            if yes(&format!("Run `{command}` now, as root?")) {
+                let line = command.strip_prefix("sudo ").unwrap_or(command);
+                match run(as_root("sh").args(["-c", line])) {
+                    Ok(()) => println!("kav: it ran."),
+                    Err(problem) => println!("kav: it did not end well: {problem}"),
+                }
+            }
+        }
+    }
+    if !yes("Is this item dealt with, so that the update goes on?") {
+        return Err(format!("the update waits for: {}\n     `kav update` asks again", item.title));
+    }
+    let mut dealt = std::fs::read_to_string(DEALT_WITH).unwrap_or_default();
+    dealt.push_str(&format!("{}\t{}\n", item.link, crate::system::today()));
+    write_as_root(DEALT_WITH, &dealt)
+}
+
+/// Before an update: Ok when it may go ahead. News that asks for hands stops it: with a
+/// person at the terminal each such item is gone through there and then, and without one
+/// the update waits until the news has been read. The rest is only named.
 pub fn before_update(paths: &Paths) -> Result<(), String> {
     let Some(new) = unread(paths) else {
         println!("kav: Arch's news could not be reached; the update goes ahead without it.");
@@ -135,7 +238,11 @@ pub fn before_update(paths: &Paths) -> Result<(), String> {
     for item in &new {
         println!("  {}  {}{}", item.date, item.title, if item.asks_for_hands() { "  ← asks for something to be done by hand" } else { "" });
     }
-    if new.iter().any(Item::asks_for_hands) {
+    if new.iter().any(Item::asks_for_hands) && someone_there() {
+        for item in new.iter().filter(|item| item.asks_for_hands()) {
+            guide(item)?;
+        }
+    } else if new.iter().any(Item::asks_for_hands) {
         return Err("the update waits: `kav news` shows what has to be done by hand; after reading it, `kav update` goes ahead".into());
     }
     mark_read(paths, &new);
@@ -161,6 +268,16 @@ mod tests {
         assert_eq!(found[0].date, "21 Jun 2025");
         assert_eq!(found[0].text, "Run pacman -Rdd linux-firmware first.");
         assert_eq!(found[1].link, "https://archlinux.org/news/two/");
+    }
+
+    #[test]
+    fn the_commands_an_item_names_are_found() {
+        assert_eq!(items(FEED)[0].commands, ["pacman -Rdd linux-firmware"]);
+        assert!(items(FEED)[1].commands.is_empty());
+        let item = "&lt;p&gt;The &lt;code&gt;linux-firmware&lt;/code&gt; package was split. Run &lt;code&gt;sudo systemctl restart x&lt;/code&gt;, then:&lt;/p&gt;\
+            &lt;pre&gt;&lt;code&gt;# pacman -Rdd linux-firmware\n$ pacman -Syu linux-firmware &amp;amp;&amp;amp; echo done\n\n# a remark\nerror: failed to commit transaction\n  mkinitcpio -P\n&lt;/code&gt;&lt;/pre&gt;\
+            &lt;p&gt;See &lt;code&gt;pacman&lt;/code&gt; and &lt;code&gt;/etc/mkinitcpio.conf&lt;/code&gt;.&lt;/p&gt;";
+        assert_eq!(commands_in(item), ["pacman -Rdd linux-firmware", "pacman -Syu linux-firmware && echo done", "mkinitcpio -P", "sudo systemctl restart x"]);
     }
 
     #[test]

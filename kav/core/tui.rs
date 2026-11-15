@@ -5,9 +5,12 @@
 //! the person sees the same questions and the same refusals as on the command line.
 
 use crate::allowlist::Allowlist;
+use crate::browse::{self, Filter};
 use crate::doctor;
-use crate::system::{Paths, as_root, read};
-use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
+use crate::snapshots::{self, Snapshot};
+use crate::system::{Paths, as_root, read, size};
+use crate::updates::{self, Source, Update};
+use ratatui::crossterm::event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::{Constraint, Layout, Rect};
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -20,16 +23,23 @@ const TABS: [&str; 7] = ["Dashboard", "Browse", "Updates", "AUR", "Snapshots", "
 const HELP: &str = "\
 1 to 7, Tab      go to a tab
 Up, Down, j, k   move in a list
+the mouse        a click goes to a tab, a card or a line; the wheel moves in a list
 /                Browse: type what to look for; Enter looks
+f                Browse: show all, the installed, the explicit, the orphans, the AUR's
 Enter            Browse: the full record of the package
 i                Browse: install the package
 x                Browse: remove the package
 u                Dashboard, Updates: bring the whole system up to date
-7                Settings: where kav keeps its lists
+h                Updates: hold a package of the AUR back, or let it go
 r                AUR: read the package, and approve it or not
-Enter            Snapshots: read the list, which asks for your password
+Enter            Snapshots: read the list, which asks for your password;
+                 then, what the change of the snapshot did, package by package
+c                Snapshots: compare the snapshot with the system now
+p                Snapshots: pin the snapshot, so it is not cleaned away, or unpin it
+d                Snapshots: delete the snapshot
 z                Snapshots: go back to before the last change of packages
 f                Doctor: mend what the line under the cursor found
+Enter            Settings: change the setting to its next value
 F5               read everything again
 q, Esc           leave";
 
@@ -58,6 +68,16 @@ struct App {
     /// kav's own command for it
     asked: Option<(String, Vec<String>)>,
     snapshots_read: bool,
+    /// which packages Browse shows
+    filter: Filter,
+    /// what an update would bring, and the snapshots, behind their lines
+    pending: Vec<Update>,
+    snapshots: Vec<Snapshot>,
+    /// where things were drawn last, for the mouse: each tab's columns, the list, and the
+    /// dashboard's cards
+    tab_spots: Vec<(u16, u16)>,
+    body: Rect,
+    cards: [Rect; 4],
 }
 
 /// The numbers and the lists of the dashboard.
@@ -65,6 +85,7 @@ struct App {
 struct Board {
     updates: usize,
     from_kavat: usize,
+    from_aur: usize,
     waiting: usize,
     waiting_first: String,
     installed: usize,
@@ -159,6 +180,12 @@ impl App {
             said: String::new(),
             asked: None,
             snapshots_read: false,
+            filter: Filter::All,
+            pending: Vec::new(),
+            snapshots: Vec::new(),
+            tab_spots: Vec::new(),
+            body: Rect::default(),
+            cards: [Rect::default(); 4],
             board: Board::default(),
         };
         app.read_all();
@@ -178,34 +205,9 @@ impl App {
         } else {
             self.rows[4] = vec![Row { name: String::new(), text: Line::from("Enter reads the snapshots; it asks for your password.") }];
         }
-        if !self.query.is_empty() {
-            self.search();
-        } else {
-            self.rows[1] = vec![Row { name: String::new(), text: Line::from("/ and what to look for, then Enter.") }];
-        }
+        self.search();
         self.read_dashboard();
-        self.rows[6] = crate::settings::SETTINGS
-            .iter()
-            .map(|setting| {
-                let now = crate::settings::get(setting.name);
-                Row {
-                    name: format!("{} {}", setting.name, crate::settings::next(setting, now)),
-                    text: Line::from(vec![
-                        Span::raw(format!("{:<34}", setting.what)),
-                        now.map_or(dim("root's to read; Enter changes it"), |value| self.bold(value.to_string())),
-                    ]),
-                }
-            })
-            .collect();
-        self.rows[6].extend([
-            Row { name: String::new(), text: Line::from("") },
-            Row { name: String::new(), text: Line::from(vec![Span::raw(format!("{:<34}", "The reviewed list of the system")), dim(self.paths.lists[0].display().to_string())]) },
-            Row { name: String::new(), text: Line::from(vec![Span::raw(format!("{:<34}", "The reviewed list of this machine")), dim(self.paths.lists[1].display().to_string())]) },
-            Row { name: String::new(), text: Line::from(vec![Span::raw(format!("{:<34}", "What was asked to be reviewed")), dim(self.paths.requests.display().to_string())]) },
-            Row { name: String::new(), text: Line::from(vec![Span::raw(format!("{:<34}", "Where AUR packages are built")), dim(self.paths.chroot.display().to_string())]) },
-            Row { name: String::new(), text: Line::from("") },
-            Row { name: String::new(), text: Line::from(dim("Enter on one of the first two changes it to its next value. The rest cannot be changed from here yet.")) },
-        ]);
+        self.read_settings();
         for tab in 0..TABS.len() {
             let last = self.rows[tab].len().saturating_sub(1);
             let at = self.cursor[tab].selected().unwrap_or(0).min(last);
@@ -213,19 +215,66 @@ impl App {
         }
     }
 
-    fn read_updates(&mut self) {
-        // pacman's own lists, as they were last fetched: kav update fetches them again
-        self.rows[2] = lines_of(Command::new("pacman").arg("-Qu"))
-            .into_iter()
-            .filter_map(|line| {
-                let mut words = line.split_whitespace();
-                let (name, from, _, to) = (words.next()?, words.next()?, words.next()?, words.next()?);
-                Some(Row {
-                    name: name.to_string(),
-                    text: Line::from(vec![Span::raw(format!("{name:<34}")), dim(format!("{from}  ->  ")), Span::raw(to.to_string())]),
-                })
+    fn read_settings(&mut self) {
+        use crate::settings::{LOCKED, SETTINGS, get, mirror, next, shown};
+        let wide = |text: &str| Span::raw(format!("{text:<68}"));
+        let fixed = |what: &str, value: String| Row { name: String::new(), text: Line::from(vec![wide(what), dim(value)]) };
+        let empty = || Row { name: String::new(), text: Line::from("") };
+        let mut rows: Vec<Row> = SETTINGS
+            .iter()
+            .map(|setting| {
+                let now = get(&self.paths, setting.name);
+                Row {
+                    name: format!("{} {}", setting.name, next(setting, now.as_deref())),
+                    text: Line::from(vec![wide(setting.what), now.map_or(dim("root's to read; Enter changes it"), |value| self.bold(shown(setting, &value)))]),
+                }
             })
             .collect();
+        rows.push(fixed("The mirror in use", mirror().unwrap_or_else(|| "none is set".into())));
+        rows.push(empty());
+        rows.extend(LOCKED.iter().map(|(what, value)| fixed(what, format!("{value} · locked"))));
+        rows.push(empty());
+        rows.extend([
+            fixed("The reviewed list of the system", self.paths.lists[0].display().to_string()),
+            fixed("The reviewed list of this machine", self.paths.lists[1].display().to_string()),
+            fixed("kav's own settings", self.paths.settings().display().to_string()),
+            fixed("What was asked to be reviewed", self.paths.requests.display().to_string()),
+            fixed("Where AUR packages are built", self.paths.chroot.display().to_string()),
+        ]);
+        rows.push(empty());
+        rows.push(Row { name: String::new(), text: Line::from(dim("Enter on one of the first five changes it to its next value. What is locked protects the system.")) });
+        self.rows[6] = rows;
+    }
+
+    fn read_updates(&mut self) {
+        // pacman's lists as they were last fetched, by an update or by the look for updates
+        self.pending = updates::pending(&self.paths);
+        let mut rows = Vec::new();
+        for source in [Source::Arch, Source::Kavat, Source::Aur] {
+            let these: Vec<&Update> = self.pending.iter().filter(|update| update.source == source).collect();
+            if these.is_empty() {
+                continue;
+            }
+            rows.push(Row { name: String::new(), text: Line::from(self.bold(format!("{} · {}", source.title(), these.len()))) });
+            for update in these {
+                let sizes = match source {
+                    Source::Aur => format!("{:>24}", "built here"),
+                    _ => format!("{:>11} {:>12}", size(update.download), updates::signed(update.change)),
+                };
+                let mut text = vec![Span::raw(format!("  {:<30}", update.name)), dim(format!("{:<18} -> ", update.from)), Span::raw(format!("{:<18}", update.to)), dim(sizes)];
+                if update.restart {
+                    text.push(Span::styled("  restart", Style::default().fg(Color::Yellow)));
+                }
+                if update.held {
+                    text.push(Span::styled("  held back", Style::default().fg(Color::Yellow)));
+                }
+                rows.push(Row { name: update.name.clone(), text: Line::from(text) });
+            }
+        }
+        if rows.is_empty() {
+            rows.push(Row { name: String::new(), text: Line::from("Nothing waits, by the lists pacman has. kav update fetches them again.") });
+        }
+        self.rows[2] = rows;
     }
 
     fn read_aur(&mut self) {
@@ -284,14 +333,10 @@ impl App {
     }
 
     fn read_snapshots(&mut self) {
-        let list = read(as_root("snapper").args(["--no-headers", "-c", "root", "list", "--columns", "number,type,date,description"]));
-        let mut rows: Vec<Row> = list
-            .unwrap_or_default()
-            .lines()
-            .rev()
-            .filter(|line| !line.trim_start().starts_with('0'))
-            .map(|line| Row { name: String::new(), text: Line::from(line.trim().to_string()) })
-            .collect();
+        // the newest first
+        self.snapshots = snapshots::list().unwrap_or_default();
+        self.snapshots.reverse();
+        let mut rows: Vec<Row> = self.snapshots.iter().map(|snapshot| Row { name: snapshot.number.to_string(), text: Line::from(snapshots::line(snapshot)) }).collect();
         if rows.is_empty() {
             rows.push(Row { name: String::new(), text: Line::from("There are no snapshots to list.") });
         }
@@ -299,8 +344,7 @@ impl App {
     }
 
     fn read_dashboard(&mut self) {
-        let updates = lines_of(Command::new("pacman").arg("-Qu"));
-        let kavat = lines_of(Command::new("pacman").args(["-Sl", "kavat"]));
+        let moving: Vec<&Update> = self.pending.iter().filter(|update| !update.held).collect();
         let asked: Vec<&Row> = self.rows[3].iter().filter(|row| !row.name.is_empty() && row.text.to_string().contains("asked for")).collect();
         let mut health = Vec::new();
         for (what, problems) in doctor::findings() {
@@ -313,17 +357,15 @@ impl App {
             });
         }
         self.board = Board {
-            updates: updates.len(),
-            from_kavat: updates.iter().filter(|line| line.split_whitespace().next().is_some_and(|name| kavat.iter().any(|listed| listed.split_whitespace().nth(1) == Some(name)))).count(),
+            updates: moving.len(),
+            from_kavat: moving.iter().filter(|update| update.source == Source::Kavat).count(),
+            from_aur: moving.iter().filter(|update| update.source == Source::Aur).count(),
             waiting: asked.len(),
             waiting_first: asked.first().map(|row| row.name.clone()).unwrap_or_default(),
             installed: lines_of(Command::new("pacman").arg("-Qq")).len(),
             explicit: lines_of(Command::new("pacman").arg("-Qeq")).len(),
             foreign: lines_of(Command::new("pacman").arg("-Qmq")).len(),
-            snapshot: self.snapshots_read.then(|| self.rows[4].first().map(|row| row.text.to_string())).flatten().and_then(|line| {
-                let mut cells = line.split('│').map(str::trim);
-                Some((cells.next()?.to_string(), cells.nth(1)?.to_string()))
-            }),
+            snapshot: self.snapshots.first().map(|snapshot| (snapshot.number.to_string(), snapshot.date.chars().take(16).collect())),
             health,
             activity: activity(),
         };
@@ -332,9 +374,10 @@ impl App {
 
     /// The dashboard, as the design draws it: four numbers, the health, what was done last
     /// and the news.
-    fn draw_dashboard(&self, frame: &mut Frame, area: Rect) {
+    fn draw_dashboard(&mut self, frame: &mut Frame, area: Rect) {
         let [cards, middle, news] = Layout::vertical([Constraint::Length(5), Constraint::Min(3), Constraint::Length(3)]).areas(area);
         let cells: [Rect; 4] = Layout::horizontal([Constraint::Ratio(1, 4); 4]).areas(cards);
+        self.cards = cells;
         let board = &self.board;
         let card = |title: &str, number: String, about: String, key: &str| {
             Paragraph::new(vec![
@@ -345,7 +388,7 @@ impl App {
             .block(Block::default().borders(Borders::ALL).border_style(Style::default().add_modifier(Modifier::DIM)).title(self.bold(format!(" {title} "))))
         };
         frame.render_widget(card("Updates", board.updates.to_string(),
-            format!("{} Arch · {} [kavat]", board.updates - board.from_kavat, board.from_kavat), "3 see them · u update all"), cells[0]);
+            format!("{} Arch · {} [kavat] · {} AUR", board.updates - board.from_kavat - board.from_aur, board.from_kavat, board.from_aur), "3 see them · u update all"), cells[0]);
         frame.render_widget(card("AUR reviews", board.waiting.to_string(),
             if board.waiting == 0 { "nothing is asked for".into() } else { format!("{} asked for", board.waiting_first) }, "4 open review"), cells[1]);
         let (number, when) = board.snapshot.clone().unwrap_or_else(|| ("–".into(), "not read yet: it asks for your password".into()));
@@ -363,28 +406,66 @@ impl App {
         );
     }
 
-    /// Look for what was typed, in pacman's repositories and on the reviewed list.
+    /// Look for what was typed, in pacman's repositories and on the reviewed list, and keep
+    /// what the filter keeps. With nothing typed, a filter shows all that is its own.
     fn search(&mut self) {
         let words: Vec<&str> = self.query.split_whitespace().collect();
+        let among = self.filter.packages();
+        let list = Allowlist::load(&self.paths.lists).unwrap_or_default();
         let mut rows = Vec::new();
-        let found = read(Command::new("pacman").arg("-Ss").args(&words)).unwrap_or_default();
-        for line in found.lines().filter(|line| !line.starts_with(' ')) {
-            let mut parts = line.split_whitespace();
-            let (Some(place), Some(version)) = (parts.next(), parts.next()) else { continue };
-            let Some((repository, name)) = place.split_once('/') else { continue };
-            let installed = if line.contains("[installed") { "installed" } else { "" };
-            rows.push(Row {
-                name: name.to_string(),
-                text: Line::from(vec![Span::raw(format!("{name:<34}")), dim(format!("{repository:<8} {version:<22}")), Span::raw(installed)]),
-            });
+        if words.is_empty() {
+            for (name, version) in &among {
+                let place = if self.filter == Filter::Aur && list.get(name).is_none() { "not on the reviewed list" } else { "" };
+                rows.push(Row { name: name.clone(), text: Line::from(vec![Span::raw(format!("{name:<34}")), dim(format!("{version:<31}")), Span::raw("installed  "), dim(place)]) });
+            }
+        } else {
+            let found = read(Command::new("pacman").arg("-Ss").args(&words)).unwrap_or_default();
+            for line in found.lines().filter(|line| !line.starts_with(' ')) {
+                let mut parts = line.split_whitespace();
+                let (Some(place), Some(version)) = (parts.next(), parts.next()) else { continue };
+                let Some((repository, name)) = place.split_once('/') else { continue };
+                if !browse::keep(self.filter, name, &among) {
+                    continue;
+                }
+                let installed = if line.contains("[installed") { "installed" } else { "" };
+                rows.push(Row {
+                    name: name.to_string(),
+                    text: Line::from(vec![Span::raw(format!("{name:<34}")), dim(format!("{repository:<8} {version:<22}")), Span::raw(installed)]),
+                });
+            }
+            // what is installed and in no list pacman has: one from the AUR, or any of them
+            // on a system that has not fetched its lists yet
+            let local = read(Command::new("pacman").arg("-Qs").args(&words)).unwrap_or_default();
+            for line in local.lines().filter(|line| !line.starts_with(' ')) {
+                let mut parts = line.split_whitespace();
+                let (Some(place), Some(version)) = (parts.next(), parts.next()) else { continue };
+                let name = place.rsplit('/').next().unwrap_or(place);
+                if rows.iter().any(|row| row.name == name) || !browse::keep(self.filter, name, &among) {
+                    continue;
+                }
+                rows.push(Row {
+                    name: name.to_string(),
+                    text: Line::from(vec![Span::raw(format!("{name:<34}")), dim(format!("{:<8} {version:<22}", "")), Span::raw("installed")]),
+                });
+            }
         }
-        if let Ok(list) = Allowlist::load(&self.paths.lists) {
-            for entry in list.entries().filter(|entry| words.iter().all(|word| entry.name.contains(word))) {
+        // the reviewed list is the AUR's: it shows with no filter, and under the AUR's
+        if matches!(self.filter, Filter::All | Filter::Aur) && (!words.is_empty() || self.filter == Filter::Aur) {
+            let shown: Vec<String> = rows.iter().map(|row| row.name.clone()).collect();
+            for entry in list.entries().filter(|entry| words.iter().all(|word| entry.name.contains(word)) && !shown.contains(&entry.name)) {
                 rows.push(Row { name: entry.name.clone(), text: Line::from(vec![Span::raw(format!("{:<34}", entry.name)), dim("the AUR, on the reviewed list")]) });
             }
         }
         if rows.is_empty() {
-            rows.push(Row { name: String::new(), text: Line::from(format!("Nothing is called {}.", self.query)) });
+            rows.push(Row {
+                name: String::new(),
+                text: Line::from(match (words.is_empty(), self.filter) {
+                    (true, Filter::All) => "/ and what to look for, then Enter. f shows the installed, the explicit, the orphans or the AUR's.".to_string(),
+                    (true, _) => "No package is like that.".to_string(),
+                    (false, Filter::All) => format!("Nothing is called {}.", self.query),
+                    (false, filter) => format!("Nothing called {} is among: {}.", self.query, filter.title()),
+                }),
+            });
         }
         self.rows[1] = rows;
         self.cursor[1].select(Some(0));
@@ -409,8 +490,12 @@ impl App {
 
         // the tabs, in one line: the one in view is filled with the accent
         let mut header = vec![self.bold(" kav "), Span::raw(" ")];
+        let mut column = 6;
+        self.tab_spots.clear();
         for (index, name) in TABS.iter().enumerate() {
             let label = format!(" {} {name} ", index + 1);
+            self.tab_spots.push((column, column + label.len() as u16));
+            column += label.len() as u16 + 1;
             header.push(if index == self.tab {
                 Span::styled(label, Style::default().bg(self.accent).fg(Color::Black).add_modifier(Modifier::BOLD))
             } else {
@@ -423,13 +508,16 @@ impl App {
         frame.render_widget(Paragraph::new(Line::from(header)), tabs);
         frame.render_widget(Paragraph::new(Line::from(dim(who))), right);
 
+        self.body = body;
         if self.tab == 0 {
             self.draw_dashboard(frame, body);
         } else {
+            let showing = if self.filter == Filter::All { String::new() } else { format!(" · showing: {}", self.filter.title()) };
             let title = match self.tab {
-                1 if self.typing => format!(" Browse · looking for: {}▏ ", self.query),
-                1 if !self.query.is_empty() => format!(" Browse · {} ", self.query),
-                2 => format!(" Updates · {} ", self.rows[2].len()),
+                1 if self.typing => format!(" Browse{showing} · looking for: {}▏ ", self.query),
+                1 if !self.query.is_empty() => format!(" Browse{showing} · {} ", self.query),
+                1 => format!(" Browse{showing} "),
+                2 => format!(" Updates · {} ", updates::total(&self.pending)),
                 tab => format!(" {} ", TABS[tab]),
             };
             let items: Vec<ListItem> = self.rows[self.tab].iter().map(|row| ListItem::new(row.text.clone())).collect();
@@ -442,9 +530,10 @@ impl App {
         // the keys that do something here, each in its own box
         let mut keys: Vec<(&str, &str)> = vec![("1–7", "tabs"), ("/", "search")];
         keys.extend(match self.tab {
-            1 => vec![("↵", "record"), ("i", "install"), ("x", "remove")],
-            2 => vec![("u", "update all")],
+            1 => vec![("f", "filter"), ("↵", "record"), ("i", "install"), ("x", "remove")],
+            2 => vec![("u", "update all"), ("h", "hold an AUR package back")],
             3 => vec![("r", "review")],
+            4 if self.snapshots_read => vec![("↵", "its packages"), ("c", "compare"), ("p", "pin"), ("d", "delete"), ("z", "undo the last change")],
             4 => vec![("↵", "read the list"), ("z", "undo the last change")],
             5 => vec![("f", "mend the line under the cursor")],
             6 => vec![("↵", "change to the next value")],
@@ -495,7 +584,7 @@ impl App {
     /// Give the screen back to the terminal, run one of kav's own commands in the open, and
     /// take the screen again once the person has read what it said.
     fn hand_over(&mut self, terminal: &mut DefaultTerminal, arguments: &[&str]) {
-        ratatui::restore();
+        screen_off();
         println!("\n  kav {}\n", arguments.join(" "));
         println!("  If it asks for your password, type it and press Enter: nothing shows while you type.\n");
         let me = std::env::current_exe().unwrap_or_else(|_| "kav".into());
@@ -509,8 +598,44 @@ impl App {
         };
         println!("\nEnter goes back to kav.");
         let _ = std::io::stdin().read_line(&mut String::new());
-        *terminal = ratatui::init();
+        *terminal = screen_on();
         self.read_all();
+    }
+
+    /// The mouse: a click goes to a tab, to a card of the dashboard or to a line of a list,
+    /// and the wheel moves in the list. It does nothing a key would have to confirm.
+    fn mouse(&mut self, mouse: MouseEvent) {
+        if self.asked.is_some() {
+            return;
+        }
+        let inside = |area: Rect| mouse.column >= area.x && mouse.column < area.x + area.width && mouse.row >= area.y && mouse.row < area.y + area.height;
+        match mouse.kind {
+            MouseEventKind::ScrollDown if self.sheet.is_none() => self.move_by(3),
+            MouseEventKind::ScrollUp if self.sheet.is_none() => self.move_by(-3),
+            MouseEventKind::Down(MouseButton::Left) => {
+                self.said.clear();
+                self.typing = false;
+                if self.sheet.take().is_some() {
+                    return;
+                }
+                if mouse.row == 0 {
+                    if let Some(tab) = self.tab_spots.iter().position(|(from, to)| (*from..*to).contains(&mouse.column)) {
+                        self.tab = tab;
+                    }
+                } else if self.tab == 0 {
+                    // each card opens the tab it counts
+                    if let Some(card) = self.cards.iter().position(|card| inside(*card)) {
+                        self.tab = [2, 3, 4, 1][card];
+                    }
+                } else if inside(self.body) && mouse.row > self.body.y {
+                    let line = self.cursor[self.tab].offset() + (mouse.row - self.body.y - 1) as usize;
+                    if line < self.rows[self.tab].len() {
+                        self.cursor[self.tab].select(Some(line));
+                    }
+                }
+            }
+            _ => {}
+        }
     }
 
     /// One key. False when it is time to leave.
@@ -562,6 +687,10 @@ impl App {
                 self.typing = true;
                 self.query.clear();
             }
+            KeyCode::Char('f') if self.tab == 1 => {
+                self.filter = self.filter.next();
+                self.search();
+            }
             KeyCode::Enter if self.tab == 1 => {
                 if let Some(name) = self.selected().map(str::to_string) {
                     let record = read(Command::new("pacman").args(["-Qi", &name]))
@@ -583,6 +712,15 @@ impl App {
             KeyCode::Char('u') if self.tab == 2 || self.tab == 0 => {
                 self.asked = Some(("Bring the whole system up to date".into(), vec!["update".into()]));
             }
+            KeyCode::Char('h') if self.tab == 2 => {
+                let update = self.selected().and_then(|name| self.pending.iter().find(|update| update.name == name));
+                match update.map(|update| (update.source, update.held, update.name.clone())) {
+                    Some((Source::Aur, true, name)) => self.asked = Some((format!("Let {name} go: kav update builds its reviewed commit"), vec!["unhold".into(), name])),
+                    Some((Source::Aur, false, name)) => self.asked = Some((format!("Hold {name} back: kav update leaves it as it is"), vec!["hold".into(), name])),
+                    Some(_) => self.said = "Only a package of the AUR can be held back: Arch's are brought up to date all together.".into(),
+                    None => {}
+                }
+            }
             KeyCode::Char('r') if self.tab == 3 => {
                 if let Some(name) = self.selected().map(str::to_string) {
                     self.hand_over(terminal, &["review", &name]);
@@ -602,11 +740,41 @@ impl App {
                     self.asked = Some((format!("{what}: {value}"), vec!["set".into(), name.into(), value.into()]));
                 }
             }
+            KeyCode::Enter if self.tab == 4 && self.snapshots_read => {
+                let chosen = self.selected().and_then(|number| self.snapshots.iter().find(|snapshot| snapshot.number.to_string() == number));
+                if let Some(snapshot) = chosen {
+                    let mut text = format!("{}, of {}\n{}\n\n", snapshot.kind, snapshot.date, snapshot.description);
+                    text.push_str(&match snapshot.packages.is_empty() {
+                        true => "pacman's log has no change of packages for it.".to_string(),
+                        false => snapshot.packages.join("\n"),
+                    });
+                    self.sheet = Some((format!("Snapshot {}{}", snapshot.number, if snapshot.pinned() { " · pinned" } else { "" }), text));
+                }
+            }
+            KeyCode::Char('c') if self.tab == 4 => {
+                if let Some(number) = self.selected().map(str::to_string) {
+                    self.hand_over(terminal, &["snapshots", "compare", &number]);
+                }
+            }
+            KeyCode::Char('d') if self.tab == 4 => {
+                if let Some(number) = self.selected().map(str::to_string) {
+                    self.asked = Some((format!("Delete snapshot {number}: the system cannot go back to it after"), vec!["snapshots".into(), "delete".into(), number, "--yes".into()]));
+                }
+            }
+            KeyCode::Char('p') if self.tab == 4 => {
+                let chosen = self.selected().and_then(|number| self.snapshots.iter().find(|snapshot| snapshot.number.to_string() == number));
+                if let Some((number, pinned)) = chosen.map(|snapshot| (snapshot.number.to_string(), snapshot.pinned())) {
+                    self.asked = Some(match pinned {
+                        true => (format!("Unpin snapshot {number}: it goes when there are too many"), vec!["snapshots".into(), "unpin".into(), number]),
+                        false => (format!("Pin snapshot {number}: it stays until it is deleted by hand"), vec!["snapshots".into(), "pin".into(), number]),
+                    });
+                }
+            }
             KeyCode::Enter if self.tab == 4 => {
                 // sudo may ask for the password: it needs the terminal as it is
-                ratatui::restore();
+                screen_off();
                 let allowed = as_root("true").status().is_ok_and(|status| status.success());
-                *terminal = ratatui::init();
+                *terminal = screen_on();
                 if allowed {
                     self.snapshots_read = true;
                     self.read_snapshots();
@@ -631,9 +799,22 @@ fn centred(area: Rect, width: u16, height: u16) -> Rect {
     cell
 }
 
+/// Takes the terminal for the full screen, with the mouse.
+fn screen_on() -> DefaultTerminal {
+    let terminal = ratatui::init();
+    let _ = ratatui::crossterm::execute!(std::io::stdout(), EnableMouseCapture);
+    terminal
+}
+
+/// Gives the terminal back as it was.
+fn screen_off() {
+    let _ = ratatui::crossterm::execute!(std::io::stdout(), DisableMouseCapture);
+    ratatui::restore();
+}
+
 pub fn run(paths: Paths) -> Result<(), String> {
     let mut app = App::new(paths);
-    let mut terminal = ratatui::init();
+    let mut terminal = screen_on();
     let ended = loop {
         if let Err(error) = terminal.draw(|frame| app.draw(frame)) {
             break Err(error.to_string());
@@ -644,10 +825,11 @@ pub fn run(paths: Paths) -> Result<(), String> {
                     break Ok(());
                 }
             }
+            Ok(Event::Mouse(mouse)) => app.mouse(mouse),
             Ok(_) => {}
             Err(error) => break Err(error.to_string()),
         }
     };
-    ratatui::restore();
+    screen_off();
     ended
 }

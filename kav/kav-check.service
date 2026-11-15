@@ -1,0 +1,14 @@
+# Part of kav: looks for updates without changing the system. It fetches pacman's lists
+# into a folder of its own, /var/lib/kav/check, and tells whoever is at the desktop when
+# something waits. Nothing is installed: that is `kav update`, which a person runs.
+[Unit]
+Description=Look for updates of the system
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/kav check --notify
+# with no network there is nothing to say
+SuccessExitStatus=1
+Nice=10

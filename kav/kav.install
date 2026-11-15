@@ -1,0 +1,7 @@
+# The record of which migrations ran starts empty on a system that already had kav: every
+# migration that comes after this is new to it. A system that is being installed gets no
+# record here: kav starts it the first time, with every migration there is then counted as
+# run, since they are older than the system.
+post_upgrade() {
+  mkdir -p var/lib/kavat/migrations
+}

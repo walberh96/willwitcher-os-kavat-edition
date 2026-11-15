@@ -1,7 +1,7 @@
 //! Packages of the AUR: fetching the commit that was reviewed, and no other, and building
 //! it in a clean system that cannot see anyone's home folder.
 
-use crate::allowlist::{Entry, is_commit, is_name};
+use crate::allowlist::{Allowlist, Entry, is_commit, is_name};
 use crate::system::{Paths, as_root, is_root, read, run};
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -61,8 +61,93 @@ pub fn check_out(folder: &Path, entry: &Entry) -> Result<(), String> {
     Ok(())
 }
 
-/// Builds the package in the clean system and gives the files it made.
-pub fn build(paths: &Paths, folder: &Path) -> Result<Vec<PathBuf>, String> {
+/// Which commit an installed AUR package was built from: kav keeps it beside the package.
+pub fn built_commit(name: &str) -> Option<String> {
+    std::fs::read_to_string(format!("/var/lib/kav/built/{name}")).ok().map(|text| text.trim().to_string())
+}
+
+/// The packages that a package's own record of itself, its .SRCINFO, says it needs: to
+/// run, to build and to check. Each is a bare name, without the versions asked of it.
+pub fn needs_in(record: &str) -> Vec<String> {
+    let mut names: Vec<String> = Vec::new();
+    for line in record.lines() {
+        let Some((field, value)) = line.trim().split_once(" = ") else { continue };
+        // a field may be for one architecture only: depends_x86_64
+        let field = field.strip_suffix("_x86_64").unwrap_or(field);
+        if ["depends", "makedepends", "checkdepends"].contains(&field) {
+            let name = value.split(['<', '>', '=', ':']).next().unwrap_or("").trim().to_string();
+            if !name.is_empty() && !names.contains(&name) {
+                names.push(name);
+            }
+        }
+    }
+    names
+}
+
+/// What a package needs, at the commit that was reviewed.
+pub fn needs(folder: &Path, commit: &str) -> Vec<String> {
+    needs_in(&read(git(folder).args(["show", &format!("{commit}:.SRCINFO")])).unwrap_or_default())
+}
+
+/// The packages of the AUR to build for a request, in the order to build them: each one
+/// after what it needs. What a package needs comes from pacman's repositories when it can
+/// (`settled` says so, also for what is installed already) and from the reviewed list
+/// when it cannot; each package has to be on the list by itself, and one that is not stops
+/// everything, by its name. `needs` gives what a package on the list needs.
+pub fn order(
+    asked: &[Entry],
+    list: &Allowlist,
+    needs: &dyn Fn(&Entry) -> Result<Vec<String>, String>,
+    settled: &dyn Fn(&str) -> bool,
+) -> Result<Vec<Entry>, String> {
+    fn visit(
+        entry: &Entry,
+        asked: &[Entry],
+        list: &Allowlist,
+        needs: &dyn Fn(&Entry) -> Result<Vec<String>, String>,
+        settled: &dyn Fn(&str) -> bool,
+        path: &mut Vec<String>,
+        done: &mut Vec<Entry>,
+    ) -> Result<(), String> {
+        if done.iter().any(|other| other.name == entry.name) {
+            return Ok(());
+        }
+        if path.contains(&entry.name) {
+            return Err(format!("{} needs itself, by way of {}: nothing was built", entry.name, path.join(", ")));
+        }
+        path.push(entry.name.clone());
+        for name in needs(entry)? {
+            // one that is being built anyway is built first, even when an older build of it is installed
+            if let Some(other) = asked.iter().find(|other| other.name == name) {
+                visit(other, asked, list, needs, settled, path, done)?;
+            } else if !settled(&name) {
+                match list.get(&name) {
+                    Some(other) => visit(other, asked, list, needs, settled, path, done)?,
+                    None => {
+                        return Err(format!(
+                            "{} needs {name}, which is not in Arch's repositories, in [kavat] or on the reviewed list of the AUR.\n     \
+                             Each package of the AUR is approved by itself. To ask for it: kav request {name}",
+                            entry.name
+                        ));
+                    }
+                }
+            }
+        }
+        path.pop();
+        done.push(entry.clone());
+        Ok(())
+    }
+    let mut done = Vec::new();
+    for entry in asked {
+        visit(entry, asked, list, needs, settled, &mut Vec::new(), &mut done)?;
+    }
+    Ok(done)
+}
+
+/// Builds the package in the clean system and gives the files it made. `with` are packages
+/// built just before that this one needs: they are put into the clean system first.
+/// `jobs` is how many processors the build may use; 0 is all of them.
+pub fn build(paths: &Paths, folder: &Path, with: &[PathBuf], jobs: u32) -> Result<Vec<PathBuf>, String> {
     if is_root() {
         return Err("a package of the AUR is built as a normal user, not as root".into());
     }
@@ -84,7 +169,13 @@ pub fn build(paths: &Paths, folder: &Path) -> Result<Vec<PathBuf>, String> {
     let _ = std::fs::remove_dir_all(&out);
     std::fs::create_dir_all(&out).map_err(|error| format!("{}: {error}", out.display()))?;
     // -c starts from a fresh copy of the clean system each time
-    run(Command::new("makechrootpkg").current_dir(folder).env("PKGDEST", &out).arg("-c").arg("-r").arg(&paths.chroot))?;
+    let jobs = if jobs == 0 { std::thread::available_parallelism().map_or(1, |count| count.get() as u32) } else { jobs };
+    let mut make = Command::new("makechrootpkg");
+    make.current_dir(folder).env("PKGDEST", &out).env("MAKEFLAGS", format!("-j{jobs}")).arg("-c").arg("-r").arg(&paths.chroot);
+    for package in with {
+        make.arg("-I").arg(package);
+    }
+    run(&mut make)?;
     let mut packages: Vec<PathBuf> = std::fs::read_dir(&out)
         .into_iter()
         .flatten()
@@ -149,6 +240,62 @@ mod tests {
 
     fn entry(commit: &str) -> Entry {
         Entry { name: "some-package".into(), commit: commit.into(), reviewed: "2026-11-13".into(), sources: vec![], notes: String::new() }
+    }
+
+    const RECORD: &str = "pkgbase = some-package\n\tpkgver = 1\n\tmakedepends = cmake\n\tdepends = glibc\n\tdepends = some-library>=2.0\n\
+                          \tdepends_x86_64 = lib32-thing\n\tdepends_aarch64 = not-here\n\toptdepends = extra: for more\n\tcheckdepends = some-library\n\npkgname = some-package\n";
+
+    #[test]
+    fn what_a_package_needs_is_read_from_its_own_record() {
+        assert_eq!(needs_in(RECORD), ["cmake", "glibc", "some-library", "lib32-thing"]);
+    }
+
+    fn reviewed(names: &[&str]) -> Allowlist {
+        let text: String = names.iter().map(|name| format!("[packages.{name}]\ncommit = \"0123456789abcdef0123456789abcdef01234567\"\nreviewed = \"2026-11-13\"\n")).collect();
+        Allowlist::parse("list", &text).unwrap()
+    }
+
+    /// A small world: what each package of the AUR needs, and what pacman can give.
+    fn needs_of(entry: &Entry) -> Result<Vec<String>, String> {
+        Ok(match entry.name.as_str() {
+            "app" => vec!["glibc", "library", "helper"],
+            "library" => vec!["base-library", "glibc"],
+            "helper" => vec!["library"],
+            "lonely" => vec!["not-reviewed"],
+            "snake" => vec!["tail"],
+            "tail" => vec!["snake"],
+            _ => vec![],
+        }
+        .into_iter()
+        .map(String::from)
+        .collect())
+    }
+
+    #[test]
+    fn what_a_package_needs_from_the_aur_is_built_before_it() {
+        let list = reviewed(&["app", "library", "helper", "base-library", "lonely", "snake", "tail"]);
+        let names = |asked: &[&str], settled: &dyn Fn(&str) -> bool| -> Result<Vec<String>, String> {
+            let asked: Vec<Entry> = asked.iter().map(|name| list.get(name).unwrap().clone()).collect();
+            order(&asked, &list, &needs_of, settled).map(|all| all.into_iter().map(|entry| entry.name).collect())
+        };
+        let in_arch = |name: &str| name == "glibc";
+        assert_eq!(names(&["app"], &in_arch).unwrap(), ["base-library", "library", "helper", "app"]);
+        // what is installed already is not built again, unless it was asked for too
+        let installed = |name: &str| name == "glibc" || name == "library";
+        assert_eq!(names(&["app"], &installed).unwrap(), ["helper", "app"]);
+        assert_eq!(names(&["app", "library"], &installed).unwrap(), ["base-library", "library", "helper", "app"]);
+    }
+
+    #[test]
+    fn a_need_that_is_not_approved_stops_everything_by_its_name() {
+        let list = reviewed(&["app", "library", "helper", "base-library", "lonely", "snake", "tail"]);
+        let ask = |names: &[&str]| {
+            let asked: Vec<Entry> = names.iter().map(|name| list.get(name).unwrap().clone()).collect();
+            order(&asked, &list, &needs_of, &|name| name == "glibc").unwrap_err()
+        };
+        let problem = ask(&["app", "lonely"]);
+        assert!(problem.starts_with("lonely needs not-reviewed, which is not in Arch's repositories") && problem.ends_with("kav request not-reviewed"), "{problem}");
+        assert!(ask(&["snake"]).starts_with("snake needs itself"), "{}", ask(&["snake"]));
     }
 
     #[test]
