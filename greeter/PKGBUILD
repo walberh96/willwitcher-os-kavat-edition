@@ -1,13 +1,14 @@
 pkgname=kavat-greeter
 pkgver=0.2.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Willwitcher-OS Kavat Edition: the login screen, a web page drawn on Wayland, behind greetd"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # greetd asks for the password and starts the session; Hyprland is what the page is drawn
 # on; the rest is what the program is written with
-depends=('greetd' 'hyprland' 'python' 'pyside6' 'qt6-webengine' 'qt6-webchannel' 'qt6-wayland')
+depends=('greetd' 'hyprland' 'python' 'pyside6' 'qt6-webengine' 'qt6-webchannel' 'qt6-wayland' 'gnome-keyring' 'libsecret')
+install=kavat-greeter.install
 optdepends=('kavat-theme: the login screen follows the theme of the system')
 # greetd wants a greeter beside it, and this is one
 provides=('greetd-greeter')

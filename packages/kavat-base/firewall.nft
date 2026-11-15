@@ -1,0 +1,26 @@
+#!/usr/bin/nft -f
+# Part of kavat-base: the system's firewall. Everything that comes in is closed, except
+# the answers to what this machine asked for; nothing that goes out is touched.
+#
+# To open a door, put a file in /etc/kavat/firewall.d/, ending in .nft, with a line like
+#     add rule inet kavat_firewall in tcp dport 22 accept
+# and run: systemctl restart kavat-firewall
+
+table inet kavat_firewall
+delete table inet kavat_firewall
+
+table inet kavat_firewall {
+  chain in {
+    type filter hook input priority filter; policy drop;
+
+    ct state established,related accept
+    ct state invalid drop
+    iifname "lo" accept
+    # what a network needs to work: ping, and IPv6's own messages
+    meta l4proto { icmp, ipv6-icmp } accept
+    # addresses handed out by the network, and names of the machines on it
+    udp dport { 68, 546, 5353 } accept
+  }
+}
+
+include "/etc/kavat/firewall.d/*.nft"

@@ -1,0 +1,14 @@
+# The keyring opens with the password typed at the login. That is said in the login's own
+# PAM file, which is greetd's: two lines are added to it, once.
+post_install() {
+  local pam=etc/pam.d/greetd
+  [ -e "$pam" ] || return 0
+  grep -q pam_gnome_keyring "$pam" && return 0
+  # after what checks the password, so that the keyring is given the one that was right
+  sed -i '/^auth .*system-local-login/a auth       optional     pam_gnome_keyring.so' "$pam"
+  sed -i '/^session .*system-local-login/a session    optional     pam_gnome_keyring.so auto_start' "$pam"
+}
+
+post_upgrade() {
+  post_install
+}

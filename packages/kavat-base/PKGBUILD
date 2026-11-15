@@ -1,14 +1,27 @@
 pkgname=kavat-base
 pkgver=0.1.0
-pkgrel=1
+pkgrel=3
 pkgdesc="Willwitcher-OS Kavat Edition: settings of the base system"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
-depends=('zram-generator')
-source=('zram.conf')
-sha256sums=('SKIP')
+depends=('zram-generator' 'nftables' 'openssh' 'pipewire' 'noise-suppression-for-voice')
+source=('zram.conf' 'firewall.nft' 'kavat-firewall.service' 'ssh.conf' 'pipewire-noise.conf')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
   install -Dm644 zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/kavat.conf"
+  # the firewall: its rules, the unit that puts them up, and the folder for doors of your own
+  install -Dm644 firewall.nft "$pkgdir/usr/share/kavat/firewall.nft"
+  install -Dm644 kavat-firewall.service "$pkgdir/usr/lib/systemd/system/kavat-firewall.service"
+  install -d "$pkgdir/etc/kavat/firewall.d"
+  # the microphone without its noise, on for every new user
+  install -Dm644 pipewire-noise.conf "$pkgdir/usr/share/kavat/pipewire-noise.conf"
+  install -d "$pkgdir/etc/skel/.config/pipewire/pipewire.conf.d"
+  ln -s /usr/share/kavat/pipewire-noise.conf "$pkgdir/etc/skel/.config/pipewire/pipewire.conf.d/kavat-noise.conf"
+  # SSH keys: an agent of the session holds them, and a key is given to it the first time
+  # its password is typed, so it is asked for once in a session
+  install -Dm644 ssh.conf "$pkgdir/etc/ssh/ssh_config.d/20-kavat.conf"
+  install -d "$pkgdir/usr/lib/systemd/user/default.target.wants"
+  ln -s ../ssh-agent.service "$pkgdir/usr/lib/systemd/user/default.target.wants/ssh-agent.service"
 }
