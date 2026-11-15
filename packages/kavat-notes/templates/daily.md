@@ -1,0 +1,10 @@
+# {{title}}
+
+#daily
+
+## Tasks
+
+- [ ]
+
+## Notes
+

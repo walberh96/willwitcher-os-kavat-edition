@@ -4,28 +4,55 @@
 # usage: kavat-notes                       the notes, on one screen
 #        kavat-notes quick                 one line to type a note in; Enter saves it to the inbox
 #        kavat-notes add <text>            save that text as a note in the inbox
-#        kavat-notes clip <title> <address>  a page of the web as a note: what comes on the input is its quote
+#        kavat-notes new                   the templates there are: meeting, bug, idea, daily and yours
+#        kavat-notes new <template> [title]  a note made from a template, opened in the editor
+#        kavat-notes daily                 today's daily note, made when it is not there
 #        kavat-notes due                   the tasks and reminders: overdue, today and upcoming
+#        kavat-notes count                 how many are due today or overdue
 #        kavat-notes remind <note> <when>  set a reminder on a note: "tomorrow 9:00", "friday 17:00"
 #        kavat-notes remind --off <note>   take the reminder off a note
 #        kavat-notes done <note>           mark a task as done, or as open again
 #        kavat-notes todo <note>           make a note a task, or a task a note again
 #        kavat-notes due <note> <day>      give a task the day it is due: "friday", "2026-12-01"
 #        kavat-notes sync                  set the timers for every reminder written in the notes
+#        kavat-notes clip <title> <address> [picture]  a page of the web as a note: what comes on the input is its quote
+#        kavat-notes about <address>       the notes, clippings and album sites that mention that site
+#        kavat-notes album                 the albums of sites, and how many each one has
+#        kavat-notes album show <album>    its sites: title, address, file and thumbnail
+#        kavat-notes album add <album> <title> <address> [picture]  keep a site in an album
+#        kavat-notes album remove <album> <address or file>         take a site out of it
+#        kavat-notes album delete <album>  delete an album with all its sites
+#        kavat-notes album open <album>    open every site of it in the browser
+#        kavat-notes album read <file>     archive a site that has been read
+#
+# add and new take --to <notebook> before the rest, for a notebook that is not the inbox.
 #
 # A note is a Markdown file in ~/Notes, as nb keeps it. A reminder is a line in the note's
 # front matter, "remind: 2026-11-13 09:00", and may come with "repeat: daily", weekly or
 # monthly. Each one that is still to come is a timer of the user's session, which shows a
-# notification; those whose time passed while the computer was off show up at login.
+# notification; those whose time passed while the computer was off show up at login. In
+# Gamer mode a reminder waits until the mode is left, unless the note says "urgent: true".
 #
 # In a note typed in one line, words that start with # are tags, and a day or a time at
 # the end, like "tomorrow 9:00" or "friday", sets the reminder.
+#
+# An album is a folder of bookmarks, ~/Notes/home/albums/<album>, each site a file as nb
+# writes a bookmark, with its thumbnail beside it. "read-later" is always there; what has
+# been read goes to its archive. The templates are in /usr/share/kavat/notes/templates,
+# and yours in ~/.config/kavat/notes/templates.
 set -u
 
 notes="${NB_DIR:-$HOME/Notes}"
 self=/usr/bin/kavat-notes
 [[ $0 == */* ]] && self=$(realpath "$0")
 fired="${XDG_RUNTIME_DIR:-/tmp}/kavat-notes-fired"
+albums="$notes/home/albums"
+# the system's templates, or the ones beside this script when it is run from its source
+templates=/usr/share/kavat/notes/templates
+[[ -d $templates ]] || templates="$(dirname "$self")/templates"
+own_templates="${XDG_CONFIG_HOME:-$HOME/.config}/kavat/notes/templates"
+# the notebook a new note goes to
+into=inbox
 
 # git needs a name to keep the history under; a machine where nobody set one uses the user's
 # for what is run from here only: the user's own git settings are not touched
@@ -82,21 +109,290 @@ set_field() {
   fi
 }
 
+# A name for a new note in a folder: the time it is made, and a number after it when two
+# are made in the same second
+fresh() {
+  local first name number=1
+  first="$1/$(date '+%Y%m%d%H%M%S')"
+  name=$first
+  while [[ -e $name.md || -e $name.todo.md ]]; do
+    name="$first-$((++number))"
+  done
+  echo "$name"
+}
+
+# Some text as one line: a title that came with line breaks or runs of spaces
+one_line() {
+  tr -s '[:space:]' ' ' <<< "$1" | sed 's/^ //; s/ $//'
+}
+
+# A picture as a JPEG no wider than asked. Nothing is left behind when it cannot be made.
+picture() {
+  local from=$1 to=$2 wide=$3
+  [[ -f $from ]] && command -v ffmpeg > /dev/null || return 1
+  if ffmpeg -nostdin -loglevel error -y -i "$from" -frames:v 1 -vf "scale='min($wide,iw)':-2" \
+    -q:v 4 -f mjpeg "$to.new" > /dev/null 2>&1 && [[ -s $to.new ]]; then
+    mv "$to.new" "$to"
+  else
+    rm -f "$to.new"
+    return 1
+  fi
+}
+
 # A page of the web as a note in the inbox: its title, the tag clip, its address and, from
-# the input, what was selected in it, as a quote. The browser saves a page this way.
+# the input, what was selected in it, as a quote. The browser saves a page this way. A page
+# that already has its note gets the new quote added to it, and a picture of the page is
+# kept beside the note, under the note's name.
 clip() {
-  local title address=${2:-} file quote
+  local title address=${2:-} shot=${3:-} file='' quote name number=1
   ready
-  title=$(tr -s '[:space:]' ' ' <<< "${1:-}" | sed 's/^ //; s/ $//')
+  title=$(one_line "${1:-}")
   [[ -n $title ]] || title="A page"
-  file="$notes/inbox/$(date '+%Y%m%d%H%M%S').md"
   quote=$(cat)
-  {
-    printf '# %s\n\n#clip\n\n%s\n' "$title" "$address"
-    [[ -n $quote ]] && { echo; sed 's/^/> /' <<< "$quote"; }
-  } > "$file"
+  if [[ -n $address ]]; then
+    file=$(grep -rlxF --include='*.md' --exclude-dir=.git --exclude-dir=albums -- "$address" "$notes" 2> /dev/null \
+      | xargs -r -d '\n' grep -lE '(^| )#clip( |$)' | head -n 1)
+  fi
+  if [[ -z $file ]]; then
+    file="$(fresh "$notes/inbox").md"
+    printf '# %s\n\n#clip\n\n%s\n' "$title" "$address" > "$file"
+  fi
+  if [[ -n $shot ]]; then
+    # the first picture has the note's name; the ones after it, a number too
+    name="$(basename "$file" .md).jpg"
+    while [[ -e $(dirname "$file")/$name ]]; do
+      name="$(basename "$file" .md)-$((++number)).jpg"
+    done
+    picture "$shot" "$(dirname "$file")/$name" 1280 && printf '\n![](%s)\n' "$name" >> "$file"
+  fi
+  [[ -n $quote ]] && { echo; sed 's/^/> /' <<< "$quote"; } >> "$file"
   keep "$file" "Clip"
   echo "$file"
+}
+
+# The address a bookmark keeps: the line between < and >
+address_of() {
+  sed -n 's/^<\(.*\)>$/\1/p' "$1" | head -n 1
+}
+
+# The folder of an album, by its name: letters, digits, - and _, and - for each space
+album_folder() {
+  if [[ ! ${1:-} =~ ^[A-Za-z0-9_\ -]+$ ]]; then
+    echo "kavat-notes: an album's name takes letters, digits, - and _: \"${1:-}\" does not do" >&2
+    return 1
+  fi
+  echo "$albums/${1// /-}"
+}
+
+# A site of an album as its file: by its address, or by the file itself
+site_of() {
+  local folder=$1 what=$2 file
+  for file in "$what" "$folder/$what" "$folder/archive/$what"; do
+    if [[ -f $file && $file == *.bookmark.md && $(realpath "$file") == "$(realpath "$folder")"/* ]]; then
+      realpath "$file"
+      return
+    fi
+  done
+  file=$(grep -lxF -- "<$what>" "$folder"/*.bookmark.md "$folder"/archive/*.bookmark.md 2> /dev/null | head -n 1)
+  [[ -n $file ]] && echo "$file"
+}
+
+album_list() {
+  local folder name
+  # read-later is always there, also before anything was kept in it
+  { echo read-later; find "$albums" -mindepth 1 -maxdepth 1 -type d -printf '%f\n' 2> /dev/null | sort; } | awk '!seen[$0]++' \
+    | while IFS= read -r name; do
+      printf '%s\t%s\n' "$name" "$(find "$albums/$name" -maxdepth 1 -name '*.bookmark.md' 2> /dev/null | wc -l)"
+    done
+}
+
+album_show() {
+  local folder file thumbnail
+  folder=$(album_folder "${1:-}") || return 1
+  if [[ ! -d $folder ]]; then
+    [[ $folder == */read-later ]] && return 0
+    echo "kavat-notes: there is no album called $1" >&2
+    return 1
+  fi
+  for file in "$folder"/*.bookmark.md; do
+    [[ -f $file ]] || continue
+    thumbnail="${file%.bookmark.md}.jpg"
+    [[ -f $thumbnail ]] || thumbnail=''
+    printf '%s\t%s\t%s\t%s\n' "$(title_of "$file" | tr '\t' ' ')" "$(address_of "$file")" "$file" "$thumbnail"
+  done
+}
+
+album_add() {
+  local folder title address=${3:-} shot=${4:-} file slug
+  folder=$(album_folder "${1:-}") || return 1
+  [[ -n $address ]] || { echo "kavat-notes: album add takes an album, a title and an address" >&2; return 1; }
+  ready
+  mkdir -p "$folder"
+  title=$(one_line "${2:-}")
+  [[ -n $title ]] || title=$address
+  # a site that is already in the album is not kept twice: its title and its picture are brought up to date
+  file=$(grep -lxF -- "<$address>" "$folder"/*.bookmark.md 2> /dev/null | head -n 1)
+  if [[ -n $file ]]; then
+    title=$title awk 'NR == 1 && /^# / { print "# " ENVIRON["title"]; next } { print }' "$file" > "$file.new" && mv "$file.new" "$file"
+  else
+    slug=$(tr '[:upper:]' '[:lower:]' <<< "$title" | sed -E 's/[^a-z0-9]+/-/g; s/^-//' | cut -c 1-40 | sed 's/-$//')
+    file="$folder/$(date '+%Y%m%d%H%M%S')-${slug:-site}"
+    while [[ -e $file.bookmark.md ]]; do file+=-; done
+    file+=.bookmark.md
+    printf '# %s\n\n<%s>\n\n#album\n' "$title" "$address" > "$file"
+  fi
+  [[ -n $shot ]] && picture "$shot" "${file%.bookmark.md}.jpg" 480
+  keep "$file" "Album"
+  echo "$file"
+}
+
+album_remove() {
+  local folder file
+  folder=$(album_folder "${1:-}") || return 1
+  file=$(site_of "$folder" "${2:-}") || { echo "kavat-notes: the album $1 has no site ${2:-}" >&2; return 1; }
+  rm -f "$file" "${file%.bookmark.md}.jpg"
+  keep "$file" "Album, removed"
+}
+
+album_delete() {
+  local folder
+  folder=$(album_folder "${1:-}") || return 1
+  [[ -d $folder ]] || { echo "kavat-notes: there is no album called $1" >&2; return 1; }
+  rm -rf "$folder"
+  keep "$folder" "Album deleted"
+}
+
+album_open() {
+  local -a addresses
+  local found
+  found=$(album_show "${1:-}") || return 1
+  mapfile -t addresses < <(cut -f 2 <<< "$found" | grep .)
+  ((${#addresses[@]})) || { echo "kavat-notes: the album $1 has no sites" >&2; return 1; }
+  command -v kavat-browser > /dev/null || { echo "kavat-notes: kavat-browser, which opens them, is not installed" >&2; return 1; }
+  setsid -f kavat-browser "${addresses[@]}" > /dev/null 2>&1 < /dev/null
+}
+
+# A site that has been read leaves the album for its archive, with its thumbnail
+album_read() {
+  local file folder
+  file=$(realpath "${1:-}" 2> /dev/null)
+  if [[ ! -f $file || $file != *.bookmark.md || $(dirname "$(dirname "$file")") != "$(realpath "$albums" 2> /dev/null)" ]]; then
+    echo "kavat-notes: ${1:-nothing} is not a site of an album" >&2
+    return 1
+  fi
+  folder="$(dirname "$file")/archive"
+  mkdir -p "$folder"
+  mv "$file" "$folder/"
+  [[ -f ${file%.bookmark.md}.jpg ]] && mv "${file%.bookmark.md}.jpg" "$folder/"
+  keep "$folder/$(basename "$file")" "Album, read"
+  echo "$folder/$(basename "$file")"
+}
+
+album() {
+  case ${1:-} in
+    '') album_list ;;
+    show) album_show "${2:-}" ;;
+    add) album_add "${@:2}" ;;
+    remove) album_remove "${2:-}" "${3:-}" ;;
+    delete) album_delete "${2:-}" ;;
+    open) album_open "${2:-}" ;;
+    read) album_read "${2:-}" ;;
+    *) echo "kavat-notes: album takes show, add, remove, delete, open or read" >&2; return 2 ;;
+  esac
+}
+
+# What the notes have of a site: every note, clipping and album site that names its host,
+# the newest first. What an album has archived is left out.
+about() {
+  local host pattern file kind
+  host=$(sed -E 's|^[A-Za-z][A-Za-z0-9+.-]*://||; s|[/?#].*$||; s|^[^@]*@||; s|:[0-9]+$||; s|^www\.||' <<< "${1:-}" | tr '[:upper:]' '[:lower:]')
+  [[ -n $host ]] || { echo "kavat-notes: about takes an address" >&2; return 1; }
+  # the host as a whole name: not inside a longer one
+  pattern="(^|[^[:alnum:].-])(www\.)?$(sed 's/[.[\*^$()+?{|]/\\&/g' <<< "$host")(\.?([^[:alnum:].-]|\$))"
+  grep -rliE --include='*.md' --exclude-dir=.git -- "$pattern" "$notes" 2> /dev/null | grep -v "^$albums/[^/]*/archive/" \
+    | xargs -r -d '\n' stat -c '%Y %n' | sort -rn | cut -d ' ' -f 2- | while IFS= read -r file; do
+      if [[ $file == "$albums"/* ]]; then
+        kind=album
+      elif grep -qE '(^| )#clip( |$)' "$file"; then
+        kind=clip
+      else
+        kind=note
+      fi
+      printf '%s\t%s\t%s\n' "$(title_of "$file" | tr '\t' ' ')" "$file" "$kind"
+    done
+}
+
+# The templates there are, yours and the system's, by name
+template_names() {
+  find "$own_templates" "$templates" -maxdepth 1 -name '*.md' -printf '%f\n' 2> /dev/null | sed 's/\.md$//' | sort -u
+}
+
+# A template as its file: yours takes the place of the system's of the same name
+template_of() {
+  local folder
+  for folder in "$own_templates" "$templates"; do
+    [[ -f $folder/$1.md ]] && { echo "$folder/$1.md"; return; }
+  done
+  return 1
+}
+
+# A template with its blanks filled: {{title}}, {{date}} and {{time}}
+fill() {
+  local text
+  text=$(< "$1")
+  text=${text//'{{title}}'/"$2"}
+  text=${text//'{{date}}'/"$(date '+%Y-%m-%d')"}
+  text=${text//'{{time}}'/"$(date '+%H:%M')"}
+  printf '%s\n' "$text"
+}
+
+# A note made from a template, in the inbox or the notebook named
+new_note() {
+  local name=${1:-} title template file
+  title=$(one_line "${*:2}")
+  template=$(template_of "$name") || {
+    echo "kavat-notes: there is no template called $name; there are: $(template_names | tr '\n' ' ')" >&2
+    return 1
+  }
+  ready
+  [[ -n $title ]] || title="${name^} of $(date '+%Y-%m-%d %H:%M')"
+  file="$(fresh "$notes/$into").md"
+  # a template whose title has a box makes a task, which nb knows by the file's name
+  grep -q -m 1 '^# \[ \] ' "$template" && file="${file%.md}.todo.md"
+  fill "$template" "$title" > "$file"
+  keep "$file" "New"
+  echo "$file"
+}
+
+# Today's note, one for each day, in the home notebook
+daily() {
+  local file template
+  ready
+  file="$notes/home/daily/$(date '+%Y-%m-%d').md"
+  if [[ ! -f $file ]]; then
+    mkdir -p "$(dirname "$file")"
+    if template=$(template_of daily); then
+      fill "$template" "$(date '+%A %-d %B %Y')" > "$file"
+    else
+      printf '# %s\n' "$(date '+%A %-d %B %Y')" > "$file"
+    fi
+    keep "$file" "Daily"
+  fi
+  echo "$file"
+}
+
+# A note that was just made: in a terminal it opens in the editor; anything else that asked
+# for it is told where it is
+show_new() {
+  if [[ -t 1 ]]; then
+    exec "${EDITOR:-nvim}" "$1"
+  fi
+  echo "$1"
+}
+
+# The mode the system is in, as kavat-mode wrote it down
+mode() {
+  sed -n 's/.*"mode": *"\([^"]*\)".*/\1/p' "${XDG_STATE_HOME:-$HOME/.local/state}/kavat/mode.json" 2> /dev/null | head -n 1
 }
 
 # Keep a change in the notebook's history, as nb does with its own
@@ -139,7 +435,7 @@ when_in() {
 }
 
 add() {
-  local text="$*" when='' title body file name
+  local text="$*" when='' title body file
   [[ -n ${text// /} ]] || return 1
   ready
   if when=$(when_in "$text"); then
@@ -157,14 +453,14 @@ add() {
     # a line that was only a time is a reminder with nothing to say
     [[ -n $when ]] && title="Reminder" || title="Note of $(date '+%Y-%m-%d %H:%M')"
   fi
-  name="$(date '+%Y%m%d%H%M%S').md"
+  file=$(fresh "$notes/$into")
   if [[ -n $when ]]; then
-    printf -- '---\nremind: %s\n---\n# [ ] %s\n' "$when" "$title" > "$notes/inbox/${name%.md}.todo.md"
-    name="${name%.md}.todo.md"
+    file+=.todo.md
+    printf -- '---\nremind: %s\n---\n# [ ] %s\n' "$when" "$title" > "$file"
   else
-    printf '# %s\n' "$title" > "$notes/inbox/$name"
+    file+=.md
+    printf '# %s\n' "$title" > "$file"
   fi
-  file="$notes/inbox/$name"
   [[ -n $body ]] && printf '\n%s\n' "${body% }" >> "$file"
   keep "$file" "Add"
   [[ -n $when ]] && sync_timers
@@ -229,6 +525,11 @@ due() {
       order = (($1 < now && day != today) || ($2 == "reminder" && $1 <= now)) ? 0 : (day == today ? 1 : 2)
       print order "\t" $0 }' | sort | cut -f 2-)
   [[ -n $last ]] || echo "Nothing is due."
+}
+
+# How many are due today or overdue: the number the bar shows
+count() {
+  dated | awk -F '\t' -v today="$(date '+%Y-%m-%d')" 'substr($1, 1, 10) <= today { found++ } END { print found + 0 }'
 }
 
 # The name of the timer of one reminder: it changes when the note's time does
@@ -357,9 +658,15 @@ fire() {
   local file=$1 when unit choice
   [[ -f $file ]] || return 0
   when=$(date -d "$(field "$file" remind)" '+%Y-%m-%d %H:%M' 2> /dev/null) || return 0
+  # In Gamer mode a reminder waits, unless its note says it is urgent: it is not written
+  # down as shown, so the next sync shows it, and kavat-mode asks for one on every change
+  if [[ $(mode) == gamer && $(field "$file" urgent) != true ]]; then
+    return 0
+  fi
   unit=$(timer_of "$file" "$when")
   mkdir -p "$fired"
-  : > "$fired/$unit"
+  # shown once: a second call for the same reminder, as when two syncs meet, leaves it be
+  (set -o noclobber && : > "$fired/$unit") 2> /dev/null || return 0
   choice=$(notify-send --app-name Notes --icon appointment-soon --urgency critical --wait \
     --action open=Open --action later='In 10 minutes' --action hour='In 1 hour' \
     --action tomorrow=Tomorrow --action done=Done \
@@ -402,6 +709,17 @@ browse() {
   return $status
 }
 
+# add and new put their note in the inbox, or in the notebook named first
+if [[ ${1:-} =~ ^(add|new)$ && ${2:-} == --to ]]; then
+  into=${3:-}
+  ready
+  if [[ -z $into || $into == */* || $into == .* || ! -d $notes/$into ]]; then
+    echo "kavat-notes: there is no notebook called $into" >&2
+    exit 1
+  fi
+  set -- "$1" "${@:4}"
+fi
+
 case ${1:-} in
   '')
     # the notes' own screen, when it is there and this is a terminal; the picker otherwise
@@ -410,7 +728,18 @@ case ${1:-} in
     ;;
   quick) quick ;;
   add) shift; add "$@" ;;
+  new)
+    if (($# > 1)); then
+      file=$(new_note "${@:2}") && show_new "$file"
+    else
+      template_names
+    fi
+    ;;
+  daily) file=$(daily) && show_new "$file" ;;
   clip) shift; clip "$@" ;;
+  album) shift; album "$@" ;;
+  about) about "${2:-}" ;;
+  count) count ;;
   due)
     if (($# > 1)); then due_date "${@:2}"; else due; fi
     ;;
@@ -444,7 +773,7 @@ case ${1:-} in
     file=$(add "${@:2}") && exec "${EDITOR:-nvim}" "$file"
     ;;
   *)
-    sed -n '2,22s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,42s/^# \{0,1\}//p' "$0" >&2
     exit 2
     ;;
 esac

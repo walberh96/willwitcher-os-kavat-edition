@@ -195,6 +195,12 @@ local groups = {
     MultiCursorDisabledCursor = { reverse = true },
     MultiCursorDisabledVisual = { link = "Visual" },
     MultiCursorDisabledSign = { link = "SignColumn" },
+
+    -- the chips under a note's title
+    KavatChip = { fg = p.text, bg = p.hover },
+    KavatChipDue = { fg = p.on_fill, bg = p.fill },
+    KavatChipLate = { fg = p.bg, bg = p.red },
+    KavatChipTag = { fg = p.blue, bg = p.surface },
 }
 for name, look in pairs(groups) do
     vim.api.nvim_set_hl(0, name, look)

@@ -1,6 +1,9 @@
 -- Markdown, and with it the notes: what Enter does on a link or a checkbox, the switch
--- between formatted and plain text, and the reminders, set again when a note is saved.
+-- between formatted and plain text, the chips under a note's title, and the reminders, set
+-- again when a note is saved.
 local M = {}
+
+local chips_of = vim.api.nvim_create_namespace("kavat-notes-chips")
 
 local function notes_folder()
     return vim.env.NB_DIR or (vim.env.HOME .. "/Notes")
@@ -72,8 +75,106 @@ function M.enter()
     end
 end
 
+-- What a note says about itself, read as the notes' screen reads it: the reminder, the
+-- repetition and whether it is urgent, from the front matter; the day under "## Due"; the
+-- tags, which are the words that start with # before the first section or under "## Tags";
+-- and the line of its title.
+function M.read(lines)
+    local note = { tags = {}, title = nil }
+    local at = 1
+    if lines[1] == "---" then
+        at = 2
+        while lines[at] and lines[at] ~= "---" do
+            local name, value = lines[at]:match("^(%a+): (.+)$")
+            if name == "remind" or name == "repeat" or name == "urgent" then
+                note[name] = vim.trim(value)
+            end
+            at = at + 1
+        end
+        at = at + 1
+    end
+    local section = ""
+    for number = at, #lines do
+        local line = lines[number]
+        if line:match("^# ") then
+            note.title = note.title or number
+        elseif line:match("^## ") then
+            section = vim.trim(line:sub(4)):lower()
+        elseif section == "due" and not note.due and line:match("^%d%d%d%d%-%d%d%-%d%d") then
+            note.due = line:sub(1, 10)
+        elseif section == "" or section == "tags" then
+            for tag in (" " .. line):gmatch("%f[%S]#[%w_-]+") do
+                note.tags[#note.tags + 1] = tag
+            end
+        end
+    end
+    return note
+end
+
+-- A day as the chips say it: "Fri 13 Nov"
+local function day(date)
+    local year, month, number = date:match("^(%d+)-(%d+)-(%d+)")
+    if not year then
+        return date
+    end
+    local said = os.date("%a %d %b", os.time({ year = tonumber(year), month = tonumber(month), day = tonumber(number), hour = 12 }))
+    return (said:gsub(" 0", " "))
+end
+
+-- Draw the chips of a note: one line under its title, or under its first line when it
+-- has no title, with the day it is due, its reminder, its repetition and its tags. They
+-- are drawn, not written: the file does not change.
+function M.chips(buf)
+    vim.api.nvim_buf_clear_namespace(buf, chips_of, 0, -1)
+    local note = M.read(vim.api.nvim_buf_get_lines(buf, 0, 400, false))
+    local now = os.date("%Y-%m-%d %H:%M")
+    local chips = {}
+    local function chip(text, group)
+        chips[#chips + 1] = { " " .. text .. " ", group }
+        chips[#chips + 1] = { " " }
+    end
+    if note.due then
+        chip("Due " .. day(note.due), note.due < now:sub(1, 10) and "KavatChipLate" or "KavatChipDue")
+    end
+    if note.remind then
+        local time = note.remind:match("%d+:%d+$")
+        chip("⏰ " .. day(note.remind) .. (time and " " .. time or ""), note.remind <= now and "KavatChipLate" or "KavatChip")
+    end
+    if note["repeat"] then
+        chip("↻ " .. note["repeat"], "KavatChip")
+    end
+    if note.urgent == "true" then
+        chip("! urgent", "KavatChipLate")
+    end
+    for _, tag in ipairs(note.tags) do
+        chip(tag, "KavatChipTag")
+    end
+    if #chips > 0 and vim.api.nvim_buf_line_count(buf) > 0 then
+        vim.api.nvim_buf_set_extmark(buf, chips_of, (note.title or 1) - 1, 0, { virt_lines = { chips } })
+    end
+    return chips
+end
+
 function M.setup()
     local group = vim.api.nvim_create_augroup("kavat-notes", {})
+    -- the chips' colours, for a colour scheme that does not name them
+    local function colours()
+        for name, link in pairs({ KavatChip = "CursorLine", KavatChipDue = "IncSearch", KavatChipLate = "DiagnosticError", KavatChipTag = "Directory" }) do
+            vim.api.nvim_set_hl(0, name, { link = link, default = true })
+        end
+    end
+    colours()
+    vim.api.nvim_create_autocmd("ColorScheme", { group = group, callback = colours })
+    -- a note opens with its chips, and they are drawn again when it is saved
+    vim.api.nvim_create_autocmd({ "BufReadPost", "BufNewFile", "BufWritePost" }, {
+        group = group,
+        pattern = "*.md",
+        callback = function(event)
+            if vim.startswith(vim.api.nvim_buf_get_name(event.buf), notes_folder() .. "/") then
+                M.chips(event.buf)
+            end
+        end,
+    })
     vim.api.nvim_create_autocmd("FileType", {
         group = group,
         pattern = "markdown",

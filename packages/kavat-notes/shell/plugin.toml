@@ -1,0 +1,13 @@
+# Part of kavat-shell: what is due in the notes, on the bar.
+id          = "kavat/notes"
+name        = "Kavat notes"
+version     = "0.1.0"
+plugin_api  = 43
+author      = "kavat"
+license     = "LicenseRef-AllRightsReserved"
+icon        = "checklist"
+description = "How many tasks and reminders are due today or overdue, on the bar."
+
+[[widget]]
+id    = "due"
+entry = "widget.luau"

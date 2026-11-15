@@ -1,14 +1,15 @@
 pkgname=kavat-notes
 pkgver=7.25.6
-pkgrel=6
+pkgrel=7
 pkgdesc="Willwitcher-OS Kavat Edition: notes in Markdown, on a fork of nb, with reminders and a quick note"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 # nb's license, which the fork keeps
 license=('AGPL-3.0-or-later')
 # nb is one Bash script that keeps each notebook in git; the picker and what draws its
-# preview; the notifications of the reminders; and the editor notes open in
-depends=('bash' 'git' 'fzf' 'bat' 'libnotify' 'systemd' 'neovim' 'kitty' 'gcc-libs')
+# preview; the notifications of the reminders; the editor notes open in; and what makes the
+# pictures of a clipping and of an album's sites small
+depends=('bash' 'git' 'fzf' 'bat' 'libnotify' 'systemd' 'neovim' 'kitty' 'gcc-libs' 'ffmpeg')
 # the notes' own screen is a Rust program
 makedepends=('cargo')
 options=('!debug')
@@ -50,4 +51,7 @@ package() {
   install -Dm644 "$srcdir/remind.nb-plugin" "$pkgdir/usr/share/kavat/nb/plugins/remind.nb-plugin"
   install -Dm644 "$srcdir/due.nb-plugin" "$pkgdir/usr/share/kavat/nb/plugins/due.nb-plugin"
   install -Dm755 "$srcdir/kavat-notes" "$pkgdir/usr/bin/kavat-notes"
+  # the templates a note is made from, and the count of what is due, for the shell's bar
+  install -Dm644 -t "$pkgdir/usr/share/kavat/notes/templates" "$startdir"/templates/*.md
+  install -Dm644 -t "$pkgdir/usr/share/kavat/shell-plugins/notes" "$startdir"/shell/*
 }

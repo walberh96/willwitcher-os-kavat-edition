@@ -170,6 +170,31 @@ local function specs(dir)
             },
         }),
 
+        -- The pictures of a note, like the one a clipping keeps, drawn in the note itself. It
+        -- draws with Kitty's graphics and ImageMagick's program, so it is only set up in a
+        -- Kitty that has it; a picture on the web is not fetched.
+        plugin("image.nvim", {
+            ft = "markdown",
+            config = function()
+                if not vim.env.KITTY_WINDOW_ID or vim.fn.executable("magick") == 0 or #vim.api.nvim_list_uis() == 0 then
+                    return
+                end
+                require("image").setup({
+                    backend = "kitty",
+                    processor = "magick_cli",
+                    integrations = {
+                        markdown = { enabled = true, download_remote_images = false, only_render_image_at_cursor = false },
+                        asciidoc = { enabled = false },
+                        typst = { enabled = false },
+                        neorg = { enabled = false },
+                        syslang = { enabled = false },
+                    },
+                    max_height_window_percentage = 40,
+                    hijack_file_patterns = {},
+                })
+            end,
+        }),
+
         -- The marketplace: plugins to look for, read about and install, on Ctrl+Shift+X. It
         -- asks the network for its list when it is opened, not before, and what it installs
         -- is a file of yours in lua/plugins/, which lazy.nvim fetches. Its count of what is

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Check the notes: nb as kavat-notes brings it, the quick note and the reminders.
+"""Check the notes: nb as kavat-notes brings it, the quick note, the reminders, the albums
+of sites, the clippings and the templates.
 
 usage: tests/notes.py [--encrypted]
   --encrypted   on the encrypted disk that tests/install.py --encrypt leaves
@@ -10,10 +11,14 @@ has to become a note in the inbox, with its tags, and a day and a time at its en
 become a reminder: a line in the note and a timer of the session. nb has to list what is
 due without asking anything first. A reminder set a minute ahead has to come up as a
 notification, and one whose time passed has to be listed as overdue. Then, on the desktop,
-Super+N has to open a line to type a note in, and Enter has to save it.
+Super+N has to open a line to type a note in, and Enter has to save it. A site has to be
+kept in an album as a bookmark with a small picture, once, and be opened, archived and
+found again by its address; a second clipping of a page has to land in the note of the
+first; a template has to make a note, and today's daily note has to be made once. In Gamer
+mode a reminder has to wait until the mode is left, unless its note says it is urgent.
 
 Needs qemu-desktop and edk2-ovmf, and tests/install.py run first. It runs as a normal user
-and takes about three minutes. Pictures of the screen are left in out/test/.
+and takes about four minutes. Pictures of the screen are left in out/test/.
 """
 import os
 import sys
@@ -157,6 +162,82 @@ def main():
         checks.report(output == 'missing: \nended: 0', 'it shows the notes by what they are for, and adds one from a line', output)
         status, output = user('grep -l -x "# \\[ \\] bring the bins out" ~/Notes/inbox/*.md | wc -l; kavat-notes < /dev/null | head -n 1')
         checks.report(output.splitlines()[:1] == ['1'], 'the note it added is a task with its reminder, in the inbox', output)
+
+        print('albums and clippings', flush=True)
+        # a picture of a page, wider than what is kept, a file that is no picture, and
+        # something that stands in for the browser and writes down what it was asked to open
+        machine.run('ffmpeg -loglevel error -y -f lavfi -i testsrc=size=1920x1080 -frames:v 1 /tmp/page.png; echo not a picture > /tmp/bad.png; '
+                    "mkdir -p /var/tmp/stub; printf '#!/bin/sh\\necho \"$@\" > /tmp/opened\\n' > /var/tmp/stub/kavat-browser; "
+                    'chmod 644 /tmp/page.png /tmp/bad.png; chmod 755 /var/tmp/stub /var/tmp/stub/kavat-browser')
+        status, output = user('kavat-notes album; kavat-notes album add "my sites" "Arch Linux" https://archlinux.org/ /tmp/page.png; '
+                              'kavat-notes album add "my sites" "Rust docs" https://docs.rs/ /tmp/bad.png > /dev/null; kavat-notes album')
+        lines = output.splitlines()
+        site = lines[1] if len(lines) > 1 else ''
+        checks.report(lines[:1] == ['read-later\t0'] and site.startswith(f'{HOME}/Notes/home/albums/my-sites/')
+                      and site.endswith('-arch-linux.bookmark.md') and lines[2:] == ['read-later\t0', 'my-sites\t2'],
+                      'a site is kept in an album, which is made for it', output)
+        status, output = user(f'cat "{site}"; ffprobe -v error -show_entries stream=width -of csv=p=0 "{site[:-12]}.jpg"; '
+                              'ls ~/Notes/home/albums/my-sites | grep -c jpg')
+        checks.report(output == '# Arch Linux\n\n<https://archlinux.org/>\n\n#album\n480\n1',
+                      'as a bookmark of nb with a small picture beside it; a file that is no picture is not kept', output)
+        status, output = user('kavat-notes album add my-sites "Arch Linux, the site" https://archlinux.org/ > /dev/null; '
+                              'kavat-notes album show my-sites | cut -f 1,2; kavat-notes album show my-sites | cut -f 3,4 | grep -c "bookmark.md.*jpg$"')
+        checks.report(output == 'Arch Linux, the site\thttps://archlinux.org/\nRust docs\thttps://docs.rs/\n1',
+                      'a site that is already there is brought up to date, not kept twice', output)
+        status, output = user('PATH=/var/tmp/stub:$PATH kavat-notes album open my-sites; sleep 1; cat /tmp/opened')
+        checks.report(output == 'https://archlinux.org/ https://docs.rs/', 'an album opens whole in the browser, in one call', output)
+        status, output = user('file=$(kavat-notes album add read-later "To read" https://example.org/long); kavat-notes album read "$file"; '
+                              'kavat-notes album show read-later | wc -l; kavat-notes album | head -n 1; kavat-notes about https://www.example.org/else | wc -l')
+        lines = output.splitlines()
+        checks.report(lines[:1] and lines[0].startswith(f'{HOME}/Notes/home/albums/read-later/archive/') and lines[1:] == ['0', 'read-later\t0', '0'],
+                      'a site that has been read goes to the archive of its album, and is not listed', output)
+
+        status, output = user('echo "first quote" | kavat-notes clip "Arch Linux" https://archlinux.org/ /tmp/page.png; '
+                              'echo "second quote" | kavat-notes clip "Arch Linux" https://archlinux.org/')
+        lines = output.splitlines()
+        clip = lines[0] if lines else ''
+        checks.report(len(lines) == 2 and lines[0] == lines[1] and clip.startswith(f'{HOME}/Notes/inbox/'),
+                      'a second clipping of a page lands in the note of the first', output)
+        status, output = user(f'grep -c -x -e "#clip" -e "> first quote" -e "> second quote" -e "!\\[\\]($(basename "{clip}" .md).jpg)" "{clip}"; '
+                              f'ffprobe -v error -show_entries stream=width -of csv=p=0 "{clip[:-3]}.jpg"')
+        checks.report(output == '4\n1280', 'with both quotes, and the picture of the page beside it and linked from it', output)
+        status, output = user('kavat-notes add "ask on archlinux.org about the mirror" > /dev/null < /dev/null; '
+                              'kavat-notes about https://www.archlinux.org/packages/ | cut -f 1,3 | sort')
+        checks.report(output.splitlines() == sorted(['Arch Linux\tclip', 'Arch Linux, the site\talbum', 'ask on archlinux.org about the mirror\tnote']),
+                      'what the notes have of a site is found by its address: the note, the clipping and the album', output)
+        status, output = user('kavat-notes album remove my-sites https://docs.rs/; kavat-notes album show my-sites | wc -l; kavat-notes album delete my-sites; '
+                              'kavat-notes album; git -C ~/Notes/home status --short | wc -l; git -C ~/Notes/home log --oneline | grep -c "kavat-notes. Album"')
+        checks.report(output.split('\n') == ['1', 'read-later\t0', '0', '7'],
+                      'a site is taken out, an album is deleted, and every change is in the history', output)
+
+        print('templates', flush=True)
+        status, output = user('kavat-notes new | tr "\\n" " "; echo; file=$(kavat-notes new bug "The bar flickers"); basename "$file" | grep -c "todo.md$"; head -n 3 "$file"')
+        checks.report(output == 'bug daily idea meeting \n1\n# [ ] The bar flickers\n\n#bug', 'a template makes a note: the bug is a task', output)
+        today = user('date +%Y-%m-%d')[1]
+        status, output = user('mkdir -p ~/.config/kavat/notes/templates; printf "# {{title}}\\n\\nmine, on {{date}}\\n" > ~/.config/kavat/notes/templates/idea.md; '
+                              'file=$(kavat-notes new --to home idea "Mine"); dirname "$file"; tr "\\n" "|" < "$file"; echo; '
+                              'kavat-notes daily; echo more >> "$(kavat-notes daily)"; tail -n 1 "$(kavat-notes daily)"; grep -c -x "#daily" "$(kavat-notes daily)"; ls ~/Notes/home/daily | wc -l')
+        checks.report(output == f'{HOME}/Notes/home\n# Mine||mine, on {today}|\n{HOME}/Notes/home/daily/{today}.md\nmore\n1\n1',
+                      "a template of the user's takes the place of the system's, in the notebook named; the daily note is made once", output)
+        status, output = user('python3 /var/tmp/screen.py "3,b,6,n" "Notes · home,Albums · read-later,A note from a template,meeting"', 60)
+        checks.report(output == 'missing: \nended: 0', "the notes' screen chooses a notebook, shows the albums and offers the templates", output)
+
+        print('reminders in Gamer mode', flush=True)
+        user('pkill -x notify-send; mkdir -p ~/.local/state/kavat; printf \'{"mode": "gamer", "undo": {}}\\n\' > ~/.local/state/kavat/mode.json')
+        status, output = user('held=$(kavat-notes add "wait for the game" < /dev/null); kavat-notes remind "$held" "1 minute ago" > /dev/null; '
+                              'now=$(kavat-notes add "the oven is on" < /dev/null); sed -i "1i ---\\nurgent: true\\n---" "$now"; '
+                              'kavat-notes remind "$now" "1 minute ago" > /dev/null; sleep 4; kavat-mode; pgrep -a -x notify-send')
+        checks.report(output.startswith('gamer') and 'Reminder the oven is on' in output and 'wait for the game' not in output,
+                      'in Gamer mode a reminder waits, and one that is urgent does not', output)
+        user('kavat-mode coder')
+        until('the one that waited comes up when the mode is left', 'pgrep -a -x notify-send', 'Reminder wait for the game')
+        status, output = user('pkill -x notify-send; test "$(kavat-notes count)" -ge 2 && echo counted; ls /usr/share/kavat/shell-plugins/notes')
+        checks.report(output.split() == ['counted', 'plugin.toml', 'widget.luau'], 'what is due is counted, for the widget of the bar', output)
+
+        status, output = user('printf -- "---\\nremind: 2030-01-01 09:00\\nrepeat: weekly\\n---\\n# [ ] Chips\\n\\n#one #two\\n" > ~/Notes/home/chips.todo.md; '
+                              'nvim --headless ~/Notes/home/chips.todo.md "+lua for _, chip in ipairs(require([[kavat.notes]]).chips(0)) do io.write(chip[1]) end" +qa! 2>&1', 60)
+        checks.report('1 Jan 09:00' in output and 'weekly' in output and '#one' in output and '#two' in output,
+                      'in the editor, a note has its reminder, its repetition and its tags as chips', output)
 
         machine.run("printf '# Title\\n\\n- [ ] box\\n' > /tmp/box.md; chmod 666 /tmp/box.md")
         status, output = user('nvim --headless /tmp/box.md "+lua vim.api.nvim_win_set_cursor(0, {3, 0}) require([[kavat.notes]]).enter() '

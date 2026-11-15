@@ -1,13 +1,13 @@
 pkgname=kavat-nvim
 pkgver=0.1.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Willwitcher-OS Kavat Edition: Neovim set up, with VS Code-style shortcuts and its plugins inside"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
-# the editor; what its picker looks with; git, for what changed; the clipboard; and the
-# language server for Markdown
-depends=('neovim' 'fzf' 'fd' 'ripgrep' 'bat' 'git' 'wl-clipboard' 'marksman')
+# the editor; what its picker looks with; git, for what changed; the clipboard; the
+# language server for Markdown; and what makes the pictures of a note ready to be drawn
+depends=('neovim' 'fzf' 'fd' 'ripgrep' 'bat' 'git' 'wl-clipboard' 'marksman' 'imagemagick')
 # what builds the parsers
 makedepends=('tree-sitter-cli' 'curl' 'tar')
 options=('!debug' '!strip')
@@ -31,6 +31,7 @@ _plugins=(
   'MeanderingProgrammer/render-markdown.nvim 8801162e041e34c64d0d1397cd1f353a14b01950'
   'alex-popov-tech/store.nvim 61af79fcf80c621afe2577a891dd74a937937dfb'
   'OXY2DEV/markview.nvim aadb6d817577d553bbef61e8b9073f1bf4b87e08'
+  '3rd/image.nvim 365e2ace0f619164ae6fd2f6f1d2807775dd6849'
 )
 source=('init.lua' 'build-parsers.lua' 'parsers.txt')
 sha256sums=('SKIP' 'SKIP' 'SKIP'
@@ -50,7 +51,8 @@ sha256sums=('SKIP' 'SKIP' 'SKIP'
             '7496f2bebb162b389e6423e718328c82e7e05fec0316d05af46578619e282889'
             '742e2d6d6a1ee0d674daa0e37294558696057ab42a435b93be2c5bd1edda14fc'
             'adc3c10e046bd8c4bfe1b63572361c9c0f87e88a966ddfc4aafb3c5706bca8a2'
-            '8d04f649479be64c081a5b3d94ad4bbbf456bc2cf54925e314129984c67e93b9')
+            '8d04f649479be64c081a5b3d94ad4bbbf456bc2cf54925e314129984c67e93b9'
+            '83c1451c5e453f4c407e5dd91a455d237431ac20ce0abdbb6968d70bbae4e7d0')
 for _plugin in "${_plugins[@]}"; do
   _repo=${_plugin% *} _commit=${_plugin#* }
   source+=("${_repo#*/}-$_commit.tar.gz::https://github.com/$_repo/archive/$_commit.tar.gz")
