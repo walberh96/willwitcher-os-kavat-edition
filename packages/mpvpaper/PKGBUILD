@@ -1,0 +1,23 @@
+# mpvpaper is not in Arch's repositories, so the system builds it here: the program as
+# its author tagged it, with nothing changed. It plays a video as the desktop's background.
+pkgname=mpvpaper
+pkgver=1.9
+pkgrel=1
+pkgdesc="A video as the wallpaper, for wlroots compositors, played by mpv"
+arch=('x86_64')
+url='https://github.com/GhostNaN/mpvpaper'
+license=('GPL-3.0-or-later')
+depends=('mpv' 'wayland' 'libglvnd')
+makedepends=('meson' 'ninja' 'wayland-protocols')
+source=("mpvpaper-$pkgver.tar.gz::https://github.com/GhostNaN/mpvpaper/archive/refs/tags/$pkgver.tar.gz")
+sha256sums=('6de941b54941cfd5d00bac62d10ef47c1338f237dac4c78a7185d0f8d30cd4d1')
+
+build() {
+  arch-meson "mpvpaper-$pkgver" build
+  meson compile -C build
+}
+
+package() {
+  meson install -C build --destdir "$pkgdir"
+  install -Dm644 "mpvpaper-$pkgver/mpvpaper.man" "$pkgdir/usr/share/man/man1/mpvpaper.1"
+}

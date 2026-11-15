@@ -1,0 +1,326 @@
+#!/usr/bin/env python3
+"""kavat-wallpaper: the desktop's background, an image or a video that plays in a loop.
+
+usage: kavat-wallpaper                  what the background is: theme, image or video, and its file
+       kavat-wallpaper set <file>       an image (PNG, JPG, WebP, SVG) or a video (MP4, WebM, MKV, GIF)
+       kavat-wallpaper theme            back to the theme's own picture
+       kavat-wallpaper list             the library: each file of ~/Pictures/Wallpapers, what it is, and a picture of it
+       kavat-wallpaper add <file>       copy a file into the library
+       kavat-wallpaper pause|resume     stop the video where it is, and let it go on
+       kavat-wallpaper playing          whether a video is playing, paused, or there is none
+       kavat-wallpaper option [<name> <value>]   the video's settings: sound, fit, gpu
+       kavat-wallpaper palette          make a palette from the background and wear it
+       kavat-wallpaper restore          at the start of a session: put the video back
+
+An image is drawn by the shell. A video is played by mpvpaper, over a still frame of it that
+the shell draws: that frame is what shows while the video is stopped, and what the palette
+is made from. The library is two folders, as in Endgame: ~/Pictures/Wallpapers/images and
+~/Pictures/Wallpapers/live.
+"""
+import colorsys
+import hashlib
+import json
+import os
+import shutil
+import socket
+import subprocess
+import sys
+import time
+
+HOME = os.path.expanduser('~')
+CONFIG = os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config'
+CACHE = (os.environ.get('XDG_CACHE_HOME') or f'{HOME}/.cache') + '/kavat/wallpaper'
+STATE_HOME = os.environ.get('XDG_STATE_HOME') or f'{HOME}/.local/state'
+RUNTIME = os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'
+SETTINGS = f'{CONFIG}/kavat/wallpaper.json'
+LIBRARY = {'image': f'{HOME}/Pictures/Wallpapers/images', 'video': f'{HOME}/Pictures/Wallpapers/live'}
+KINDS = {'image': ('.png', '.jpg', '.jpeg', '.webp', '.svg'), 'video': ('.mp4', '.webm', '.mkv', '.gif', '.mov')}
+SOCKET = f'{RUNTIME}/kavat-wallpaper.sock'
+UNIT = 'kavat-wallpaper-video'
+OPTIONS = {'sound': ('off', 'on'), 'fit': ('fill', 'fit', 'stretch'), 'gpu': ('on', 'off')}
+
+
+def settings():
+    try:
+        with open(SETTINGS, encoding='utf-8') as file:
+            return json.load(file)
+    except (OSError, ValueError):
+        return {}
+
+
+def save(value):
+    os.makedirs(os.path.dirname(SETTINGS), exist_ok=True)
+    with open(SETTINGS + '.new', 'w', encoding='utf-8') as file:
+        json.dump(value, file, indent=2)
+        file.write('\n')
+    os.replace(SETTINGS + '.new', SETTINGS)
+
+
+def run(*command, timeout=30):
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout.strip() if done.returncode == 0 else None
+
+
+def kind_of(path):
+    ending = os.path.splitext(path)[1].lower()
+    return next((kind for kind, endings in KINDS.items() if ending in endings), None)
+
+
+def theme_picture():
+    folder = f'{STATE_HOME}/kavat/theme/current/wallpaper'
+    try:
+        return next(f'{folder}/{name}' for name in sorted(os.listdir(folder)) if name.endswith('.svg'))
+    except (OSError, StopIteration):
+        return None
+
+
+def still_of(video):
+    """One frame of a video, kept: what the shell draws under it."""
+    stamp = hashlib.sha1(f'{video}{os.path.getmtime(video)}'.encode()).hexdigest()[:16]
+    still = f'{CACHE}/{stamp}.png'
+    if not os.path.exists(still):
+        os.makedirs(CACHE, exist_ok=True)
+        # a second in, so that it is not the black a video often starts with; the first frame when it is shorter
+        for at in ('1', '0'):
+            run('ffmpeg', '-y', '-loglevel', 'error', '-ss', at, '-i', video, '-frames:v', '1', still, timeout=60)
+            if os.path.exists(still):
+                break
+    return still if os.path.exists(still) else None
+
+
+def shell_shows(picture):
+    for _ in range(20):
+        if run('kavat-shell', 'msg', 'wallpaper-set', picture, timeout=5) is not None:
+            return True
+        time.sleep(0.5)
+    return False
+
+
+def stop_video():
+    run('systemctl', '--user', 'stop', f'{UNIT}.service')
+    run('systemctl', '--user', 'reset-failed', f'{UNIT}.service')
+
+
+def play(video, now):
+    """mpvpaper on every screen, as a unit of the session, so that it is one and can be stopped."""
+    stop_video()
+    fit = {'fill': 'panscan=1.0', 'fit': 'panscan=0.0', 'stretch': 'keepaspect=no'}[now.get('fit', 'fill')]
+    options = ['loop-file=inf', fit, f'input-ipc-server={SOCKET}',
+               'hwdec=auto-safe' if now.get('gpu', 'on') == 'on' else 'hwdec=no']
+    if now.get('sound', 'off') != 'on':
+        options.append('no-audio')
+    # --auto-pause: the video stops while a window covers the whole of it
+    return run('systemd-run', '--user', '--quiet', '--collect', '--unit', UNIT, '--description', 'The video on the desktop',
+               'mpvpaper', '--auto-pause', '-o', ' '.join(options), 'ALL', video) is not None
+
+
+def tell_player(*command):
+    """A word to the running video, through mpv's own socket."""
+    try:
+        with socket.socket(socket.AF_UNIX) as player:
+            player.settimeout(2)
+            player.connect(SOCKET)
+            player.sendall(json.dumps({'command': list(command)}).encode() + b'\n')
+            answer = json.loads(player.recv(4096).split(b'\n')[0])
+        return answer.get('data', True)
+    except (OSError, ValueError):
+        return None
+
+
+def set_to(path):
+    path = os.path.abspath(os.path.expanduser(path))
+    kind = kind_of(path)
+    if not os.path.isfile(path) or kind is None:
+        sys.exit(f'kavat-wallpaper: {path} is not an image or a video this can show')
+    now = settings()
+    if kind == 'video':
+        if not shutil.which('mpvpaper'):
+            sys.exit('kavat-wallpaper: a video needs mpvpaper, which is not installed')
+        still = still_of(path)
+        if still is None:
+            sys.exit(f'kavat-wallpaper: no frame could be read from {path}')
+        shell_shows(still)
+        if not play(path, now):
+            sys.exit('kavat-wallpaper: the video could not be started')
+    else:
+        stop_video()
+        shell_shows(path)
+    now.update(kind=kind, file=path)
+    save(now)
+    follow()
+
+
+def to_theme():
+    stop_video()
+    now = settings()
+    now.pop('kind', None)
+    now.pop('file', None)
+    save(now)
+    picture = theme_picture()
+    if picture:
+        shell_shows(picture)
+
+
+def shown():
+    """The picture on the desktop now: the image, the video's still, or the theme's."""
+    now = settings()
+    if now.get('kind') == 'video' and os.path.exists(now.get('file', '')):
+        return still_of(now['file'])
+    if now.get('kind') == 'image' and os.path.exists(now.get('file', '')):
+        return now['file']
+    return run('kavat-shell', 'msg', 'wallpaper-get', timeout=5) or theme_picture()
+
+
+# ---- a palette from the picture
+
+NAMES = [(15, 'red'), (40, 'orange'), (70, 'yellow'), (165, 'green'), (200, 'cyan'), (255, 'blue'), (290, 'purple'), (335, 'pink'), (361, 'red')]
+
+
+def colour(hue, lightness, saturation):
+    red, green, blue = colorsys.hls_to_rgb(hue % 360 / 360, lightness, saturation)
+    return f'#{round(red * 255):02x}{round(green * 255):02x}{round(blue * 255):02x}'
+
+
+def palette_from(picture):
+    """The colours of a picture as a palette of the theme: its file's text.
+
+    The neutrals take the hue most of the picture has; the accents are the hues that
+    stand out in it. kavat-theme adjusts whatever does not read well enough."""
+    source = picture
+    if picture.lower().endswith('.svg'):
+        # a drawing is made a picture first
+        os.makedirs(CACHE, exist_ok=True)
+        source = f'{CACHE}/drawing.png'
+        run('rsvg-convert', '-w', '256', '-o', source, picture)
+    raw = subprocess.run(['ffmpeg', '-loglevel', 'error', '-i', source, '-frames:v', '1', '-vf', 'scale=64:64',
+                          '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'], capture_output=True, check=False).stdout
+    if len(raw) < 64 * 64 * 3:
+        sys.exit(f'kavat-wallpaper: {picture} could not be read')
+    area, vivid, strength = [0.0] * 24, [0.0] * 24, [0.0] * 24
+    for at in range(0, 64 * 64 * 3, 3):
+        hue, lightness, saturation = colorsys.rgb_to_hls(raw[at] / 255, raw[at + 1] / 255, raw[at + 2] / 255)
+        bin_ = int(hue * 24) % 24
+        weight = saturation * (1 - abs(2 * lightness - 1))  # how much colour the eye sees in it
+        area[bin_] += 0.05 + weight
+        vivid[bin_] += weight * weight
+        strength[bin_] += weight
+    base = max(range(24), key=lambda bin_: area[bin_]) * 15 + 7
+    colourful = sum(strength) / (64 * 64)  # 0 for a grey picture
+    tint = min(0.22, 0.06 + colourful * 0.5)
+
+    # the hues that stand out, each at least 45 degrees from the ones already taken
+    accents = []
+    for bin_ in sorted(range(24), key=lambda bin_: -vivid[bin_]):
+        hue = bin_ * 15 + 7
+        if vivid[bin_] > 0 and all(min(abs(hue - other), 360 - abs(hue - other)) >= 45 for other in accents):
+            accents.append(hue)
+        if len(accents) == 5:
+            break
+    if not accents:
+        accents = [base]
+    # a picture of one colour still gets a choice: what is across and beside it
+    for turn in (180, 120, 240):
+        if len(accents) < 3:
+            accents.append((accents[0] + turn) % 360)
+    vividness = min(0.8, max(0.5, 0.45 + colourful * 2))
+
+    lines = ['# Made by kavat-wallpaper from the background: ' + picture,
+             '# `kavat-wallpaper palette` makes it again; a copy under another name is yours to keep.', '',
+             'name = "Wallpaper"', '', '[accents]']
+    taken = {}
+    for hue in accents:
+        name = next(name for limit, name in NAMES if hue < limit)
+        taken[name] = taken.get(name, 0) + 1
+        lines.append(f'{name if taken[name] == 1 else name + str(taken[name])} = "{colour(hue, 0.62, vividness)}"')
+    hues = {'red': 2, 'green': 130, 'yellow': 45, 'blue': 215, 'magenta': 300, 'cyan': 185}
+    for side, neutrals, light in (('dark', {'bg': 0.065, 'surface': 0.10, 'surface2': 0.145, 'text': 0.92, 'muted': 0.68, 'border': 0.25}, 0.64),
+                                  ('light', {'bg': 0.93, 'surface': 0.975, 'surface2': 0.895, 'text': 0.15, 'muted': 0.38, 'border': 0.80}, 0.42)):
+        lines += ['', f'[{side}]']
+        for name, lightness in neutrals.items():
+            lines.append(f'{name} = "{colour(base, lightness, tint if name not in ("text", "muted") else tint * 0.6)}"')
+        lines.append('')
+        for name, hue in hues.items():
+            lines.append(f'{name} = "{colour(hue, light, vividness * 0.85)}"')
+    return '\n'.join(lines) + '\n'
+
+
+def wear_palette():
+    """Write the palette of the background in force, and have the theme wear it."""
+    picture = shown()
+    if not picture or not os.path.exists(picture):
+        sys.exit('kavat-wallpaper: there is no background to take the colours from')
+    folder = f'{CONFIG}/kavat/palettes'
+    os.makedirs(folder, exist_ok=True)
+    text = palette_from(picture)
+    with open(f'{folder}/wallpaper.toml', 'w', encoding='utf-8') as file:
+        file.write(text)
+    first = text.split('[accents]\n', 1)[1].split(' ', 1)[0]
+    return subprocess.run(['kavat-theme', 'set', 'palette', 'wallpaper', 'accent', first], check=False).returncode
+
+
+def follow():
+    """With the theme taking its colours from the background, a new background is new colours."""
+    if run('kavat-theme', 'get', 'palette') == 'wallpaper':
+        wear_palette()
+
+
+def main():
+    arguments = sys.argv[1:]
+    now = settings()
+    if not arguments:
+        print(now.get('kind', 'theme'), now.get('file', theme_picture() or ''))
+    elif arguments[0] == 'set' and len(arguments) == 2:
+        set_to(arguments[1])
+    elif arguments == ['theme']:
+        to_theme()
+    elif arguments == ['list']:
+        # each line: what it is, the file, and a picture of it to show small
+        picture = theme_picture()
+        if picture:
+            lock = (os.environ.get('XDG_CACHE_HOME') or f'{HOME}/.cache') + '/kavat/lock/' + os.path.basename(picture)[:-4] + '.png'
+            print(f'theme\t{picture}\t{lock if os.path.exists(lock) else picture}')
+        for kind, folder in LIBRARY.items():
+            os.makedirs(folder, exist_ok=True)
+            for name in sorted(os.listdir(folder)):
+                if kind_of(name) == kind:
+                    path = f'{folder}/{name}'
+                    print(f'{kind}\t{path}\t{(still_of(path) or path) if kind == "video" else path}')
+    elif arguments[0] == 'add' and len(arguments) == 2:
+        kind = kind_of(arguments[1])
+        if kind is None or not os.path.isfile(arguments[1]):
+            sys.exit(f'kavat-wallpaper: {arguments[1]} is not an image or a video this can show')
+        os.makedirs(LIBRARY[kind], exist_ok=True)
+        print(shutil.copy2(arguments[1], LIBRARY[kind]))
+    elif arguments in (['pause'], ['resume']):
+        tell_player('set_property', 'pause', arguments[0] == 'pause')
+    elif arguments == ['playing']:
+        paused = tell_player('get_property', 'pause')
+        print('none' if paused is None else 'paused' if paused else 'playing')
+    elif arguments[0] == 'option' and len(arguments) == 1:
+        for name, values in OPTIONS.items():
+            print(name, now.get(name, values[0]))
+    elif arguments[0] == 'option' and len(arguments) == 3:
+        name, value = arguments[1:]
+        if name not in OPTIONS or value not in OPTIONS[name]:
+            sys.exit('kavat-wallpaper: the options are ' + '; '.join(f'{name}: {", ".join(values)}' for name, values in OPTIONS.items()))
+        now[name] = value
+        save(now)
+        if now.get('kind') == 'video' and os.path.exists(now.get('file', '')):
+            play(now['file'], now)
+    elif arguments == ['palette']:
+        sys.exit(wear_palette())
+    elif arguments == ['restore']:
+        if now.get('kind') == 'video' and os.path.exists(now.get('file', '')):
+            still = still_of(now['file'])
+            if still:
+                shell_shows(still)
+            play(now['file'], now)
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()

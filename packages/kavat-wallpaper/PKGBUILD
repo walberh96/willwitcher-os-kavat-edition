@@ -1,0 +1,17 @@
+# The desktop's background: an image, or a video played by mpvpaper, and a palette made from it.
+pkgname=kavat-wallpaper
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: the desktop's background, image or video, and the theme's colours from it"
+arch=('any')
+url="https://github.com/walberh96/willwitcher-os-kavat-edition"
+license=('LicenseRef-AllRightsReserved')
+depends=('python' 'kavat-shell' 'kavat-theme' 'mpvpaper' 'ffmpeg' 'librsvg')
+source=(kavat-wallpaper)
+sha256sums=('SKIP')
+
+package() {
+  install -Dm755 kavat-wallpaper "$pkgdir/usr/bin/kavat-wallpaper"
+  # the library's two folders, for every new user
+  install -d "$pkgdir/etc/skel/Pictures/Wallpapers/images" "$pkgdir/etc/skel/Pictures/Wallpapers/live"
+}
