@@ -4,6 +4,7 @@
 # usage: kavat-notes                       the notes, on one screen
 #        kavat-notes quick                 one line to type a note in; Enter saves it to the inbox
 #        kavat-notes add <text>            save that text as a note in the inbox
+#        kavat-notes clip <title> <address>  a page of the web as a note: what comes on the input is its quote
 #        kavat-notes due                   the tasks and reminders: overdue, today and upcoming
 #        kavat-notes remind <note> <when>  set a reminder on a note: "tomorrow 9:00", "friday 17:00"
 #        kavat-notes remind --off <note>   take the reminder off a note
@@ -79,6 +80,23 @@ set_field() {
   if [[ $(sed -n 2p "$file") == --- ]]; then
     sed -i 1,2d "$file"
   fi
+}
+
+# A page of the web as a note in the inbox: its title, the tag clip, its address and, from
+# the input, what was selected in it, as a quote. The browser saves a page this way.
+clip() {
+  local title address=${2:-} file quote
+  ready
+  title=$(tr -s '[:space:]' ' ' <<< "${1:-}" | sed 's/^ //; s/ $//')
+  [[ -n $title ]] || title="A page"
+  file="$notes/inbox/$(date '+%Y%m%d%H%M%S').md"
+  quote=$(cat)
+  {
+    printf '# %s\n\n#clip\n\n%s\n' "$title" "$address"
+    [[ -n $quote ]] && { echo; sed 's/^/> /' <<< "$quote"; }
+  } > "$file"
+  keep "$file" "Clip"
+  echo "$file"
 }
 
 # Keep a change in the notebook's history, as nb does with its own
@@ -392,6 +410,7 @@ case ${1:-} in
     ;;
   quick) quick ;;
   add) shift; add "$@" ;;
+  clip) shift; clip "$@" ;;
   due)
     if (($# > 1)); then due_date "${@:2}"; else due; fi
     ;;

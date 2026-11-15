@@ -1,6 +1,6 @@
 # Willwitcher-OS Kavat Edition — What to try by hand
 
-Written on 14 November 2026 and brought up to date on 15 November, for phase 3 · [Design document](DESIGN.md) · [Pending decisions](PENDING.md)
+Written on 14 November 2026 and brought up to date on 15 November, twice, for phase 3 · [Design document](DESIGN.md) · [Pending decisions](PENDING.md)
 
 The automatic tests run in a virtual machine with one screen, no network and a keyboard that types through a remote console. This is the list of what they cannot see: the real graphics card, two monitors, the mouse, the network, and how things feel. It is meant to be gone through once, from top to bottom, after one installation.
 
@@ -16,6 +16,7 @@ Mark each line as you go. For anything that fails, the line says what to note do
 
 - [ ] **The installer** is a dark window in the middle of the screen, with its steps down the left. Compare with `docs/screenshots/installer.png`.
 - [ ] **Appearance.** Choose a palette that is not Kavat, Light, and another accent: the small desktop on the right follows. After installing, the boot menu, the loading screen, the login and the desktop wear what you chose.
+- [ ] **Software.** With the network cable in, or Wi-Fi joined from the bar before opening the installer: check a few programs in two categories, and type `htop` in "Any other package". After installing, they are there (`pacman -Q firefox htop`), and `/etc/kavat/kavat-install.toml` says what was asked for and what came in. *This was only tried without a network, where it leaves everything out and says so: with a network it has never run. It makes the installation longer by what has to be downloaded.*
 - [ ] **While it installs**, pictures of the system go by, each with its line.
 - [ ] **The disk page**: the legend under the two bars can be read.
 
@@ -125,7 +126,65 @@ With the network:
 - [ ] **An AUR package**: `kav request <name>`, `kav review <name>`, approve it, `kav install <name>`. *The build itself was never run: it needs the network. This is the most likely place for something to fail.*
 - [ ] **`kav doctor`**, and on the Doctor tab, `f` on a line that failed. To have one: `sudo touch /var/lib/pacman/db.lck`.
 
-## 9. What has not changed, once more
+## 9. Modes
+
+- [ ] **The bar** has Coder, Gamer and Incognito, with Coder lit. Compare with the mockup's bar.
+- [ ] **Gamer**: press it. A notice says so; notifications are silent (send one: `notify-send test`); `powerprofilesctl get` says performance. Press Coder: all of it is back. **`Super+Shift+M`** goes to the next mode.
+- [ ] **Gamer by itself**: start a game from Steam, once Steam is installed: the bar goes to Gamer, and back when the game closes. *Never tried with a real game: the test uses a process that looks like one.*
+- [ ] **Incognito without a VPN**: press it: a notice says it needs one, and the bar stays on Coder.
+- [ ] **Incognito with your VPN**: import your Proton VPN or other file (`nmcli connection import type wireguard file <file>`, or `type openvpn`), choose it on the Modes page of the settings, and press Incognito. Check your address on a web page: it is the VPN's. Then bring the VPN down by hand (`nmcli connection down <name>`): **nothing should load** until you go back to Coder. *This is the most important check of this part: the test machine has no network, so the guard was only tried against a VPN that leads nowhere. Note exactly what happens.*
+- [ ] **In Incognito**, type a command in a new terminal, leave the mode, and look for it with the up arrow in another new terminal: it is not there. What you copied in the mode cannot be pasted after leaving.
+- [ ] **Modes page** (`Super+T`, Modes): the three cards say what each does; "New mode" opens a file of your own.
+
+## 10. The background and the displays
+
+- [ ] **Wallpaper page**: put a few images in `~/Pictures/Wallpapers/images` and a video in `~/Pictures/Wallpapers/live`. They show as pictures; pressing one sets it. In Yazi, `W` on a file sets it too.
+- [ ] **A video** plays as the background, on both monitors. Open a window full screen (`Super+F`): the video should stop, to save the graphics card. In Gamer mode it stops too. Try Sound and Fit. *Watch `kavat-top` while it plays and say how much of the processor and the graphics card it takes: the virtual machine has no graphics card to measure.*
+- [ ] **After a restart** the video plays again.
+- [ ] **Colours from it**: turn it on with a colourful image: the whole system takes its colours. Change the image: the colours change. Say whether the result is good to look at with three or four different pictures; this is the part most likely to need tuning by eye.
+- [ ] **Displays page**: your two monitors are drawn. Press one, change its resolution: it changes, and a line asks to keep it. Do not press Keep: after ten seconds it goes back. Change it again and press Keep.
+- [ ] **Place**: put one monitor to the left of the other, and above. Keep the one you like. Restart: it is as you left it. *Two monitors were never tried: the virtual machine has one.*
+- [ ] **Rotation and scale** on one monitor.
+- [ ] **GPU page**: it names your RX 6800 and shows its temperature, use, memory, fan and power, moving as you look. Start something heavy and watch them rise. "Install LACT" brings the program for the fan curve; try setting a curve there. *The readings were tried on this PC's card from CachyOS; the page itself only in the virtual machine, which has no card.*
+- [ ] **A USB stick**: plug it in: a notice offers to open it in Yazi and to take it out. Try both buttons. Try an NTFS stick if you have one.
+- [ ] **Profiles**: on Appearance, type a name and press "Save current"; change the look; press the profile: the look comes back.
+
+## 11. Backups and history
+
+- [ ] **Previous versions**: an hour after installing, or after `sudo snapper -c home create`, change a file in your home folder; in Yazi press `V` on it: the list shows the version from before, with what changed. `Ctrl+R` puts it back beside the file. Delete a file, press `V` on its folder, Enter: a new tab opens inside the snapshot, and the file can be copied back from there.
+- [ ] **Undo**: change a few things in the settings panel, then press **Undo** at the foot of the page, twice: each press takes one change back, and the system follows. **History** lists them all; Enter on one goes back to it.
+- [ ] **Export** leaves a file in your home folder; say whether you want Import in the panel too.
+- [ ] **A backup**: on Backup & sync, type a folder of an external disk as the place and press Enter; press "Back up now". Then `kavat-backup list`, and `kavat-backup restore latest ~/Documents/<a file> /tmp/back`. **Write the key down** (`kavat-backup key`). *A backup to another machine over SSH (`sftp:you@host:/folder`) was never tried.*
+- [ ] **Sync**: with a private repository of yours, type its address in "Sent to", press Enter, then "Send now". *Never tried against a real server; it needs your SSH key to be set up for git.*
+- [ ] **Keys**: `ssh-add -l` in a terminal answers (it says the agent has no keys, not that there is no agent). After the first `git push` over SSH that asks for the key's password, the next one does not ask. `secret-tool store --label test a b`, then `secret-tool lookup a b`, gives it back without asking for a password: the keyring opened with your login.
+- [ ] **The microphone**: in the sound controls there is "Microphone, noise removed". Record yourself with it while typing on the keyboard (any recorder, or a call): the keys should be gone. *Never heard: the test machine has no microphone.* Turn it off on the Sound page if it gets in the way.
+- [ ] **`kav news`** shows Arch's news since the installation, once there is some.
+- [ ] **The firewall**: `sudo nft list table inet kavat_firewall` shows it. From another machine of your network, `ping` this one works and nothing else answers. *If something you use needs an open door (a local server, KDE Connect, a game), say which: a door is one line in `/etc/kavat/firewall.d/`.*
+
+## 12. The browser
+
+- [ ] **`Super+B`** opens Kavat Browser on its start page: the clock, the search, and the sites you go to most once there are some, in the theme's colours. Change the mode of the theme to light: a new tab is light.
+- [ ] **Ads**: open a news site you know to be full of them: they are gone. The blocker's button on the toolbar turns it off for that site.
+- [ ] **The console**: `Ctrl+Shift+K`, type `zen`, Enter: the page takes the whole screen; again to come back. Try "close other tabs", "sleep other tabs", "copy link", "downloads" (Yazi opens on the downloads).
+- [ ] **Your own command**: add one to `~/.config/kavat/browser/commands.toml` (the file has examples), open the console: it is there.
+- [ ] **A clipping**: select a paragraph on a page, `Ctrl+Shift+S`. The button on the toolbar shows a tick; the note is in `Super+Shift+N`, tagged `clip`, with the address and the paragraph as a quote. The right button's "Save to the notes" does the same.
+- [ ] **Files**: on a page that uploads a file, the window that opens is Yazi; the same for "Save as". After a download, "Show in folder" opens Yazi at the file. *The window to pick a file was never seen from the browser: the test opens the browser but uploads nothing.*
+- [ ] **Protected video**: play something on Netflix, Prime Video or Spotify's web player. *Never tried: it needs your account. If it says the browser is not supported, note the exact words: Google retires old versions of the module.*
+- [ ] **The modes**: with the browser open, enter Incognito: its window goes out of sight, and `Super+B` opens a private window. Leave the mode: the first window is back. Enter Gamer with several tabs open: the tabs out of view have gone to sleep (they reload when you go to them).
+- [ ] **Look for what is missing from the browser you use now.** It is Chromium with the system's policies: sync with a Google account is off, and extensions install from the Chrome Web Store as usual. Say what you miss.
+
+## 13. Projects, the palette and the rest
+
+- [ ] **A project**: in a terminal, inside a folder of yours, `kavat project new <name>`; then `kavat project open <name>`: an empty workspace gets a terminal and the editor in that folder. Go to another workspace and open it again: it only takes you there. On the Projects page of the settings it is listed.
+- [ ] **The palette**: `Super+D`, then `/s dis` (Displays), `/f` and part of a file's name, `/pr`, `/m gamer`, `/k htop`, `/n` and a few words. Enter on each does what it says. *The typing in the launcher was not tried by the tests: note any of the six that shows nothing.*
+- [ ] **`kavat`** and Tab, in a terminal: it offers its words; `kavat mode` and Tab offers the modes.
+- [ ] **The screen's text**: `Shift+Print`, drag over some text on the screen, paste it somewhere: it is the text. Try it on Spanish text too.
+- [ ] **On the bar**: start a call or a recording: a mark shows that the microphone is in use. `Alt+Shift` changes the keyboard, and the bar says which.
+- [ ] **Neovim's marketplace**: `Ctrl+Shift+X` in the editor, with the network: a list of plugins to look through; install one and restart the editor: it is there. *Never tried with a network.*
+- [ ] **The lights**, if your keyboard or tower has them: `kav install openrgb`, then change the theme's accent: they take it. *Never tried: it depends on OpenRGB knowing your devices.*
+- [ ] **Privacy & network page**: it says the firewall is closed. "Turn it on" installs OpenSnitch; open a few apps and answer its questions. Say whether you want it on from the start.
+
+## 14. What has not changed, once more
 
 - [ ] A snapshot boots from the menu and `kavat-rollback` goes back to it.
 - [ ] Recovery in the boot menu ends in its own menu.
@@ -153,8 +212,13 @@ The user went through this list on the PC on 14 November 2026. Everything worked
 
 These are not failures: they are listed in the design document as left for later.
 
-- The settings panel has seventeen pages of twenty-six; the rest say what they wait for.
-- Profiles, and the theme following the sun instead of the clock.
+- The settings panel has twenty-three pages of twenty-six; the rest wait for the agent, or are the terminal's shell.
+- The theme following the sun instead of the clock, and rules that change the profile.
+- In the modes: all that waits for the agent and the browser, and the VPN's state on the bar.
+- Displays: placing by dragging, the main display, and a background for each display.
+- In the browser: the palette's colours on its own bars, a profile for each mode, albums, and the agent's panel.
+- A profile for each game, encrypted DNS, the sandbox profiles, and placing the displays by dragging.
+- In the installer: the programs that are only in the AUR, and repeating an installation from its answer file.
 - In Yazi: the wallpaper action, and the indicator of a copy that works out of sight.
 - `kavat-fetch` and `kavat-top` are fastfetch and btop with the theme, not the forks of the design yet.
 - In the notes: the Albums tab, the index, images inside notes, and the bar's count.

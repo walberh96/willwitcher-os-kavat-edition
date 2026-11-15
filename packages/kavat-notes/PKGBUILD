@@ -1,6 +1,6 @@
 pkgname=kavat-notes
 pkgver=7.25.6
-pkgrel=5
+pkgrel=6
 pkgdesc="Willwitcher-OS Kavat Edition: notes in Markdown, on a fork of nb, with reminders and a quick note"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

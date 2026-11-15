@@ -56,7 +56,7 @@ The forks (Hyprland, Kavat Shell) live in separate repos, and here there is only
 
 ## Installer
 
-Calamares with its own branding does the installation in nine steps, and the base system installs without network. Calamares is not in the official Arch repos, so it is packaged as `kavat-calamares` in `[kavat]`.
+Calamares with its own branding does the installation in ten steps, and the base system installs without network. Calamares is not in the official Arch repos, so it is packaged as `kavat-calamares` in `[kavat]`.
 
 The default language is English, with Spanish as the second option in the selector. Both come already installed in the ISO and in the system, with the US keyboard by default. Everything of our own (installer, greeter, shell, `kav` and agent) ships its text in English, and only in English: you decided this on 13 November 2026.
 
@@ -65,21 +65,21 @@ The default language is English, with Spanish as the second option in the select
 3. **Keyboard**: `us` or `es`, with a place to try it.
 4. **Partitions**: erase everything, alongside another system, or manual. Btrfs and subvolumes already decided; encryption as a switch, off by default.
 5. **Users**: name, password, host name.
-6. **Appearance**: theme, light or dark mode and accent hue, with a live preview.
-7. **Summary**: exact list of what is going to be done.
-8. **Install**: a progress bar, with pictures of the system going by.
-9. **Finish**: restart, or stay in the live session.
+6. **Software**: programs that are added to the base system, checked one by one by category. It needs network; the details are below.
+7. **Appearance**: theme, light or dark mode and accent hue, with a live preview.
+8. **Summary**: exact list of what is going to be done.
+9. **Install**: a progress bar, with pictures of the system going by.
+10. **Finish**: restart, or stay in the live session.
 
-They are Calamares' own steps, one page for each of its modules: you decided on 15 November 2026 (D43) to keep them, instead of joining them into the seven this list had. The graphics driver is detected without asking, so there is no Hardware step. One more step comes later, between Users and Appearance:
-
-- **Software**: programs that are added to the base system, checked one by one by category, and whether the agent is installed with its model. It needs network; the details are below.
+They are Calamares' own steps, one page for each of its modules, and the two pages of the installer's own: you decided on 15 November 2026 (D43) to keep them, instead of joining them into the seven this list had. The graphics driver is detected without asking, so there is no Hardware step.
 
 **How it is built.** In `installer/`, and checked by `tests/install.py`. Decided on 14 November 2026, after you saw it on the PC: it has to look like the mockup, show the system while it installs, and have the Appearance step.
 
 - **The look** is Kavat's dark side. The steps down the left are drawn by `calamares-sidebar.qml`, with a check on the ones done and the number of the one in view in the accent; the pages Calamares draws itself take their colours from `stylesheet.qss`. The buttons are Calamares' own, so that `Alt` with a letter presses them from anywhere. The window floats in the middle of the screen, 1280 by 800.
 - **Appearance** is a page of the installer's own, `appearance.qml`: the palettes of `kavat-theme` as cards, the mode, the accents of the palette chosen, and a small desktop drawn with those colours. The `kavat-look` step writes what was chosen as the settings of the machine, `/etc/kavat/theme.toml`, before the boot loader's step: the boot menu, the loading screen and the login wear it, and every user starts from it.
 - **While it installs** it shows eight pictures of the system, one after another, each with a line that says what it is. They are the mockup's screenshots, copied to `installer/branding/kavat/slides/`.
-- **Left for later**: the Software step, the answer file, the top bar that says whether there is a network, and "Auto" and "From wallpaper" on the Appearance page.
+- **Software** is a page of the installer's own too, `software.qml`: the categories, a box for each program, and a line for any other package by its name. The `kavat-software` step installs what was checked with pacman, working on the new system as `pacstrap` does, from the repositories that system is set to. It never stops the installation: with no network, or with a name pacman does not know, the system is installed as it comes, and what was left out is written in `/etc/kavat/kavat-install.toml`, with what was asked for, for `kav install` later. Every program offered is in Arch's own repositories.
+- **Left for later**: on the Software page, the programs that are only in the AUR, which wait for their entry in the reviewed list, the agent with its model, and what `pnpm` installs at the first boot; reading `kavat-install.toml` back to repeat an installation; the top bar that says whether there is a network; and "Auto" and "From wallpaper" on the Appearance page.
 
 Our own ideas on top of stock Calamares:
 
@@ -251,6 +251,15 @@ Shortcuts: 19 inherited from Endgame as they are and 12 new ones for what did no
 
 **Calculator in the palette.** Typing a calculation or a unit conversion in `Super+D` gives the result, computed on the machine, and Enter copies it.
 
+**How it is built.** Since phase 3, and checked by `tests/desktop.py`:
+
+- **The palette** is the shell's launcher with the system's own things added by a plugin, `kavat/palette`, each behind its word: `/s` the pages of the settings, `/f` files by name, `/pr` the projects, `/m` the modes, `/k` packages, which Enter hands to `kav` in a terminal, and `/n` the notes, where words that find nothing are saved as a note. Apps, the calculator, the clipboard and the rest are the launcher's own.
+- **Projects**: `kavat-project new <name>` makes one for a folder, and `kavat-project open <name>` goes to its workspace and opens what it is made of: a terminal and the editor in its folder, and whatever else its file says, files, the browser with a profile of the project's own, or any command. Opening one that is open only goes to it. The Projects page of the panel lists them.
+- **`kavat`** is the one command: `kavat theme`, `mode`, `wallpaper`, `displays`, `project`, `notes`, `find`, `browser`, `packages`, `doctor`, `backup`, `history`, `settings`, `set`, `fetch` and `top` are the system's programs under one name, with Tab offering what each takes.
+- **The screen's text**: `Shift+Print` reads a region of the screen with tesseract, in English and Spanish, on the machine, and copies what it says.
+- **On the bar**, beside the modes: a mark when an app uses the microphone, the camera or the screen, and which of the two keyboards is in use. Both are the shell's own widgets.
+- **Left for later**: windows and browser tabs in the palette, one grammar shared with the browser's console and Neovim's, passing what is not found to the agent, a project remembering its windows' places, and the cheat sheet of the app in focus.
+
 **Rule for all the forks.** Each fork carries a `PATCHES.md` with what it changes and why, and an automatic task that warns when upstream publishes a version and whether the patches apply cleanly.
 
 ## System modes
@@ -286,6 +295,16 @@ A limit to keep clear: the VPN hides your IP from the sites and your traffic fro
 
 On entering Incognito, the normal browser windows already open are hidden in a separate workspace and come back on exit.
 
+**How it is built.** Since phase 3, in `packages/kavat-modes/`, and checked by `tests/modes.py`. It is built without `kavatd`, which is phase 4: the program that changes the mode is `kavat-mode`.
+
+- **A mode is a file**, as above: the system's in `/usr/share/kavat/modes/`, the machine's in `/etc/kavat/modes/`, yours in `~/.config/kavat/modes/`. It can name the processor's profile, silence the notifications, stop units of the system and of the user, pause a video background, ask for the VPN and stop the terminal's history.
+- **What a mode changes is written down and undone on leaving it**: only the units that were running are started again, and the processor's profile and the notifications go back to what they were. Every session starts in Coder, undoing what an earlier one left.
+- **On the bar**, the three modes are a switch, drawn by a plugin of the shell, `kavat/modes`; `Super+Shift+M` goes to the next one, and the Modes page of the panel shows what each does.
+- **Units of the system** are stopped by a small helper that runs as root without asking for a password, for the person at the machine only; it touches nothing but the units a mode of the system names, so a mode in a home folder cannot stop a service of the system.
+- **Gamer** puts the processor on performance, silences the notifications, pauses a video background and stops the disk's index, the scheduled snapshots and the containers. A watch of the session enters it when Steam starts a game and goes back when the game ends; it can be turned off on the Modes page.
+- **Incognito** needs a VPN that NetworkManager knows, WireGuard or OpenVPN, chosen on the Modes page or with `kavat-mode vpn <name>`. It brings it up, and is not entered if it does not come up. Then a table of nftables lets nothing out but through the VPN's device and to the VPN's server: if the VPN drops, nothing goes out. The terminal keeps no history while in it, and the clipboard is emptied on leaving.
+- **Left for later**: what waits for the agent and the browser (the agent off or without history, private windows, the windows hidden), notifications without their content, the recent files, and the VPN's state on the bar.
+
 ## Gaming and hardware
 
 The machine is a desktop with a Radeon RX 6800, and the system treats it as such.
@@ -306,6 +325,16 @@ The machine is a desktop with a Radeon RX 6800, and the system treats it as such
 - **Main display**: the launcher, Kavat, the notifications and the games open on it. The workspaces are distributed per display.
 - **Confirm or undo**: a change that is not confirmed in 10 seconds undoes itself.
 - **In the file**: the layouts live in `~/.config/hypr/monitors.lua`, as a table of values. By default, a new display extends to the right.
+
+**How it is built.** Since phase 3, and checked by `tests/desktop.py`:
+
+- **`kavat-displays`**, in `packages/kavat-hyprland/`, sets a display's mode, scale, rotation and place, and keeps one arrangement for each set of displays in `~/.config/hypr/monitors.lua`, which Hyprland's configuration reads. A set is known by what its displays are, not by their sockets.
+- **A change is tried first**: it is worn at once, and undone by itself after ten seconds unless it is kept. The Displays page of the panel draws the displays to scale, changes the one that is pressed, and asks to keep or undo.
+- **A disk that is plugged in** is mounted by udiskie, which shows a notice with two buttons: one opens it in Yazi, the other takes it out safely.
+- **The microphone's noise suppression** is a file of PipeWire's, in `packages/kavat-base/`: it adds a microphone, "Microphone, noise removed", that listens to the real one through RNNoise and is offered first. It is on for every new user, and the Sound page of the panel turns it off and on.
+- **The GPU page** of the panel shows what the card says of itself, read from the kernel's files every two seconds while the page is in view: temperature, use, memory, fan and power. The fan curve and the power limit are LACT's, a program for exactly that, which the page opens, or installs with `kav` when it is not there; it is among the Games of the installer's Software page.
+- **The lights** take the theme's accent when OpenRGB is installed: the theme leaves the colour in a file and a helper hands it to OpenRGB, at each change of theme and when the session starts. OpenRGB is among the Games of the installer's Software page.
+- **Left for later**: placing by dragging, the main display, the workspaces of each display, the arrangement changing by itself when a display is plugged in during a session, the per-game profile, the card's sensors on the bar, and the lights changing with the mode and with Kavat's voice.
 
 ## Settings from the shell
 
@@ -368,14 +397,15 @@ How it works:
 **How it is built.** Since phase 3, in `packages/kavat-settings/`, and checked by `tests/settings.py`. These are the first pages. Decided on 14 November 2026 (D37): what counts is that the panel ends up as the mockup draws it; it is a plugin as far as a plugin reaches that, and C++ inside the shell where it does not.
 
 - **The panel is a plugin of the shell**, `kavat/settings`: a folder with its description and one script. `kavat-theme` writes, in the shell's settings, where that folder is and that the plugin is on, so it is there from the first login.
-- **`Super+T`** opens it. Seventeen pages of the twenty-six are built: **Appearance** and **Windows**, with every setting of the theme, each applied as it is changed; **Wallpaper**, which puts the theme's picture back or opens the shell's chooser for one of your own; **Accessibility**, which gathers less motion, the size of the text, high contrast and the size of the cursor; **Keybindings**, the desktop's shortcuts, which `Super+/` opens as a cheat sheet; **Displays**, which shows each screen as Hyprland has it; **Sound**, **Network** and **Bar & widgets**, which open the shell's own controls for them; **Terminal**, **Editor** and **Files**, with settings of Kitty, Neovim and Yazi; **Notes**, with what is due; **Packages**, with what is installed and what waits; **Boot**, which gives the screens before the desktop the look in force; **Login & lock**, with the times of the lock; and **Language & region**, with which keyboard comes first. The other nine are listed and say what they wait for.
+- **`Super+T`** opens it. Twenty-three pages of the twenty-six are built: **Appearance** and **Windows**, with every setting of the theme, each applied as it is changed; **Wallpaper**, which puts the theme's picture back or opens the shell's chooser for one of your own; **Accessibility**, which gathers less motion, the size of the text, high contrast and the size of the cursor; **Keybindings**, the desktop's shortcuts, which `Super+/` opens as a cheat sheet; **Displays**, which shows each screen as Hyprland has it; **Sound**, **Network** and **Bar & widgets**, which open the shell's own controls for them; **Terminal**, **Editor** and **Files**, with settings of Kitty, Neovim and Yazi; **Notes**, with what is due; **Packages**, with what is installed and what waits; **Boot**, which gives the screens before the desktop the look in force; **Login & lock**, with the times of the lock; **Language & region**, with which keyboard comes first; **Modes**, with what each mode does and what Gamer and Incognito need; and **Backup & sync**, with the snapshots, the backups and the history. Wallpaper and Displays are whole pages now: the library with its pictures, and each display's mode, scale, rotation and place. **GPU** shows the card's sensors; **Browser**, which browser opens links, the console's commands, the blocker and Widevine; **Projects**, the projects, to open and to make; and **Privacy & network**, the firewall and who reaches the network. The other three are listed and say what they wait for: the terminal's shell, the agent and its skills.
 - **A setting an app keeps in its own file is changed there**, by `kavat-conf`: it knows each page's file, how a line of it is written and what each setting may be, changes only that setting's line and tells the app. The Editor's are in `~/.config/kavat/editor.json`, which `kavat-nvim` reads; your own `init.lua` has the last word.
 - **The shortcuts' list** is `shortcuts.tsv`, kept beside Hyprland's configuration in `kavat-hyprland`.
 - **Nothing is kept in the panel.** Each page asks its program what is in force and changes it by running that program: `kavat-theme`, `kav`, `kavat-notes`. A value changed by hand shows the next time the panel opens, and a value the program refuses is not applied and its reason is shown.
 - **The shell's two lists of plugins on the network are off** until you turn them on in its settings: as Noctalia they were fetched on every start and every six hours.
 - **`Super+U`** opens `kav` on its full screen, in a floating window.
 - **The keyboard** is the one chosen in the installer, with the other of the two, `us` and `es`, behind it: `Alt+Shift` changes between them. The Language & region page changes which comes first; it is kept in `~/.config/kavat/desktop.json`, which Hyprland's configuration reads.
-- **Left for later**: the other nine pages, changing a screen's resolution or place, searching inside the pages, the undo and its history, changing a shortcut, export and import, and the guaranteed dependencies.
+- **Undo, History and Export**, at the foot of every page, are the history of the settings: Undo takes the last change back, History opens all of them in the system's picker, and Export leaves the settings as one file.
+- **Left for later**: the other three pages, searching inside the pages, changing a shortcut, and the guaranteed dependencies.
 
 Rule for the forks: an app is forked when it does not allow changing its configuration live or does not allow including a generated file. Hyprland and Kitty allow both, so today no further fork is needed; this is confirmed when implementing it in phase 3.
 
@@ -410,6 +440,19 @@ Added ideas:
 - **Maintenance**: Google retires old versions of the module, so `kavat-widevine` is rebuilt when it stops working; `kav doctor` checks it.
 - **Limit of protected video**: on Linux Widevine runs in software, and the services limit the quality in that case; the usual is 720p, with no 4K or HDR. The same happens in any Linux browser.
 - **Blocker**: start with uBlock Origin bundled and move to a native blocker only if needed, because Chromium limits more and more what blocking extensions can do.
+
+**How it is built.** Since phase 3, in `packages/kavat-browser/` and `packages/kavat-widevine/`, and checked by `tests/browser.py`. It is layer 1, whole: Chromium as Arch builds it, with nothing compiled here. Layer 2, the patches, is not started; what would need it is listed at the end.
+
+- **`kavat-browser`** is the command, and `Super+B` its key. It runs Chromium with its own settings folder, `~/.config/kavat-browser/`, under its own window name, with the system's policies and its two extensions loaded from the system's files. Links open in it.
+- **The policies**, in `/etc/chromium/policies/managed/`, turn off what a browser does behind your back: the usage reports, the sign-in, the advertising topics and measurements, running after it is closed, and asking to be the default.
+- **The blocker** is uBlock Origin Lite, the one that works with the extensions Chromium still allows. Its lists come inside it, so it blocks from the first start with no network. uBlock Origin itself can no longer be loaded in Chromium.
+- **The Kavat extension** is the system's own: the command console on `Ctrl+Shift+K`, a window where a command is found by typing and run with Enter; the start page, with the clock, the search and the sites most gone to, in the theme's colours; `Ctrl+Shift+S` and the right button's "Save to the notes"; and zen mode on `Ctrl+Shift+Z`.
+- **Its line to the system** is a small program, `browser-host`, that only the Kavat extension may start. Through it the extension gets the theme's colours, the mode in force and your own commands, from `~/.config/kavat/browser/commands.toml`, and sends a clipping, which becomes a note with the page's address, what was selected as a quote, and the tag `clip`. The other way, `kavat-browser command "<name>"` asks the open browser for a command of its console.
+- **The modes**: in Incognito every window it opens is a private one, the ones that were open are put out of sight until the mode is left, and nothing is saved to the notes; in Gamer the tabs out of view go to sleep.
+- **Files**: uploads and "save as" open Yazi, through the portal, and "show in folder" opens Yazi at the download.
+- **Protected video**: `kavat-widevine` fetches the module from Google when it is built and puts it where Chromium looks for it.
+- **The theme**: light and dark follow the system at once. The colours of the browser's own bars are Chromium's, not the palette's: that needs layer 2.
+- **Left for later**: the patches of layer 2 (the palette on the browser's own bars and internal pages, hiding native panels, a browser profile for each mode); the albums and the panel of notes about a site, and the screenshot in a clipping; and the agent's side panel, which is phase 4.
 
 ## Editor
 
@@ -450,7 +493,8 @@ Neovim is the core editor and ships as `kavat-nvim`: useful as soon as you open 
 - **What comes**: fzf-lua as the picker, nvim-tree as the explorer, bufferline and lualine, nvim-treesitter with 53 parsers already compiled, nvim-lspconfig, blink.cmp for completion, conform for formatting, gitsigns, toggleterm, which-key, multicursor.nvim and render-markdown.nvim.
 - **Language servers and formatters are turned on when their program is installed**: `kav install rust-analyzer` is enough. Marksman comes with the system.
 - **The colours are the theme's.** `kavat-theme` writes a palette and the editor's own colour scheme is made from it; an open editor changes with the theme.
-- **Left for later**: the marketplace, the Editor page of the panel, the side panels and the shortcut presets other than VS Code's.
+- **The marketplace** is store.nvim, in the package like the rest, on `Ctrl+Shift+X`. It asks the network for its list of plugins when it is opened, and what it installs is a file of yours in `lua/plugins/`, which lazy.nvim fetches. The count of what is looked at and installed that it sends to its author is turned off.
+- **Left for later**: the marketplace's categories and the system's own additions to it, the side panels and the shortcut presets other than VS Code's.
 
 **Marketplace.** `Ctrl+Shift+X` opens a TUI inside Neovim to search, view and install plugins by category, like the extensions tab of VS Code.
 
@@ -523,7 +567,8 @@ Yazi is in the official Arch repos. The portal backend is in the AUR, so it come
 - **`M` opens the disks**: Yazi's own mount manager, which mounts, unmounts and ejects with udisks, as in Endgame.
 - **The copy window** is a plugin, `paste.yazi`, on `Ctrl+V`. It does the copy itself, one item after another, with `cp` and `mv`, and follows it by looking at what has arrived: each item has its bar, the total has its own with the speed and the time left. A copy that is over at once never shows the window. When a name is taken it says what is there, its size and its date, and asks: `r` replaces, `s` skips, `k` keeps both with a number after the name, and `a` makes the answer hold for the rest. A folder over a folder is filled, not emptied first. `Esc` leaves the copy working out of sight, and a notice says when it is done; `c` cancels, and the half-copied item is taken away. On the same disk a copy shares the data with the original, so it is instant.
 - **What is copied is on the clipboard too**: `Ctrl+C` and `Ctrl+X` are `copy.yazi`, which also leaves the files on the system's clipboard as a list of files, so they can be pasted into another program.
-- **Left for later**: the indicator in the status bar while a copy works out of sight, and the line that says how many items are ready to paste; the wallpaper action, the opening rules from the panel's default apps, the Files page, the browser's part and Kavat's skills.
+- **`W` sets the file under the cursor as the background, and `V` shows its previous versions**, from the snapshots of the home folders.
+- **Left for later**: the indicator in the status bar while a copy works out of sight, and the line that says how many items are ready to paste; the opening rules from the panel's default apps, the Files page, the browser's part and Kavat's skills.
 
 ## File search
 
@@ -767,7 +812,8 @@ Planned commands: `kav install`, `remove`, `update`, `search`, `info`, `review`,
 - **`kav fix`** mends what `kav doctor` found: it removes the packages nothing needs, takes away pacman's lock when pacman is not running, cleans the cache, starts a failed service again after showing why it failed, and opens a settings file beside the package's new one to merge them. On the Doctor tab, `f` does it for the line under the cursor.
 - **`kav set`** changes the two settings that are real today, each in the file of the tool that uses it: `kav set downloads 8` is how many packages pacman downloads at once, and `kav set snapshots 20` how many snapshots snapper keeps. With nothing after it, it says what each is. On the Settings tab, Enter on one of them changes it to its next value.
 - **Before a key changes the system**, a window over the screen says what it will run and that the password is asked for in the terminal, and waits for Enter; `sudo`'s line says what the password is for.
-- **Left for later in this phase**: the rest of the Settings tab, Arch's news, the filters of Browse, the versions' sizes in Updates, comparing and deleting snapshots, the mouse, the signing of the list, an AUR package depending on another AUR package, the Arch news with its guided interventions, the migrations, the transaction guards and the firmware. Really building an AUR package needs a network, and the test machine has none: the test goes as far as checking which commit would be built.
+- **Arch's news** is read before an update: `kav update` names the items that came out since the last time, and when one asks for something to be done by hand it waits until `kav news` has shown them. Without a network the update goes ahead and says so.
+- **Left for later in this phase**: the rest of the Settings tab, the filters of Browse, the versions' sizes in Updates, comparing and deleting snapshots, the mouse, the signing of the list, an AUR package depending on another AUR package, guiding the interventions the news asks for, the migrations, the transaction guards and the firmware. Really building an AUR package needs a network, and the test machine has none: the test goes as far as checking which commit would be built.
 
 **Terminal interface.** `kav` with no arguments opens a full-screen TUI. The commands still exist for scripts and for the agent; TUI and commands share the same Rust core (the TUI with ratatui).
 
@@ -833,7 +879,9 @@ How it works:
 - **Today the theme is followed by** Hyprland (borders, corners, gaps, blur, shadows and animations), Kitty (colors, font and opacity; in light mode it lets less of the background through, so it does not turn gray), Kavat Shell (palette, mode, corners and font; its templates for other apps and its first-run wizard stay off) and GTK (colors and the light or dark preference). Hyprland asks for the theme when it loads its configuration, so the first login and safe mode already come up with it.
 - **Text never becomes code**: a font or palette name only accepts letters, digits, spaces and `- _ . #`, because it ends up inside the configuration files of other apps.
 - **The mode by the hour**: with `auto.follow` on, the mode is light from `auto.light_from` to `auto.dark_from`, 7 and 19 as they come, and dark the rest. `/usr/lib/kavat/theme-auto` sets it when the session starts and leaves a timer of the session for the next change. Auto, beside Light and Dark on the Appearance page, turns it on; choosing Light or Dark turns it off.
-- **Left for later in this phase**: the mode by the sun instead of the clock, profiles and rules, the theme from the wallpaper, the per-app override, `kavat-theme add`, having boot follow the desktop theme on its own, and the templates for the rest: Qt and the installer.
+- **Profiles**: `kavat-theme profile save work` keeps the settings in force under a name, `kavat-theme profile work` wears them, and `kavat-theme profile` lists them. The Appearance page has them as buttons.
+- **A palette someone made**: `kavat-theme add <file or address>` checks that it is a palette and keeps it among yours.
+- **Left for later in this phase**: the mode by the sun instead of the clock, rules that change the profile, the per-app override, having boot follow the desktop theme on its own, and the templates for the rest: Qt and the installer.
 
 **Icons and cursor.** They also come from the tokens, so they change with the palette, the mode and the accent.
 
@@ -887,6 +935,14 @@ How it works:
 - **Outside the panel**: `kavat wallpaper set <file>` and the agent do the same.
 
 mpvpaper is in the AUR and not in the official repos, so it comes in through `[kavat]` already built. If it caused problems, any other wallpaper player would do: the panel talks to a layer of its own, not to mpvpaper directly.
+
+**How it is built.** Since phase 3, in `packages/kavat-wallpaper/` and `packages/mpvpaper/`, and checked by `tests/desktop.py`:
+
+- **`kavat-wallpaper set <file>`** takes an image or a video. An image is drawn by the shell. A video is played by mpvpaper, on every display, over a still frame of it that the shell draws; the session puts it back when it starts.
+- **The library** is the two folders, made for every new user. The Wallpaper page of the panel shows them as pictures, filtered by kind, with the theme's own picture first; pressing one sets it. In Yazi, `W` sets the file under the cursor.
+- **The video stops** while a window covers the whole screen, which is mpvpaper's own doing, and in Gamer mode, which `kavat-mode` asks for. Sound, fit and GPU decoding are settings of the page.
+- **The theme from the background**: `kavat-wallpaper palette` reads the picture, or the video's still frame, and writes a palette: the neutrals take the hue most of the picture has, and the accents are the hues that stand out in it. `kavat-theme` then adjusts it for contrast as it does any palette. While the theme wears that palette, a new background makes it again.
+- **Left for later**: a background for each display, the slideshow, the moving preview of a video in the library, and the login and the lock showing the still frame.
 
 ## Local agent
 
@@ -1073,6 +1129,18 @@ The system assumes that something is going to break and that some package will b
 * **Synced configuration**: that repo can be pushed to a private remote; reinstalling or setting up another machine means cloning it.
 * **Privacy in plain sight**: the bar shows when an app is using the microphone, the camera or the screen, and the panel keeps who accessed what.
 * **Per-application firewall**: the first time an app wants to reach the network, the system asks; the rules are seen and changed in the panel. The games that Steam launches use Steam's rule, so it does not ask for each game.
+
+**How it is built.** Since phase 3, and checked by `tests/backup.py` and `tests/desktop.py`:
+
+- **The firewall** is in `packages/kavat-base/`: one table of nftables that closes everything incoming but the answers to what the machine asked for, put up before the network by `kavat-firewall.service`. A door of your own is a line in a file of `/etc/kavat/firewall.d/`.
+- **Snapshots of `/home`**, in `packages/kavat-backup/`: snapper takes one every hour and keeps the last day's, a week of daily ones and a month of weekly ones. In Yazi, `V` lists the previous versions of what is under the cursor, with what changed; Enter goes to that version in a new tab, to copy from it, and `Ctrl+R` puts it back beside the one of now.
+- **The history of the settings**, `kavat-history`: a git repository of its own that keeps the files of your settings where they are. Every change made in the panel is kept with what it was, and a change made by hand within ten minutes. `kavat-history undo` goes back one change at a time, `back <mark>` to any of them, and the system follows. The panel's Undo, History and Export buttons are these.
+- **Sync**: `kavat-history remote <address>` and `push` send the history to a private repository, and `kavat-history clone <address>` brings it to another machine and wears it. Keys and passwords are left out of it.
+- **Backups off the computer**, `kavat-backup`: restic copies the home folder, encrypted, to a folder of an external disk or to another machine over SSH. The key is made the first time; without it the copies cannot be opened. It can be made daily or weekly by itself, and a failure is said in a notice. The Backup & sync page of the panel has all of it.
+- **The keyring** is gnome-keyring, opened by the password typed at the login: the login's PAM file gets its two lines when `kavat-greeter` is installed. **SSH keys** are held by an agent of the session, `ssh-agent`, which every app of the session is pointed at; a key is handed to it the first time its password is typed.
+- **After `kav update`** the system is looked over with `kav doctor`, and when something is not as it should be it says that `kav undo` goes back to before the update.
+- **Who listens and who reaches out**: the bar marks an app that uses the microphone, the camera or the screen. The per-application firewall is OpenSnitch, which asks the first time a program wants to reach the network; it is not on as the system comes, because it asks often at first: the Privacy & network page of the panel turns it on, and shows the firewall's state and the doors you opened. Flatpak and OpenSnitch are among the installer's programs.
+- **Left for later**: optional encrypted DNS, the sandbox profiles, the automatic test of the graphical boot after updating, and the record of who used the microphone, the camera and the screen.
 
 ## Accessibility
 

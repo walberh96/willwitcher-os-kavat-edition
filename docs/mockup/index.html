@@ -517,7 +517,6 @@ body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
 .step{display:flex;align-items:center;gap:.7em;padding:.5em .6em;border-radius:calc(var(--r)*.6);font-size:.92em;color:var(--muted)}
 .step i{width:1.5em;height:1.5em;border-radius:50%;border:.12em solid var(--border);display:grid;place-items:center;font-style:normal;font-size:.78em}
 .step.done i{background:var(--ok);border-color:transparent;color:#0c1a0c}
-.step.soft{display:none}.screen[data-istep=software] #cal .step.soft{display:flex}
 .step.on{background:var(--surface);color:var(--text)}.step.on i{background:var(--accent);border-color:transparent;color:#14110a;font-weight:700}
 .main{flex:1;padding:1.7em 2em;display:flex;flex-direction:column;gap:1.1em;min-width:0}
 .main h2{font-size:1.55em;font-weight:650;letter-spacing:-.01em}
@@ -1065,11 +1064,11 @@ body.lit:not(.bare) .monitor{animation:lit 1.15s ease-in-out infinite alternate}
         <div class="step done"><i>✓</i>Keyboard</div>
         <div class="step done"><i>✓</i>Partitions</div>
         <div class="step done"><i>✓</i>Users</div>
-        <div class="step soft"><i>6</i>Software</div>
-        <div class="step on"><i>6</i>Appearance</div>
-        <div class="step"><i>7</i>Summary</div>
-        <div class="step"><i>8</i>Install</div>
-        <div class="step"><i>9</i>Finish</div>
+        <div class="step done"><i>✓</i>Software</div>
+        <div class="step on"><i>7</i>Appearance</div>
+        <div class="step"><i>8</i>Summary</div>
+        <div class="step"><i>9</i>Install</div>
+        <div class="step"><i>10</i>Finish</div>
       </div>
       <div class="main">
         <h2>Appearance</h2>
@@ -1205,7 +1204,7 @@ function apply(){
   screen_.dataset.notices=!!S.notices&&S.scene==='desk';screen_.dataset.calc=!!S.calc;
   screen_.dataset.ico=S.ico;$$('[data-ico]').forEach(b=>b.classList.toggle('on',b.dataset.ico===S.ico));
   document.body.classList.toggle('iscene',S.scene==='install');{const cur=S.istep!=='software'?'appearance':S.inet?'software':'offline';$$('[data-inst]').forEach(b=>b.classList.toggle('on',b.dataset.inst===cur))}
-  screen_.dataset.istep=S.istep;{const sw=S.istep==='software',cur=5;$$('#cal .step').filter(e=>sw||!e.classList.contains('soft')).forEach((e,i)=>{e.className='step'+(e.classList.contains('soft')?' soft':'')+(i<cur?' done':i===cur?' on':'');e.firstElementChild.textContent=i<cur?'✓':i+1;});screen_.dataset.inet=S.inet;$$('.js-inet').forEach(e=>e.textContent=sw&&S.inet?'Online · packages download while installing':'No network · offline install')}
+  screen_.dataset.istep=S.istep;{const sw=S.istep==='software',cur=sw?5:6;$$('#cal .step').forEach((e,i)=>{e.className='step'+(i<cur?' done':i===cur?' on':'');e.firstElementChild.textContent=i<cur?'✓':i+1;});screen_.dataset.inet=S.inet;$$('.js-inet').forEach(e=>e.textContent=sw&&S.inet?'Online · packages download while installing':'No network · offline install')}
   $$('.js-fmode').forEach(e=>e.textContent=inc?'Incognito':g?'Gamer':'Coder');
   $$('.js-bprofile').forEach(e=>e.textContent=inc?'Incognito':g?'Gamer':'Coder');
   $$('.js-btitle').forEach(e=>e.textContent=inc?'Kavat Browser · Incognito':'Kavat Browser');
