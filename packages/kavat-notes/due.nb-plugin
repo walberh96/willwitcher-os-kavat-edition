@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+###############################################################################
+# due.nb-plugin
+#
+# Part of kavat-notes: what is due, across every notebook. The work is done by
+# kavat-notes.
+###############################################################################
+
+_subcommands add "due"
+
+_subcommands describe "due" <<HEREDOC
+$(_color_primary "Usage"):
+  ${_ME} due
+
+$(_color_primary "Description"):
+  List the reminders and the open tasks that have a date, across every
+  notebook: the overdue ones, those of today and the upcoming ones. A task's
+  date is the one under its "## Due" heading; a reminder's is its "remind:"
+  line.
+HEREDOC
+
+_due() {
+  kavat-notes due
+}

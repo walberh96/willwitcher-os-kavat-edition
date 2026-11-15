@@ -1,0 +1,68 @@
+--- a/nb	2026-11-14 16:46:55.121285588 -0500
++++ b/nb	2026-11-14 17:32:39.325400242 -0500
+@@ -473,7 +473,18 @@
+ # Default: `$HOME/.nb`
+ #
+ # The location of the directory that contains the notebooks.
+-export NB_DIR="${NB_DIR:-"${HOME}/.${_ME}"}"
++# Willwitcher-OS Kavat Edition: git wants a name to keep the history under. Until
++# the user gives git one, the notes are kept under the user's own name, for nb
++# only: git's settings are not written.
++if ! git config user.name > /dev/null 2>&1 || ! git config user.email > /dev/null 2>&1
++then
++  export GIT_CONFIG_COUNT=2
++  export GIT_CONFIG_KEY_0=user.name   GIT_CONFIG_VALUE_0="${USER:-$(id -un)}"
++  export GIT_CONFIG_KEY_1=user.email  GIT_CONFIG_VALUE_1="${USER:-$(id -un)}@localhost"
++fi
++
++# Willwitcher-OS Kavat Edition: the notes live in ~/Notes, in plain sight.
++export NB_DIR="${NB_DIR:-"${HOME}/Notes"}"
+ 
+ # Handle symlinked NB_DIR.
+ if [[ -L "${NB_DIR:-}"      ]]
+@@ -764,7 +775,8 @@
+ # Default: value of $EDITOR or $VISUAL
+ #
+ # Example Values: 'vim', `code`'
+-NB_EDITOR="${NB_EDITOR:-${EDITOR:-${VISUAL:-}}}"
++# Willwitcher-OS Kavat Edition: with no editor named, the system's is used.
++NB_EDITOR="${NB_EDITOR:-${EDITOR:-${VISUAL:-nvim}}}"
+ 
+ __set_editor() {
+   local _editors=(
+@@ -4020,10 +4032,10 @@
+     fi
+ 
+     local _git_name=
+-    _git_name="$(git config --global --includes user.name   || printf '')"
++    _git_name="$(git config user.name   || printf '')"
+ 
+     local _git_email=
+-    _git_email="$(git config --global --includes user.email || printf '')"
++    _git_email="$(git config user.email || printf '')"
+ 
+     if [[ -z "${_git_name:-}"   ]]  ||
+        [[ -z "${_git_email:-}"  ]]
+@@ -9655,6 +9667,22 @@
+ #
+ # NOTE: Themes are loaded separately.
+ __load_plugins() {
++  # Willwitcher-OS Kavat Edition: the system's own plugins come first, from the
++  # kavat-notes package; a user's plugin of the same name takes their place.
++  if [[ -d "/usr/share/kavat/nb/plugins" ]]
++  then
++    set +f
++    local __system_file=
++    for   __system_file in /usr/share/kavat/nb/plugins/*."${_ME}"-plugin
++    do
++      [[ -f "${__system_file}"                                    ]] || continue
++      [[ -f "${NB_DIR}/.plugins/${__system_file##*/}"             ]] && continue
++
++      source "${__system_file}" 2>/dev/null || :
++    done
++    set -f
++  fi
++
+   if [[ -d "${NB_DIR}/.plugins" ]]
+   then
+     set +f

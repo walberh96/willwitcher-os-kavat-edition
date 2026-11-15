@@ -1,0 +1,31 @@
+#!/usr/bin/env bash
+###############################################################################
+# remind.nb-plugin
+#
+# Part of kavat-notes: reminders on notes, which the system shows as
+# notifications. The work is done by kavat-notes.
+###############################################################################
+
+_subcommands add "remind"
+
+_subcommands describe "remind" <<HEREDOC
+$(_color_primary "Usage"):
+  ${_ME} remind <note> <when>
+  ${_ME} remind --off <note>
+
+$(_color_primary "Description"):
+  Set a reminder on a note. <when> is a day and a time as you would say them:
+  "tomorrow 9:00", "friday 17:00", "2026-12-01 08:30". When the time comes, the
+  system shows a notification with the note, to open it, put it off or mark it
+  as done. A reminder is the "remind:" line in the note's front matter; add
+  "repeat: daily", "weekly" or "monthly" under it for one that comes back.
+
+$(_color_primary "Examples"):
+  ${_ME} remind 3 tomorrow 9:00
+  ${_ME} remind inbox:12 friday 17:00
+  ${_ME} remind --off 3
+HEREDOC
+
+_remind() {
+  kavat-notes remind "${@:-}"
+}

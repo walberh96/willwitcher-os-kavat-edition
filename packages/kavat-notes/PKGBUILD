@@ -1,0 +1,38 @@
+pkgname=kavat-notes
+pkgver=7.25.6
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: notes in Markdown, on a fork of nb, with reminders and a quick note"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+# nb's license, which the fork keeps
+license=('AGPL-3.0-or-later')
+# nb is one Bash script that keeps each notebook in git; the picker and what draws its
+# preview; the notifications of the reminders; and the editor notes open in
+depends=('bash' 'git' 'fzf' 'bat' 'libnotify' 'systemd' 'neovim' 'kitty')
+provides=("nb=$pkgver")
+conflicts=('nb')
+source=("nb-$pkgver.tar.gz::https://github.com/xwmx/nb/archive/refs/tags/$pkgver.tar.gz"
+        'kavat.patch' 'kavat-notes' 'remind.nb-plugin' 'due.nb-plugin')
+sha256sums=('affbfc5183b7c6205e1a512a26240cda4385aeb9df95525352e48f3099f6ade2'
+            'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+# The fork is one small patch: the notes live in ~/Notes, the system's plugins are read
+# from its own folder, git is given the user's name instead of being asked for one, and
+# the editor is Neovim when none is named.
+prepare() {
+  cd "nb-$pkgver"
+  patch -p1 < "$srcdir/kavat.patch"
+}
+
+package() {
+  cd "nb-$pkgver"
+  install -Dm755 nb "$pkgdir/usr/bin/nb"
+  install -Dm644 etc/nb-completion.bash "$pkgdir/usr/share/bash-completion/completions/nb"
+  install -Dm644 etc/nb-completion.zsh "$pkgdir/usr/share/zsh/site-functions/_nb"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  # nb's own daily log, and the system's two
+  install -Dm644 plugins/daily.nb-plugin "$pkgdir/usr/share/kavat/nb/plugins/daily.nb-plugin"
+  install -Dm644 "$srcdir/remind.nb-plugin" "$pkgdir/usr/share/kavat/nb/plugins/remind.nb-plugin"
+  install -Dm644 "$srcdir/due.nb-plugin" "$pkgdir/usr/share/kavat/nb/plugins/due.nb-plugin"
+  install -Dm755 "$srcdir/kavat-notes" "$pkgdir/usr/bin/kavat-notes"
+}
