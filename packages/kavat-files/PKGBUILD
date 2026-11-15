@@ -1,6 +1,6 @@
 pkgname=kavat-files
 pkgver=0.1.0
-pkgrel=4
+pkgrel=6
 pkgdesc="Willwitcher-OS Kavat Edition: Yazi as the file manager of the whole system"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -11,15 +11,15 @@ license=('LicenseRef-AllRightsReserved')
 depends=('yazi' 'kitty'
          'ffmpeg' 'poppler' 'imagemagick' 'resvg' '7zip' 'jq' 'mediainfo' 'file'
          'kavat-find' 'fd' 'ripgrep' 'fzf' 'zoxide' 'neovim'
-         'ouch' 'udisks2' 'wl-clipboard' 'xdg-utils'
+         'ouch' 'udisks2' 'udiskie' 'xdg-desktop-portal-gtk' 'wl-clipboard' 'xdg-utils'
          'xdg-desktop-portal' 'xdg-desktop-portal-hyprland' 'xdg-desktop-portal-termfilechooser'
          'python' 'python-gobject')
 # Yazi's own plugins, at the commit they were tried at: the mount manager comes from them
 _plugins=1ef5fe02a6122f8f3bb47a41056aab3f4b8598bf
 source=('yazi.toml' 'keymap.toml' 'init.lua' 'file-picker' 'termfilechooser.conf' 'portals.conf'
-        'show-in-folder' 'org.freedesktop.FileManager1.service'
+        'show-in-folder' 'org.freedesktop.FileManager1.service' 'open-folder' 'udiskie.yml'
         "yazi-plugins-$_plugins.tar.gz::https://github.com/yazi-rs/plugins/archive/$_plugins.tar.gz")
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
             'f2808f0ff5851cde839c3f36a3e038647449ad102b1c97b9b775a0670f186038')
 
 package() {
@@ -36,6 +36,8 @@ package() {
   install -Dm755 file-picker "$pkgdir/usr/lib/kavat/file-picker"
   install -Dm644 termfilechooser.conf "$pkgdir/etc/xdg/xdg-desktop-portal-termfilechooser/config"
   install -Dm644 portals.conf "$pkgdir/etc/xdg/xdg-desktop-portal/hyprland-portals.conf"
+  install -Dm755 open-folder "$pkgdir/usr/lib/kavat/open-folder"
+  install -Dm644 udiskie.yml "$pkgdir/usr/share/kavat/udiskie.yml"
   install -Dm755 show-in-folder "$pkgdir/usr/lib/kavat/show-in-folder"
   install -Dm644 org.freedesktop.FileManager1.service "$pkgdir/usr/share/dbus-1/services/org.freedesktop.FileManager1.service"
 }

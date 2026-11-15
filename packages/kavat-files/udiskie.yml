@@ -1,0 +1,16 @@
+# Part of kavat-files: what happens when a disk is plugged in. udiskie mounts it and
+# shows a notice with two buttons, one that opens it in Yazi and one that takes it out
+# safely. A file of your own, ~/.config/udiskie/config.yml, is not read: the session
+# starts udiskie with this one. Change the start line in Hyprland's configuration to use yours.
+program_options:
+  automount: true
+  notify: true
+  tray: false
+  file_manager: /usr/lib/kavat/open-folder
+
+notifications:
+  timeout: 10
+
+notification_actions:
+  device_mounted: [browse, detach]
+  device_added: []

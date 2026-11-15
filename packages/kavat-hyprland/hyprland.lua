@@ -10,7 +10,21 @@ local mod      = "SUPER"
 local terminal = "kitty"
 local files    = "kitty yazi"
 
+-- A display nothing is said of shows its best mode, to the right of the others.
 hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" })
+
+-- The arrangement kept for the displays connected, which kavat-displays writes: one
+-- arrangement for each set of displays, and the one named in `active` is worn.
+do
+    local home = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
+    local read, kept = pcall(dofile, home .. "/hypr/monitors.lua")
+    if read and type(kept) == "table" and type(kept.sets) == "table" then
+        for _, display in ipairs(kept.sets[kept.active] or {}) do
+            hl.monitor({ output = display.output, mode = display.mode, position = display.position,
+                         scale = display.scale, transform = display.transform })
+        end
+    end
+end
 
 -- The shell: bar, launcher, notifications and wallpaper
 hl.on("hyprland.start", function()
@@ -20,17 +34,30 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("kavat-cursor-apply")
     -- the background is the theme's, unless you chose one of your own
     hl.exec_cmd("/usr/lib/kavat/wallpaper")
+    -- a video you chose as the background plays again
+    hl.exec_cmd("kavat-wallpaper restore")
+    -- the arrangement kept for the displays that are connected now
+    hl.exec_cmd("kavat-displays restore")
     -- light by day and dark by night, for who asked for it
     hl.exec_cmd("/usr/lib/kavat/theme-auto")
     hl.exec_cmd("kavat-icons-apply")
+    -- the lights of the keyboard and the tower take the accent, when OpenRGB is installed
+    hl.exec_cmd("/usr/lib/kavat/lights")
     -- The reminders written in the notes become timers of this session; those whose time
     -- passed while the computer was off are shown now
     hl.exec_cmd("kavat-notes sync")
+    -- A disk that is plugged in is mounted, and a notice offers to open it or take it out
+    hl.exec_cmd("udiskie --config /usr/share/kavat/udiskie.yml")
+    -- Every session starts in Coder: what another mode left changed is undone. Then the
+    -- watch that enters Gamer when Steam starts a game.
+    hl.exec_cmd("kavat-mode restore; exec kavat-mode watch")
     -- The screen locks when nobody is there. Not on the live medium, whose user has no
     -- password to come back with.
     hl.exec_cmd("test -e /run/archiso || hypridle")
 end)
 
+-- the agent that holds the SSH keys, for every app of the session
+hl.env("SSH_AUTH_SOCK", (os.getenv("XDG_RUNTIME_DIR") or ("/run/user/" .. (os.getenv("UID") or "1000"))) .. "/ssh-agent.socket")
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
@@ -113,6 +140,7 @@ hl.bind(mod .. " + Return", hl.dsp.exec_cmd(terminal))
 hl.bind(mod .. " + Q", hl.dsp.window.close())
 hl.bind(mod .. " + D", hl.dsp.exec_cmd("kavat-shell msg panel-toggle launcher"))
 hl.bind(mod .. " + E", hl.dsp.exec_cmd(files))
+hl.bind(mod .. " + B", hl.dsp.exec_cmd("kavat-browser"))
 hl.bind(mod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mod .. " + P", hl.dsp.window.pseudo())
 hl.bind(mod .. " + J", hl.dsp.layout("togglesplit"))
@@ -134,8 +162,11 @@ hl.bind(mod .. " + S", hl.dsp.workspace.toggle_special("scratchpad"))
 hl.bind(mod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:scratchpad" }))
 
 hl.bind("ALT + Tab", hl.dsp.window.cycle_next())
+hl.bind(mod .. " + SHIFT + M", hl.dsp.exec_cmd("kavat-mode next"))
 hl.bind(mod .. " + SHIFT + V", hl.dsp.exec_cmd("kavat-shell msg panel-toggle clipboard"))
 hl.bind(mod .. " + SHIFT + P", hl.dsp.exec_cmd("hyprpicker -a"))
+-- a region of the screen, read: its text goes to the clipboard
+hl.bind("SHIFT + Print", hl.dsp.exec_cmd("/usr/lib/kavat/screen-text"))
 hl.bind("Print", hl.dsp.exec_cmd('grim -g "$(slurp)" - | wl-copy'))
 hl.bind(mod .. " + SHIFT + L", hl.dsp.exec_cmd("hyprlock"))
 hl.bind(mod .. " + M", hl.dsp.exit())

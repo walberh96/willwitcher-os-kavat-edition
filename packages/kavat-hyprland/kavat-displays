@@ -1,0 +1,214 @@
+#!/usr/bin/env python3
+"""kavat-displays: arrange the displays, and keep one arrangement for each set of them.
+
+usage: kavat-displays                          each display: its name, what it is, and how it is set
+       kavat-displays modes <display>          the sizes and rates a display can show
+       kavat-displays set <display> <setting>=<value>...
+                                               mode=2560x1440@144  scale=1.25  rotate=0|90|180|270
+                                               at=0x0, or at=right-of:<display>, left-of:, above:, below:
+       kavat-displays keep                     keep the arrangement in view: without it, a change is undone in 10 seconds
+       kavat-displays undo                     go back to the arrangement from before the last change
+       kavat-displays restore                  at the start of a session: wear the arrangement kept for the displays connected
+
+The arrangements live in ~/.config/hypr/monitors.lua, a table Hyprland's configuration
+reads: one arrangement for each set of displays, the set known by what the displays are,
+their make, model and serial number, and not by the socket they are plugged into. A change
+is tried first: it is written, Hyprland reads its configuration again, and unless
+`kavat-displays keep` comes within ten seconds the file from before is put back.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import time
+
+HOME = os.path.expanduser('~')
+CONFIG = os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config'
+FILE = f'{CONFIG}/hypr/monitors.lua'
+RUNTIME = os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'
+PENDING = f'{RUNTIME}/kavat-displays-before.lua'  # the file from before a change that is being tried
+SECONDS = 10
+ROTATIONS = {'0': 0, '90': 1, '180': 2, '270': 3}
+
+
+def hyprctl(*arguments):
+    for instance in ([], ['--instance', '0']):
+        try:
+            done = subprocess.run(['hyprctl', *instance, *arguments], capture_output=True, text=True, timeout=10, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return ''
+        if done.returncode == 0 and 'HYPRLAND_INSTANCE_SIGNATURE' not in done.stdout:
+            return done.stdout
+    return ''
+
+
+def displays():
+    try:
+        return json.loads(hyprctl('monitors', 'all', '-j') or '[]')
+    except ValueError:
+        return []
+
+
+def what(display):
+    """What a display is, wherever it is plugged in."""
+    return display.get('description') or display['name']
+
+
+def set_of(found):
+    return ' + '.join(sorted(what(display) for display in found))
+
+
+# ---- the file: a Lua table, written and read here
+
+def read_file():
+    """{'active': set, 'sets': {set: [rule, ...]}} from the file; empty when there is none."""
+    try:
+        text = open(FILE, encoding='utf-8').read()
+    except OSError:
+        return {'active': '', 'sets': {}}
+    kept = {'active': '', 'sets': {}}
+    active = re.search(r'^\s*active = "((?:[^"\\]|\\.)*)"', text, re.M)
+    if active:
+        kept['active'] = active.group(1).replace('\\"', '"')
+    for name, body in re.findall(r'^\s*\["((?:[^"\\]|\\.)*)"\] = \{\n(.*?)^\s*\},\n', text, re.M | re.S):
+        rules = []
+        for line in body.splitlines():
+            fields = {key: value.replace('\\"', '"').replace('\\\\', '\\')
+                      for key, value in re.findall(r'(\w+) = "((?:[^"\\]|\\.)*)"', line)}
+            fields.update({key: float(value) if '.' in value else int(value) for key, value in re.findall(r'(\w+) = (-?[\d.]+)', line)})
+            if 'output' in fields:
+                rules.append(fields)
+        kept['sets'][name.replace('\\"', '"')] = rules
+    return kept
+
+
+def write_file(kept):
+    def quoted(text):
+        return '"' + str(text).replace('\\', '\\\\').replace('"', '\\"') + '"'
+    lines = ['-- Written by kavat-displays: the arrangement of the displays, one for each set of them.',
+             '-- It is changed on the Displays page of the settings, or with kavat-displays; by hand too,',
+             '-- keeping one display to a line. Hyprland wears the set named in `active`.',
+             'return {', f'  active = {quoted(kept["active"])},', '  sets = {']
+    for name, rules in kept['sets'].items():
+        lines.append(f'    [{quoted(name)}] = {{')
+        for rule in rules:
+            lines.append('      { ' + ', '.join(f'{key} = {quoted(rule[key]) if isinstance(rule[key], str) else rule[key]}'
+                                                for key in ('output', 'mode', 'position', 'scale', 'transform') if key in rule) + ' },')
+        lines.append('    },')
+    lines += ['  },', '}']
+    os.makedirs(os.path.dirname(FILE), exist_ok=True)
+    with open(FILE + '.new', 'w', encoding='utf-8') as file:
+        file.write('\n'.join(lines) + '\n')
+    os.replace(FILE + '.new', FILE)
+
+
+def rule_of(display):
+    """A display as it is now, as a rule of the file."""
+    return {'output': 'desc:' + display['description'] if display.get('description') else display['name'],
+            'mode': f'{display["width"]}x{display["height"]}@{display["refreshRate"]:.2f}',
+            'position': f'{display["x"]}x{display["y"]}', 'scale': round(display['scale'], 2), 'transform': display.get('transform', 0)}
+
+
+def size_of(rule):
+    """The room a display takes in the arrangement: its size, turned and scaled."""
+    width, height = (int(n) for n in re.match(r'(\d+)x(\d+)', rule['mode']).groups())
+    if rule.get('transform', 0) % 2:
+        width, height = height, width
+    return round(width / rule.get('scale', 1)), round(height / rule.get('scale', 1))
+
+
+def reload():
+    hyprctl('reload')
+
+
+def main():
+    arguments = sys.argv[1:]
+    found = [display for display in displays() if not display.get('disabled')]
+    by_name = {display['name']: display for display in found}
+    if not arguments:
+        for display in found:
+            rule = rule_of(display)
+            print(f'{display["name"]}\t{what(display)}\t{rule["mode"]}\t{rule["position"]}\t{rule["scale"]}\t{rule["transform"] * 90}')
+    elif arguments[0] == 'modes' and len(arguments) == 2 and arguments[1] in by_name:
+        seen = dict.fromkeys(mode.replace('Hz', '') for mode in by_name[arguments[1]].get('availableModes', []))
+        print('\n'.join(seen))
+    elif arguments[0] == 'set' and len(arguments) >= 3 and arguments[1] in by_name:
+        kept = read_file()
+        name = set_of(found)
+        # the set as it is now, with what the file already says of it
+        rules = {rule['output']: rule for rule in kept['sets'].get(name, [])}
+        current = {display['name']: rules.get(rule_of(display)['output'], rule_of(display)) for display in found}
+        rule = dict(current[arguments[1]])
+        for pair in arguments[2:]:
+            key, _, value = pair.partition('=')
+            if key == 'mode' and re.fullmatch(r'\d+x\d+(@[\d.]+)?', value):
+                rule['mode'] = value
+            elif key == 'scale' and re.fullmatch(r'[0-9.]+', value) and 0.5 <= float(value) <= 4:
+                rule['scale'] = float(value)
+            elif key == 'rotate' and value in ROTATIONS:
+                rule['transform'] = ROTATIONS[value]
+            elif key == 'at' and re.fullmatch(r'-?\d+x-?\d+', value):
+                rule['position'] = value
+            elif key == 'at' and re.fullmatch(r'(right-of|left-of|above|below):.+', value) and value.split(':', 1)[1] in current \
+                    and value.split(':', 1)[1] != arguments[1]:
+                side, other = value.split(':', 1)
+                x, y = (int(n) for n in re.match(r'(-?\d+)x(-?\d+)', current[other]['position']).groups())
+                other_width, other_height = size_of(current[other])
+                width, height = size_of(rule)
+                rule['position'] = {'right-of': f'{x + other_width}x{y}', 'left-of': f'{x - width}x{y}',
+                                    'above': f'{x}x{y - height}', 'below': f'{x}x{y + other_height}'}[side]
+            else:
+                sys.exit(f'kavat-displays: {pair} is not something a display can be set to\n\n' + __doc__)
+        current[arguments[1]] = rule
+        # the file from before is kept aside until the change is kept or undone
+        if not os.path.exists(PENDING):
+            with open(PENDING, 'w', encoding='utf-8') as file:
+                try:
+                    file.write(open(FILE, encoding='utf-8').read())
+                except OSError:
+                    pass
+        kept['sets'][name] = list(current.values())
+        kept['active'] = name
+        write_file(kept)
+        reload()
+        # unless it is kept, it is undone: a display left black by a mode it cannot show comes back by itself
+        stamp = str(time.time())
+        with open(PENDING + '.stamp', 'w', encoding='utf-8') as file:
+            file.write(stamp)
+        subprocess.Popen(['sh', '-c', f'sleep {SECONDS}; [ "$(cat "$1.stamp" 2> /dev/null)" = "$2" ] && exec "$0" undo', sys.argv[0], PENDING, stamp],
+                         start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print(f'kavat-displays: `kavat-displays keep` within {SECONDS} seconds keeps it.')
+    elif arguments == ['keep']:
+        for path in (PENDING, PENDING + '.stamp'):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+    elif arguments == ['undo']:
+        if os.path.exists(PENDING):
+            before = open(PENDING, encoding='utf-8').read()
+            if before:
+                with open(FILE, 'w', encoding='utf-8') as file:
+                    file.write(before)
+            else:
+                os.remove(FILE)
+            for path in (PENDING, PENDING + '.stamp'):
+                try:
+                    os.remove(path)
+                except OSError:
+                    pass
+            reload()
+    elif arguments == ['restore']:
+        kept = read_file()
+        name = set_of(found)
+        if name in kept['sets'] and kept['active'] != name:
+            kept['active'] = name
+            write_file(kept)
+            reload()
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()

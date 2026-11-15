@@ -3,6 +3,8 @@
 # Every shortcut in hyprland.lua is here; tests/settings.py checks that none is missing.
 Super+Return	Terminal	Apps
 Super+E	Files	Apps
+Super+B	Browser	Apps
+Shift+Print	Copy the text of a region of the screen	Capture
 Super+D	Launcher	Apps
 Super+T	Settings	Apps
 Super+U	kav, the packages	Apps
@@ -30,5 +32,6 @@ Super+Shift+V	Clipboard history	Tools
 Super+Shift+P	Colour picker	Tools
 Print	Screenshot of a region, to the clipboard	Tools
 Super+Shift+L	Lock the screen	Session
+Super+Shift+M	The next mode: Coder, Gamer, Incognito	Session
 Super+Escape	Power menu	Session
 Super+M	Leave the session	Session

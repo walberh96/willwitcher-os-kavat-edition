@@ -1,0 +1,4 @@
+#!/bin/sh
+# Part of kavat-files: open a folder in Yazi, in a window of its own. What starts a file
+# manager for a folder, as the notice of a disk does, runs this.
+exec kitty yazi "$@"

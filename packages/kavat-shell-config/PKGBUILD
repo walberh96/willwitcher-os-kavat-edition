@@ -1,6 +1,6 @@
 pkgname=kavat-shell-config
 pkgver=0.1.0
-pkgrel=4
+pkgrel=7
 pkgdesc="Willwitcher-OS Kavat Edition: zsh as the terminal's shell, with its prompt and the terminal's everyday tools"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -9,8 +9,8 @@ license=('LicenseRef-AllRightsReserved')
 # tools the settings below make room for
 depends=('zsh' 'starship' 'zsh-autosuggestions' 'zsh-syntax-highlighting' 'fzf-tab'
          'kavat-find' 'zoxide' 'lsd' 'ripgrep' 'fd' 'fzf' 'bat' 'jq' 'fastfetch' 'btop')
-source=('zshrc' 'starship.toml' 'skel-zshrc' 'kavat-fetch' 'kavat-top')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+source=('zshrc' 'starship.toml' 'skel-zshrc' 'kavat-fetch' 'kavat-top' 'kavat' 'kavat-project' '_kavat')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
   install -Dm644 zshrc "$pkgdir/etc/zsh/zshrc"
@@ -19,4 +19,8 @@ package() {
   # what machine this is and what is running, in the theme's colours
   install -Dm755 kavat-fetch "$pkgdir/usr/bin/kavat-fetch"
   install -Dm755 kavat-top "$pkgdir/usr/bin/kavat-top"
+  # one command for the whole system, the projects, and what Tab offers after them
+  install -Dm755 kavat "$pkgdir/usr/bin/kavat"
+  install -Dm755 kavat-project "$pkgdir/usr/bin/kavat-project"
+  install -Dm644 _kavat "$pkgdir/usr/share/zsh/site-functions/_kavat"
 }

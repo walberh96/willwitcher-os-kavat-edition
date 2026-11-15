@@ -1,0 +1,144 @@
+#!/usr/bin/env python3
+"""kavat-project: a whole workspace under a name, opened as you left it.
+
+usage: kavat-project                       your projects: a * on the ones that are open, their folder, their workspace
+       kavat-project new <name> [folder]   make one for a folder; the one you are in, when none is said
+       kavat-project open <name>           go to its workspace, and open what it is made of when it is not there
+       kavat-project edit <name>           its file, in the editor
+       kavat-project delete <name>
+
+A project is a file, ~/.config/kavat/projects/<name>.toml: its folder, the workspace it
+lives on, and what it is made of. Each thing in `open` is `terminal`, `editor`, `files` or
+`browser`, which open in the project's folder, the browser with a profile of the project's
+own; or any command, which is run in that folder. Opening a project whose windows are
+already there only goes to them.
+"""
+import json
+import os
+import re
+import subprocess
+import sys
+import tomllib
+
+HOME = os.path.expanduser('~')
+FOLDER = (os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config') + '/kavat/projects'
+NAME = r'[A-Za-z0-9][A-Za-z0-9._-]{0,40}'
+PARTS = {
+    'terminal': lambda folder, name: ['kitty', '--directory', folder],
+    'editor': lambda folder, name: ['kitty', '--directory', folder, 'nvim', '.'],
+    'files': lambda folder, name: ['kitty', 'yazi', folder],
+    'browser': lambda folder, name: ['kavat-browser', f'--profile-directory={name}'],
+}
+
+
+def hyprctl(*arguments):
+    for instance in ([], ['--instance', '0']):
+        try:
+            done = subprocess.run(['hyprctl', *instance, *arguments], capture_output=True, text=True, timeout=10, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            return ''
+        if done.returncode == 0 and 'HYPRLAND_INSTANCE_SIGNATURE' not in done.stdout:
+            return done.stdout
+    return ''
+
+
+def read(name):
+    try:
+        with open(f'{FOLDER}/{name}.toml', 'rb') as file:
+            return tomllib.load(file)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+
+def names():
+    try:
+        return sorted(entry[:-5] for entry in os.listdir(FOLDER) if entry.endswith('.toml'))
+    except OSError:
+        return []
+
+
+def used_workspaces():
+    """The workspaces that have windows, by their number."""
+    try:
+        return {window['workspace']['id'] for window in json.loads(hyprctl('clients', '-j') or '[]')}
+    except (ValueError, KeyError):
+        return set()
+
+
+def workspace_of(name, project):
+    """Where a project lives: the one its file names, or the one it was opened on this session."""
+    if isinstance(project.get('workspace'), int):
+        return project['workspace']
+    return opened().get(name)
+
+
+def opened():
+    """The projects opened in this session, and on which workspace: forgotten at a restart."""
+    try:
+        with open(STATE, encoding='utf-8') as file:
+            return json.load(file)
+    except (OSError, ValueError):
+        return {}
+
+
+STATE = (os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}') + '/kavat-projects.json'
+
+
+def main():
+    arguments = sys.argv[1:]
+    if not arguments:
+        busy = used_workspaces()
+        for name in names():
+            project = read(name) or {}
+            at = workspace_of(name, project)
+            print(f'{"*" if at in busy and name in opened() else " "} {name}\t{project.get("folder", "")}\t{at or ""}')
+    elif arguments[0] == 'new' and len(arguments) in (2, 3) and re.fullmatch(NAME, arguments[1]):
+        name = arguments[1]
+        folder = os.path.abspath(os.path.expanduser(arguments[2] if len(arguments) == 3 else os.getcwd()))
+        if not os.path.isdir(folder):
+            sys.exit(f'kavat-project: {folder} is not a folder')
+        if read(name) is not None:
+            sys.exit(f'kavat-project: there is already a project called {name}')
+        os.makedirs(FOLDER, exist_ok=True)
+        with open(f'{FOLDER}/{name}.toml', 'w', encoding='utf-8') as file:
+            file.write(f'# The project {name}. `kavat-project open {name}` goes to its workspace and opens these.\n'
+                       f'folder = {json.dumps(folder)}\n'
+                       '# the workspace it lives on, 1 to 10; with none, the first that is empty when it is opened\n'
+                       '# workspace = 3\n'
+                       '# terminal, editor, files, browser, or any command, run in the folder\n'
+                       'open = ["terminal", "editor"]\n')
+        print(f'{FOLDER}/{name}.toml')
+    elif arguments[0] == 'open' and len(arguments) == 2:
+        name = arguments[1]
+        project = read(name)
+        if project is None:
+            sys.exit(f'kavat-project: there is no project called {name}; there are: ' + (', '.join(names()) or 'none yet'))
+        folder = os.path.expanduser(str(project.get('folder', HOME)))
+        if not os.path.isdir(folder):
+            sys.exit(f'kavat-project: its folder, {folder}, is not there')
+        busy = used_workspaces()
+        at = workspace_of(name, project)
+        there = at in busy and name in opened()
+        if at is None or (not there and at in busy and not isinstance(project.get('workspace'), int)):
+            at = next((number for number in range(1, 11) if number not in busy), 10)
+        hyprctl('dispatch', f'hl.dsp.focus({{ workspace = {int(at)} }})')
+        if not there:
+            for part in project.get('open', ['terminal']):
+                command = PARTS[part](folder, name) if part in PARTS else ['sh', '-c', str(part)]
+                subprocess.Popen(command, cwd=folder, start_new_session=True,
+                                 stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            state = opened()
+            state[name] = at
+            with open(STATE, 'w', encoding='utf-8') as file:
+                json.dump(state, file)
+        print(f'{name}: workspace {at}')
+    elif arguments[0] == 'edit' and len(arguments) == 2 and read(arguments[1]) is not None:
+        os.execvp(os.environ.get('EDITOR', 'nvim'), [os.environ.get('EDITOR', 'nvim'), f'{FOLDER}/{arguments[1]}.toml'])
+    elif arguments[0] == 'delete' and len(arguments) == 2 and read(arguments[1]) is not None:
+        os.remove(f'{FOLDER}/{arguments[1]}.toml')
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()

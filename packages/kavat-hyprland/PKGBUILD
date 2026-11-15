@@ -1,19 +1,21 @@
 pkgname=kavat-hyprland
 pkgver=0.1.0
-pkgrel=13
+pkgrel=17
 pkgdesc="Willwitcher-OS Kavat Edition: the system's Hyprland configuration"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # Hyprland, the shell it starts, the theme its look comes from, and every program its
 # shortcuts open
-depends=('hyprland' 'kavat-shell' 'kavat-theme' 'kavat-icons' 'kavat-cursor' 'kavat-kitty' 'kavat-find' 'kavat-files' 'kavat-notes' 'kavat-settings' 'kav' 'hyprlock' 'hypridle' 'hyprpicker' 'grim' 'slurp' 'wl-clipboard')
-source=('hyprland.lua' 'hypridle.conf' 'shortcuts.tsv')
-sha256sums=('SKIP' 'SKIP' 'SKIP')
+depends=('hyprland' 'kavat-shell' 'kavat-theme' 'kavat-icons' 'kavat-cursor' 'kavat-kitty' 'kavat-find' 'kavat-files' 'kavat-notes' 'kavat-settings' 'kavat-modes' 'kavat-wallpaper' 'kavat-backup' 'kavat-browser' 'kav' 'tesseract' 'tesseract-data-eng' 'tesseract-data-spa' 'hyprlock' 'hypridle' 'hyprpicker' 'grim' 'slurp' 'wl-clipboard')
+source=('hyprland.lua' 'hypridle.conf' 'shortcuts.tsv' 'kavat-displays' 'screen-text')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
   install -Dm644 hyprland.lua "$pkgdir/usr/share/kavat/hypr/hyprland.lua"
   # Hyprland looks here when the user has no configuration of their own
+  install -Dm755 kavat-displays "$pkgdir/usr/bin/kavat-displays"
+  install -Dm755 screen-text "$pkgdir/usr/lib/kavat/screen-text"
   install -Dm644 shortcuts.tsv "$pkgdir/usr/share/kavat/hypr/shortcuts.tsv"
   install -Dm644 hypridle.conf "$pkgdir/etc/xdg/hypr/hypridle.conf"
   install -d "$pkgdir/etc/xdg/hypr"

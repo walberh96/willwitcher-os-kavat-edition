@@ -76,6 +76,14 @@ def main():
             _, found = user(command)
         return checks.report(wanted in found, what, f'wanted {wanted}, found {found}')
 
+    def to_file():
+        """Put Yazi's cursor on the test's file: the folders of the home folder come before it."""
+        machine.screen.press('/')
+        time.sleep(1)
+        machine.screen.type(FILE)
+        machine.screen.press('enter')
+        time.sleep(1)
+
     try:
         if not checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the installed system boots'):
             sys.exit(1)
@@ -91,6 +99,7 @@ def main():
         machine.screen.press('super', 'e')
         until('Super+E opens Yazi', 'pgrep -c -x yazi', '1')
         time.sleep(3)
+        to_file()
         machine.screen.picture(f'{pictures}/files.png')
         machine.screen.press('ctrl', 'c')
         until('Ctrl+C leaves the file on the clipboard too, as a file',
@@ -124,6 +133,7 @@ def main():
         if opened:
             time.sleep(3)
             machine.screen.picture(f'{pictures}/files-picker.png')
+            to_file()
             machine.screen.press('enter')
             until('the file picked there is the answer the app gets', 'cat /tmp/portal.log', f'0 file://{HOME}/{FILE}')
             until('and the window closes', f'{WINDOWS} | grep -c "class: kavat-picker"; echo closed', '0\nclosed')

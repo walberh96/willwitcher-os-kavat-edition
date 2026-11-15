@@ -1,0 +1,56 @@
+#compdef kavat kavat-mode kavat-project kavat-theme
+# Tab after `kavat`: its words, and after some of them what they take.
+
+local -a words_of_kavat
+words_of_kavat=(
+  'theme:the look of the system'
+  'mode:Coder, Gamer, Incognito'
+  'wallpaper:the background'
+  'displays:the displays and their arrangement'
+  'project:a workspace under a name'
+  'notes:notes, tasks and reminders'
+  'find:the file search'
+  'browser:the browser'
+  'packages:install, remove, update'
+  'doctor:the health of the system'
+  'backup:copies off the computer'
+  'history:the changes of your settings'
+  'settings:the settings panel'
+  'set:a setting an app keeps in its own file'
+  'fetch:what machine this is'
+  'top:what is running'
+)
+
+_kavat_modes() { compadd -- ${(f)"$(kavat-mode list 2> /dev/null | cut -c3- | cut -f1)"} next list show vpn vpns auto }
+_kavat_projects() {
+  if (( CURRENT == 2 )); then compadd -- open new edit delete
+  else compadd -- ${(f)"$(kavat-project 2> /dev/null | cut -c3- | cut -f1)"}; fi
+}
+_kavat_theme() {
+  if (( CURRENT == 2 )); then compadd -- apply set get list tokens profile add boot
+  elif [[ $words[2] == profile ]]; then compadd -- save delete ${(f)"$(kavat-theme profile 2> /dev/null | cut -c3-)"}
+  elif [[ $words[2] == (set|get) ]]; then compadd -- ${(f)"$(kavat-theme get 2> /dev/null | cut -d' ' -f1)"}; fi
+}
+
+case $service in
+  kavat-mode) _kavat_modes ;;
+  kavat-project) _kavat_projects ;;
+  kavat-theme) _kavat_theme ;;
+  kavat)
+    if (( CURRENT == 2 )); then
+      _describe 'what' words_of_kavat
+    else
+      # what comes after the word is that program's own
+      local what=$words[2]
+      shift words; (( CURRENT-- ))
+      case $what in
+        mode) _kavat_modes ;;
+        project) _kavat_projects ;;
+        theme) _kavat_theme ;;
+        settings) compadd -- appearance wallpaper accessibility windows keys displays gpu sound network terminal editor files notes browser bar modes projects packages backup boot login language ;;
+        wallpaper) compadd -- set theme list add pause resume option palette; _files ;;
+        *) _files ;;
+      esac
+    fi
+    ;;
+esac

@@ -9,6 +9,16 @@ HISTFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/history"
 [[ -d ${HISTFILE:h} ]] || mkdir -p "${HISTFILE:h}"
 HISTSIZE=50000
 SAVEHIST=50000
+# In a mode that keeps no history, Incognito, nothing typed is written down: kavat-mode
+# leaves a file while such a mode is in force, and each prompt looks for it.
+_kavat_history() {
+  if [[ -e ${XDG_RUNTIME_DIR:-/run/user/$UID}/kavat-no-history ]]; then
+    [[ -n $HISTFILE ]] && _kavat_histfile=$HISTFILE && unset HISTFILE
+  elif [[ -n $_kavat_histfile ]]; then
+    HISTFILE=$_kavat_histfile; unset _kavat_histfile
+  fi
+}
+precmd_functions+=(_kavat_history)
 setopt share_history hist_ignore_all_dups hist_ignore_space hist_reduce_blanks
 setopt auto_cd interactive_comments
 

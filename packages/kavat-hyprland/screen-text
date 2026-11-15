@@ -1,0 +1,13 @@
+#!/bin/sh
+# Part of kavat-hyprland: the text of a region of the screen, to the clipboard.
+#
+# A region is chosen with the mouse, as for a screenshot; what is written in it is read on
+# this machine, by tesseract, in English and Spanish, and copied. Nothing leaves the machine.
+region=$(slurp) || exit 0
+text=$(grim -g "$region" - | tesseract -l eng+spa --psm 6 - - 2> /dev/null | sed 's/[[:space:]]*$//')
+if [ -n "$(printf '%s' "$text" | tr -d '[:space:]')" ]; then
+  printf '%s' "$text" | wl-copy
+  notify-send --app-name 'Screen text' --icon edit-copy 'Text copied' "$(printf '%s' "$text" | head -c 200)"
+else
+  notify-send --app-name 'Screen text' --icon dialog-information 'No text was found there'
+fi
