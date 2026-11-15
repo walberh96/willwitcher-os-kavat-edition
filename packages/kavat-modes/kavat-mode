@@ -96,6 +96,15 @@ def shell_knows():
     run('kavat-shell', 'msg', 'plugin', 'kavat/modes:mode', 'all', 'changed', timeout=5)
 
 
+def notes_know():
+    """The reminders that waited in Gamer are shown once it is left: the notes look at the mode again."""
+    try:
+        subprocess.Popen(['kavat-notes', 'sync'], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
+                         stderr=subprocess.DEVNULL, start_new_session=True)
+    except OSError:
+        pass  # the notes are not installed
+
+
 def vpns():
     lines = run('nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show') or ''
     return [line.rsplit(':', 1)[0].replace('\\:', ':') for line in lines.splitlines()
@@ -200,6 +209,7 @@ def change(word, quiet=False):
         raise
     save(STATE, {'mode': word, 'undo': undo, 'since': int(time.time())})
     shell_knows()
+    notes_know()
     if not quiet:
         tell(f'{known[word].get("name", word)}: {known[word].get("about", "")}'.rstrip(': '))
 
@@ -301,6 +311,7 @@ def main():
         if state['mode'] != 'coder' or state.get('undo'):
             leave(state.get('undo', {}))
             save(STATE, {'mode': 'coder', 'undo': {}})
+            notes_know()
         shell_knows()
     elif arguments == ['watch']:
         watch()

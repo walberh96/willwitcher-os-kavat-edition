@@ -1,0 +1,199 @@
+#!/usr/bin/env python3
+"""kavat-game: a game started with its own profile.
+
+usage: kavat-game                         the profiles: their name, the game they are for, and what they set
+       kavat-game new <name> [game]       make a profile; the game is its number in Steam, or the name of its program
+       kavat-game edit <name>             its file, in the editor
+       kavat-game delete <name>
+       kavat-game run <command> ...       start a game with the profile that is for it
+       kavat-game show <command> ...      say what `run` would start, and start nothing
+
+In Steam, a game's launch options are set to:   kavat-game run %command%
+From then on the game starts with its profile: the one whose `game` is its number in Steam
+or the name of its program; with none of its own, the profile called `default`, when there
+is one; with neither, the game starts as it is.
+
+A profile is a file, ~/.config/kavat/games/<name>.toml. It can ask for the performance
+monitor over the game and a limit of frames, both MangoHud's; for the game's own resolution
+and scaling, gamescope's; and for a profile of the graphics card, one of LACT's, worn
+while the game runs and taken off after it. What a profile asks of a program that is not
+installed is left out, and said.
+"""
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tomllib
+
+HOME = os.path.expanduser('~')
+FOLDER = (os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config') + '/kavat/games'
+NAME = r'[A-Za-z0-9][A-Za-z0-9._-]{0,40}'
+NEW = '''# The profile {name}. Steam starts the game with it when the game's launch options are:
+#   kavat-game run %command%
+# the game it is for: its number in Steam, or the name of its program; none for `default`
+{game}
+
+# the performance monitor over the game (MangoHud)
+monitor = true
+# the most frames a second; 0 is no limit (MangoHud)
+fps_limit = 0
+
+# the game's own resolution and scaling (gamescope): the size it is drawn at, the size it
+# is shown at, and how it is made larger: fsr, nis, integer or linear
+# [gamescope]
+# width = 1920
+# height = 1080
+# shown_width = 2560
+# shown_height = 1440
+# refresh = 144
+# scaling = "fsr"
+# fullscreen = true
+
+# a profile of the graphics card, by its name in LACT, worn while the game runs
+# gpu_profile = "Performance"
+
+# words set for the game alone, as NAME=value
+# environment = ["DXVK_ASYNC=1"]
+'''
+
+
+def read(name):
+    try:
+        with open(f'{FOLDER}/{name}.toml', 'rb') as file:
+            return tomllib.load(file)
+    except (OSError, tomllib.TOMLDecodeError):
+        return None
+
+
+def names():
+    try:
+        return sorted(entry[:-5] for entry in os.listdir(FOLDER) if entry.endswith('.toml'))
+    except OSError:
+        return []
+
+
+def profile_for(command):
+    """The profile of the game a command starts, and its name: its own, or `default`."""
+    wanted = {os.environ.get('SteamAppId', ''), os.environ.get('SteamGameId', '')}
+    # the name of each program in the command: Steam wraps the game in its own
+    wanted.update(os.path.basename(word).lower() for word in command if not word.startswith('-'))
+    wanted.update(os.path.splitext(word)[0] for word in list(wanted))
+    wanted.discard('')
+    for name in names():
+        found = read(name) or {}
+        if str(found.get('game', '')).lower() in wanted:
+            return name, found
+    return ('default', read('default')) if read('default') is not None else (None, {})
+
+
+def number(value, least=0, most=100000):
+    return int(value) if isinstance(value, (int, float)) and not isinstance(value, bool) and least <= value <= most else None
+
+
+def plan(command):
+    """What to start for a command: the whole command, the words set for it, the graphics
+    card's profile, and what had to be left out."""
+    name, found = profile_for(command)
+    environment, left_out, before = {}, [], []
+    monitor, limit = found.get('monitor') is True, number(found.get('fps_limit'), 1, 1000)
+    if monitor or limit:
+        if shutil.which('mangohud'):
+            before = ['mangohud']
+            settings = [f'fps_limit={limit}'] if limit else []
+            if not monitor:
+                settings.append('no_display')
+            if settings:
+                environment['MANGOHUD_CONFIG'] = ','.join(settings)
+        else:
+            left_out.append('MangoHud is not installed: no monitor and no limit of frames')
+    scope = found.get('gamescope')
+    if isinstance(scope, dict):
+        if shutil.which('gamescope'):
+            words = ['gamescope']
+            for key, flag in (('width', '-w'), ('height', '-h'), ('shown_width', '-W'), ('shown_height', '-H'), ('refresh', '-r')):
+                if number(scope.get(key), 1) is not None:
+                    words += [flag, str(number(scope[key], 1))]
+            if scope.get('scaling') in ('fsr', 'nis', 'integer', 'linear', 'nearest'):
+                words += ['-F', scope['scaling']]
+            if scope.get('fullscreen', True) is not False:
+                words.append('-f')
+            before = [*words, '--', *before]
+        else:
+            left_out.append('gamescope is not installed: the game keeps the resolution it has')
+    for pair in found.get('environment', []):
+        key, _, value = str(pair).partition('=')
+        if re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', key):
+            environment[key] = value
+    card = found.get('gpu_profile')
+    if isinstance(card, str) and card:
+        if not shutil.which('lact'):
+            left_out.append('LACT is not installed: the graphics card keeps its profile')
+            card = None
+    else:
+        card = None
+    return {'profile': name, 'command': [*before, *command], 'environment': environment, 'gpu_profile': card, 'left_out': left_out}
+
+
+def card_profile(name=None):
+    """Wear a profile of the graphics card, or with no name say which is worn."""
+    try:
+        if name is None:
+            done = subprocess.run(['lact', 'cli', 'profile', 'get'], capture_output=True, text=True, timeout=10, check=False)
+            return done.stdout.strip() if done.returncode == 0 else ''
+        return subprocess.run(['lact', 'cli', 'profile', 'set', name], capture_output=True, timeout=10, check=False).returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return '' if name is None else False
+
+
+def main():
+    arguments = sys.argv[1:]
+    if not arguments:
+        for name in names():
+            found = read(name) or {}
+            sets = [word for word, there in (('monitor', found.get('monitor') is True), (f'{found.get("fps_limit")} fps', number(found.get('fps_limit'), 1)),
+                                             ('gamescope', isinstance(found.get('gamescope'), dict)), (f'card: {found.get("gpu_profile")}', found.get('gpu_profile'))) if there]
+            print(f'{name}\t{found.get("game", "")}\t{", ".join(sets)}')
+    elif arguments[0] == 'new' and len(arguments) in (2, 3) and re.fullmatch(NAME, arguments[1]):
+        name = arguments[1]
+        if read(name) is not None or os.path.exists(f'{FOLDER}/{name}.toml'):
+            sys.exit(f'kavat-game: there is already a profile called {name}')
+        game = arguments[2] if len(arguments) == 3 else ''
+        if game and not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9 ._-]{0,80}', game):
+            sys.exit('kavat-game: a game is its number in Steam or the name of its program')
+        os.makedirs(FOLDER, exist_ok=True)
+        with open(f'{FOLDER}/{name}.toml', 'w', encoding='utf-8') as file:
+            file.write(NEW.format(name=name, game=f'game = {json.dumps(game)}' if game else '# game = "1245620"'))
+        print(f'{FOLDER}/{name}.toml')
+    elif arguments[0] == 'edit' and len(arguments) == 2 and os.path.isfile(f'{FOLDER}/{arguments[1]}.toml'):
+        editor = os.environ.get('EDITOR', 'nvim')
+        os.execvp(editor, [editor, f'{FOLDER}/{arguments[1]}.toml'])
+    elif arguments[0] == 'delete' and len(arguments) == 2 and os.path.isfile(f'{FOLDER}/{arguments[1]}.toml'):
+        os.remove(f'{FOLDER}/{arguments[1]}.toml')
+    elif arguments[0] in ('run', 'show') and len(arguments) > 1:
+        planned = plan(arguments[1:])
+        if arguments[0] == 'show':
+            print(json.dumps(planned, indent=2))
+            return
+        for line in planned['left_out']:
+            print(f'kavat-game: {line}', file=sys.stderr)
+        environment = {**os.environ, **planned['environment']}
+        if not planned['gpu_profile']:
+            # nothing to take off afterwards: the game takes this program's place
+            os.execvpe(planned['command'][0], planned['command'], environment)
+        before = card_profile()
+        if not card_profile(planned['gpu_profile']):
+            print(f'kavat-game: LACT has no profile called {planned["gpu_profile"]}', file=sys.stderr)
+        try:
+            code = subprocess.run(planned['command'], env=environment, check=False).returncode
+        finally:
+            if before:
+                card_profile(before)
+        sys.exit(code)
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()
