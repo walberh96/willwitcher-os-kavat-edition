@@ -1,0 +1,733 @@
+diff --color -ruN -x .git a/docs/plugin-api.json b/docs/plugin-api.json
+--- a/docs/plugin-api.json	2026-10-29 15:05:32.000000000 -0400
++++ b/docs/plugin-api.json	2026-11-15 10:19:49.369093870 -0500
+@@ -244,5 +244,11 @@
+     "noctaliaVersion": null,
+     "feature": "container-color-roles",
+     "introduced": "Container color roles (`primary_container`, `surface_container`, `surface_container_high`, `outline_variant`, `scrim`, ...). `surface_variant` and `outline` are retired as role names; use `surface_container` and `outline_variant`."
++  },
++  {
++    "level": 44,
++    "noctaliaVersion": null,
++    "feature": "arrange",
++    "introduced": "`ui.arrange` for rectangles drawn to scale and placed by dragging, with edges that snap to each other and `onSelect` / `onMove` callbacks."
+   }
+ ]
+diff --color -ruN -x .git a/docs/user/plugins/development/declarative-ui.mdx b/docs/user/plugins/development/declarative-ui.mdx
+--- a/docs/user/plugins/development/declarative-ui.mdx	2026-10-29 15:05:32.000000000 -0400
++++ b/docs/user/plugins/development/declarative-ui.mdx	2026-11-15 10:20:15.798388305 -0500
+@@ -58,6 +58,7 @@
+ | `ui.toggle`            | `checked` (bool), `enabled`, `onChange`                                                                                                                                                                                                                                |
+ | `ui.slider`            | `min`, `max`, `step`, `value`, `controlSize` (`sm`/`md`/`lg`), `enabled`, `onChange`, `onDragEnd`                                                                                                                                                                      |
+ | `ui.colorPicker`       | `value`, `alpha`, `inputs`, `swatches`, `width`, `enabled`, `onChange`, `onChangeEnd`; see [Color picker](#color-picker)                                                                                                                                               |
++| `ui.arrange`           | `items`, `revision`, `width`, `height`, `onSelect`, `onMove`; see [Arrange](#arrange)                                                                                                                                                                                  |
+ | `ui.select`            | `options` (array of strings), `selectedIndex`, `placeholder`, `controlSize` (`sm`/`md`/`lg`), `enabled`, `width`, `height`, `onChange`                                                                                                                                 |
+ | `ui.input`             | `value` (initial text only - see below), `placeholder`, `fontSize`, `controlSize` (`sm`/`md`/`lg`), `password` (bool), `multiline` (bool), `submitOnEnter` (bool - see below), `frameVisible` (bool - see below), `focus` (bool), `enabled`, `onChange`, `onSubmit`    |
+ 
+@@ -381,6 +382,30 @@
+ - **Ticks**: `update()` runs on the `noctalia.setUpdateInterval` interval (default 1000 ms). `setNeedsFrameTick(true)` delivers `onFrameTick(deltaMs)` every frame while the layer is shown. As for desktop widgets, `deltaMs` arrives as a string-formatted number; use `tonumber`.
+ - **Input**: pointer and keyboard input drive controls like in a panel, and keys arrive only while the layer holds keyboard focus (see the `keyboard` manifest key).
+ 
++## Arrange
++
++`ui.arrange` draws a set of rectangles to scale and lets the user place them by dragging: the arrangement of the displays, for one (requires <PluginApiBadge feature="arrange" />).
++
++```lua
++ui.arrange({
++  key = "displays", width = 520, height = 260,
++  items = {
++    { key = "DP-1", x = 0, y = 0, width = 2560, height = 1440, label = "DP-1", sublabel = "2560x1440", selected = true },
++    { key = "HDMI-A-1", x = 2560, y = 180, width = 1920, height = 1080, label = "HDMI-A-1" },
++  },
++  onSelect = function(key) selected = key; render() end,
++  onMove = function(key, x, y) place(key, tonumber(x), tonumber(y)) end,
++})
++```
++
++- `items` is an array of rectangles. Each has a `key` (a string that names it in the callbacks), `x`, `y`, `width` and `height` in your own layout units (positions may be negative, sizes must be above zero), a `label` drawn centred inside it, an optional smaller `sublabel` under the label, and `selected` (bool), which gives it the highlighted border. Up to 32 are shown. Later ones are drawn over earlier ones.
++- The whole arrangement is scaled by one factor and centred so that it fits inside the control, whose size is `width` and `height` in logical pixels. A text that does not fit inside its rectangle is left out.
++- `onSelect(key)` fires when a rectangle is pressed, before any drag. The pressed rectangle is shown selected at once; render again with `selected` set to keep it so.
++- Dragging a rectangle moves it with the pointer inside the host, with no callbacks on the way. While it moves, its edges snap to the edges of the others when they come within about 10 pixels: side by side (left to right, top to bottom) or aligned (left to left, top to top). A press that does not travel a few pixels is only a select.
++- `onMove(key, x, y)` fires once, on release, with the new position in layout units, rounded to whole numbers and delivered as strings. A handler given as the name of a global instead of a function receives `(key, "x,y")`.
++- After a drop the control keeps showing the dropped position. Like a slider's `value`, `items` is applied only when it changes between renders, so render again with the positions you accepted. To take a move back, render the old positions with a different `revision` (any number): a changed `revision` applies `items` again even when they are the same as before.
++- `items` arriving during a drag are applied, except for the position of the rectangle being dragged, which stays with the pointer.
++
+ ## Color picker
+ 
+ `ui.colorPicker` embeds the shell's color picker: a saturation/brightness plane, a hue strip, and text fields, with corners that follow the shell's corner radius setting (requires <PluginApiBadge feature="color-picker" />). To ask for a color in a separate dialog instead, use `noctalia.openColorPicker`.
+diff --color -ruN -x .git a/meson.build b/meson.build
+--- a/meson.build	2026-11-15 10:20:29.956031461 -0500
++++ b/meson.build	2026-11-15 10:19:49.369424618 -0500
+@@ -921,6 +921,7 @@
+   'src/time/time_service.cpp',
+   'src/ui/visuals/audio_visualizer.cpp',
+   'src/ui/visuals/fancy_audio_visualizer.cpp',
++  'src/ui/controls/arrange.cpp',
+   'src/ui/controls/box.cpp',
+   'src/ui/controls/button.cpp',
+   'src/ui/controls/calendar_view.cpp',
+diff --color -ruN -x .git a/src/scripting/plugin_api.h b/src/scripting/plugin_api.h
+--- a/src/scripting/plugin_api.h	2026-10-29 15:05:32.000000000 -0400
++++ b/src/scripting/plugin_api.h	2026-11-15 10:19:49.368899909 -0500
+@@ -43,7 +43,8 @@
+   inline constexpr std::uint32_t kColorPickerPluginApiVersion = 41;
+   inline constexpr std::uint32_t kPanelContentHeightPluginApiVersion = 42;
+   inline constexpr std::uint32_t kContainerColorRolesPluginApiVersion = 43;
+-  inline constexpr std::uint32_t kCurrentPluginApiVersion = kContainerColorRolesPluginApiVersion;
++  inline constexpr std::uint32_t kArrangePluginApiVersion = 44;
++  inline constexpr std::uint32_t kCurrentPluginApiVersion = kArrangePluginApiVersion;
+ 
+   static_assert(kOldestSupportedPluginApiVersion <= kCurrentPluginApiVersion);
+ 
+diff --color -ruN -x .git a/src/scripting/ui_prelude.h b/src/scripting/ui_prelude.h
+--- a/src/scripting/ui_prelude.h	2026-10-29 15:05:32.000000000 -0400
++++ b/src/scripting/ui_prelude.h	2026-11-15 10:19:49.368729110 -0500
+@@ -36,6 +36,39 @@
+ ui.scroll = ctor("scroll")
+ ui.dragSource = ctor("drag_source")
+ ui.dropZone = ctor("drop_zone")
++-- ui.arrange takes its rectangles as `items`, an array of tables. A prop holds a flat array
++-- of numbers or of strings and nothing deeper, so they cross to the host as parallel arrays;
++-- a position is two numbers and a callback carries two arguments, so onMove's comes as "x,y"
++-- and is split here.
++ui.arrange = function(props)
++  local out = {}
++  local keys, labels, sublabels, rects = {}, {}, {}, {}
++  for name, value in pairs(props or {}) do
++    if name ~= "items" then
++      out[name] = value
++    end
++  end
++  for i, item in ipairs(props and props.items or {}) do
++    keys[i] = tostring(item.key)
++    labels[i] = tostring(item.label or "")
++    sublabels[i] = tostring(item.sublabel or "")
++    local at = (i - 1) * 5
++    rects[at + 1] = tonumber(item.x) or 0
++    rects[at + 2] = tonumber(item.y) or 0
++    rects[at + 3] = tonumber(item.width) or 0
++    rects[at + 4] = tonumber(item.height) or 0
++    rects[at + 5] = item.selected and 1 or 0
++  end
++  out.itemKeys, out.itemLabels, out.itemSublabels, out.itemRects = keys, labels, sublabels, rects
++  local onMove = out.onMove
++  if type(onMove) == "function" then
++    out.onMove = function(key, position)
++      local x, y = string.match(position or "", "^(-?%d+),(-?%d+)$")
++      return onMove(key, x, y)
++    end
++  end
++  return { type = "arrange", props = out, children = {} }
++end
+ )luau";
+ 
+ } // namespace scripting
+diff --color -ruN -x .git a/src/ui/controls/arrange.cpp b/src/ui/controls/arrange.cpp
+--- a/src/ui/controls/arrange.cpp	1969-12-31 19:00:00.000000000 -0500
++++ b/src/ui/controls/arrange.cpp	2026-11-15 10:20:15.845917125 -0500
+@@ -0,0 +1,336 @@
++#include "ui/controls/arrange.h"
++
++#include "ui/controls/box.h"
++#include "ui/controls/label.h"
++#include "ui/palette.h"
++#include "ui/style.h"
++
++#include <algorithm>
++#include <cmath>
++#include <limits>
++#include <memory>
++#include <utility>
++
++namespace {
++  // How close two edges come, in pixels before the content scale, before one snaps to the other.
++  constexpr float kSnapPixels = 10.0F;
++  // How far a press travels before it stops being a click and starts carrying the rectangle.
++  constexpr float kDragThresholdPixels = 4.0F;
++  constexpr float kSelectedBorderWidth = 2.0F;
++} // namespace
++
++Arrange::Arrange() {
++  setClipChildren(true);
++
++  auto background = std::make_unique<Box>();
++  background->setFill(colorSpecFromRole(ColorRole::SurfaceContainerLow));
++  background->setBorder(colorSpecFromRole(ColorRole::OutlineVariant), Style::borderWidth);
++  m_background = static_cast<Box*>(addChild(std::move(background)));
++
++  setOnPress([this](const PointerData& pointer) { onPointerPress(pointer); });
++  setOnMotion([this](const PointerData& pointer) { onPointerMotion(pointer); });
++  setOnCancel([this] { cancelDrag(); });
++}
++
++void Arrange::setScale(float scale, float fontScale) {
++  if (m_scale == scale && m_fontScale == fontScale) {
++    return;
++  }
++  m_scale = scale;
++  m_fontScale = fontScale;
++  for (std::size_t i = 0; i < m_visuals.size(); ++i) {
++    applyItemStyle(i);
++  }
++  markLayoutDirty();
++}
++
++void Arrange::setItems(std::vector<Item> items, bool force) {
++  if (!force && items == m_given) {
++    return;
++  }
++  m_given = items;
++  if (m_drag.has_value()) {
++    // The rectangle in the hand stays under the pointer; the position given for it is where
++    // a cancel takes it back to.
++    const Item& carried = m_items[m_drag->index];
++    const auto match = std::ranges::find(items, carried.key, &Item::key);
++    if (match == items.end()) {
++      m_drag.reset();
++    } else {
++      m_drag->index = static_cast<std::size_t>(match - items.begin());
++      m_drag->startX = match->x;
++      m_drag->startY = match->y;
++      match->x = carried.x;
++      match->y = carried.y;
++    }
++  }
++  m_items = std::move(items);
++  syncVisuals();
++  markLayoutDirty();
++}
++
++void Arrange::cancelDrag() {
++  if (!m_drag.has_value()) {
++    return;
++  }
++  Item& item = m_items[m_drag->index];
++  item.x = m_drag->startX;
++  item.y = m_drag->startY;
++  endDrag();
++}
++
++void Arrange::endDrag() {
++  if (m_drag.has_value() && m_drag->index < m_visuals.size()) {
++    m_visuals[m_drag->index].box->setZIndex(0);
++  }
++  m_drag.reset();
++  // The arrangement is fitted again around where the rectangle ended up.
++  markLayoutDirty();
++}
++
++void Arrange::onPointerPress(const PointerData& pointer) {
++  if (pointer.button != BTN_LEFT) {
++    return;
++  }
++  if (pointer.pressed) {
++    if (m_drag.has_value()) {
++      return;
++    }
++    const auto index = itemAt(pointer.localX, pointer.localY);
++    if (!index.has_value()) {
++      return;
++    }
++    const Item& item = m_items[*index];
++    m_drag = Drag{
++        .index = *index,
++        .startX = item.x,
++        .startY = item.y,
++        .grabX =
++            m_transform.unitX + static_cast<double>(pointer.localX - m_transform.originX) / m_transform.factor - item.x,
++        .grabY =
++            m_transform.unitY + static_cast<double>(pointer.localY - m_transform.originY) / m_transform.factor - item.y,
++        .pressX = pointer.localX,
++        .pressY = pointer.localY,
++    };
++    // Shown at once; the caller's next render confirms it.
++    for (std::size_t i = 0; i < m_items.size(); ++i) {
++      const bool selected = i == *index;
++      if (m_items[i].selected != selected) {
++        m_items[i].selected = selected;
++        applyItemStyle(i);
++      }
++    }
++    m_visuals[*index].box->setZIndex(1);
++    markPaintDirty();
++    if (m_onSelect) {
++      const std::string key = item.key;
++      m_onSelect(key);
++    }
++    return;
++  }
++
++  if (!m_drag.has_value()) {
++    return;
++  }
++  const bool moved = m_drag->moved;
++  Item& item = m_items[m_drag->index];
++  if (moved) {
++    item.x = std::round(item.x);
++    item.y = std::round(item.y);
++  }
++  const std::string key = item.key;
++  const auto x = static_cast<long long>(item.x);
++  const auto y = static_cast<long long>(item.y);
++  endDrag();
++  if (moved && m_onMove) {
++    m_onMove(key, x, y);
++  }
++}
++
++void Arrange::onPointerMotion(const PointerData& pointer) {
++  if (!m_drag.has_value()) {
++    return;
++  }
++  // The pointer is followed past the control's edge, pinned to it.
++  const float localX = std::clamp(pointer.localX, 0.0F, std::max(0.0F, width()));
++  const float localY = std::clamp(pointer.localY, 0.0F, std::max(0.0F, height()));
++  if (!m_drag->moved) {
++    if (std::hypot(localX - m_drag->pressX, localY - m_drag->pressY) < kDragThresholdPixels * m_scale) {
++      return;
++    }
++    m_drag->moved = true;
++  }
++  double x = m_transform.unitX + static_cast<double>(localX - m_transform.originX) / m_transform.factor - m_drag->grabX;
++  double y = m_transform.unitY + static_cast<double>(localY - m_transform.originY) / m_transform.factor - m_drag->grabY;
++  snap(m_drag->index, x, y);
++  Item& item = m_items[m_drag->index];
++  item.x = x;
++  item.y = y;
++  placeItem(m_drag->index);
++  markPaintDirty();
++}
++
++// Each axis takes the nearest of the other rectangles' edges within reach: side by side
++// (left to right, right to left, top to bottom, bottom to top) or aligned (left to left,
++// right to right, top to top, bottom to bottom).
++void Arrange::snap(std::size_t index, double& x, double& y) const {
++  const Item& item = m_items[index];
++  const double reach = static_cast<double>(kSnapPixels * m_scale) / m_transform.factor;
++  double bestX = std::numeric_limits<double>::infinity();
++  double bestY = std::numeric_limits<double>::infinity();
++  const auto consider = [reach](double delta, double& best) {
++    if (std::abs(delta) <= reach && std::abs(delta) < std::abs(best)) {
++      best = delta;
++    }
++  };
++  for (std::size_t i = 0; i < m_items.size(); ++i) {
++    if (i == index) {
++      continue;
++    }
++    const Item& other = m_items[i];
++    consider(other.x + other.width - x, bestX);
++    consider(other.x - (x + item.width), bestX);
++    consider(other.x - x, bestX);
++    consider(other.x + other.width - (x + item.width), bestX);
++    consider(other.y + other.height - y, bestY);
++    consider(other.y - (y + item.height), bestY);
++    consider(other.y - y, bestY);
++    consider(other.y + other.height - (y + item.height), bestY);
++  }
++  if (std::isfinite(bestX)) {
++    x += bestX;
++  }
++  if (std::isfinite(bestY)) {
++    y += bestY;
++  }
++}
++
++std::optional<std::size_t> Arrange::itemAt(float localX, float localY) const {
++  // The last one drawn is the one on top.
++  for (std::size_t i = m_visuals.size(); i-- > 0;) {
++    const Box* box = m_visuals[i].box;
++    if (localX >= box->x()
++        && localX < box->x() + box->width()
++        && localY >= box->y()
++        && localY < box->y() + box->height()) {
++      return i;
++    }
++  }
++  return std::nullopt;
++}
++
++void Arrange::syncVisuals() {
++  while (m_visuals.size() > m_items.size()) {
++    (void)removeChild(m_visuals.back().box);
++    m_visuals.pop_back();
++  }
++  while (m_visuals.size() < m_items.size()) {
++    Visual visual;
++    auto box = std::make_unique<Box>();
++    box->setFill(colorSpecFromRole(ColorRole::SurfaceContainerHigh));
++    auto label = std::make_unique<Label>();
++    label->setColor(colorSpecFromRole(ColorRole::OnSurface));
++    label->setMaxLines(1);
++    auto sublabel = std::make_unique<Label>();
++    sublabel->setColor(colorSpecFromRole(ColorRole::OnSurfaceVariant));
++    sublabel->setMaxLines(1);
++    visual.label = static_cast<Label*>(box->addChild(std::move(label)));
++    visual.sublabel = static_cast<Label*>(box->addChild(std::move(sublabel)));
++    visual.box = static_cast<Box*>(addChild(std::move(box)));
++    m_visuals.push_back(visual);
++  }
++  for (std::size_t i = 0; i < m_items.size(); ++i) {
++    m_visuals[i].label->setText(m_items[i].label);
++    m_visuals[i].sublabel->setText(m_items[i].sublabel);
++    m_visuals[i].box->setZIndex(m_drag.has_value() && m_drag->index == i ? 1 : 0);
++    applyItemStyle(i);
++  }
++}
++
++void Arrange::applyItemStyle(std::size_t index) {
++  const Visual& visual = m_visuals[index];
++  if (m_items[index].selected) {
++    visual.box->setBorder(colorSpecFromRole(ColorRole::Primary), kSelectedBorderWidth * m_scale);
++  } else {
++    visual.box->setBorder(colorSpecFromRole(ColorRole::OutlineVariant), Style::borderWidth);
++  }
++  visual.box->setRadius(Style::scaledRadiusMd(m_scale));
++  visual.label->setFontSize(Style::fontSizeBody * m_scale * m_fontScale);
++  visual.sublabel->setFontSize(Style::fontSizeMini * m_scale * m_fontScale);
++}
++
++Arrange::Transform Arrange::fitTransform() const {
++  Transform transform;
++  if (m_items.empty()) {
++    return transform;
++  }
++  double left = std::numeric_limits<double>::infinity();
++  double top = std::numeric_limits<double>::infinity();
++  double right = -std::numeric_limits<double>::infinity();
++  double bottom = -std::numeric_limits<double>::infinity();
++  for (const Item& item : m_items) {
++    left = std::min(left, item.x);
++    top = std::min(top, item.y);
++    right = std::max(right, item.x + item.width);
++    bottom = std::max(bottom, item.y + item.height);
++  }
++  const double margin = static_cast<double>(Style::spaceMd * m_scale);
++  const double roomX = std::max(1.0, static_cast<double>(width()) - margin * 2.0);
++  const double roomY = std::max(1.0, static_cast<double>(height()) - margin * 2.0);
++  const double spanX = std::max(1.0, right - left);
++  const double spanY = std::max(1.0, bottom - top);
++  transform.factor = std::min(roomX / spanX, roomY / spanY);
++  transform.unitX = left;
++  transform.unitY = top;
++  transform.originX = static_cast<float>((static_cast<double>(width()) - spanX * transform.factor) * 0.5);
++  transform.originY = static_cast<float>((static_cast<double>(height()) - spanY * transform.factor) * 0.5);
++  return transform;
++}
++
++void Arrange::placeItem(std::size_t index) {
++  const Item& item = m_items[index];
++  m_visuals[index].box->setPosition(
++      std::round(m_transform.originX + static_cast<float>((item.x - m_transform.unitX) * m_transform.factor)),
++      std::round(m_transform.originY + static_cast<float>((item.y - m_transform.unitY) * m_transform.factor))
++  );
++}
++
++void Arrange::doLayout(Renderer& renderer) {
++  m_background->setPosition(0.0F, 0.0F);
++  m_background->setFrameSize(width(), height());
++  m_background->setRadius(Style::scaledRadiusLg(m_scale));
++
++  if (!m_drag.has_value()) {
++    m_transform = fitTransform();
++  }
++  const float padding = Style::spaceXs * m_scale;
++  for (std::size_t i = 0; i < m_items.size(); ++i) {
++    const Item& item = m_items[i];
++    const Visual& visual = m_visuals[i];
++    const float boxWidth = std::max(1.0F, std::round(static_cast<float>(item.width * m_transform.factor)));
++    const float boxHeight = std::max(1.0F, std::round(static_cast<float>(item.height * m_transform.factor)));
++    visual.box->setFrameSize(boxWidth, boxHeight);
++    placeItem(i);
++
++    // The texts are centred as one block; what does not fit inside the rectangle is left out,
++    // the smaller line first.
++    const float textWidth = std::max(1.0F, boxWidth - padding * 2.0F);
++    visual.label->setMaxWidth(textWidth);
++    visual.label->measure(renderer);
++    visual.sublabel->setMaxWidth(textWidth);
++    visual.sublabel->measure(renderer);
++    const float room = boxHeight - padding * 2.0F;
++    const bool showLabel = !item.label.empty() && visual.label->height() <= room;
++    const bool showSublabel =
++        showLabel && !item.sublabel.empty() && visual.label->height() + visual.sublabel->height() <= room;
++    visual.label->setVisible(showLabel);
++    visual.sublabel->setVisible(showSublabel);
++    const float blockHeight = visual.label->height() + (showSublabel ? visual.sublabel->height() : 0.0F);
++    const float blockTop = std::round((boxHeight - blockHeight) * 0.5F);
++    visual.label->setPosition(std::round((boxWidth - visual.label->width()) * 0.5F), blockTop);
++    visual.sublabel->setPosition(
++        std::round((boxWidth - visual.sublabel->width()) * 0.5F), blockTop + visual.label->height()
++    );
++  }
++  InputArea::doLayout(renderer);
++}
+diff --color -ruN -x .git a/src/ui/controls/arrange.h b/src/ui/controls/arrange.h
+--- a/src/ui/controls/arrange.h	1969-12-31 19:00:00.000000000 -0500
++++ b/src/ui/controls/arrange.h	2026-11-15 10:18:29.704846983 -0500
+@@ -0,0 +1,105 @@
++#pragma once
++
++#include "render/scene/input_area.h"
++
++#include <cstddef>
++#include <functional>
++#include <optional>
++#include <string>
++#include <vector>
++
++class Box;
++class Label;
++
++// Rectangles placed freely on a plane, drawn to scale and moved by dragging: the
++// arrangement of a set of displays, for one. Positions and sizes are in the caller's own
++// layout units; the control fits the whole arrangement inside its box with one scale
++// factor. A drag moves a rectangle with the pointer without leaving the control, its edges
++// snapping to the other rectangles' edges, and reports the new position once, on release.
++class Arrange final : public InputArea {
++public:
++  struct Item {
++    std::string key;
++    double x = 0.0;
++    double y = 0.0;
++    double width = 0.0;
++    double height = 0.0;
++    std::string label;
++    std::string sublabel;
++    bool selected = false;
++
++    bool operator==(const Item&) const = default;
++  };
++
++  using SelectHandler = std::function<void(const std::string& key)>;
++  // The position is in layout units, rounded to whole ones.
++  using MoveHandler = std::function<void(const std::string& key, long long x, long long y)>;
++
++  Arrange();
++
++  // Content scale of the surface and the extra multiplier of its text.
++  void setScale(float scale, float fontScale);
++  // The rectangles, in drawing order. Applied only when they differ from the ones given
++  // last, or when `force` is set, so re-applying an unchanged tree never undoes a drop the
++  // caller has not answered yet. A rectangle being dragged keeps the pointer's position.
++  void setItems(std::vector<Item> items, bool force);
++  void setOnSelect(SelectHandler handler) { m_onSelect = std::move(handler); }
++  void setOnMove(MoveHandler handler) { m_onMove = std::move(handler); }
++
++  [[nodiscard]] bool dragging() const noexcept { return m_drag.has_value(); }
++  // Ends a drag in progress, putting the rectangle back where it was. Reports nothing.
++  void cancelDrag();
++
++private:
++  struct Visual {
++    Box* box = nullptr;
++    Label* label = nullptr;
++    Label* sublabel = nullptr;
++  };
++
++  // Layout units to pixels: pixel = origin + (unit - unitOrigin) * factor.
++  struct Transform {
++    double factor = 1.0;
++    double unitX = 0.0;
++    double unitY = 0.0;
++    float originX = 0.0F;
++    float originY = 0.0F;
++  };
++
++  struct Drag {
++    std::size_t index = 0;
++    // Where the rectangle was, to go back to on a cancel.
++    double startX = 0.0;
++    double startY = 0.0;
++    // From the rectangle's corner to the pointer, in layout units.
++    double grabX = 0.0;
++    double grabY = 0.0;
++    float pressX = 0.0F;
++    float pressY = 0.0F;
++    bool moved = false;
++  };
++
++  void onPointerPress(const PointerData& pointer);
++  void onPointerMotion(const PointerData& pointer);
++  void syncVisuals();
++  void applyItemStyle(std::size_t index);
++  void placeItem(std::size_t index);
++  void endDrag();
++  [[nodiscard]] Transform fitTransform() const;
++  [[nodiscard]] std::optional<std::size_t> itemAt(float localX, float localY) const;
++  void snap(std::size_t index, double& x, double& y) const;
++  void doLayout(Renderer& renderer) override;
++
++  Box* m_background = nullptr;
++  std::vector<Item> m_given;
++  std::vector<Item> m_items;
++  std::vector<Visual> m_visuals;
++  // Recomputed by every layout, except during a drag: the plane must not move under the
++  // pointer while a rectangle is carried across it.
++  Transform m_transform;
++  std::optional<Drag> m_drag;
++  SelectHandler m_onSelect;
++  MoveHandler m_onMove;
++  float m_scale = 1.0F;
++  float m_fontScale = 1.0F;
++};
+diff --color -ruN -x .git a/src/ui/ui_tree_reconciler.cpp b/src/ui/ui_tree_reconciler.cpp
+--- a/src/ui/ui_tree_reconciler.cpp	2026-10-29 15:05:32.000000000 -0400
++++ b/src/ui/ui_tree_reconciler.cpp	2026-11-15 10:20:29.834667068 -0500
+@@ -7,6 +7,7 @@
+ #include "render/core/color.h"
+ #include "render/core/renderer.h"
+ #include "render/scene/input_area.h"
++#include "ui/controls/arrange.h"
+ #include "ui/controls/box.h"
+ #include "ui/controls/button.h"
+ #include "ui/controls/color_picker.h"
+@@ -96,6 +97,57 @@
+         "onMiddleClick", "onScroll",      "onTextInput", "onKeyEvent",
+     };
+ 
++    // ui.arrange carries its rectangles as parallel arrays, which the ui.* prelude makes from
++    // the `items` a plugin writes: a key, a label and a sublabel each, and five numbers (x, y,
++    // width, height, selected).
++    constexpr std::size_t kArrangeRectFields = 5;
++    constexpr std::size_t kArrangeMaxItems = 32;
++
++    std::vector<Arrange::Item> readArrangeItems(const UiTreeNode& node) {
++      std::vector<Arrange::Item> items;
++      const std::vector<std::string>* keys = strArrayProp(node, "itemKeys");
++      if (keys == nullptr || keys->empty()) {
++        return items; // an empty table is read as an empty number array
++      }
++      const std::vector<std::string>* labels = strArrayProp(node, "itemLabels");
++      const std::vector<std::string>* sublabels = strArrayProp(node, "itemSublabels");
++      const std::vector<double>* rects = arrayProp(node, "itemRects");
++      if (rects == nullptr || rects->size() != keys->size() * kArrangeRectFields) {
++        kLog.warn("ui tree: arrange expects {} numbers for each of its items; none shown", kArrangeRectFields);
++        return items;
++      }
++      if (keys->size() > kArrangeMaxItems) {
++        kLog.warn("ui tree: arrange keeps the first {} items", kArrangeMaxItems);
++      }
++      const std::size_t count = std::min(keys->size(), kArrangeMaxItems);
++      items.reserve(count);
++      for (std::size_t i = 0; i < count; ++i) {
++        const double* rect = rects->data() + i * kArrangeRectFields;
++        if (!std::isfinite(rect[0])
++            || !std::isfinite(rect[1])
++            || !(rect[2] > 0.0)
++            || !(rect[3] > 0.0)
++            || !std::isfinite(rect[2])
++            || !std::isfinite(rect[3])) {
++          kLog.warn("ui tree: arrange skips item '{}': it needs a position and a size above zero", (*keys)[i]);
++          continue;
++        }
++        items.push_back(
++            Arrange::Item{
++                .key = (*keys)[i],
++                .x = rect[0],
++                .y = rect[1],
++                .width = rect[2],
++                .height = rect[3],
++                .label = labels != nullptr && i < labels->size() ? (*labels)[i] : std::string{},
++                .sublabel = sublabels != nullptr && i < sublabels->size() ? (*sublabels)[i] : std::string{},
++                .selected = rect[4] != 0.0,
++            }
++        );
++      }
++      return items;
++    }
++
+     bool isDragDropType(std::string_view type) { return type == "drag_source" || type == "drop_zone"; }
+ 
+     struct DragDropPropError {
+@@ -509,6 +561,10 @@
+           "width",  "flexGrow", "opacity", "visible",  "value",       "alpha",
+           "inputs", "swatches", "enabled", "onChange", "onChangeEnd",
+       };
++      static const std::unordered_set<std::string> kArrange = {
++          "width",      "height",        "flexGrow",  "opacity",  "visible", "itemKeys",
++          "itemLabels", "itemSublabels", "itemRects", "revision", "onMove",  "onSelect",
++      };
+       static const std::unordered_set<std::string> kSeparator = {"width",   "height",  "flexGrow",
+                                                                  "opacity", "visible", "thickness",
+                                                                  "color",   "spacing", "orientation"};
+@@ -578,6 +634,9 @@
+       if (type == "color_picker") {
+         return kColorPicker;
+       }
++      if (type == "arrange") {
++        return kArrange;
++      }
+       if (type == "separator") {
+         return kSeparator;
+       }
+@@ -627,7 +686,7 @@
+     std::string rightCallbackName;        // last-wired button onRightClick target
+     std::string hoverCallbackName;        // last-wired onHover target (button/box/image/row/column)
+     std::string submitCallbackName;       // last-wired input onSubmit target
+-    std::string dragEndCallbackName;      // last-wired slider onDragEnd target
++    std::string dragEndCallbackName;      // last-wired slider onDragEnd / arrange onMove target
+     std::string pointerMoveCallbackName;  // last-wired graph onPointerMove target
+     std::string pointerLeaveCallbackName; // last-wired graph onPointerLeave target
+     std::string pointerStreamKey; // coalescing stream shared by this graph's or pixel stream's pointer callbacks
+@@ -759,6 +818,9 @@
+     if (desired.type == "color_picker") {
+       return std::make_unique<ColorPicker>();
+     }
++    if (desired.type == "arrange") {
++      return std::make_unique<Arrange>();
++    }
+     if (desired.type == "separator") {
+       return std::make_unique<Separator>();
+     }
+@@ -1676,6 +1738,50 @@
+       return;
+     }
+ 
++    if (desired.type == "arrange") {
++      auto* arrange = static_cast<Arrange*>(node);
++      arrange->setScale(m_scale, m_fontScale);
++      arrange->setSize(
++          width != nullptr ? scaled(*width) : arrange->width(), height != nullptr ? scaled(*height) : arrange->height()
++      );
++      // Like a slider's value: the rectangles are applied only when they change between
++      // renders, so an unchanged tree never undoes a drop. A new `revision` applies them
++      // again as they are: how a plugin takes back a move it did not accept.
++      const double* revision = numProp(desired, "revision");
++      const bool revised = revision != nullptr && (!slot.lastScalar.has_value() || *slot.lastScalar != *revision);
++      if (revision != nullptr) {
++        slot.lastScalar = *revision;
++      }
++      arrange->setItems(readArrangeItems(desired), revised);
++
++      const std::string* onSelect = callbackProp(desired, "onSelect");
++      const std::string selectName = onSelect != nullptr ? *onSelect : std::string{};
++      if (selectName != slot.callbackName) {
++        slot.callbackName = selectName;
++        arrange->setOnSelect(
++            selectName.empty() ? Arrange::SelectHandler{} : [this, selectName](const std::string& key) {
++              if (m_sink) {
++                m_sink(ControlCallback{selectName, key});
++              }
++            }
++        );
++      }
++      const std::string* onMove = callbackProp(desired, "onMove");
++      const std::string moveName = onMove != nullptr ? *onMove : std::string{};
++      if (moveName != slot.dragEndCallbackName) {
++        slot.dragEndCallbackName = moveName;
++        arrange->setOnMove(
++            moveName.empty() ? Arrange::MoveHandler{}
++                             : [this, moveName](const std::string& key, long long x, long long y) {
++                                 if (m_sink) {
++                                   m_sink(ControlCallback{moveName, key, std::format("{},{}", x, y)});
++                                 }
++                               }
++        );
++      }
++      return;
++    }
++
+     if (desired.type == "image") {
+       auto* image = controlFromSlot<Image>(node);
+       if (image == nullptr) {
