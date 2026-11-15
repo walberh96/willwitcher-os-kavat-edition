@@ -1,0 +1,84 @@
+/* The installer's look: Kavat's dark side, as the design draws it. The sidebar and the
+   buttons at the bottom are drawn by calamares-sidebar.qml and calamares-navigation.qml;
+   this is for the pages Calamares draws itself. */
+
+QWidget {
+    background-color: #151821;
+    color: #e8e6df;
+    font-size: 13px;
+}
+QLabel { background: transparent; }
+QLabel:disabled, QCheckBox:disabled, QRadioButton:disabled { color: #5c6170; }
+
+QLineEdit, QComboBox, QSpinBox, QPlainTextEdit, QTextEdit, QListView, QTreeView, QTableView {
+    background-color: #1e2230;
+    color: #e8e6df;
+    border: 1px solid #2a2f3f;
+    border-radius: 7px;
+    padding: 5px 8px;
+    selection-background-color: #f2a93b;
+    selection-color: #14110a;
+}
+QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #f2a93b; }
+QComboBox::drop-down { border: none; width: 22px; }
+QComboBox QAbstractItemView {
+    background-color: #1e2230;
+    border: 1px solid #2a2f3f;
+    selection-background-color: #f2a93b;
+    selection-color: #14110a;
+}
+QListView::item, QTreeView::item { padding: 4px; }
+QListView::item:selected, QTreeView::item:selected { background-color: #f2a93b; color: #14110a; }
+QHeaderView::section { background-color: #1e2230; color: #8b90a0; border: none; padding: 5px; }
+
+QPushButton {
+    background-color: transparent;
+    color: #e8e6df;
+    border: 1px solid #3a4054;
+    border-radius: 8px;
+    padding: 6px 16px;
+}
+QPushButton:hover { background-color: #2a2f3f; }
+QPushButton:default, QPushButton:checked { background-color: #f2a93b; color: #14110a; border-color: #f2a93b; }
+QPushButton:disabled { color: #5c6170; border-color: #2a2f3f; }
+
+QCheckBox, QRadioButton { background: transparent; spacing: 8px; }
+QCheckBox::indicator, QRadioButton::indicator {
+    width: 16px; height: 16px;
+    border: 1px solid #4a5066;
+    background-color: #1e2230;
+}
+QCheckBox::indicator { border-radius: 4px; }
+QRadioButton::indicator { border-radius: 9px; }
+QCheckBox::indicator:checked, QRadioButton::indicator:checked { background-color: #f2a93b; border-color: #f2a93b; }
+
+QProgressBar {
+    background-color: #1e2230;
+    border: none;
+    border-radius: 5px;
+    height: 10px;
+    text-align: center;
+    color: transparent;
+}
+QProgressBar::chunk { background-color: #f2a93b; border-radius: 5px; }
+
+QScrollBar:vertical { background: transparent; width: 10px; }
+QScrollBar::handle:vertical { background: #3a4054; border-radius: 5px; min-height: 24px; }
+QScrollBar::add-line, QScrollBar::sub-line { height: 0; width: 0; }
+QScrollBar:horizontal { background: transparent; height: 10px; }
+QScrollBar::handle:horizontal { background: #3a4054; border-radius: 5px; min-width: 24px; }
+
+QToolTip { background-color: #1e2230; color: #e8e6df; border: 1px solid #2a2f3f; }
+QGroupBox { border: 1px solid #2a2f3f; border-radius: 8px; margin-top: 12px; padding-top: 8px; }
+QGroupBox::title { subcontrol-origin: margin; left: 10px; color: #8b90a0; }
+QFrame[frameShape="4"], QFrame[frameShape="5"] { color: #2a2f3f; }
+
+/* The buttons along the bottom: Next is the one in the accent */
+QPushButton#view-button-next { background-color: #f2a93b; color: #14110a; border-color: #f2a93b; font-weight: 600; min-width: 70px; }
+QPushButton#view-button-next:hover { background-color: #f6ba5c; }
+QPushButton#view-button-next:disabled { background-color: #4f4031; color: #8b90a0; border-color: #4f4031; }
+QPushButton#view-button-back, QPushButton#view-button-cancel { min-width: 70px; }
+
+/* The disk page draws its own legend under the two bars */
+PartitionLabelsView, PartitionBarsView, QAbstractItemView { color: #e8e6df; }
+PartitionLabelsView { background: transparent; border: none; }

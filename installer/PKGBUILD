@@ -1,21 +1,54 @@
 pkgname=kavat-installer
 pkgver=0.1.0
-pkgrel=10
+pkgrel=11
 pkgdesc="Willwitcher-OS Kavat Edition: the installer's configuration and looks"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # Calamares, and what its steps run on the new system's disk
-depends=('kavat-calamares' 'btrfs-progs' 'cryptsetup' 'dosfstools' 'efibootmgr' 'grub' 'python' 'qt6-wayland' 'rsync'
+depends=('kavat-calamares' 'kavat-theme' 'btrfs-progs' 'cryptsetup' 'dosfstools' 'efibootmgr' 'grub' 'python' 'qt6-wayland' 'rsync'
          'squashfs-tools' 'sudo')
 source=('settings.conf' 'kavat-installer' 'kavat-installer.desktop' 'finish-system' 'install-bootloader')
 sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
+# The Appearance page offers the palettes the theme system has: they are read from its
+# package, which is why it is needed to build this one.
+build() {
+  python - > "$srcdir/palettes.js" << 'END'
+import glob, json, os, re
+
+palettes = []
+for path in sorted(glob.glob('/usr/share/kavat/themes/palettes/*.toml')):
+    palette = {'id': os.path.basename(path)[:-5], 'name': '', 'accents': [], 'dark': {}, 'light': {}}
+    section = ''
+    for line in open(path, encoding='utf-8'):
+        header = re.match(r'\[(\w+)\]', line)
+        pair = re.match(r'(\w+)\s*=\s*"([^"]*)"', line)
+        if header:
+            section = header.group(1)
+        elif pair and section == '' and pair.group(1) == 'name':
+            palette['name'] = pair.group(2)
+        elif pair and section == 'accents':
+            palette['accents'].append({'name': pair.group(1), 'colour': pair.group(2)})
+        elif pair and section in ('dark', 'light'):
+            palette[section][pair.group(1)] = pair.group(2)
+    # the system's own goes first
+    palettes.insert(0 if palette['id'] == 'kavat' else len(palettes), palette)
+print('// Made when the package is built, from the palettes of kavat-theme.')
+print('.pragma library')
+print('var palettes = ' + json.dumps(palettes, indent=1))
+END
+}
+
 package() {
   install -Dm644 settings.conf "$pkgdir/etc/calamares/settings.conf"
   install -Dm644 -t "$pkgdir/etc/calamares/modules" "$startdir"/modules/*.conf
-  install -Dm644 -t "$pkgdir/etc/calamares/branding/kavat" "$startdir"/branding/kavat/*
+  install -d "$pkgdir/etc/calamares/branding"
+  cp -r "$startdir/branding/kavat" "$pkgdir/etc/calamares/branding/kavat"
+  install -Dm644 "$srcdir/palettes.js" "$pkgdir/etc/calamares/branding/kavat/palettes.js"
+  chmod -R u=rwX,go=rX "$pkgdir/etc/calamares/branding"
   install -Dm644 -t "$pkgdir/usr/lib/calamares/modules/luks-keys" "$startdir"/luks-keys/*
+  install -Dm644 -t "$pkgdir/usr/lib/calamares/modules/kavat-look" "$startdir"/kavat-look/*
   install -Dm755 kavat-installer "$pkgdir/usr/bin/kavat-installer"
   install -Dm755 finish-system "$pkgdir/usr/lib/kavat-installer/finish-system"
   install -Dm755 install-bootloader "$pkgdir/usr/lib/kavat-installer/install-bootloader"

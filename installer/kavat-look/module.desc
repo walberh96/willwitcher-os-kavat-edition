@@ -1,0 +1,6 @@
+# The installer's own step: the look chosen on the Appearance page. See main.py.
+---
+type: "job"
+name: "kavat-look"
+interface: "python"
+script: "main.py"

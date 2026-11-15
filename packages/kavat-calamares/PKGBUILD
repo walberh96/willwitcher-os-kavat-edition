@@ -5,7 +5,7 @@
 # 00ACD15E25A79FEE028B0EE57FEA3DA6169C77D6.
 pkgname=kavat-calamares
 pkgver=3.4.3
-pkgrel=1
+pkgrel=2
 pkgdesc='Calamares, the installer framework, as Willwitcher-OS Kavat Edition builds it'
 arch=('x86_64')
 url='https://codeberg.org/Calamares/calamares'
@@ -18,6 +18,14 @@ conflicts=('calamares')
 options=('!debug')
 source=("calamares-$pkgver.tar.gz::$url/releases/download/v$pkgver/calamares-$pkgver.tar.gz")
 sha256sums=('144cbbf6bdcebfb21685950db4f0777218519df095f62f4aa392f28348110d18')
+
+# The disk page writes the legend under its bars in black, whatever the colours of the rest:
+# it is made to use the text colour of the installer's stylesheet, which is light on dark.
+prepare() {
+  local file="calamares-$pkgver/src/modules/partition/gui/PartitionLabelsView.cpp"
+  grep -q 'painter->setPen( Qt::black );' "$file"
+  sed -i 's/painter->setPen( Qt::black );/painter->setPen( palette().windowText().color() );/' "$file"
+}
 
 build() {
   # Modules for other init systems and initramfs tools, the samples, and the ones that

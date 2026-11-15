@@ -3,11 +3,11 @@
 ---
 componentName: kavat
 welcomeStyleCalamares: false
-welcomeExpandingLogo: true
+welcomeExpandingLogo: false
 windowExpanding: normal
-windowSize: 1100px,720px
+windowSize: 1280px,800px
 windowPlacement: center
-sidebar: widget
+sidebar: qml
 navigation: widget
 
 strings:

@@ -27,7 +27,7 @@ from machine import (BOOT_TIMEOUT, ROOT, Checks, Machine, check_desktop, check_p
 USER = 'tester'
 PASSWORD = 'kavat-123'
 DISK_PASSWORD = 'kavat-disk-456'  # the recovery password of the encrypted disk
-ENCRYPT_BOX = (282, 854)  # where the disk page shows Encrypt system, on a 1920x1080 screen
+ENCRYPT_BOX = (528, 742)  # where the disk page shows Encrypt system, on a 1920x1080 screen
 INSTALL_TIMEOUT = 900  # seconds for the installer to do its work
 LOG = '/tmp/installer.log'
 # what the installed system's root and its other subvolumes are mounted on
@@ -37,9 +37,10 @@ SUBVOLUMES = {'/': '/@', '/home': '/@home', '/games': '/@games', '/var/log': '/@
 
 # where the installer's side bar names each step, on a 1920x1080 screen; the one it is on
 # is painted in the accent colour
-NEXT_BUTTON = (1754, 1039)  # where the installer's Next is, on a 1920x1080 screen
+NEXT_BUTTON = (1419, 935)  # where the installer's Next is, on a 1920x1080 screen
 LIVE = 'runuser -u live -- env XDG_RUNTIME_DIR=/run/user/1000 WAYLAND_DISPLAY=wayland-1'
-STEPS = {'location': 195, 'keyboard': 234, 'partitions': 273, 'users': 312, 'summary': 351}
+STEPS = {'location': 292, 'keyboard': 328, 'partitions': 364, 'users': 400, 'appearance': 436, 'summary': 472}
+STEP_DOT = 353  # how far across the screen the mark of each step is
 
 
 def next_page(screen, step, timeout=120, machine=None):
@@ -63,7 +64,7 @@ def next_page(screen, step, timeout=120, machine=None):
         again = time.time() + 12
         while time.time() < min(again, deadline):
             time.sleep(1)
-            red, green, blue = screen.pixel(30, STEPS[step])
+            red, green, blue = screen.pixel(STEP_DOT, STEPS[step])
             if red > 200 and green > 130 and blue < 110:
                 time.sleep(1)
                 return True
@@ -106,6 +107,9 @@ def install(machine, checks, pictures, encrypt):
     screen.press('tab')
     screen.type(PASSWORD)
     time.sleep(1)
+    # the Appearance page, left as it comes: the system's own look
+    shown = shown and next_page(screen, 'appearance', machine=machine)
+    screen.picture(f'{pictures}/install-appearance.png')
     shown = shown and next_page(screen, 'summary', machine=machine)
     screen.picture(f'{pictures}/install-summary.png')
     if not checks.report(shown, 'the installer goes through its pages'):
@@ -203,6 +207,8 @@ def check_installed(machine, checks):
     checks.report(output.isdigit() and int(output) < 100, 'a terminal opens its shell in under 100 ms', f'{output} ms')
     status, output = machine.run("stat -c '%a' /etc/fstab /etc/locale.conf /etc/default/grub /var/lib/kavat/theme | sort -u | tr '\\n' ' '")
     checks.report(output == '644 755', 'what the installer wrote can be read by everyone', output)
+    status, output = machine.run('grep -c -E "^(palette = \\"kavat\\"|mode = \\"dark\\"|accent = \\"amber\\")$" /etc/kavat/theme.toml')
+    checks.report(output == '3', 'the look chosen on the Appearance page is the settings of the machine', output)
 
 
 def boot_with_password(disk, firmware, checks, pictures):
