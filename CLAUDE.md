@@ -25,7 +25,7 @@ The two diagrams of the design document are images in `docs/img/`, each made fro
 
 ## How the design changes
 
-1. What the user has to decide goes to `docs/PENDING.md`, not to the design document. Each point has a number (D1 to D40 are used; the next is D41), a recommendation and what happens if the answer is no.
+1. What the user has to decide goes to `docs/PENDING.md`, not to the design document. Each point has a number (D1 to D43 are used; the next is D44), a recommendation and what happens if the answer is no.
 2. Before working, that file is read: the user answers in the chat or by writing in it.
 3. What is approved goes to `docs/DESIGN.md`, to the mockup and, when it applies, to the README, and leaves the pending list. The document and the mockup change in the same commit: neither is left for later.
 4. What is rejected is deleted from the pending list and is not asked again. If the user approves one part and says "not the rest", that no covers everything else that was on the table.
@@ -61,9 +61,9 @@ After touching `iso/`, `packages/` or `installer/` these are run, in this order.
 - `tests/kav.py [--encrypted]`: on the same disk, asks `kav` for packages on and off the reviewed list, with a folder standing in for the AUR, and undoes a change with `kav undo`. It is the other half of the gate of phase 3. It uses the lists of packages that `tools/build-repo.sh` leaves in its chroot.
 - `tests/find.py [--encrypted]`: on the same disk, checks that the installer left the index of the whole disk built and that a change of packages brings it up to date, then logs in, opens the file search with `Super+Shift+F` and finds a file by name, in the index and by a word inside it.
 - `tests/editor.py [--encrypted]`: on the same disk, loads every plugin of `kavat-nvim` with no network, checks treesitter, Marksman and the shortcuts, changes the theme under an open editor, and types into a file on the desktop and saves it.
-- `tests/files.py [--encrypted]`: on the same disk, opens Yazi with `Super+E` and copies and trashes a file with the system's keys, asks the desktop for a file as an app does and picks it in Yazi, and asks for a file to be shown in its folder.
+- `tests/files.py [--encrypted]`: on the same disk, opens Yazi with `Super+E`, copies a file onto its own name, answers the copy window and trashes a file with the system's keys, asks the desktop for a file as an app does and picks it in Yazi, and asks for a file to be shown in its folder.
 - `tests/notes.py [--encrypted]`: on the same disk, saves notes with `kavat-notes`, checks that a day and a time become a reminder with its timer, waits for a reminder to come up as a notification, and types a quick note with `Super+N`.
-- `tests/settings.py [--encrypted]`: on the same disk, checks that the shell has the settings plugin on, opens the panel with `Super+T`, presses Light and a palette in it, and checks that the theme of the system changed.
+- `tests/settings.py [--encrypted]`: on the same disk, checks that the shell has the settings plugin on, opens the panel with `Super+T`, presses Light and a palette in it, and checks that the theme of the system changed; changes settings of Kitty, Yazi, the keyboard and the lock with `kavat-conf`; opens every page that is built; and locks the screen and opens it with the password.
 
 What the tests share is in `tests/machine.py`. The last ten work on a layer over the installed disk, so they do not change it.
 
@@ -71,15 +71,19 @@ What the tests share is in `tests/machine.py`. The last ten work on a layer over
 
 `kav` is in `kav/` and is Rust too, with its code in `kav/core/`; `tui.rs` there is the full screen that `kav` opens with no arguments in a terminal; its unit tests run with `cargo test` inside that folder. `kav install` is not tried on the build PC: CachyOS's repositories have packages there, like `yay`, that do not exist in Kavat.
 
+`kavat-fetch` and `kavat-top` are in `packages/kavat-shell-config/`: two small scripts over fastfetch and btop, whose looks are the templates `themes/templates/fastfetch/` and `themes/templates/btop/`. The mode by the hour is `themes/kavat-theme-auto`, installed as `/usr/lib/kavat/theme-auto`. `kavat-files` is in `packages/kavat-files/`, with its Yazi plugins in `plugins/`; Yazi's own source documents what a plugin can call.
+
 `kavat-find`, the file search, is in `packages/kavat-find/`: one bash script that drives `fzf`, which calls the same script back for its lists, its preview and what a key does. `fzf-tab`, which Arch's repositories do not have, is built in `packages/fzf-tab/` from its release.
 
 `kavat-nvim` is in `editor/`: `lua/kavat/` is the configuration, `colors/kavat.lua` the colour scheme made from the theme's palette, and the PKGBUILD lists each plugin with its commit and compiles the treesitter parsers named in `parsers.txt`. `work/nvim/run.sh`, when it exists, opens it on the build PC apart from the host's own Neovim.
 
 `kavat-notes` is in `packages/kavat-notes/`: `kavat.patch` is the whole fork of `nb`, and `kavat-notes` the script with the quick note, the reminders and what is due. It can be tried on the build PC with `NB_DIR` and `HOME` pointed at a temporary folder; the timers it makes there are the build PC's, so `kavat-notes sync` is run after deleting that folder.
 
-`kavat-settings` is in `packages/kavat-settings/`: `settings/` is a plugin of the shell, with `plugin.toml` and `panel.luau`, which is Luau; the functions a plugin calls are still named `noctalia.`. What a plugin can do is in Noctalia's own documents, inside its source, under `docs/user/plugins/development/`: they are read before using a control or a function that is not already in the script.
+`kavat-settings` is in `packages/kavat-settings/`: `settings/` is a plugin of the shell, with `plugin.toml` and `panel.luau`, which is Luau, and `kavat-conf` is the program that reads and changes the settings each app keeps in its own file; the functions a plugin calls are still named `noctalia.`. What a plugin can do is in Noctalia's own documents, inside its source, under `docs/user/plugins/development/`: they are read before using a control or a function that is not already in the script.
 
 Kavat Shell is in `packages/kavat-shell/`: Noctalia's source, `no-ping.patch`, `no-network.patch` and `rename.py`, which changes the name in the source before it is built. A patch is made against the source with the patches before it applied, and before the renaming. Its build takes about a quarter of an hour.
+
+The installer's look is in `installer/branding/kavat/`: `stylesheet.qss` for Calamares' own pages, `calamares-sidebar.qml` for the steps, `appearance.qml` for the Appearance page and `show.qml` for the pictures shown while it installs, which are copies of some of `docs/screenshots/` in `slides/`: when one of those screenshots is retaken, its copy is too. `work/vm/live.py`, when it exists, keeps a machine running from a copy of the ISO, to try the installer's files in without building.
 
 `kavat-greeter`, the login screen, is in `greeter/`: `greeter.py` is its program, which greetd starts inside a small Hyprland session (`hyprland.lua`), and `page/` is the web page it shows. That page can be opened in a browser, where it stands in for the program itself with a made-up user whose password is `kavat`.
 
