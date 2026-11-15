@@ -175,6 +175,19 @@ def main():
         status, output = machine.run('kav doctor')
         checks.report(status == 0 and 'FAIL' not in output, 'kav doctor finds the system healthy', output)
 
+        status, output = machine.run('touch /var/lib/pacman/db.lck; kav doctor | grep -c "^FAIL"; kav fix lock && kav doctor | grep -c "^FAIL"; '
+                                     'kav fix everything 2>&1 | head -n 1')
+        checks.report(output.splitlines()[:2] == ['1', '0'] and 'kav fix takes' in output,
+                      'kav fix mends what doctor found, and says what it can mend', output)
+
+        status, output = machine.run('kav set; kav set downloads 8 && grep -c "^ParallelDownloads = 8" /etc/pacman.conf; '
+                                     'kav set snapshots 20 > /dev/null && grep -c \'^NUMBER_LIMIT="20"\' /etc/snapper/configs/root; '
+                                     'kav set downloads 99 2>&1 | head -n 1; kav set downloads 5; kav set snapshots 10')
+        lines = output.splitlines()
+        checks.report(len(lines) > 5 and lines[0].split()[::len(lines[0].split()) - 1] == ['downloads', '5'] and lines[1].split()[-1] == '10'
+                      and lines[3] == '1' and lines[4] == '1' and 'kav set takes' in lines[5],
+                      "kav set reads and changes pacman's downloads at once and snapper's snapshots kept, each in its own file", output)
+
         print('removing a package and going back', flush=True)
         status, output = machine.run(f'yes | kav remove {PACKAGE}', 120)
         checks.report(status == 0 and machine.run(f'pacman -Q {PACKAGE}')[0] != 0, f'kav remove takes {PACKAGE} out', output)

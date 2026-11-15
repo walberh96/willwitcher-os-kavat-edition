@@ -63,6 +63,53 @@ pub fn findings() -> Vec<(&'static str, Vec<String>)> {
     all
 }
 
+/// What mends each of the checks of findings(), in their order: the word after `kav fix`.
+/// A check with none has nothing a command can do for it.
+pub const FIXES: [Option<&str>; 6] = [Some("service"), Some("orphans"), Some("merge"), Some("cache"), None, Some("lock")];
+
+/// Mends what one of the checks found. Each is the plain command a person would run, in
+/// the open.
+pub fn fix(arguments: &[String]) -> Result<(), String> {
+    use crate::system::{as_root, run};
+    match arguments.iter().map(String::as_str).collect::<Vec<_>>().as_slice() {
+        ["orphans"] => {
+            let orphans = lines(read(Command::new("pacman").arg("-Qdtq")));
+            if orphans.is_empty() {
+                println!("kav: no package is left that nothing needs.");
+                return Ok(());
+            }
+            run(as_root("pacman").args(["-Rns", "--"]).args(&orphans))
+        }
+        ["lock"] => {
+            if read(Command::new("pgrep").args(["-x", "pacman"])).is_some() {
+                return Err("pacman is running: its lock is in use".into());
+            }
+            run(as_root("rm").args(["-f", "/var/lib/pacman/db.lck"]))
+        }
+        // pacman's own cleaning: it asks before it deletes the packages that are not installed
+        ["cache"] => run(as_root("pacman").arg("-Sc")),
+        ["service", unit] if !unit.is_empty() && unit.chars().all(|c| c.is_ascii_alphanumeric() || "-_.@:\\".contains(c)) => {
+            let _ = Command::new("systemctl").args(["status", "--no-pager", "--lines", "15", unit]).status();
+            println!("\nkav: starting {unit} again.");
+            run(as_root("systemctl").args(["restart", unit]))
+        }
+        ["merge", file] if file.starts_with("/etc/") && !file.contains("..") && (file.ends_with(".pacnew") || file.ends_with(".pacsave")) => {
+            let (yours, _) = file.rsplit_once('.').unwrap_or((file, ""));
+            println!("kav: {yours} is yours, on the left; {file} is the package's, on the right.\nChange yours as you see fit, save and leave the editor.");
+            run(as_root("nvim").args(["-d", yours, file]))?;
+            print!("Delete {file}, now that it is merged? [y/N] ");
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+            let mut answer = String::new();
+            let _ = std::io::stdin().read_line(&mut answer);
+            if answer.trim().eq_ignore_ascii_case("y") {
+                run(as_root("rm").args(["--", file]))?;
+            }
+            Ok(())
+        }
+        _ => Err("kav fix takes: orphans, lock, cache, service <unit>, or merge <file ending in .pacnew or .pacsave>".into()),
+    }
+}
+
 pub fn check() -> Result<(), String> {
     let mut wrong = 0;
     for (what, problems) in findings() {

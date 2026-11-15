@@ -29,6 +29,7 @@ u                Dashboard, Updates: bring the whole system up to date
 r                AUR: read the package, and approve it or not
 Enter            Snapshots: read the list, which asks for your password
 z                Snapshots: go back to before the last change of packages
+f                Doctor: mend what the line under the cursor found
 F5               read everything again
 q, Esc           leave";
 
@@ -53,6 +54,9 @@ struct App {
     sheet: Option<(String, String)>,
     /// what the last thing done ended in
     said: String,
+    /// something that changes the system, waiting for a yes: what it is, in words, and
+    /// kav's own command for it
+    asked: Option<(String, Vec<String>)>,
     snapshots_read: bool,
 }
 
@@ -153,6 +157,7 @@ impl App {
             typing: false,
             sheet: None,
             said: String::new(),
+            asked: None,
             snapshots_read: false,
             board: Board::default(),
         };
@@ -179,14 +184,28 @@ impl App {
             self.rows[1] = vec![Row { name: String::new(), text: Line::from("/ and what to look for, then Enter.") }];
         }
         self.read_dashboard();
-        self.rows[6] = vec![
+        self.rows[6] = crate::settings::SETTINGS
+            .iter()
+            .map(|setting| {
+                let now = crate::settings::get(setting.name);
+                Row {
+                    name: format!("{} {}", setting.name, crate::settings::next(setting, now)),
+                    text: Line::from(vec![
+                        Span::raw(format!("{:<34}", setting.what)),
+                        now.map_or(dim("root's to read; Enter changes it"), |value| self.bold(value.to_string())),
+                    ]),
+                }
+            })
+            .collect();
+        self.rows[6].extend([
+            Row { name: String::new(), text: Line::from("") },
             Row { name: String::new(), text: Line::from(vec![Span::raw(format!("{:<34}", "The reviewed list of the system")), dim(self.paths.lists[0].display().to_string())]) },
             Row { name: String::new(), text: Line::from(vec![Span::raw(format!("{:<34}", "The reviewed list of this machine")), dim(self.paths.lists[1].display().to_string())]) },
             Row { name: String::new(), text: Line::from(vec![Span::raw(format!("{:<34}", "What was asked to be reviewed")), dim(self.paths.requests.display().to_string())]) },
             Row { name: String::new(), text: Line::from(vec![Span::raw(format!("{:<34}", "Where AUR packages are built")), dim(self.paths.chroot.display().to_string())]) },
             Row { name: String::new(), text: Line::from("") },
-            Row { name: String::new(), text: Line::from(dim("These cannot be changed from here yet: mirrors, how often to check, and what is kept.")) },
-        ];
+            Row { name: String::new(), text: Line::from(dim("Enter on one of the first two changes it to its next value. The rest cannot be changed from here yet.")) },
+        ]);
         for tab in 0..TABS.len() {
             let last = self.rows[tab].len().saturating_sub(1);
             let at = self.cursor[tab].selected().unwrap_or(0).min(last);
@@ -241,15 +260,24 @@ impl App {
 
     fn read_doctor(&mut self) {
         let mut rows = Vec::new();
-        for (what, problems) in doctor::findings() {
+        for (index, (what, problems)) in doctor::findings().into_iter().enumerate() {
             let mark = if problems.is_empty() {
                 Span::styled("ok    ", Style::default().fg(Color::Green))
             } else {
                 Span::styled("FAIL  ", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD))
             };
-            rows.push(Row { name: String::new(), text: Line::from(vec![mark, Span::raw(what)]) });
+            // a line that can be mended carries kav's own words for it: f runs kav fix with them
+            let fix = doctor::FIXES.get(index).copied().flatten().filter(|_| !problems.is_empty());
+            let whole = fix.filter(|fix| !matches!(*fix, "service" | "merge")).unwrap_or_default();
+            let hint = if whole.is_empty() { Span::raw("") } else { dim("   f mends it") };
+            rows.push(Row { name: whole.to_string(), text: Line::from(vec![mark, Span::raw(what), hint]) });
             for problem in problems {
-                rows.push(Row { name: String::new(), text: Line::from(vec![Span::raw("      "), dim(problem)]) });
+                let one = match fix {
+                    Some(fix @ ("service" | "merge")) => format!("{fix} {problem}"),
+                    _ => String::new(),
+                };
+                let hint = if one.is_empty() { Span::raw("") } else { dim("   f mends it") };
+                rows.push(Row { name: one, text: Line::from(vec![Span::raw("      "), dim(problem), hint]) });
             }
         }
         self.rows[5] = rows;
@@ -418,6 +446,8 @@ impl App {
             2 => vec![("u", "update all")],
             3 => vec![("r", "review")],
             4 => vec![("↵", "read the list"), ("z", "undo the last change")],
+            5 => vec![("f", "mend the line under the cursor")],
+            6 => vec![("↵", "change to the next value")],
             0 => vec![("u", "update all")],
             _ => vec![],
         });
@@ -433,6 +463,25 @@ impl App {
         }
         frame.render_widget(Paragraph::new(Line::from(bar)), bottom);
 
+        if let Some((what, arguments)) = &self.asked {
+            let area = centred(frame.area(), 60, 40);
+            frame.render_widget(Clear, area);
+            let text = vec![
+                Line::from(""),
+                Line::from(Span::styled(format!("  {what}"), Style::default().add_modifier(Modifier::BOLD))),
+                Line::from(""),
+                Line::from(format!("  It runs  kav {}  in this terminal.", arguments.join(" "))),
+                Line::from("  It changes the system, so it asks for your password there:"),
+                Line::from("  type it at the line that says so, and it goes on."),
+                Line::from(""),
+                Line::from(vec![Span::raw("  "), self.bold("Enter"), Span::raw("  go on      "), self.bold("Esc"), Span::raw("  leave it")]),
+            ];
+            let question = Paragraph::new(text)
+                .wrap(Wrap { trim: false })
+                .block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(self.accent)).title(self.bold(" Before it starts ")));
+            frame.render_widget(question, area);
+        }
+
         if let Some((title, text)) = &self.sheet {
             let area = centred(frame.area(), 80, 80);
             frame.render_widget(Clear, area);
@@ -447,9 +496,13 @@ impl App {
     /// take the screen again once the person has read what it said.
     fn hand_over(&mut self, terminal: &mut DefaultTerminal, arguments: &[&str]) {
         ratatui::restore();
-        println!("kav {}\n", arguments.join(" "));
+        println!("\n  kav {}\n", arguments.join(" "));
+        println!("  If it asks for your password, type it and press Enter: nothing shows while you type.\n");
         let me = std::env::current_exe().unwrap_or_else(|_| "kav".into());
-        let ended = Command::new(me).args(arguments).status();
+        let ended = Command::new(me)
+            .args(arguments)
+            .env("SUDO_PROMPT", "  Your password, %u, to change the system's packages: ")
+            .status();
         self.said = match ended {
             Ok(status) if status.success() => format!("kav {} is done", arguments.join(" ")),
             _ => format!("kav {} did not finish", arguments.join(" ")),
@@ -464,6 +517,13 @@ impl App {
     fn key(&mut self, terminal: &mut DefaultTerminal, code: KeyCode, modifiers: KeyModifiers) -> bool {
         self.said.clear();
         if self.sheet.take().is_some() {
+            return true;
+        }
+        if let Some((_, arguments)) = self.asked.take() {
+            if code == KeyCode::Enter {
+                let arguments: Vec<&str> = arguments.iter().map(String::as_str).collect();
+                self.hand_over(terminal, &arguments);
+            }
             return true;
         }
         if self.typing {
@@ -512,18 +572,34 @@ impl App {
             }
             KeyCode::Char('i') if self.tab == 1 => {
                 if let Some(name) = self.selected().map(str::to_string) {
-                    self.hand_over(terminal, &["install", &name]);
+                    self.asked = Some((format!("Install {name}"), vec!["install".into(), name]));
                 }
             }
             KeyCode::Char('x') if self.tab == 1 => {
                 if let Some(name) = self.selected().map(str::to_string) {
-                    self.hand_over(terminal, &["remove", &name]);
+                    self.asked = Some((format!("Remove {name}"), vec!["remove".into(), name]));
                 }
             }
-            KeyCode::Char('u') if self.tab == 2 || self.tab == 0 => self.hand_over(terminal, &["update"]),
+            KeyCode::Char('u') if self.tab == 2 || self.tab == 0 => {
+                self.asked = Some(("Bring the whole system up to date".into(), vec!["update".into()]));
+            }
             KeyCode::Char('r') if self.tab == 3 => {
                 if let Some(name) = self.selected().map(str::to_string) {
                     self.hand_over(terminal, &["review", &name]);
+                }
+            }
+            KeyCode::Char('f') if self.tab == 5 => {
+                if let Some(words) = self.selected().map(str::to_string) {
+                    let mut arguments = vec!["fix".to_string()];
+                    arguments.extend(words.split_whitespace().map(str::to_string));
+                    self.asked = Some((format!("Mend: {words}"), arguments));
+                }
+            }
+            KeyCode::Enter if self.tab == 6 => {
+                // the row's name is the setting and the value it would take
+                if let Some((name, value)) = self.selected().and_then(|row| row.split_once(' ')) {
+                    let what = crate::settings::SETTINGS.iter().find(|s| s.name == name).map_or(name, |s| s.what);
+                    self.asked = Some((format!("{what}: {value}"), vec!["set".into(), name.into(), value.into()]));
                 }
             }
             KeyCode::Enter if self.tab == 4 => {
@@ -539,7 +615,9 @@ impl App {
                     self.said = "The snapshots are root's to read, and the password was not given.".into();
                 }
             }
-            KeyCode::Char('z') if self.tab == 4 => self.hand_over(terminal, &["undo"]),
+            KeyCode::Char('z') if self.tab == 4 => {
+                self.asked = Some(("Go back to before the last change of packages".into(), vec!["undo".into()]));
+            }
             _ => {}
         }
         true

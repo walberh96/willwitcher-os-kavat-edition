@@ -9,6 +9,7 @@ mod allowlist;
 mod aur;
 mod doctor;
 mod review;
+mod settings;
 mod system;
 mod tui;
 
@@ -34,6 +35,9 @@ usage: kav             in a terminal: everything below on one screen
   request <package>    ask for an AUR package to be reviewed
   undo [--yes]         take the system back to before the last change of packages
   doctor               check the health of the system
+  fix <what>           mend what doctor found: orphans, lock, cache, service <unit>,
+                       merge <file ending in .pacnew>
+  set [<what> <n>]     what kav can change, and changing it: downloads at once, snapshots kept
 
 The reviewed list is /usr/share/kav/allowlist.toml, and /etc/kav/allowlist.toml for what
 was approved on this machine.";
@@ -410,6 +414,8 @@ fn command(arguments: &[String]) -> Result<(), String> {
         ["undo"] => undo(false),
         ["undo", "--yes"] => undo(true),
         ["doctor"] => doctor::check(),
+        ["fix", ..] => doctor::fix(&arguments[1..]),
+        ["set", ..] => settings::set(&arguments[1..]),
         // with nothing asked and a person at the terminal: everything on one screen
         [] if std::io::stdin().is_terminal() && std::io::stdout().is_terminal() => tui::run(paths),
         [] | ["help"] | ["--help"] | ["-h"] => {

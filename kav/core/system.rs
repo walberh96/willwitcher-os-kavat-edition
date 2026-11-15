@@ -52,7 +52,8 @@ pub fn as_root(program: &str) -> Command {
         return Command::new(program);
     }
     let mut command = Command::new("sudo");
-    command.arg(program);
+    // sudo's own prompt does not say what the password is for
+    command.args(["-p", "Your password, %u, to change the system: "]).arg(program);
     command
 }
 
