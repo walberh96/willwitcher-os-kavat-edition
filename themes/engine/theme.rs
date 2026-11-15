@@ -410,6 +410,8 @@ pub fn resolve(settings: &Settings, palette: &Palette) -> Result<Tokens, String>
     colour("border", border);
     colour("accent", accent);
     colour("accent_text", accent.readable_on(surface, readable));
+    // the side of a thing drawn in the accent that is in its own shade, like a folder's back
+    colour("accent_deep", accent.lighten(-0.1));
     colour("on_accent", ink(accent));
     colour("accent2", accent2);
     colour("on_accent2", ink(accent2));
@@ -454,6 +456,7 @@ pub fn resolve(settings: &Settings, palette: &Palette) -> Result<Tokens, String>
         tokens.insert(name.to_string(), token);
     };
     value("mode", Token::Text(mode.to_string()));
+    value("mode_title", Token::Text(if dark { "Dark" } else { "Light" }.to_string()));
     value("palette", Token::Text(palette.id.clone()));
     value("palette_name", Token::Text(palette.name.clone()));
     let radius = settings.number("shape.radius");

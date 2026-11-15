@@ -1,0 +1,29 @@
+pkgname=kavat-cursor
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: a cursor in the colours of the theme"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+# the drawings are Bibata's, with the colours changed; they keep its license
+license=('GPL-3.0-only')
+# what packs the cursor and the theme system, which fills the colours in
+depends=('hyprcursor' 'kavat-theme')
+makedepends=('python')
+_bibata=2.0.7
+source=('make-template.py' 'kavat-cursor-apply'
+        "Bibata_Cursor-$_bibata.tar.gz::https://github.com/ful1e5/Bibata_Cursor/archive/refs/tags/v$_bibata.tar.gz")
+sha256sums=('SKIP' 'SKIP'
+            '1f21e5cade53d668476f973bd8ec827882a0e32c38e0e766abf007f8b3b46313')
+
+build() {
+  rm -rf "$srcdir/cursor"
+  python make-template.py "$srcdir/Bibata_Cursor-$_bibata" "$srcdir/cursor"
+}
+
+package() {
+  install -d "$pkgdir/usr/share/kavat/themes/templates"
+  cp -r "$srcdir/cursor" "$pkgdir/usr/share/kavat/themes/templates/cursor"
+  chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat"
+  install -Dm755 kavat-cursor-apply "$pkgdir/usr/bin/kavat-cursor-apply"
+  install -Dm644 "$srcdir/Bibata_Cursor-$_bibata/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE.Bibata"
+}

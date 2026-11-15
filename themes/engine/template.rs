@@ -51,8 +51,12 @@ pub struct FileRule {
     /// where the result goes, inside the generated folder
     pub to: String,
     /// where the app looks for it, when the app cannot be pointed at the generated folder:
-    /// a link is left there. Starts with `config:`, the user's configuration folder.
+    /// a link is left there. Starts with `config:`, the user's configuration folder, or
+    /// with `data:`, the user's data folder.
     pub link: Option<String>,
+    /// the same, for an app that looks for a whole folder: a link to the folder this file
+    /// is generated in
+    pub folder_link: Option<String>,
 }
 
 pub struct Template {
@@ -77,15 +81,18 @@ impl Template {
             let from = rule.get("from").and_then(Item::as_str).ok_or_else(|| problem("a [[file]] has no from".into()))?;
             let to = rule.get("to").and_then(Item::as_str).map_or(format!("{name}/{from}"), str::to_string);
             let link = rule.get("link").and_then(Item::as_str).map(str::to_string);
+            let folder_link = rule.get("folder_link").and_then(Item::as_str).map(str::to_string);
             for path in [from, &to] {
                 if path.starts_with('/') || path.split('/').any(|part| part == ".." || part.is_empty()) {
                     return Err(problem(format!("{path} has to stay inside its folder")));
                 }
             }
-            if link.as_ref().is_some_and(|link| !link.starts_with("config:") || link.contains("..")) {
-                return Err(problem("link has to start with config: and stay inside it".into()));
+            for link in [&link, &folder_link].into_iter().flatten() {
+                if !(link.starts_with("config:") || link.starts_with("data:")) || link.contains("..") {
+                    return Err(problem("a link has to start with config: or data: and stay inside it".into()));
+                }
             }
-            files.push(FileRule { from: folder.join(from), to, link });
+            files.push(FileRule { from: folder.join(from), to, link, folder_link });
         }
         if files.is_empty() {
             return Err(problem("it names no [[file]]".into()));

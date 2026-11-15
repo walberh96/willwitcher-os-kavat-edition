@@ -18,6 +18,8 @@ pub struct Paths {
     pub machine: PathBuf,
     /// the user's configuration folder, ~/.config
     pub config: PathBuf,
+    /// the user's data folder, ~/.local/share
+    pub user_data: PathBuf,
     /// where the generated files live, ~/.local/state/kavat/theme
     pub state: PathBuf,
     /// true for the screens before the desktop (the boot menu, the loading screen and the
@@ -38,6 +40,7 @@ impl Paths {
             data: std::env::var_os("KAVAT_THEME_DATA").map_or("/usr/share/kavat/themes".into(), PathBuf::from),
             machine: "/etc/kavat/theme.toml".into(),
             config: folder("XDG_CONFIG_HOME", ".config")?,
+            user_data: folder("XDG_DATA_HOME", ".local/share")?,
             state: folder("XDG_STATE_HOME", ".local/state")?.join("kavat/theme"),
             system: false,
         })
@@ -49,6 +52,7 @@ impl Paths {
             data: std::env::var_os("KAVAT_THEME_DATA").map_or("/usr/share/kavat/themes".into(), PathBuf::from),
             machine: "/etc/kavat/theme.toml".into(),
             config: "/etc".into(),
+            user_data: "/usr/local/share".into(),
             state: "/var/lib/kavat/theme".into(),
             system: true,
         }
@@ -154,10 +158,20 @@ pub fn plan(paths: &Paths, tokens: &Tokens) -> Result<Plan, String> {
             if plan.files.insert(rule.to.clone(), filled).is_some() {
                 return Err(format!("two templates write {}", rule.to));
             }
-            match &rule.link {
-                Some(_) if paths.system => return Err(problem("a template for the boot cannot leave links".into())),
-                Some(link) => plan.links.push((paths.config.join(link.trim_start_matches("config:")), rule.to.clone())),
-                None => {}
+            // where a link named in a template is: in the user's configuration or data folder
+            let place = |link: &str| match link.strip_prefix("data:") {
+                Some(inside) => paths.user_data.join(inside),
+                None => paths.config.join(link.trim_start_matches("config:")),
+            };
+            if paths.system && (rule.link.is_some() || rule.folder_link.is_some()) {
+                return Err(problem("a template for the boot cannot leave links".into()));
+            }
+            if let Some(link) = &rule.link {
+                plan.links.push((place(link), rule.to.clone()));
+            }
+            if let Some(link) = &rule.folder_link {
+                let folder = Path::new(&rule.to).parent().map(|folder| folder.to_string_lossy().into_owned()).unwrap_or_default();
+                plan.links.push((place(link), folder));
             }
         }
         for command in &template.reload {
@@ -298,6 +312,7 @@ mod tests {
             data: PathBuf::from(env!("CARGO_MANIFEST_DIR")),
             machine: root.join("etc/theme.toml"),
             config: root.join("config"),
+            user_data: root.join("data"),
             state: root.join("state/kavat/theme"),
             system: false,
         }
@@ -322,8 +337,21 @@ mod tests {
         assert!(look.contains("rgb(f2a93b)"), "{look}");
         assert_eq!(fs::read_link(paths.state.join("current")).unwrap(), PathBuf::from("1"));
         // where an app looks, a link leads to the current files
-        let palette = fs::read_to_string(paths.config.join("noctalia/palettes/Kavat.json")).unwrap();
+        let palette = fs::read_to_string(paths.config.join("kavat-shell/palettes/Kavat.json")).unwrap();
         assert!(palette.contains("\"mPrimary\": \"#f2a93b\""), "{palette}");
+    }
+
+    #[test]
+    fn a_template_of_the_user_s_can_leave_a_link_to_a_whole_folder() {
+        let paths = paths("folder");
+        let mine = paths.config.join("kavat/templates/mine");
+        write(mine.join("template.toml"), "[[file]]\nfrom = \"set/index.theme\"\nfolder_link = \"data:icons/Mine\"\n");
+        write(mine.join("set/index.theme"), "Inherits=Papirus-{{ mode_title }}\n");
+        assert_eq!(apply(&paths), Ok(true));
+        // the link is to the folder the file is generated in, so the app finds all of it
+        let index = fs::read_to_string(paths.user_data.join("icons/Mine/index.theme")).unwrap();
+        assert_eq!(index, "Inherits=Papirus-Dark\n");
+        assert!(fs::read_link(paths.user_data.join("icons/Mine")).unwrap().ends_with("current/mine/set"));
     }
 
     #[test]
@@ -362,7 +390,7 @@ mod tests {
         let conf = fs::read_to_string(paths.state.join("current/kitty/theme.conf")).unwrap();
         assert!(conf.contains("background           #fbf9f4"), "{conf}");
         // the link an app follows now leads to the new files, without having changed
-        let palette = fs::read_to_string(paths.config.join("noctalia/palettes/Kavat.json")).unwrap();
+        let palette = fs::read_to_string(paths.config.join("kavat-shell/palettes/Kavat.json")).unwrap();
         assert!(palette.contains("\"mSurface\": \"#fbf9f4\""), "{palette}");
     }
 

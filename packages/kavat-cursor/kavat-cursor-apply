@@ -1,0 +1,27 @@
+#!/bin/sh
+# Part of kavat-cursor: pack the cursor that kavat-theme wrote, and tell Hyprland to use it.
+#
+# kavat-theme runs it after a change of theme, and the session when it starts. The packing
+# is skipped when the drawings are the ones already packed.
+state="${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/cursor/Kavat"
+packed="${XDG_DATA_HOME:-$HOME/.local/share}/icons/Kavat-cursor"
+size="${XCURSOR_SIZE:-24}"
+
+[ -e "$state/manifest.hl" ] || exit 0
+
+drawings="$(cat "$state"/hyprcursors/*/* | sha256sum)"
+if [ "$(cat "$packed/.drawings" 2> /dev/null)" != "$drawings" ]; then
+  work="$(mktemp -d)" || exit 1
+  if ! hyprcursor-util --create "$state" --output "$work" > "$work/log" 2>&1; then
+    cat "$work/log" >&2
+    rm -rf "$work"
+    exit 1
+  fi
+  mkdir -p "$(dirname "$packed")"
+  rm -rf "$packed"
+  mv "$work"/theme_* "$packed"
+  echo "$drawings" > "$packed/.drawings"
+  rm -rf "$work"
+fi
+
+hyprctl setcursor Kavat "$size" > /dev/null 2>&1 || hyprctl --instance 0 setcursor Kavat "$size" > /dev/null 2>&1 || true
