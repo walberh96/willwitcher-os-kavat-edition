@@ -56,29 +56,34 @@ The forks (Hyprland, Kavat Shell) live in separate repos, and here there is only
 
 ## Installer
 
-Calamares with its own branding does the installation in 7 screens, and the base system installs without network. Calamares is not in the official Arch repos, so it is packaged as `kavat-calamares` in `[kavat]`.
+Calamares with its own branding does the installation in nine steps, and the base system installs without network. Calamares is not in the official Arch repos, so it is packaged as `kavat-calamares` in `[kavat]`.
 
 The default language is English, with Spanish as the second option in the selector. Both come already installed in the ISO and in the system, with the US keyboard by default. Everything of our own (installer, greeter, shell, `kav` and agent) ships its text in English, and only in English: you decided this on 13 November 2026.
 
-1. **Welcome**: language, keyboard and requirements check (UEFI, RAM, disk).
-2. **Disk**: erase everything, alongside another system, or manual. Btrfs and subvolumes already decided; encryption as a switch, off by default.
-3. **User**: name, password, host name.
-4. **Hardware**: detects the GPU and proposes drivers (NVIDIA, AMD, Intel) instead of asking blindly. On your machine, AMD with the free Mesa drivers, which already come in the ISO.
-5. **Software**: programs that are added to the base system, checked one by one by category, and whether the agent is installed with its model. It needs network; the details are below.
-6. **Appearance**: theme, light or dark mode and accent hue, with a live preview of the installer itself.
-7. **Summary and installation**: exact list of what is going to be done and a progress bar with slides.
+1. **Welcome**: language and requirements check (UEFI, RAM, disk).
+2. **Location**: region and time zone.
+3. **Keyboard**: `us` or `es`, with a place to try it.
+4. **Partitions**: erase everything, alongside another system, or manual. Btrfs and subvolumes already decided; encryption as a switch, off by default.
+5. **Users**: name, password, host name.
+6. **Appearance**: theme, light or dark mode and accent hue, with a live preview.
+7. **Summary**: exact list of what is going to be done.
+8. **Install**: a progress bar, with pictures of the system going by.
+9. **Finish**: restart, or stay in the live session.
+
+They are Calamares' own steps, one page for each of its modules: you decided on 15 November 2026 (D43) to keep them, instead of joining them into the seven this list had. The graphics driver is detected without asking, so there is no Hardware step. One more step comes later, between Users and Appearance:
+
+- **Software**: programs that are added to the base system, checked one by one by category, and whether the agent is installed with its model. It needs network; the details are below.
 
 **How it is built.** In `installer/`, and checked by `tests/install.py`. Decided on 14 November 2026, after you saw it on the PC: it has to look like the mockup, show the system while it installs, and have the Appearance step.
 
 - **The look** is Kavat's dark side. The steps down the left are drawn by `calamares-sidebar.qml`, with a check on the ones done and the number of the one in view in the accent; the pages Calamares draws itself take their colours from `stylesheet.qss`. The buttons are Calamares' own, so that `Alt` with a letter presses them from anywhere. The window floats in the middle of the screen, 1280 by 800.
 - **Appearance** is a page of the installer's own, `appearance.qml`: the palettes of `kavat-theme` as cards, the mode, the accents of the palette chosen, and a small desktop drawn with those colours. The `kavat-look` step writes what was chosen as the settings of the machine, `/etc/kavat/theme.toml`, before the boot loader's step: the boot menu, the loading screen and the login wear it, and every user starts from it.
 - **While it installs** it shows eight pictures of the system, one after another, each with a line that says what it is. They are the mockup's screenshots, copied to `installer/branding/kavat/slides/`.
-- **The steps are Calamares' own nine**, not the seven of the list above: Welcome, Location, Keyboard, Partitions, Users, Appearance, Summary, Install and Finish. Hardware and Software are not built.
-- **Left for later**: the Hardware and Software steps, the answer file, the top bar that says whether there is a network, and "Auto" and "From wallpaper" on the Appearance page.
+- **Left for later**: the Software step, the answer file, the top bar that says whether there is a network, and "Auto" and "From wallpaper" on the Appearance page.
 
 Our own ideas on top of stock Calamares:
 
-- **`kavat-theme` module**: what was chosen on screen 6 is applied to the greeter, to Plymouth and to the desktop before the first boot.
+- **`kavat-theme` module**: what was chosen on the Appearance step is applied to the greeter, to Plymouth and to the desktop before the first boot.
 - **`kavat-hardware` module**: writes the Hyprland configuration according to the monitors and GPU detected.
 - **Installation without network**: the ISO carries the packages of the base system; with network, it updates at the end and adds the chosen software.
 
@@ -234,7 +239,7 @@ Shortcuts: 19 inherited from Endgame as they are and 12 new ones for what did no
 - Our own additions: the settings panel, the agent panel, the theme picker with preview, the `kav` panel (updates, snapshots, AUR requests) and the first-run wizard.
 - Its color engine is fed from the system's tokens, so there is a single source of truth.
 - The first-run wizard it inherited is turned off: it chooses palette and mode on its own, which is the system theme's business. Whoever changes the theme from the shell's own settings leaves it out of sync with the rest; that page disappears when the settings panel covers it.
-- **It asks the network for nothing by itself** (D40, 14 November 2026). Noctalia's "Anonymous Startup Ping" was removed first, on 13 November: it sent the version, the system, the compositor, the resolutions, the RAM and the scale on every startup. Reading its log then showed more: on every start it fetched a catalogue of community palettes and one of templates, exchange rates for the launcher's calculator, and its two lists of plugins from GitHub, these again every six hours. All of it is off until you turn it on. Two things with no switch were taken out: the cover of what is playing and the icon of a notification are no longer fetched when they are an address on the network, since that address is chosen by another program; a cover that is a file is shown as before. What can still use the network, when you set it up: the calendar, the weather, your address on the network and your location, the plugin store, and a plugin that does.
+- **It asks the network for nothing by itself** (D40, 14 November 2026). Noctalia's "Anonymous Startup Ping" was removed first, on 13 November: it sent the version, the system, the compositor, the resolutions, the RAM and the scale on every startup. Reading its log then showed more: on every start it fetched a catalogue of community palettes and one of templates, exchange rates for the launcher's calculator, and its two lists of plugins from GitHub, these again every six hours. All of it is off until you turn it on. Two things with no switch were taken out: the cover of what is playing and the icon of a notification are no longer fetched when they are an address on the network, since that address is chosen by another program; a cover that is a file is shown as before. What can still use the network, when you set it up: the calendar, the weather, your address on the network and your location, the plugin store, and a plugin that does. The cover of what is playing and the picture of a notification are not fetched either when they are an address on the network: you decided on 15 November 2026 (D41) to leave it so.
 - **How it is built.** In `packages/kavat-shell/`: Noctalia 5.4.1 with Arch's recipe, two patches and a script. `no-ping.patch` removes the ping, its checkbox and its card in the assistant. `no-network.patch` turns off what was fetched by itself. `rename.py` gives it its name before it is built: the command is `kavat-shell`, its settings are in `~/.config/kavat-shell/`, its files in `/usr/share/kavat-shell/`, and its names on D-Bus and every text it shows say Kavat Shell. What keeps the old name on purpose: the code's own identifiers; the `noctalia.` functions that plugins call, so that a plugin written for Noctalia still runs; and the addresses of Noctalia's own plugin lists. `tests/theme.py` checks that it runs under its name, that the ping's address is not in it and that its log shows no request to the network after a start. The polkit password dialog is drawn by the shell: its agent comes turned on.
 
 **Command palette.** `Super+D` opens a single palette for the whole system: apps, files, settings, skills, packages, open windows and browser tabs. It uses the same grammar and the same command names as the browser's console and the Neovim palette, and what it does not find it can pass to the agent.
@@ -681,19 +686,19 @@ A clipping saves what you are looking at to a note:
 
 ## System information and monitor
 
-Two terminal tools become pieces of the system, each with its fork: the one that shows what machine this is and the one that shows what is running.
+Two terminal tools become pieces of the system: the one that shows what machine this is and the one that shows what is running. You decided on 15 November 2026 (D42) that the first needs no fork, and that the second is forked in phase 4, when there is an agent for it to ask.
 
-**System information (`kavat-fetch`).** It is a fork of fastfetch. It starts from fastfetch and not from neofetch because neofetch has been archived since 2024 and fastfetch is the one that is maintained.
+**System information (`kavat-fetch`).** It is fastfetch as Arch packages it, with a settings file the theme writes: everything below is done from that file, where a line can be what a command prints. It starts from fastfetch and not from neofetch because neofetch has been archived since 2024 and fastfetch is the one that is maintained.
 
 - **Its own logo**: the Kavat cat goes inside the program. In Kitty it is drawn as an image, with its graphics protocol; outside Kitty the character one comes out, in the accent color. There is a small version and it can be removed.
 - **The information you choose**: the lines and their order are chosen in the panel or in the file. Out of the box: system, kernel, window manager, shell, theme, mode, packages, GPU, agent and health.
-- **Lines from the system itself**: the active theme and mode, the packages counted by `kav` with the ones that come from the AUR, and the state of the agent. They are new modules, and that is what justifies the fork.
+- **Lines from the system itself**: the active theme and mode, the packages counted by `kav` with the ones that come from the AUR, and the state of the agent. They are lines that run a command.
 - **Health line**: the pending updates and the warnings from `kav doctor`, read from the last thing `kav` saved so as not to slow it down.
 - **Theme colors**: it takes the tokens from the theme system and changes with it, like the rest.
 - **Optional greeting**: a three-line version when the first terminal of the session opens. It comes turned off.
 - **How it is launched**: with `kavat fetch`. Its configuration lives in `~/.config/fastfetch/config.jsonc` and is adjusted on the Terminal page of the panel.
 
-**System monitor (`kavat-top`).** It is a fork of btop, which you already used in Endgame. It is forked because what is asked of it does not fit in its configuration: asking the agent about a process and grouping the processes by what they are.
+**System monitor (`kavat-top`).** It is a fork of btop, which you already used in Endgame; until phase 4 it is btop itself, in the theme's colours. It is forked because what is asked of it does not fit in its configuration: asking the agent about a process and grouping the processes by what they are.
 
 - **System theme**: its colors come from the tokens and change live with the theme.
 - **Ask Kavat**: with `K` on a process, the agent explains what it is, who started it and why it uses what it uses, and proposes what to do. It uses the read tool `system.processes`; if what it proposes changes something, it goes through the usual permissions.
@@ -706,13 +711,13 @@ Two terminal tools become pieces of the system, each with its fork: the one that
 - **Warning when something runs away**: if a process has been eating the CPU or the memory for minutes, a discreet notice comes up that opens the monitor on that process. It stays quiet in Gamer mode.
 - **How it is launched**: with `kavat top` or from the launcher. Its configuration lives in `~/.config/btop/btop.conf` and is adjusted on the Terminal page of the panel.
 
-The two forks follow the rule of the others: they are small and carry their `PATCHES.md`.
+The fork of btop follows the rule of the others: it is small and carries its `PATCHES.md`.
 
-**How it is built.** Since phase 3, in `packages/kavat-shell-config/` and in two templates of the theme. This is the first part, and it is not forks yet:
+**How it is built.** Since phase 3, in `packages/kavat-shell-config/` and in two templates of the theme. This is the first part:
 
 - **`kavat-fetch`** is fastfetch, unchanged, run with the file `kavat-theme` writes: the cat in characters, in the accent, and the system, the kernel, the window manager, the shell, the terminal, the theme with its mode, the packages, the processor, the graphics card, the memory and the disk. A `~/.config/fastfetch/config.jsonc` of your own is used in its place.
 - **`kavat-top`** is btop, unchanged, with a colour theme `kavat-theme` writes, `kavat`. The first time it is run it tells btop to use that theme; from then on btop's settings are yours. btop reads its theme when it opens, so an open one keeps its colours until it is opened again.
-- **Left for later**: the forks themselves and all they are for: the cat as an image, the agent and health lines, asking Kavat about a process, the groups, the GPU box, the services, the history and the warning.
+- **Left for later**: in `kavat-fetch`, the cat as an image and the agent and health lines; and the fork of btop with all it is for: asking Kavat about a process, the groups, the GPU box, the services, the history and the warning.
 
 ## Package manager
 

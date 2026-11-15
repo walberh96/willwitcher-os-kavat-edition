@@ -183,7 +183,7 @@ A settings panel inside the shell configures the whole core, on twenty-six pages
 - **Kitty and zsh**, with a starship prompt cut down to what costs no time: opening a terminal goes unnoticed.
 - **One command palette.** `Super+D` searches apps, files, settings, skills, packages, windows and browser tabs, works out sums and unit conversions, with the same commands as the browser console and Neovim.
 - **Projects.** A project saves a whole workspace (folder, terminals, editor, browser profile, window layout) and brings it back as you left it.
-- **System info with its own face.** `kavat fetch` is a fork of fastfetch: the Kavat cat as its logo, the lines you choose, the colours of your theme. In Kitty the logo is an image, and a health line shows pending updates and `kav doctor` notices.
+- **System info with its own face.** `kavat-fetch` is fastfetch with the system's own settings: the Kavat cat as its logo, the lines you choose, the colours of your theme. In Kitty the logo is an image, and a health line shows pending updates and `kav doctor` notices.
 - **A monitor that knows the system.** `kavat top` is a fork of btop: processes grouped by what they belong to, the agent's share of the GPU in sight, and `K` asks Kavat what a process is and why it is busy. It also lists failed services with their log, keeps 24 hours of history, and warns when a process runs away.
 - **One `kavat` command.** `kavat theme`, `mode`, `wallpaper`, `project`, `ask`, `fetch`, `top`, `doctor`: everything the panel does, from the terminal.
 - **The shortcuts you already know**, inherited from Willwitcher-OS Endgame, plus `Super+Space` for Kavat.
