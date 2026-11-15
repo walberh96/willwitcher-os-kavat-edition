@@ -188,6 +188,17 @@ def main():
                       and lines[3] == '1' and lines[4] == '1' and 'kav set takes' in lines[5],
                       "kav set reads and changes pacman's downloads at once and snapper's snapshots kept, each in its own file", output)
 
+        machine.run("printf '<rss><item><title>Old news</title><link>https://archlinux.org/news/old/</link><description>nothing</description>"
+                    "<pubDate>Sat, 01 Nov 2026 10:00:00 +0000</pubDate></item></rss>' > /tmp/feed")
+        status, output = machine.run('export KAV_NEWS=/tmp/feed; kav news; '
+                                     "sed -i 's|<rss>|<rss><item><title>grub needs manual intervention</title><link>https://archlinux.org/news/grub/</link>"
+                                     "<description>\\&lt;p\\&gt;Run grub-install again.\\&lt;/p\\&gt;</description><pubDate>Sat, 14 Nov 2026 10:00:00 +0000</pubDate></item>|' /tmp/feed; "
+                                     'kav update 2>&1 | tail -n 2; echo "status ${PIPESTATUS[0]}"; kav news | head -n 5 | tr "\\n" "|"; echo; kav news')
+        lines = output.split('\n')
+        checks.report(lines[0] == 'kav: there is no news since the last time.' and 'asks for something to be done by hand' in output and 'the update waits' in output
+                      and 'status 1' in output and 'Run grub-install again.' in output and lines[-1] == 'kav: there is no news since the last time.',
+                      "kav update waits for Arch's news to be read when an item asks for something to be done by hand", output)
+
         print('removing a package and going back', flush=True)
         status, output = machine.run(f'yes | kav remove {PACKAGE}', 120)
         checks.report(status == 0 and machine.run(f'pacman -Q {PACKAGE}')[0] != 0, f'kav remove takes {PACKAGE} out', output)

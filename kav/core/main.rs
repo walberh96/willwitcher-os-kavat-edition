@@ -8,6 +8,7 @@
 mod allowlist;
 mod aur;
 mod doctor;
+mod news;
 mod review;
 mod settings;
 mod system;
@@ -34,6 +35,8 @@ usage: kav             in a terminal: everything below on one screen
                        with the lines worth a second look marked; then approve it or not
   request <package>    ask for an AUR package to be reviewed
   undo [--yes]         take the system back to before the last change of packages
+  news                 Arch's news since the last time: an update waits for it to be read
+                       when an item asks for something to be done by hand
   doctor               check the health of the system
   fix <what>           mend what doctor found: orphans, lock, cache, service <unit>,
                        merge <file ending in .pacnew>
@@ -170,6 +173,8 @@ fn foreign() -> Vec<String> {
 }
 
 fn update(paths: &Paths) -> Result<(), String> {
+    // news that asks for something to be done by hand stops the update until it is read
+    news::before_update(paths)?;
     run(as_root("pacman").arg("-Syu"))?;
     let list = Allowlist::load(&paths.lists)?;
     for name in foreign() {
@@ -178,6 +183,11 @@ fn update(paths: &Paths) -> Result<(), String> {
             Some(_) => {}
             None => println!("kav: {name} is installed but not on the reviewed list: it stays as it is"),
         }
+    }
+    // the system is looked over after the change, while going back is one command away
+    println!("\nkav: the system after the update:");
+    if doctor::check().is_err() {
+        println!("\nkav: something is not as it should be. `kav fix` mends what it can; `kav undo` takes the system back to before this update.");
     }
     Ok(())
 }
@@ -414,6 +424,7 @@ fn command(arguments: &[String]) -> Result<(), String> {
         ["undo"] => undo(false),
         ["undo", "--yes"] => undo(true),
         ["doctor"] => doctor::check(),
+        ["news"] => news::show(&paths),
         ["fix", ..] => doctor::fix(&arguments[1..]),
         ["set", ..] => settings::set(&arguments[1..]),
         // with nothing asked and a person at the terminal: everything on one screen
