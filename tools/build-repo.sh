@@ -6,8 +6,7 @@
 #   with folders   build only those, e.g. tools/build-repo.sh kavat-hyprland installer
 #
 # A package is a folder with a PKGBUILD: one of those in packages/, or a piece of the system
-# that carries its own, like installer/. They are built in that order, and each one can
-# depend on the ones before it.
+# that carries its own, like installer/. Each one is built after those it depends on.
 #
 # Every package is built in a clean Arch chroot, against Arch's repositories as they were on
 # the day in iso/arch-snapshot. Nothing comes from the machine that runs this: not its
@@ -28,6 +27,29 @@ else
     fi
   done
 fi
+
+# A package is built after those of this repository that it needs, whatever its folder is
+# called.
+declare -A name_of needs placed
+for dir in "${dirs[@]}"; do
+  name_of[$dir]="$(bash -c 'source "$1/PKGBUILD" > /dev/null 2>&1; echo "$pkgname"' _ "$dir")"
+  needs[$dir]="$(bash -c 'source "$1/PKGBUILD" > /dev/null 2>&1; echo "${depends[@]} ${makedepends[@]}"' _ "$dir")"
+done
+ordered=()
+while (( ${#ordered[@]} < ${#dirs[@]} )); do
+  moved=0
+  for dir in "${dirs[@]}"; do
+    [[ -n ${placed[$dir]:-} ]] && continue
+    ready=1
+    for other in "${dirs[@]}"; do
+      [[ $other == "$dir" || -n ${placed[$other]:-} ]] && continue
+      [[ " ${needs[$dir]} " == *" ${name_of[$other]} "* ]] && ready=0
+    done
+    if (( ready )); then ordered+=("$dir"); placed[$dir]=1; moved=1; fi
+  done
+  if (( ! moved )); then echo "these packages need each other in a circle: ${dirs[*]}" >&2; exit 1; fi
+done
+dirs=("${ordered[@]}")
 
 arch_chroot "$chroot/root" "$kavat_conf" base-devel
 

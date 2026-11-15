@@ -14,7 +14,7 @@
 
 Fast like a tiling WM. Curated like one person's system. And with someone inside who listens.
 
-`Arch Linux` · `Hyprland` · `Noctalia` · `Calamares` · `kav` · `Neovim` · `Yazi` · `Custom Chromium` · `Local agent`
+`Arch Linux` · `Hyprland` · `Kavat Shell` · `Calamares` · `kav` · `Neovim` · `Yazi` · `Custom Chromium` · `Local agent`
 
 **[Watch the tour](docs/video/kavat-tour.mp4)** · **[Interactive mockup](docs/mockup/index.html)** · **[Design document](docs/DESIGN.md)** · **[Screenshots](docs/screenshots/)**
 
@@ -22,7 +22,7 @@ Fast like a tiling WM. Curated like one person's system. And with someone inside
 
 ![The Willwitcher-OS Kavat Edition desktop](docs/screenshots/desktop.png)
 
-> **Status: phase 3, the identity, has started.** This README describes the finished system. The images come from an interactive mockup, not from a running system: what runs today is an installable system with Hyprland as Arch ships it and a first fork of Noctalia, in this system's colours, behind its own boot menu, loading screen and login screen. Details in [Real project status](#real-project-status).
+> **Status: phase 3, the identity, has started.** This README describes the finished system. The images come from an interactive mockup, not from a running system: what runs today is an installable system with Hyprland as Arch ships it and Kavat Shell, the system's own shell, in this system's colours, behind its own boot menu, loading screen and login screen. Details in [Real project status](#real-project-status).
 
 ---
 
@@ -178,7 +178,7 @@ A settings panel inside the shell configures the whole core, on twenty-six pages
 ## The desktop
 
 - **Hyprland**, with modular configuration: the system's in `/usr/share/kavat/`, yours in `~/.config/`, and yours always wins. Its configuration is Lua, and the settings panel only ever writes plain values for that Lua to load.
-- **Noctalia**, in its own fork: bar, launcher, notifications, control centre, plus the agent's panel, the mode selector and the settings panel.
+- **Kavat Shell**, the system's own shell, which began as Noctalia: bar, launcher, notifications, control centre, plus the agent's panel, the mode selector and the settings panel.
 - **greetd + `kavat-greeter`**, with a login screen that uses your theme and your wallpaper. Entering the desktop has no visual cut.
 - **Kitty and zsh**, with a starship prompt cut down to what costs no time: opening a terminal goes unnoticed.
 - **One command palette.** `Super+D` searches apps, files, settings, skills, packages, windows and browser tabs, works out sums and unit conversions, with the same commands as the browser console and Neovim.
@@ -203,7 +203,7 @@ Neovim is part of the core, and it is useful the moment you open it.
 Yazi is the file manager, and the file explorer for the whole system.
 
 - **It follows the theme**, like everything else.
-- **Drag and drop.** `Alt+D` lifts your selection out so you can drag it into any app, and whatever you drop there is copied into the current folder.
+- **Drag and drop.** The selection is dragged with the mouse into any app, and whatever you drop on Yazi is copied into the current folder.
 - **Every app picks files with it.** "Open" and "Save as" open Yazi instead of a foreign dialog, in the browser too.
 - **Downloads land in it.** Click a download in the browser and Yazi opens in the downloads folder with that file selected.
 - **No Vim keys required.** Arrows, `Enter`, `Backspace`, `Ctrl+C` / `Ctrl+V`, `Del` and `F2` work; the Vim ones are still there.
@@ -291,7 +291,7 @@ Already on Arch? `pacman -S kavat-desktop` converts it.
 
 ```
 ┌───────────────────────────────────────────────┐ ┌──────────────────┐
-│ Experience    Noctalia · greeter · Calamares  │ │  Kavat (agent)   │
+│ Experience    Kavat Shell · greeter · Calamares│ │  Kavat (agent)   │
 ├───────────────────────────────────────────────┤ │  Ollama + model  │
 │ Compositor    Hyprland · hyprlock · hypridle  │ │  + voice         │
 └───────────────────────────────────────────────┘ └────────┬─────────┘
@@ -355,7 +355,7 @@ This README describes the finished system. Today phases 1 and 2 are done, the li
 - **Phase 1 is done.** The ISO boots to a live session with Hyprland and Noctalia as Arch ships them, set up with this system's shortcuts.
 - **Phase 2 is done.** The installer puts the system on a disk with no network: Btrfs with its subvolumes, zram, the zen kernel with the LTS one as fallback, GRUB and a login screen. Every package change takes a snapshot, a snapshot boots from the menu with its own kernel, and the system can go back to it. A boot that fails opens the next one in safe mode, which ignores your settings without deleting them. The disk can be encrypted, off by default: GRUB opens it with a key sealed in the TPM2, and asks for the recovery password only when the TPM2 does not give it. Secure Boot is not used and has to be off.
 - **Phase 2 was checked on real hardware**: installed next to CachyOS and Windows, sharing CachyOS's EFI partition, booted, and taken back to a snapshot.
-- **Phase 3 has started.** The theme system works: `kavat-theme set mode light` changes Hyprland, Kitty, the shell and GTK apps at once, without restarting any of them. Seven palettes come with it, each with a dark and a light side. The boot menu, the loading screen and the login screen wear the same theme, over one picture, and `kavat-theme boot` gives them the look of your desktop. The boot menu has the system's own entries, with a recovery console among them, and the login screen is `kavat-greeter`, the system's own page behind greetd, drawn on Wayland with no X server. `kav` is the one command over pacman: it installs from Arch's repositories and refuses any AUR package that is not on the reviewed list, which starts empty; `kav review` shows a package with its risky lines marked, and an approved package is built from the exact commit that was read. The shell is now `kavat-shell`, a fork of Noctalia whose only change so far is that the anonymous startup ping is gone, code and switches. The terminal's shell is zsh, with the system's prompt and its everyday tools, and it opens in under 100 ms. There is one file search, `kavat-find`, on `Super+Shift+F` and in the terminal: your files by name, the whole disk from an index the installer builds, and text inside files, all in one picker, which is also what `Tab` opens in zsh. Icons, the cursor and the rest of the apps do not follow the theme yet, `kav` has no full-screen interface yet and the shell has none of its own panels yet.
+- **Phase 3 has started.** The theme system works: `kavat-theme set mode light` changes Hyprland, Kitty, the shell and GTK apps at once, without restarting any of them. Seven palettes come with it, each with a dark and a light side. The boot menu, the loading screen and the login screen wear the same theme, over one picture, and `kavat-theme boot` gives them the look of your desktop. The boot menu has the system's own entries, with a recovery console among them, and the login screen is `kavat-greeter`, the system's own page behind greetd, drawn on Wayland with no X server. `kav` is the one command over pacman: it installs from Arch's repositories and refuses any AUR package that is not on the reviewed list, which starts empty; `kav review` shows a package with its risky lines marked, and an approved package is built from the exact commit that was read. The shell is Kavat Shell, with the command `kavat-shell`: it began as Noctalia and is the system's own program now. It asks the network for nothing by itself: the startup ping, the catalogues, the exchange rates and the lists of plugins it used to fetch on every start are gone or off. The terminal's shell is zsh, with the system's prompt and its everyday tools, and it opens in under 100 ms. There is one file search, `kavat-find`, on `Super+Shift+F` and in the terminal: your files by name, the whole disk from an index the installer builds, and text inside files, all in one picker, which is also what `Tab` opens in zsh. Neovim comes set up as `kavat-nvim`: VS Code-style shortcuts over Vim's modes, fifteen plugins inside the package so that it is whole with no network, and the theme's colours. Yazi comes set up as `kavat-files`, with the keys of any file manager, and is also the window every app opens and saves files with. The folders' icons and the cursor take the theme's colours. Notes are Markdown files in `~/Notes`, kept by a fork of `nb`: `Super+N` saves one from a single line, and a day and a time at its end set a reminder that comes up as a notification. The rest of the apps do not follow the theme yet. `kav` with no arguments opens a full screen with its tabs. The settings panel has its first pages, on `Super+T`: the whole look of the system, applied as it is changed. The agent and the rest of the shell's own panels are not there yet.
 
 To build and try it on an Arch-based machine with `devtools`, `qemu-desktop` and `edk2-ovmf`:
 
@@ -370,6 +370,10 @@ tests/theme.py        # changes mode, palette and accent on the running desktop 
 tests/startup.py      # watches the boot menu, the loading screen and the login for the theme, and boots the recovery console
 tests/kav.py          # asks kav for packages on and off the reviewed list, and undoes a change
 tests/find.py         # checks the index the installer leaves, and finds files by name and by text from the desktop
+tests/files.py        # copies and trashes a file in Yazi, and picks a file in it as an app would
+tests/notes.py        # saves notes, waits for a reminder to come up, and types a quick note
+tests/settings.py     # opens the settings panel and changes the theme by pressing in it
+tests/editor.py       # loads Neovim's plugins with no network, changes the theme under it, and types and saves on the desktop
 ```
 
 | Phase | Deliverable | Status |
@@ -380,6 +384,6 @@ tests/find.py         # checks the index the installer leaves, and finds files b
 | 3 | Themes, settings, greeter, shell fork, `kav`, editor and notes | In progress: the theme system, the boot screens, the login screen, `kav` on the command line and a first fork of the shell work |
 | 4 | Local agent, skills and voice | Pending |
 
-A study of Omarchy and other distributions reopened eight of those decisions. All are now answered. The current Noctalia was read against what this shell needs: plugins could host almost all of it, but not the settings panel, so the shell is a fork of Noctalia 5 and from that point on it is this system's own application. They are listed, with their status, in the design document under "Decisions under review".
+A study of Omarchy and other distributions reopened eight of those decisions. All are now answered. The current Noctalia was read against what this shell needs: plugins could host almost all of it, but not the settings panel, so the shell began as a fork of Noctalia 5 and is this system's own application, Kavat Shell. They are listed, with their status, in the design document under "Decisions under review".
 
 The design also takes several assumptions for granted that have not been tested. They are listed, with the phase in which each gets verified, at the end of the [design document](docs/DESIGN.md#decisions).

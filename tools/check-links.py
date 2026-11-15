@@ -3,7 +3,7 @@
 
 usage: tools/check-links.py
 
-Run it after editing README.md, docs/DESIGN.md or docs/PENDING.md. It exits with an error when a link is broken.
+Run it after editing README.md, docs/DESIGN.md, docs/PENDING.md or docs/MANUAL-TESTS.md. It exits with an error when a link is broken.
 """
 import os
 import re
@@ -12,7 +12,7 @@ import urllib.parse
 
 repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 broken = False
-for name in ('README.md', 'docs/DESIGN.md', 'docs/PENDING.md'):
+for name in ('README.md', 'docs/DESIGN.md', 'docs/PENDING.md', 'docs/MANUAL-TESTS.md'):
     text = open(os.path.join(repo, name), encoding='utf-8').read()
     links = set(re.findall(r'\]\(([^)#]+)(?:#[^)]*)?\)', text))
     base = os.path.join(repo, os.path.dirname(name))

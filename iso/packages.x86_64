@@ -42,7 +42,7 @@ rtkit
 # Graphics: Mesa comes with Hyprland; this is the Vulkan driver of the target machine
 vulkan-radeon
 
-# Desktop: Hyprland as Arch ships it, and kavat-shell, the system's fork of Noctalia, with
+# Desktop: Hyprland as Arch ships it, and Kavat Shell, the system's shell, with
 # the configuration from [kavat].
 # kavat-hyprland brings what its shortcuts open: Kitty, Yazi, hyprlock and the capture tools,
 # and the theme system, kavat-theme, that gives all of them their look.
@@ -61,6 +61,18 @@ kavat-shell-config
 # The file search: kavat-find, over fd, plocate and ripgrep, with fzf as its picker. It
 # comes with the two packages above; it is named here because it is a piece of its own.
 kavat-find
+
+# The file manager: Yazi, set up, and the window every app picks its files with
+kavat-files
+
+# Notes: nb, with the system's reminders and quick note
+kavat-notes
+
+# The system's settings, as a panel of the shell
+kavat-settings
+
+# The editor: Neovim, with the system's shortcuts and plugins
+kavat-nvim
 
 # Compressed files, which the file manager opens as folders; NTFS disks; headsets
 7zip

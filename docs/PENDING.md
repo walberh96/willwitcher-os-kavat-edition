@@ -14,7 +14,9 @@ Only what waits for your decision is here. Everything else lives in the [design 
 
 There are no pending decisions.
 
-The last two were settled on 14 November 2026:
+Settled on 14 November 2026:
 
-- **D35**, a minimum time for the loading screen: rejected. It is not needed for now.
-- **D36**, one file search for the whole system: approved, and now in the design document under "File search".
+- **D37**, the settings panel as a plugin of the shell or as C++ inside it: what counts is that the panel ends up as the mockup draws it, whatever it takes. It is built as a plugin as far as a plugin reaches that, and in C++ where it does not.
+- **D38**, ripdrag now that Yazi drags by itself: dropped. Dragging is Yazi's own.
+- **D39**, a name of its own for the shell: yes. It is Kavat Shell, with the command `kavat-shell`.
+- **D40**, what the shell fetched from the network when it started: all of it removed or turned off. What was found and what was done is in the design document, under "Desktop".

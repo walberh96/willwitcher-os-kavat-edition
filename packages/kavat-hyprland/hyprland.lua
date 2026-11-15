@@ -14,7 +14,14 @@ hl.monitor({ output = "", mode = "preferred", position = "auto", scale = "auto" 
 
 -- The shell: bar, launcher, notifications and wallpaper
 hl.on("hyprland.start", function()
-    hl.exec_cmd("noctalia --daemon")
+    hl.exec_cmd("kavat-shell --daemon")
+    -- The cursor and the icons are the theme's: the cursor is packed from what kavat-theme
+    -- wrote, and apps are told the name of the icon theme
+    hl.exec_cmd("kavat-cursor-apply")
+    hl.exec_cmd("gsettings set org.gnome.desktop.interface icon-theme Kavat")
+    -- The reminders written in the notes become timers of this session; those whose time
+    -- passed while the computer was off are shown now
+    hl.exec_cmd("kavat-notes sync")
 end)
 
 hl.env("XCURSOR_SIZE", "24")
@@ -72,7 +79,7 @@ hl.config({
 
 hl.bind(mod .. " + Return", hl.dsp.exec_cmd(terminal))
 hl.bind(mod .. " + Q", hl.dsp.window.close())
-hl.bind(mod .. " + D", hl.dsp.exec_cmd("noctalia msg panel-toggle launcher"))
+hl.bind(mod .. " + D", hl.dsp.exec_cmd("kavat-shell msg panel-toggle launcher"))
 hl.bind(mod .. " + E", hl.dsp.exec_cmd(files))
 hl.bind(mod .. " + V", hl.dsp.window.float({ action = "toggle" }))
 hl.bind(mod .. " + P", hl.dsp.window.pseudo())
@@ -95,7 +102,7 @@ hl.bind(mod .. " + S", hl.dsp.workspace.toggle_special("scratchpad"))
 hl.bind(mod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:scratchpad" }))
 
 hl.bind("ALT + Tab", hl.dsp.window.cycle_next())
-hl.bind(mod .. " + SHIFT + V", hl.dsp.exec_cmd("noctalia msg panel-toggle clipboard"))
+hl.bind(mod .. " + SHIFT + V", hl.dsp.exec_cmd("kavat-shell msg panel-toggle clipboard"))
 hl.bind(mod .. " + SHIFT + P", hl.dsp.exec_cmd("hyprpicker -a"))
 hl.bind("Print", hl.dsp.exec_cmd('grim -g "$(slurp)" - | wl-copy'))
 hl.bind(mod .. " + SHIFT + L", hl.dsp.exec_cmd("hyprlock"))
@@ -108,7 +115,7 @@ hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 hl.bind(mod .. " + F", hl.dsp.window.fullscreen({ action = "toggle", mode = "fullscreen" }))
 
-hl.bind(mod .. " + Escape", hl.dsp.exec_cmd("noctalia msg panel-toggle session"))
+hl.bind(mod .. " + Escape", hl.dsp.exec_cmd("kavat-shell msg panel-toggle session"))
 
 -- The file search, in a window of its own over whatever is open. Kitty asks for the size
 -- its last window had, which here was a tiled one: it is told not to.
@@ -117,6 +124,46 @@ hl.bind(mod .. " + SHIFT + F",
 hl.window_rule({
     name   = "file-search",
     match  = { class = "^kavat-find$" },
+    float  = true,
+    size   = "(monitor_w*0.7) (monitor_h*0.7)",
+    center = true,
+})
+
+-- The system's settings, on the page of the look; and kav, on its full screen
+hl.bind(mod .. " + T", hl.dsp.exec_cmd("kavat-shell msg panel-toggle kavat/settings:panel"))
+hl.bind(mod .. " + U", hl.dsp.exec_cmd("kitty --class kavat-kav -o remember_window_size=no kav"))
+hl.window_rule({
+    name   = "kav",
+    match  = { class = "^kavat-kav$" },
+    float  = true,
+    size   = "(monitor_w*0.7) (monitor_h*0.7)",
+    center = true,
+})
+
+-- Notes: a line to type one in, over whatever is open, and the notes themselves
+hl.bind(mod .. " + N",
+    hl.dsp.exec_cmd("kitty --class kavat-note -o remember_window_size=no kavat-notes quick"))
+hl.bind(mod .. " + SHIFT + N",
+    hl.dsp.exec_cmd("kitty --class kavat-notes -o remember_window_size=no kavat-notes"))
+hl.window_rule({
+    name   = "quick-note",
+    match  = { class = "^kavat-note$" },
+    float  = true,
+    size   = "900 150",
+    center = true,
+})
+hl.window_rule({
+    name   = "notes",
+    match  = { class = "^kavat-notes$" },
+    float  = true,
+    size   = "(monitor_w*0.7) (monitor_h*0.7)",
+    center = true,
+})
+
+-- Yazi when it is the window an app picks a file with: over the app, in the middle
+hl.window_rule({
+    name   = "file-picker",
+    match  = { class = "^kavat-picker$" },
     float  = true,
     size   = "(monitor_w*0.7) (monitor_h*0.7)",
     center = true,

@@ -24,7 +24,8 @@ DESKTOP_TIMEOUT = 120  # seconds, after that, until its desktop is up
 
 KEYS = {'enter': 0xff0d, 'tab': 0xff09, 'esc': 0xff1b, 'backspace': 0xff08, 'space': 0x20,
         'shift': 0xffe1, 'ctrl': 0xffe3, 'alt': 0xffe9, 'super': 0xffeb,
-        'up': 0xff52, 'down': 0xff54, 'left': 0xff51, 'right': 0xff53}
+        'up': 0xff52, 'down': 0xff54, 'left': 0xff51, 'right': 0xff53, 'delete': 0xffff,
+        'f2': 0xffbf, 'f5': 0xffc2, 'f12': 0xffc9}
 # characters that need Shift on a US keyboard, and the key each one is on
 SHIFTED = dict(zip('~!@#$%^&*()_+{}|:"<>?', "`1234567890-=[]\\;',./"))
 
@@ -96,6 +97,18 @@ class Screen:
 
     def __init__(self, path):
         self.path = path
+        self._left = 0.0  # when the last connection was closed
+
+    def _settle(self):
+        """Wait until the last connection is well gone, before typing or clicking.
+
+        When a viewer leaves, QEMU lets go of the keys it takes to be held, a moment later.
+        A shortcut typed right after a look at the screen lost its Super that way: the look's
+        connection was still being closed.
+        """
+        wait = self._left + 1.0 - time.time()
+        if wait > 0:
+            time.sleep(wait)
 
     def _connect(self):
         sock = socket.socket(socket.AF_UNIX)
@@ -152,6 +165,7 @@ class Screen:
                 at = ((y + row) * width + x) * 4
                 frame[at:at + w * 4] = pixels[row * w * 4:(row + 1) * w * 4]
         sock.close()
+        self._left = time.time()
         return width, height, frame
 
     def pixel(self, x, y):
@@ -193,13 +207,16 @@ class Screen:
 
     def press(self, *keys):
         """Press keys together and let go: press('alt', 'n'), press('enter')."""
+        self._settle()
         sock = self._connect()[0]
         self._press(sock, keys)
         time.sleep(0.2)
         sock.close()
+        self._left = time.time()
 
     def click(self, x, y):
         """Click with the left button at a point of the screen."""
+        self._settle()
         sock = self._connect()[0]
         # Telling the server which encodings we take is also when QEMU checks that the
         # machine has an absolute pointer; until then it moves the mouse by differences.
@@ -209,9 +226,11 @@ class Screen:
             time.sleep(0.1)
         time.sleep(0.2)
         sock.close()
+        self._left = time.time()
 
     def type(self, text):
         """Type text as a US keyboard would."""
+        self._settle()
         sock = self._connect()[0]
         for char in text:
             if char in SHIFTED:
@@ -222,6 +241,7 @@ class Screen:
                 self._press(sock, [char])
         time.sleep(0.2)
         sock.close()
+        self._left = time.time()
 
 
 class Machine:
@@ -332,12 +352,16 @@ class Machine:
 
     def power_off(self, timeout=90):
         """Shut the system down from inside and wait for the machine to go. True if it did."""
-        self.agent.send('guest-exec', path='/bin/sh', arg=['-c', 'systemctl poweroff'])
-        try:
-            self.proc.wait(timeout)
-            return True
-        except subprocess.TimeoutExpired:
-            return False
+        # the request is lost now and then, and the machine stays up: it is made again
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            self.agent.send('guest-exec', path='/bin/sh', arg=['-c', 'systemctl poweroff'])
+            try:
+                self.proc.wait(min(30, max(1, deadline - time.time())))
+                return True
+            except subprocess.TimeoutExpired:
+                pass
+        return False
 
     def stop(self):
         if self.proc.poll() is None:
@@ -401,15 +425,15 @@ def newest_iso():
 
 
 def check_desktop(machine, checks, user, timeout=DESKTOP_TIMEOUT):
-    """Check that the user's session has Hyprland and Noctalia up and drawing."""
+    """Check that the user's session has Hyprland and the shell up and drawing."""
     # hyprctl as that user; the machine runs a single Hyprland
     hyprctl = f'runuser -u {user} -- env XDG_RUNTIME_DIR=/run/user/$(id -u {user}) hyprctl --instance 0'
     deadline = time.time() + timeout
     for what, command in [
         (f"Hyprland runs in {user}'s session", f'pgrep -u {user} -x Hyprland'),
         ('Hyprland answers', f'{hyprctl} version'),
-        ('Noctalia runs', f'pgrep -u {user} -x noctalia'),
-        ('Noctalia has drawn on the screen', f'{hyprctl} layers | grep -i noctalia'),
+        ('the shell runs', f'pgrep -u {user} -x kavat-shell'),
+        ('the shell has drawn on the screen', f'{hyprctl} layers | grep -i kavat-shell'),
     ]:
         status, output = machine.wait_until(command, deadline - time.time())
         checks.report(status == 0, what, output)

@@ -81,6 +81,9 @@ bindkey '^G' kavat-find-text
 # zoxide: z and part of a folder's name goes there
 eval "$(zoxide init zsh)"
 
+# The editor programs open when they need one
+export EDITOR=nvim VISUAL=nvim
+
 # lsd in the place of ls
 alias ls='lsd'
 alias ll='lsd -l'

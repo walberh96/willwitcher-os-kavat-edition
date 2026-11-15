@@ -1,6 +1,6 @@
 pkgname=kavat-shell-config
 pkgver=0.1.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Willwitcher-OS Kavat Edition: zsh as the terminal's shell, with its prompt and the terminal's everyday tools"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
