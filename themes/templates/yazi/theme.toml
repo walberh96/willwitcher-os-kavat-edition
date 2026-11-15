@@ -1,0 +1,28 @@
+# Made by kavat-theme from the theme's settings; what is changed here is lost.
+# The settings are in ~/.config/kavat/theme.toml.
+
+[mgr]
+cwd          = { fg = "{{ accent_text }}", bold = true }
+border_style = { fg = "{{ border }}" }
+
+[tabs]
+active   = { fg = "{{ on_accent }}", bg = "{{ accent }}", bold = true }
+inactive = { fg = "{{ muted }}", bg = "{{ surface2 }}" }
+
+[mode]
+normal_main = { fg = "{{ on_accent }}", bg = "{{ accent }}", bold = true }
+normal_alt  = { fg = "{{ accent_text }}", bg = "{{ surface2 }}" }
+
+[status]
+progress_normal = { fg = "{{ accent }}", bg = "{{ surface2 }}" }
+
+[which]
+border = { fg = "{{ border }}" }
+cand   = { fg = "{{ accent_text }}" }
+
+[input]
+border = { fg = "{{ accent_text }}" }
+
+[pick]
+border = { fg = "{{ accent_text }}" }
+active = { fg = "{{ accent_text }}", bold = true }

@@ -1,0 +1,65 @@
+#!/usr/bin/env python3
+"""Part of kavat-files: "show in folder", for any app that asks.
+
+Apps ask the desktop's file manager to show a file through the D-Bus name
+org.freedesktop.FileManager1. This answers to that name and opens Yazi in a terminal at the
+file, with the file under the cursor. D-Bus starts it when somebody asks, and it leaves by
+itself a little after its last answer.
+"""
+import subprocess
+from urllib.parse import unquote, urlparse
+
+from gi.repository import Gio, GLib
+
+INTERFACE = '''
+<node>
+  <interface name="org.freedesktop.FileManager1">
+    <method name="ShowFolders">
+      <arg type="as" name="uris" direction="in"/>
+      <arg type="s" name="startup_id" direction="in"/>
+    </method>
+    <method name="ShowItems">
+      <arg type="as" name="uris" direction="in"/>
+      <arg type="s" name="startup_id" direction="in"/>
+    </method>
+    <method name="ShowItemProperties">
+      <arg type="as" name="uris" direction="in"/>
+      <arg type="s" name="startup_id" direction="in"/>
+    </method>
+  </interface>
+</node>
+'''
+IDLE = 20  # seconds with nothing asked before it leaves
+
+loop = GLib.MainLoop()
+leave = None
+
+
+def stay():
+    """Put off leaving."""
+    global leave
+    if leave:
+        GLib.source_remove(leave)
+    leave = GLib.timeout_add_seconds(IDLE, loop.quit)
+
+
+def called(connection, sender, path, interface, method, parameters, invocation):
+    uris, _ = parameters.unpack()
+    for uri in uris[:4]:  # an app that names a hundred files does not get a hundred windows
+        where = unquote(urlparse(uri).path) if '://' in uri else uri
+        # Yazi given a file opens its folder with the file under the cursor
+        subprocess.Popen(['kitty', 'yazi', where], start_new_session=True,
+                         stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    invocation.return_value(None)
+    stay()
+
+
+def got_bus(connection, name):
+    node = Gio.DBusNodeInfo.new_for_xml(INTERFACE)
+    connection.register_object('/org/freedesktop/FileManager1', node.interfaces[0], called, None, None)
+
+
+Gio.bus_own_name(Gio.BusType.SESSION, 'org.freedesktop.FileManager1', Gio.BusNameOwnerFlags.NONE,
+                 got_bus, None, lambda connection, name: loop.quit())
+stay()
+loop.run()

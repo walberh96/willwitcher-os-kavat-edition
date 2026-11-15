@@ -1,0 +1,21 @@
+# Your Yazi settings. This file starts as the system's, from kavat-files, and is yours to
+# change. What is not said here is as Yazi brings it.
+
+[mgr]
+ratio          = [ 1, 3, 3 ]
+sort_by        = "natural"
+sort_dir_first = true
+show_hidden    = false
+linemode       = "size"
+
+[opener]
+# Text opens in the editor, in this same window
+edit = [
+	{ run = "${EDITOR:-nvim} %s", desc = "Edit", block = true },
+]
+
+[open]
+prepend_rules = [
+	# a folder is entered, not opened; Enter does that by itself
+	{ mime = "application/{toml,yaml,x-shellscript,xml,x-desktop}", use = [ "edit", "reveal" ] },
+]

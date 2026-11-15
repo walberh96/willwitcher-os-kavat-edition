@@ -1,0 +1,33 @@
+# Your Yazi shortcuts. This file starts as the system's, from kavat-files, and is yours to
+# change. These come before Yazi's own, which all stay: the arrows, the Vim keys and the
+# rest are as Yazi brings them.
+
+[mgr]
+prepend_keymap = [
+	# As in any file manager
+	{ on = "<Enter>",     run = "plugin smart-enter",          desc = "Go into the folder, or open the file" },
+	{ on = "<Right>",     run = "plugin smart-enter",          desc = "Go into the folder, or open the file" },
+	{ on = "<Backspace>", run = "leave",                       desc = "Back to the folder above" },
+	{ on = "<A-Left>",    run = "back",                        desc = "Back to where you were" },
+	{ on = "<A-Right>",   run = "forward",                     desc = "Forward again" },
+	{ on = "<C-c>",       run = "yank",                        desc = "Copy" },
+	{ on = "<C-x>",       run = "yank --cut",                  desc = "Cut" },
+	{ on = "<C-v>",       run = "paste",                       desc = "Paste" },
+	{ on = "<Delete>",    run = "remove",                      desc = "Send to the trash" },
+	{ on = "<S-Delete>",  run = "remove --permanently",        desc = "Delete for good" },
+	{ on = "<F2>",        run = "rename --cursor=before_ext",  desc = "Rename" },
+	{ on = "<C-n>",       run = "create",                      desc = "New file; end the name with / for a folder" },
+	{ on = "<C-f>",       run = "filter --smart",              desc = "Filter what is listed" },
+	{ on = "<C-h>",       run = "hidden toggle",               desc = "Show or hide the hidden files" },
+	{ on = "<C-t>",       run = "tab_create --current",        desc = "New tab" },
+	{ on = "<C-w>",       run = "close",                       desc = "Close the tab" },
+	{ on = "<C-Tab>",     run = "tab_switch 1 --relative",     desc = "Next tab" },
+	{ on = "<F5>",        run = "refresh",                     desc = "Read the folder again" },
+
+	# The system's own
+	{ on = "<C-p>",       run = "shell --block -- kavat-find", desc = "The file search" },
+	{ on = "e",           run = "shell --block -- ${EDITOR:-nvim} %s", desc = "Open in the editor" },
+	{ on = "T",           run = "shell --orphan -- kitty --directory .", desc = "A terminal here" },
+	{ on = "C",           run = "plugin compress",             desc = "Compress the selection" },
+	{ on = [ "g", "t" ],  run = "plugin trash",                desc = "Go to the trash" },
+]

@@ -1,0 +1,25 @@
+# This portal backend is not in Arch's repositories, so the system builds it here, as its
+# author released it. It lets a program of the terminal be the "open" and "save as" window
+# of every app; kavat-files points it at Yazi.
+pkgname=xdg-desktop-portal-termfilechooser
+pkgver=1.5.0
+pkgrel=1
+pkgdesc="A portal backend that picks files with a terminal file manager"
+arch=('x86_64')
+url='https://github.com/hunkyburrito/xdg-desktop-portal-termfilechooser'
+license=('MIT')
+depends=('xdg-desktop-portal' 'libinih' 'systemd-libs')
+makedepends=('meson' 'scdoc')
+options=('!debug')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/hunkyburrito/xdg-desktop-portal-termfilechooser/archive/refs/tags/v$pkgver.tar.gz")
+sha256sums=('dfd592b840aee6f3a05319eb593fa3b88da06852cdcae81c26a07618508dc189')
+
+build() {
+  arch-meson "$pkgname-$pkgver" build
+  meson compile -C build
+}
+
+package() {
+  meson install -C build --destdir "$pkgdir"
+  install -Dm644 "$pkgname-$pkgver/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}

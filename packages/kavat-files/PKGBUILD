@@ -1,0 +1,35 @@
+pkgname=kavat-files
+pkgver=0.1.0
+pkgrel=2
+pkgdesc="Willwitcher-OS Kavat Edition: Yazi as the file manager of the whole system"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+# Yazi and the terminal it opens in; what its previews are made with; the file search and
+# the editor its keys open; what compresses, mounts and copies; and what makes it
+# the window that picks files and the answer to "show in folder"
+depends=('yazi' 'kitty'
+         'ffmpeg' 'poppler' 'imagemagick' 'resvg' '7zip' 'jq' 'mediainfo' 'file'
+         'kavat-find' 'fd' 'ripgrep' 'fzf' 'zoxide' 'neovim'
+         'ouch' 'udisks2' 'wl-clipboard' 'xdg-utils'
+         'xdg-desktop-portal' 'xdg-desktop-portal-hyprland' 'xdg-desktop-portal-termfilechooser'
+         'python' 'python-gobject')
+source=('yazi.toml' 'keymap.toml' 'init.lua' 'file-picker' 'termfilechooser.conf' 'portals.conf'
+        'show-in-folder' 'org.freedesktop.FileManager1.service')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+package() {
+  # Yazi reads its settings from the user's folder only, so they start there
+  local file
+  for file in yazi.toml keymap.toml init.lua; do
+    install -Dm644 "$file" "$pkgdir/etc/skel/.config/yazi/$file"
+  done
+  cp -r "$startdir/plugins" "$pkgdir/etc/skel/.config/yazi/"
+  chmod -R u=rwX,go=rX "$pkgdir/etc/skel"
+
+  install -Dm755 file-picker "$pkgdir/usr/lib/kavat/file-picker"
+  install -Dm644 termfilechooser.conf "$pkgdir/etc/xdg/xdg-desktop-portal-termfilechooser/config"
+  install -Dm644 portals.conf "$pkgdir/etc/xdg/xdg-desktop-portal/hyprland-portals.conf"
+  install -Dm755 show-in-folder "$pkgdir/usr/lib/kavat/show-in-folder"
+  install -Dm644 org.freedesktop.FileManager1.service "$pkgdir/usr/share/dbus-1/services/org.freedesktop.FileManager1.service"
+}

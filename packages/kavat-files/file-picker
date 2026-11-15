@@ -1,0 +1,31 @@
+#!/bin/sh
+# Part of kavat-files: Yazi as the "open" and "save as" window of every app.
+#
+# xdg-desktop-portal-termfilechooser runs this when an app asks for a file. What comes in,
+# as its manual says: whether several can be picked, whether a folder is wanted, whether it
+# is to save, the path to start at, and the file to write the answer to. The window is a
+# Kitty of its own class, which Hyprland floats in the middle of the screen.
+multiple="$1" directory="$2" save="$3" path="$4" out="$5"
+
+if [ "$save" = 1 ]; then
+  title="Save as: go to the folder, and pick the file left there for you"
+elif [ "$directory" = 1 ]; then
+  title="Choose a folder: go into it and leave with q"
+elif [ "$multiple" = 1 ]; then
+  title="Choose files: Space marks them, Enter takes them"
+else
+  title="Choose a file: Enter takes it"
+fi
+
+if [ "$directory" = 1 ]; then
+  kitty --class kavat-picker --title "$title" -o remember_window_size=no \
+    yazi --chooser-file="$out" --cwd-file="$out.1" "$path"
+  # with nothing picked, the folder Yazi was left in is the answer
+  if [ ! -s "$out" ] && [ -s "$out.1" ]; then
+    cat "$out.1" > "$out"
+  fi
+  rm -f "$out.1"
+else
+  kitty --class kavat-picker --title "$title" -o remember_window_size=no \
+    yazi --chooser-file="$out" "$path"
+fi

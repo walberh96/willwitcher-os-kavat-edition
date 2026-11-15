@@ -1,0 +1,10 @@
+# Yazi: the colours that are the theme's own. The rest of Yazi uses the terminal's
+# colours, which Kitty already takes from the theme.
+#
+# Yazi reads theme.toml from the user's folder, so it is reached through a link there, and
+# reads it when it opens: a Yazi that is open keeps these few colours until it is opened
+# again.
+
+[[file]]
+from = "theme.toml"
+link = "config:yazi/theme.toml"
