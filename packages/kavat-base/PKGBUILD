@@ -1,13 +1,14 @@
 pkgname=kavat-base
 pkgver=0.1.0
-pkgrel=3
+pkgrel=4
 pkgdesc="Willwitcher-OS Kavat Edition: settings of the base system"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
-depends=('zram-generator' 'nftables' 'openssh' 'pipewire' 'noise-suppression-for-voice')
-source=('zram.conf' 'firewall.nft' 'kavat-firewall.service' 'ssh.conf' 'pipewire-noise.conf')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+depends=('zram-generator' 'nftables' 'openssh' 'pipewire' 'noise-suppression-for-voice' 'python' 'polkit' 'bubblewrap' 'xdg-dbus-proxy' 'util-linux')
+source=('zram.conf' 'firewall.nft' 'kavat-firewall.service' 'ssh.conf' 'pipewire-noise.conf' 'kavat-dns' 'org.kavat.dns.policy'
+        'kavat-sandbox' 'sandbox-browser.toml' 'sandbox-electron.toml')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
   install -Dm644 zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/kavat.conf"
@@ -22,6 +23,13 @@ package() {
   # SSH keys: an agent of the session holds them, and a key is given to it the first time
   # its password is typed, so it is asked for once in a session
   install -Dm644 ssh.conf "$pkgdir/etc/ssh/ssh_config.d/20-kavat.conf"
+  # encrypted DNS, off as the system comes
+  install -Dm755 kavat-dns "$pkgdir/usr/bin/kavat-dns"
+  install -Dm644 org.kavat.dns.policy "$pkgdir/usr/share/polkit-1/actions/org.kavat.dns.policy"
+  # the sandbox, and the two profiles that come with the system
+  install -Dm755 kavat-sandbox "$pkgdir/usr/bin/kavat-sandbox"
+  install -Dm644 sandbox-browser.toml "$pkgdir/usr/share/kavat/sandbox/browser.toml"
+  install -Dm644 sandbox-electron.toml "$pkgdir/usr/share/kavat/sandbox/electron.toml"
   install -d "$pkgdir/usr/lib/systemd/user/default.target.wants"
   ln -s ../ssh-agent.service "$pkgdir/usr/lib/systemd/user/default.target.wants/ssh-agent.service"
 }

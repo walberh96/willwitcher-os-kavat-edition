@@ -1,0 +1,118 @@
+#!/usr/bin/env python3
+"""kavat-dns: the names the machine asks for, encrypted on their way.
+
+usage: kavat-dns                 whether it is on, and who answers
+       kavat-dns on [who]        ask through DNS over TLS: cloudflare, quad9 or mullvad, as it
+                                 comes quad9; or a server of your own, written 9.9.9.9#dns.quad9.net
+       kavat-dns off             back to the names' server the network gives
+       kavat-dns list            who can be asked
+
+Without it, every name the machine looks up goes in the clear to the server the network
+gives, your provider's as a rule, which sees each site you go to. With it, systemd-resolved
+asks one server over TLS and nobody on the way reads the question. It is strict: when that
+server cannot be reached nothing is resolved, rather than asking in the clear. A network
+that wants you to sign in on a page of its own first, as a hotel's does, will not let it
+through: turn it off there.
+
+Changing it is root's: this asks for the password through pkexec.
+"""
+import os
+import re
+import subprocess
+import sys
+
+FILE = '/etc/systemd/resolved.conf.d/kavat-dns.conf'
+STUB = '/run/systemd/resolve/stub-resolv.conf'
+# each: the addresses, with the name their certificate has to carry
+WHO = {
+    'quad9': ['9.9.9.9#dns.quad9.net', '149.112.112.112#dns.quad9.net', '2620:fe::fe#dns.quad9.net'],
+    'cloudflare': ['1.1.1.1#cloudflare-dns.com', '1.0.0.1#cloudflare-dns.com', '2606:4700:4700::1111#cloudflare-dns.com'],
+    'mullvad': ['194.242.2.2#dns.mullvad.net', '2a07:e340::2#dns.mullvad.net'],
+}
+SERVER = r'[0-9A-Fa-f:.]{3,45}#[A-Za-z0-9.-]{3,100}'
+
+
+def state():
+    """Who answers, when it is on: the name of one of the list, or the server itself."""
+    try:
+        with open(FILE, encoding='utf-8') as file:
+            text = file.read()
+    except OSError:
+        return None
+    found = re.search(r'^DNS=(.+)$', text, re.M)
+    if not found or os.path.realpath('/etc/resolv.conf') != STUB:
+        return None
+    servers = found.group(1).split()
+    return next((name for name, theirs in WHO.items() if theirs == servers), ' '.join(servers))
+
+
+def as_root(*arguments):
+    if os.geteuid() != 0:
+        os.execvp('pkexec', ['pkexec', '/usr/bin/kavat-dns', *arguments])
+
+
+def run(*command):
+    return subprocess.run(command, check=False).returncode == 0
+
+
+def on(who):
+    servers = WHO.get(who) or ([who] if re.fullmatch(SERVER, who) else None)
+    if servers is None:
+        sys.exit(f'kavat-dns: {who} is not one of {", ".join(WHO)}, nor a server written like 9.9.9.9#dns.quad9.net')
+    as_root('on', who)
+    os.makedirs(os.path.dirname(FILE), exist_ok=True)
+    with open(FILE, 'w', encoding='utf-8') as file:
+        file.write('# Written by kavat-dns: names are asked for over TLS, of these servers and no other.\n'
+                   '[Resolve]\n'
+                   f'DNS={" ".join(servers)}\n'
+                   'DNSOverTLS=yes\n'
+                   # every name goes to them, whatever server the network offers
+                   'Domains=~.\n'
+                   'FallbackDNS=\n'
+                   # and the machine does not call its name out to the local network
+                   'LLMNR=no\n'
+                   'MulticastDNS=no\n')
+    # the file every program reads points at systemd-resolved, which NetworkManager then leaves alone
+    if os.path.realpath('/etc/resolv.conf') != STUB:
+        if os.path.exists('/etc/resolv.conf') or os.path.islink('/etc/resolv.conf'):
+            os.replace('/etc/resolv.conf', '/etc/resolv.conf.kavat-dns')
+        os.symlink(STUB, '/etc/resolv.conf')
+    ok = run('systemctl', '-q', 'enable', '--now', 'systemd-resolved.service') and run('systemctl', 'restart', 'systemd-resolved.service')
+    run('systemctl', 'try-reload-or-restart', 'NetworkManager.service')
+    if not ok:
+        sys.exit('kavat-dns: systemd-resolved did not start; kavat-dns off goes back')
+    print(f'names are asked for over TLS: {who}')
+
+
+def off():
+    as_root('off')
+    if os.path.exists(FILE):
+        os.remove(FILE)
+    run('systemctl', '-q', 'disable', '--now', 'systemd-resolved.service', 'systemd-resolved-varlink.socket', 'systemd-resolved-monitor.socket')
+    if os.path.islink('/etc/resolv.conf') and os.path.realpath('/etc/resolv.conf') == STUB:
+        os.remove('/etc/resolv.conf')
+        if os.path.exists('/etc/resolv.conf.kavat-dns'):
+            os.replace('/etc/resolv.conf.kavat-dns', '/etc/resolv.conf')
+    # NetworkManager writes the file again, with the server the network gives
+    run('systemctl', 'try-reload-or-restart', 'NetworkManager.service')
+    print('names are asked of the server the network gives')
+
+
+def main():
+    arguments = sys.argv[1:]
+    if not arguments:
+        who = state()
+        print(f'on\t{who}' if who else 'off')
+    elif arguments == ['list']:
+        for name, servers in WHO.items():
+            print(f'{name}\t{servers[0]}')
+    elif arguments[0] == 'on' and len(arguments) in (1, 2):
+        on(arguments[1] if len(arguments) == 2 else 'quad9')
+    elif arguments == ['off']:
+        off()
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()

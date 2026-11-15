@@ -1,0 +1,17 @@
+# The sandbox for an app made with Electron, a chat or a music app: `kavat-sandbox app
+# <name>` keeps one in it. The app gets a home folder of its own, where its settings and
+# its sessions live, and of your real one it sees only the downloads.
+about = "An Electron app: a home folder of its own, and the downloads"
+
+own_home = true
+# `downloads` is your downloads folder
+write = ["downloads"]
+read = [
+  ".local/share/themes",
+  ".local/share/icons",
+  ".local/share/fonts",
+  ".config/fontconfig",
+  ".config/gtk-3.0",
+  ".config/gtk-4.0",
+]
+network = true

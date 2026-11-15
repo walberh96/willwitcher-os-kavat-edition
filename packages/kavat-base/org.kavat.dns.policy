@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- Who the machine asks for names is a setting of the whole system, and whoever answers
+     sees every site that is gone to: changing it asks for the password. -->
+<policyconfig>
+  <action id="org.kavat.dns.change">
+    <description>Change who the machine asks for names</description>
+    <message>Changing who answers the names the machine looks up</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/kavat-dns</annotate>
+  </action>
+</policyconfig>

@@ -1,0 +1,33 @@
+# The browser's sandbox: `kavat-sandbox on browser` turns it on, and the browser's next
+# start is inside it. The browser then sees its own folders, the downloads and the notes,
+# and nothing else of your home folder. A file can only be uploaded from a folder named
+# here, so add your own to a copy of this file in ~/.config/kavat/sandbox/browser.toml.
+about = "The browser: its own folders, the downloads and the notes"
+
+# folders of the home folder it may write; `downloads` is your downloads folder
+write = [
+  "downloads",
+  ".config/kavat-browser",
+  ".cache/chromium",
+  ".local/share/kavat-browser",
+  # clippings and albums are files of the notes
+  "Notes",
+  # the line of the start page's album
+  ".config/kavat/browser",
+]
+# folders it may only read: the theme, the mode in force, the fonts
+read = [
+  ".config/kavat",
+  ".local/state/kavat",
+  ".local/share/themes",
+  ".local/share/icons",
+  ".local/share/fonts",
+  ".config/fontconfig",
+  ".config/gtk-3.0",
+  ".config/gtk-4.0",
+  ".config/git",
+  ".gitconfig",
+]
+# folders of the session's own that it shares: where the system leaves a command for it
+runtime = ["kavat-browser"]
+network = true

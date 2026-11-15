@@ -1,0 +1,313 @@
+#!/usr/bin/env python3
+"""kavat-sandbox: a program that sees only the part of your files it is given.
+
+usage: kavat-sandbox                          the profiles, which are on, and the apps kept in one
+       kavat-sandbox on <profile>             from its next start, the program of that profile runs inside it
+       kavat-sandbox off <profile>
+       kavat-sandbox is <profile>             says nothing; succeeds when the profile is on
+       kavat-sandbox show <profile>           what a program in it can see and write
+       kavat-sandbox run <profile> [--as <name>] -- <command> ...
+                                              run a command inside the profile
+       kavat-sandbox app <desktop entry>      keep an app in the electron profile from now on:
+                                              kavat-sandbox app vesktop
+       kavat-sandbox app <desktop entry> off  let it out again
+
+A profile is a file: the system's in /usr/share/kavat/sandbox/, yours in
+~/.config/kavat/sandbox/, which wins. It names the folders of your home folder the program
+may write and the ones it may only read; everything else of your home folder is not there
+for it: your keys, your documents, your projects, your notes unless the profile names them.
+The system's own files are there to be read, as for any program. It reaches the screen,
+the sound and, unless the profile says no, the network; of the session's other programs it
+can only speak to the ones a sandboxed app needs: the windows to pick files, the
+notifications and the keyring.
+
+A profile with `own_home = true` gives the program a home folder of its own, kept in
+~/.local/share/kavat/sandbox/<name>/, with the named folders of yours inside it.
+
+The walls are bubblewrap's, the program Flatpak builds its own with.
+"""
+import json
+import os
+import re
+import shlex
+import shutil
+import subprocess
+import sys
+import tomllib
+
+HOME = os.path.expanduser('~')
+CONFIG = os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config'
+DATA = os.environ.get('XDG_DATA_HOME') or f'{HOME}/.local/share'
+RUNTIME = os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'
+FOLDERS = [f'{CONFIG}/kavat/sandbox', '/usr/share/kavat/sandbox']
+STATE = f'{CONFIG}/kavat/sandbox.toml'
+APPS = f'{DATA}/applications'
+NAME = r'[A-Za-z0-9][A-Za-z0-9._-]{0,60}'
+MARK = '# kept in a sandbox by kavat-sandbox\n'
+# who a program inside may speak to on the session's bus
+TALK = ['org.freedesktop.portal.*', 'org.freedesktop.Notifications', 'org.freedesktop.secrets',
+        'org.kde.StatusNotifierWatcher', 'org.freedesktop.FileManager1', 'org.freedesktop.ScreenSaver']
+OWN = ['org.mpris.MediaPlayer2.*']
+
+
+def profile(name):
+    if not re.fullmatch(NAME, name):
+        return None
+    for folder in FOLDERS:
+        try:
+            with open(f'{folder}/{name}.toml', 'rb') as file:
+                return tomllib.load(file)
+        except (OSError, tomllib.TOMLDecodeError):
+            continue
+    return None
+
+
+def profiles():
+    found = set()
+    for folder in FOLDERS:
+        try:
+            found.update(entry[:-5] for entry in os.listdir(folder) if entry.endswith('.toml'))
+        except OSError:
+            pass
+    return sorted(found)
+
+
+def on():
+    try:
+        with open(STATE, 'rb') as file:
+            listed = tomllib.load(file).get('on', [])
+    except (OSError, tomllib.TOMLDecodeError):
+        return []
+    return [name for name in listed if isinstance(name, str)]
+
+
+def keep(names):
+    os.makedirs(os.path.dirname(STATE), exist_ok=True)
+    with open(STATE, 'w', encoding='utf-8') as file:
+        file.write('# The sandbox profiles that are on; kavat-sandbox on and off write this.\n'
+                   f'on = {json.dumps(sorted(set(names)))}\n')
+
+
+def inside_home(path):
+    """A folder a profile names, as a path of the home folder; None when it would leave it."""
+    path = str(path)
+    if path == 'downloads':
+        try:
+            path = subprocess.run(['xdg-user-dir', 'DOWNLOAD'], capture_output=True, text=True, check=False).stdout.strip() or 'Downloads'
+        except OSError:
+            path = 'Downloads'
+    full = os.path.normpath(os.path.join(HOME, os.path.expanduser(path)))
+    return full if full.startswith(HOME + '/') else None
+
+
+def walls(name, settings, home_name):
+    """bubblewrap's arguments for a profile, and the address of the bus inside it."""
+    uid = os.getuid()
+    kept = f'{RUNTIME}/kavat-sandbox/{home_name}'
+    os.makedirs(f'{kept}/tmp', mode=0o700, exist_ok=True)
+    arguments = ['bwrap', '--die-with-parent', '--new-session', '--unshare-pid', '--unshare-ipc', '--unshare-uts',
+                 '--ro-bind', '/usr', '/usr', '--symlink', 'usr/bin', '/bin', '--symlink', 'usr/bin', '/sbin',
+                 '--symlink', 'usr/lib', '/lib', '--symlink', 'usr/lib', '/lib64', '--ro-bind', '/etc', '/etc',
+                 '--proc', '/proc', '--dev-bind', '/dev', '/dev', '--ro-bind', '/sys', '/sys',
+                 '--tmpfs', '/var', '--tmpfs', '/run',
+                 # one /tmp for every run of the profile: a browser finds the one already open through it
+                 '--bind', f'{kept}/tmp', '/tmp']
+    for folder in ('/opt', '/var/cache/fontconfig', '/var/lib/flatpak', '/run/systemd/resolve', '/run/opengl-driver'):
+        if os.path.exists(folder):
+            arguments += ['--ro-bind', folder, folder]
+    if settings.get('network') is False:
+        arguments.append('--unshare-net')
+    # the home folder: empty, or one of the program's own, and then what the profile names
+    if settings.get('own_home'):
+        own = f'{DATA}/kavat/sandbox/{home_name}'
+        os.makedirs(own, exist_ok=True)
+        arguments += ['--bind', own, HOME]
+    else:
+        arguments += ['--tmpfs', HOME]
+    for listed, bind in (('write', '--bind'), ('read', '--ro-bind')):
+        for folder in settings.get(listed, []):
+            path = inside_home(folder)
+            if path is None:
+                continue
+            if bind == '--bind' and not os.path.exists(path):
+                os.makedirs(path, exist_ok=True)
+            if os.path.exists(path):
+                arguments += [bind, path, path]
+    # the session: the screen, the sound, and a bus that lets only a few names through
+    arguments += ['--dir', RUNTIME]
+    for name_in in (os.environ.get('WAYLAND_DISPLAY', 'wayland-1'), 'pipewire-0', 'pulse'):
+        if os.path.exists(f'{RUNTIME}/{name_in}'):
+            arguments += ['--ro-bind', f'{RUNTIME}/{name_in}', f'{RUNTIME}/{name_in}']
+    for folder in settings.get('runtime', []):
+        if re.fullmatch(NAME, str(folder)):
+            os.makedirs(f'{RUNTIME}/{folder}', mode=0o700, exist_ok=True)
+            arguments += ['--bind', f'{RUNTIME}/{folder}', f'{RUNTIME}/{folder}']
+    arguments += ['--bind', f'{kept}/bus', f'{RUNTIME}/bus', '--setenv', 'DBUS_SESSION_BUS_ADDRESS', f'unix:path={RUNTIME}/bus',
+                  '--chdir', HOME]
+    return arguments, kept
+
+
+def running(kept):
+    """The process that is first inside a profile's sandbox when one is up, or None."""
+    try:
+        with open(f'{kept}/pid', encoding='utf-8') as file:
+            pid = int(file.read().strip())
+    except (OSError, ValueError):
+        return None
+    try:
+        with open(f'/proc/{pid}/cmdline', 'rb') as file:
+            return pid if file.read() else None
+    except OSError:
+        return None
+
+
+def run(name, home_name, command):
+    settings = profile(name)
+    if settings is None:
+        sys.exit(f'kavat-sandbox: there is no profile called {name}; there are: {", ".join(profiles())}')
+    if not shutil.which('bwrap'):
+        sys.exit('kavat-sandbox: bubblewrap is not installed')
+    arguments, kept = walls(name, settings, home_name)
+    # A second command of a profile goes into the sandbox that is already up, so that a
+    # browser's second window finds its first.
+    first = running(kept)
+    if first:
+        os.execvp('nsenter', ['nsenter', '--preserve-credentials', '-U', '-m', '-p', '-i', '-u', '-t', str(first),
+                              'env', f'DBUS_SESSION_BUS_ADDRESS=unix:path={RUNTIME}/bus', *command])
+    # the bus inside: a go-between that passes on only what is said to the names allowed
+    proxy = None
+    bus = os.environ.get('DBUS_SESSION_BUS_ADDRESS') or f'unix:path={RUNTIME}/bus'
+    try:
+        os.remove(f'{kept}/bus')
+    except OSError:
+        pass
+    if shutil.which('xdg-dbus-proxy'):
+        proxy = subprocess.Popen(['xdg-dbus-proxy', bus, f'{kept}/bus', '--filter',
+                                  *[f'--talk={who}' for who in TALK + [str(who) for who in settings.get('talk', [])]],
+                                  *[f'--own={who}' for who in OWN]])
+        for _ in range(100):
+            if os.path.exists(f'{kept}/bus'):
+                break
+            try:
+                proxy.wait(0.02)
+                break
+            except subprocess.TimeoutExpired:
+                pass
+    if not os.path.exists(f'{kept}/bus'):
+        # with no go-between there is no bus inside at all, rather than the whole of it
+        open(f'{kept}/bus', 'w').close()
+    read_end, write_end = os.pipe()
+    child = subprocess.Popen([*arguments, '--json-status-fd', str(write_end), '--', *command], pass_fds=[write_end])
+    os.close(write_end)
+    try:
+        with os.fdopen(read_end, encoding='utf-8') as status:
+            said = json.loads(status.readline() or '{}')
+            if 'child-pid' in said:
+                with open(f'{kept}/pid', 'w', encoding='utf-8') as file:
+                    file.write(str(said['child-pid']))
+            code = child.wait()
+    except KeyboardInterrupt:
+        code = 130
+    finally:
+        for path in (f'{kept}/pid',):
+            try:
+                os.remove(path)
+            except OSError:
+                pass
+        if proxy:
+            proxy.terminate()
+    sys.exit(code)
+
+
+def entry(name):
+    """An app's desktop entry of the system, by its name with or without .desktop."""
+    name = name.removesuffix('.desktop')
+    if not re.fullmatch(NAME, name):
+        return None, None
+    for folder in ('/usr/share/applications', '/var/lib/flatpak/exports/share/applications'):
+        if os.path.isfile(f'{folder}/{name}.desktop'):
+            return name, f'{folder}/{name}.desktop'
+    return name, None
+
+
+def app(name, off):
+    name, path = entry(name)
+    mine = f'{APPS}/{name}.desktop' if name else None
+    if off:
+        try:
+            with open(mine, encoding='utf-8') as file:
+                ours = file.read().startswith(MARK)
+        except (OSError, TypeError):
+            ours = False
+        if not ours:
+            sys.exit(f'kavat-sandbox: {name} is not kept in a sandbox')
+        os.remove(mine)
+        print(f'{name} runs as it came')
+        return
+    if path is None:
+        sys.exit(f'kavat-sandbox: there is no app called {name} in /usr/share/applications')
+    with open(path, encoding='utf-8') as file:
+        text = file.read()
+    wrapped = re.sub(r'^Exec=(.*)$', lambda found: f'Exec=kavat-sandbox run electron --as {name} -- {found.group(1)}', text, flags=re.M)
+    os.makedirs(APPS, exist_ok=True)
+    with open(mine, 'w', encoding='utf-8') as file:
+        file.write(MARK + wrapped)
+    print(f'{name} runs in the electron profile from its next start; its home folder is {DATA}/kavat/sandbox/{name}')
+
+
+def wrapped_apps():
+    found = []
+    try:
+        entries = sorted(os.listdir(APPS))
+    except OSError:
+        return found
+    for one in entries:
+        try:
+            with open(f'{APPS}/{one}', encoding='utf-8') as file:
+                if file.read(len(MARK)) == MARK:
+                    found.append(one.removesuffix('.desktop'))
+        except OSError:
+            pass
+    return found
+
+
+def main():
+    arguments = sys.argv[1:]
+    if not arguments:
+        lit = on()
+        for name in profiles():
+            print(f'{"on" if name in lit else "off"}\t{name}\t{(profile(name) or {}).get("about", "")}')
+        for name in wrapped_apps():
+            print(f'app\t{name}\tkept in the electron profile')
+    elif arguments[0] in ('on', 'off') and len(arguments) == 2:
+        if profile(arguments[1]) is None:
+            sys.exit(f'kavat-sandbox: there is no profile called {arguments[1]}; there are: {", ".join(profiles())}')
+        keep([name for name in on() if name != arguments[1]] + ([arguments[1]] if arguments[0] == 'on' else []))
+    elif arguments[0] == 'is' and len(arguments) == 2:
+        sys.exit(0 if arguments[1] in on() and profile(arguments[1]) is not None else 1)
+    elif arguments[0] == 'show' and len(arguments) == 2 and profile(arguments[1]) is not None:
+        settings = profile(arguments[1])
+        print(settings.get('about', ''))
+        print('home\t' + ('one of its own' if settings.get('own_home') else 'empty but for what follows'))
+        for listed in ('write', 'read'):
+            for folder in settings.get(listed, []):
+                print(f'{listed}\t{inside_home(folder) or folder}')
+        print('network\t' + ('no' if settings.get('network') is False else 'yes'))
+    elif arguments[0] == 'run' and '--' in arguments and arguments.index('--') in (2, 4):
+        split = arguments.index('--')
+        home_name = arguments[1]
+        if split == 4:
+            if arguments[2] != '--as' or not re.fullmatch(NAME, arguments[3]):
+                sys.exit(__doc__)
+            home_name = arguments[3]
+        if not arguments[split + 1:]:
+            sys.exit(__doc__)
+        run(arguments[1], home_name, arguments[split + 1:])
+    elif arguments[0] == 'app' and len(arguments) in (2, 3) and (len(arguments) == 2 or arguments[2] == 'off'):
+        app(arguments[1], len(arguments) == 3)
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()
