@@ -1,0 +1,7 @@
+# Neovim: the colours kavat-nvim's colour scheme is made of.
+#
+# palette.lua is a table of values. kavat-nvim watches the folder it is in and puts the
+# colours on again when they change, so there is nothing to reload.
+
+[[file]]
+from = "palette.lua"

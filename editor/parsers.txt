@@ -1,0 +1,4 @@
+bash c cpp cmake css csv diff dockerfile fish git_config git_rebase gitattributes gitcommit gitignore
+go gomod gosum html http hyprlang ini java javascript jsdoc json json5 kotlin lua luadoc make markdown
+markdown_inline nix php python query regex ruby rust scss sql ssh_config svelte toml tsx typescript vim
+vimdoc vue xml yaml zig zsh

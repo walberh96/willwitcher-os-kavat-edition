@@ -11,6 +11,7 @@ work/
 packages/*/*.tar.*
 packages/*/src/
 packages/*/pkg/
+editor/*.tar.*
 
 # The system's own files
 .DS_Store
