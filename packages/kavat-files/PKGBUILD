@@ -1,6 +1,6 @@
 pkgname=kavat-files
 pkgver=0.1.0
-pkgrel=6
+pkgrel=7
 pkgdesc="Willwitcher-OS Kavat Edition: Yazi as the file manager of the whole system"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -8,7 +8,7 @@ license=('LicenseRef-AllRightsReserved')
 # Yazi and the terminal it opens in; what its previews are made with; the file search and
 # the editor its keys open; what compresses, mounts and copies; and what makes it
 # the window that picks files and the answer to "show in folder"
-depends=('yazi' 'kitty'
+depends=('yazi' 'kitty' 'imv' 'zathura' 'zathura-pdf-mupdf' 'mpv'
          'ffmpeg' 'poppler' 'imagemagick' 'resvg' '7zip' 'jq' 'mediainfo' 'file'
          'kavat-find' 'fd' 'ripgrep' 'fzf' 'zoxide' 'neovim'
          'ouch' 'udisks2' 'udiskie' 'xdg-desktop-portal-gtk' 'wl-clipboard' 'xdg-utils'

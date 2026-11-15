@@ -9,6 +9,9 @@
 #   wallpaper   the background: kavat wallpaper set <file>       (kavat-wallpaper)
 #   displays    the displays and their arrangement               (kavat-displays)
 #   project     a workspace under a name: kavat project open x   (kavat-project)
+#   game        a game's own profile: kavat game new elden       (kavat-game)
+#   dns         the names asked for over TLS: kavat dns on       (kavat-dns)
+#   sandbox     a program kept to a part of your files           (kavat-sandbox)
 #   notes       notes, tasks and reminders                       (kavat-notes)
 #   find        the file search                                  (kavat-find)
 #   browser     the browser, and its console's commands          (kavat-browser)
@@ -24,6 +27,7 @@ declare -A programs=(
   [theme]=kavat-theme [mode]=kavat-mode [wallpaper]=kavat-wallpaper [displays]=kavat-displays [project]=kavat-project
   [notes]=kavat-notes [find]=kavat-find [browser]=kavat-browser [packages]=kav [backup]=kavat-backup
   [history]=kavat-history [set]=kavat-conf [fetch]=kavat-fetch [top]=kavat-top
+  [game]=kavat-game [dns]=kavat-dns [sandbox]=kavat-sandbox
 )
 what=${1:-}
 case "$what" in

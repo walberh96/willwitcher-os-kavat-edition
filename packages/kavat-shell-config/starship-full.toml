@@ -1,0 +1,40 @@
+# The full prompt of Willwitcher-OS Kavat Edition, chosen on the Shell page of the settings:
+# who, where, the branch with the state of the repository, how long the last command took
+# when it was long, and a mark that turns red when the last command failed.
+#
+# It takes its colours from the terminal's, so it follows the theme. The state of the
+# repository is asked of git at each prompt, which a large repository makes slower. To have
+# your own prompt, copy this file to ~/.config/starship.toml and change it there.
+
+format = "$username$directory$git_branch$git_status$cmd_duration$character"
+add_newline = false
+
+[username]
+show_always = true
+format = "[$user]($style) "
+style_user = "bold blue"
+style_root = "bold red"
+
+[directory]
+format = "[$path]($style)[$read_only]($read_only_style) "
+style = "bold cyan"
+truncation_length = 3
+truncate_to_repo = true
+
+[git_branch]
+format = "[$symbol$branch]($style) "
+symbol = " "
+style = "purple"
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[git_status]
+format = "([$all_status$ahead_behind]($style) )"
+style = "yellow"
+
+[cmd_duration]
+min_time = 3000
+format = "[$duration]($style) "
+style = "dimmed white"

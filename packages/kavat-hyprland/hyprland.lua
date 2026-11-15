@@ -41,6 +41,9 @@ hl.on("hyprland.start", function()
     -- light by day and dark by night, for who asked for it
     hl.exec_cmd("/usr/lib/kavat/theme-auto")
     hl.exec_cmd("kavat-icons-apply")
+    -- GTK 3 apps, the browser among them, wear the theme's own theme of GTK, Kavat: a
+    -- session that has another is given it; kavat-theme goes between its two names after that
+    hl.exec_cmd([[sh -c 'case $(gsettings get org.gnome.desktop.interface gtk-theme) in *Kavat*) ;; *) gsettings set org.gnome.desktop.interface gtk-theme Kavat ;; esac']])
     -- the lights of the keyboard and the tower take the accent, when OpenRGB is installed
     hl.exec_cmd("/usr/lib/kavat/lights")
     -- The reminders written in the notes become timers of this session; those whose time

@@ -5,8 +5,8 @@ usage: kavat-conf show <page>                 the settings of a page and their v
        kavat-conf set <page> <setting> <value>
        kavat-conf file <page>                 the file a page's settings are kept in
 
-The pages: terminal (Kitty), editor (Neovim), files (Yazi), language (the keyboard), sound (the
-microphone) and lock (the lock screen).
+The pages: terminal (Kitty), shell (zsh), editor (Neovim), files (Yazi), language (the keyboard),
+sound (the microphone) and lock (the lock screen).
 
 Each setting lives in one place, the file of its app: this only changes that setting's
 line there, and leaves the rest of the file, comments and all, as it was. A setting that
@@ -41,6 +41,19 @@ PAGES = {
             'tab_bar_style': (['fade', 'separator', 'powerline', 'hidden'], 'fade'),
             'enable_audio_bell': (['yes', 'no'], 'yes'),
             'confirm_os_window_close': (['0', '-1'], '-1'),
+        },
+    },
+    'shell': {
+        # read by /etc/zsh/zshrc when a terminal opens: a name and its value to a line, as Kitty's
+        'file': f'{CONFIG}/kavat/shell.conf', 'style': 'kitty', 'reload': None,
+        'settings': {
+            'prompt': (['short', 'full'], 'short'),
+            'suggestions': (['yes', 'no'], 'yes'),
+            'highlighting': (['yes', 'no'], 'yes'),
+            'completion_picker': (['yes', 'no'], 'yes'),
+            'history_lines': (['10000', '50000', '200000'], '50000'),
+            'shared_history': (['yes', 'no'], 'yes'),
+            'listing': (['lsd', 'ls'], 'lsd'),
         },
     },
     'editor': {

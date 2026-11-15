@@ -6,6 +6,8 @@ usage: kavat-displays                          each display: its name, what it i
        kavat-displays set <display> <setting>=<value>...
                                                mode=2560x1440@144  scale=1.25  rotate=0|90|180|270
                                                at=0x0, or at=right-of:<display>, left-of:, above:, below:
+       kavat-displays place <display> <x> <y>  put a display near there, as dragging it does: it ends
+                                               against the nearest edge of another, over none of them
        kavat-displays keep                     keep the arrangement in view: without it, a change is undone in 10 seconds
        kavat-displays undo                     go back to the arrangement from before the last change
        kavat-displays restore                  at the start of a session: wear the arrangement kept for the displays connected
@@ -118,6 +120,44 @@ def size_of(rule):
     return round(width / rule.get('scale', 1)), round(height / rule.get('scale', 1))
 
 
+def place_of(rule):
+    return tuple(int(n) for n in re.match(r'(-?\d+)x(-?\d+)', rule['position']).groups())
+
+
+def settle(current, moved, x, y):
+    """Where a display dropped at x, y ends: against the nearest edge of another display,
+    over none of them, with its edges lined up with its neighbour's when they are close.
+    Then the whole arrangement is moved so that it starts at 0x0."""
+    width, height = size_of(current[moved])
+    others = [(place_of(rule), size_of(rule)) for name, rule in current.items() if name != moved]
+
+    def over(at):
+        return any(at[0] < ox + ow and ox < at[0] + width and at[1] < oy + oh and oy < at[1] + height
+                   for (ox, oy), (ow, oh) in others)
+
+    def lined(value, size, start, length):
+        """A place along an edge: kept on the neighbour, and lined up with it when close."""
+        value = max(start - size + 1, min(start + length - 1, value))
+        for line in (start, start + length - size, start + (length - size) // 2):
+            if abs(value - line) <= max(size, length) * 0.08:
+                return line
+        return value
+
+    choices = []
+    for (ox, oy), (ow, oh) in others:
+        choices += [(ox + ow, lined(y, height, oy, oh)), (ox - width, lined(y, height, oy, oh)),
+                    (lined(x, width, ox, ow), oy + oh), (lined(x, width, ox, ow), oy - height)]
+    free = [at for at in choices if not over(at)]
+    if free:
+        x, y = min(free, key=lambda at: (at[0] - x) ** 2 + (at[1] - y) ** 2)
+    current[moved]['position'] = f'{x}x{y}'
+    left = min(place_of(rule)[0] for rule in current.values())
+    top = min(place_of(rule)[1] for rule in current.values())
+    for rule in current.values():
+        at = place_of(rule)
+        rule['position'] = f'{at[0] - left}x{at[1] - top}'
+
+
 def reload():
     hyprctl('reload')
 
@@ -133,14 +173,19 @@ def main():
     elif arguments[0] == 'modes' and len(arguments) == 2 and arguments[1] in by_name:
         seen = dict.fromkeys(mode.replace('Hz', '') for mode in by_name[arguments[1]].get('availableModes', []))
         print('\n'.join(seen))
-    elif arguments[0] == 'set' and len(arguments) >= 3 and arguments[1] in by_name:
+    elif (arguments[0] == 'set' and len(arguments) >= 3 and arguments[1] in by_name) or \
+            (arguments[0] == 'place' and len(arguments) == 4 and arguments[1] in by_name
+             and all(re.fullmatch(r'-?\d+', number) for number in arguments[2:])):
         kept = read_file()
         name = set_of(found)
         # the set as it is now, with what the file already says of it
         rules = {rule['output']: rule for rule in kept['sets'].get(name, [])}
         current = {display['name']: rules.get(rule_of(display)['output'], rule_of(display)) for display in found}
-        rule = dict(current[arguments[1]])
-        for pair in arguments[2:]:
+        current = {name: dict(rule) for name, rule in current.items()}
+        rule = current[arguments[1]]
+        if arguments[0] == 'place':
+            settle(current, arguments[1], int(arguments[2]), int(arguments[3]))
+        for pair in arguments[2:] if arguments[0] == 'set' else []:
             key, _, value = pair.partition('=')
             if key == 'mode' and re.fullmatch(r'\d+x\d+(@[\d.]+)?', value):
                 rule['mode'] = value
@@ -160,7 +205,6 @@ def main():
                                     'above': f'{x}x{y - height}', 'below': f'{x}x{y + other_height}'}[side]
             else:
                 sys.exit(f'kavat-displays: {pair} is not something a display can be set to\n\n' + __doc__)
-        current[arguments[1]] = rule
         # the file from before is kept aside until the change is kept or undone
         if not os.path.exists(PENDING):
             with open(PENDING, 'w', encoding='utf-8') as file:

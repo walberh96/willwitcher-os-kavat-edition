@@ -231,6 +231,22 @@ class Screen:
         sock.close()
         self._left = time.time()
 
+    def drag(self, x, y, to_x, to_y, steps=12):
+        """Press the left button at a point, move to another in small steps, and let go."""
+        self._settle()
+        sock = self._connect()[0]
+        sock.sendall(struct.pack('>BxHi', 2, 1, 0))
+        sock.sendall(struct.pack('>BBHH', 5, 0, x, y))
+        time.sleep(0.15)
+        for step in range(steps + 1):
+            sock.sendall(struct.pack('>BBHH', 5, 1, x + (to_x - x) * step // steps, y + (to_y - y) * step // steps))
+            time.sleep(0.05)
+        time.sleep(0.2)
+        sock.sendall(struct.pack('>BBHH', 5, 0, to_x, to_y))
+        time.sleep(0.3)
+        sock.close()
+        self._left = time.time()
+
     def type(self, text):
         """Type text as a US keyboard would."""
         self._settle()

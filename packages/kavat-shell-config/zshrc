@@ -4,11 +4,24 @@
 # Nothing here goes through a framework: each piece is read directly, and what takes time
 # to work out is kept from one terminal to the next. Opening a terminal has to stay fast.
 
+# The settings of the Shell page of the settings panel: a name and its value to a line, in
+# ~/.config/kavat/shell.conf. They are read here without starting a program; a terminal
+# opened after a change has it.
+typeset -A _kavat_shell=(suggestions yes highlighting yes completion_picker yes history_lines 50000
+                         shared_history yes prompt short listing lsd)
+() {
+  local name value file="${XDG_CONFIG_HOME:-$HOME/.config}/kavat/shell.conf"
+  [[ -r $file ]] || return
+  while read -r name value; do
+    [[ -n $name && $name != \#* && -n ${_kavat_shell[$name]} && $value =~ '^[a-z0-9]+$' ]] && _kavat_shell[$name]=$value
+  done < "$file"
+}
+
 # History: kept across terminals, without repeats
 HISTFILE="${XDG_STATE_HOME:-$HOME/.local/state}/zsh/history"
 [[ -d ${HISTFILE:h} ]] || mkdir -p "${HISTFILE:h}"
-HISTSIZE=50000
-SAVEHIST=50000
+HISTSIZE=${_kavat_shell[history_lines]}
+SAVEHIST=${_kavat_shell[history_lines]}
 # In a mode that keeps no history, Incognito, nothing typed is written down: kavat-mode
 # leaves a file while such a mode is in force, and each prompt looks for it.
 _kavat_history() {
@@ -19,7 +32,13 @@ _kavat_history() {
   fi
 }
 precmd_functions+=(_kavat_history)
-setopt share_history hist_ignore_all_dups hist_ignore_space hist_reduce_blanks
+setopt hist_ignore_all_dups hist_ignore_space hist_reduce_blanks
+if [[ ${_kavat_shell[shared_history]} == yes ]]; then
+  setopt share_history
+else
+  # each terminal keeps its own until it closes, and adds it to the file then
+  setopt inc_append_history_time
+fi
 setopt auto_cd interactive_comments
 
 # Keys: the usual ones of a terminal, with Home, End, Delete and Ctrl with the arrows
@@ -68,6 +87,7 @@ source /usr/share/fzf/completion.zsh
 # Tab shows what can be completed in the picker, with a look at each file or folder; / goes
 # into the folder under the cursor. It has to be read after compinit and fzf's own keys, which
 # take Tab too, and before the two plugins further down.
+if [[ ${_kavat_shell[completion_picker]} == yes ]]; then
 source /usr/share/zsh/plugins/fzf-tab/fzf-tab.plugin.zsh
 zstyle ':completion:*' menu no
 zstyle ':completion:*:descriptions' format '[%d]'
@@ -76,9 +96,13 @@ zstyle ':fzf-tab:complete:*:*' fzf-preview \
   'if [[ -d $realpath ]]; then lsd -la --color always $realpath; elif [[ -f $realpath ]]; then bat --color always --style numbers --line-range :200 $realpath; fi'
 zstyle ':fzf-tab:complete:(kill|ps):argument-rest' fzf-preview 'ps -p $word -o cmd --no-headers -w -w'
 zstyle ':fzf-tab:complete:(kill|ps):argument-rest' fzf-flags --preview-window=down:3:wrap
+else
+  # without the picker: zsh's own menu, moved through with Tab and the arrows
+  zstyle ':completion:*' menu select
+fi
 
 # Suggestions from the history as you type; the right arrow takes one
-source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+[[ ${_kavat_shell[suggestions]} == yes ]] && source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
 
 # Ctrl+G looks for text inside the files of this folder
 kavat-find-text() {
@@ -94,14 +118,32 @@ eval "$(zoxide init zsh)"
 # The editor programs open when they need one
 export EDITOR=nvim VISUAL=nvim
 
-# lsd in the place of ls
-alias ls='lsd'
-alias ll='lsd -l'
-alias la='lsd -la'
+# lsd in the place of ls, unless the Shell page says ls is ls
+if [[ ${_kavat_shell[listing]} == lsd ]]; then
+  alias ls='lsd'
+  alias ll='lsd -l'
+  alias la='lsd -la'
+else
+  alias ls='ls --color=auto'
+  alias ll='ls --color=auto -l'
+  alias la='ls --color=auto -la'
+fi
+
+# Your aliases and functions: a file of their own, read by every terminal
+[[ -r ${XDG_CONFIG_HOME:-$HOME/.config}/kavat/aliases.zsh ]] && source "${XDG_CONFIG_HOME:-$HOME/.config}/kavat/aliases.zsh"
 
 # The prompt: the system's, until you have your own in ~/.config/starship.toml
-[[ -e ${XDG_CONFIG_HOME:-$HOME/.config}/starship.toml ]] || export STARSHIP_CONFIG=/usr/share/kavat/starship.toml
+# The short one starts no program to draw itself; the full one adds the state of the
+# repository and how long the last command took, and is a little slower in a large repository.
+if [[ ! -e ${XDG_CONFIG_HOME:-$HOME/.config}/starship.toml ]]; then
+  if [[ ${_kavat_shell[prompt]} == full ]]; then
+    export STARSHIP_CONFIG=/usr/share/kavat/starship-full.toml
+  else
+    export STARSHIP_CONFIG=/usr/share/kavat/starship.toml
+  fi
+fi
 eval "$(starship init zsh)"
 
 # Colours for what you type, as you type it. It has to be the last thing read.
-source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+[[ ${_kavat_shell[highlighting]} == yes ]] && source /usr/share/zsh/plugins/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
+unset _kavat_shell

@@ -25,7 +25,7 @@ local PAGES = {
   { id = "editor", name = "Editor", about = "Neovim" },
   { id = "files", name = "Files", about = "Yazi" },
   { id = "notes", name = "Notes", about = "nb" },
-  { id = "shell", name = "Shell", about = "zsh", waits = "the terminal shell's settings page" },
+  { id = "shell", name = "Shell", about = "zsh" },
   { id = "browser", name = "Browser" },
   { id = "bar", name = "Bar & widgets" },
   { id = "modes", name = "Modes" },
@@ -50,7 +50,8 @@ local packages = { installed = "…", updates = "…" }
 local due = "…"
 local projects = {}  -- each: name, folder, workspace, open
 local project_name = ""
-local privacy = { firewall = "", doors = {}, opensnitch = "", vpn = "" }
+local privacy = { firewall = "", doors = {}, opensnitch = "", vpn = "", dns = "off", sandbox = {} }
+local games = {}  -- the game profiles, as kavat-game lists them
 local browser = { default = "", widevine = "", commands = "0" }  -- what the browser page shows
 local panel_open = false  -- what reads again and again stops when the panel closes
 local gpu = {}  -- what the graphics card says of itself, by name
@@ -350,12 +351,17 @@ end
 
 local function read_privacy()
   noctalia.runAsync("echo \"firewall $(systemctl is-active kavat-firewall 2>/dev/null)\"; echo \"opensnitch $(systemctl is-active opensnitchd 2>/dev/null)\"; "
-    .. "echo \"vpn $(kavat-mode vpn 2>/dev/null)\"; cat /etc/kavat/firewall.d/*.nft 2>/dev/null | grep '^add rule' | sed 's/^add rule inet kavat_firewall in /door /'", function(result)
-    local found = { firewall = "", doors = {}, opensnitch = "", vpn = "" }
+    .. "echo \"vpn $(kavat-mode vpn 2>/dev/null)\"; echo \"dns $(kavat-dns 2>/dev/null | tr '\\t' ' ')\"; kavat-sandbox 2>/dev/null | sed 's/^/sandbox /'; cat /etc/kavat/firewall.d/*.nft 2>/dev/null | grep '^add rule' | sed 's/^add rule inet kavat_firewall in /door /'", function(result)
+    local found = { firewall = "", doors = {}, opensnitch = "", vpn = "", dns = "off", sandbox = {} }
     for line in result.stdout:gmatch("[^\n]+") do
       local name, value = line:match("^(%S+) ?(.*)$")
       if name == "door" then
         found.doors[#found.doors + 1] = value
+      elseif name == "sandbox" then
+        local state, profile, about = value:match("^(%S+)\t([^\t]+)\t?(.*)$")
+        if state then
+          found.sandbox[#found.sandbox + 1] = { state = state, name = profile, about = about }
+        end
       elseif name then
         found[name] = value
       end
@@ -793,9 +799,57 @@ local function pages_modes()
   } }
 end
 
+local function read_games()
+  noctalia.runAsync({ "kavat-game" }, function(result)
+    local found = {}
+    for line in result.stdout:gmatch("[^\n]+") do
+      local name, game, sets = line:match("^([^\t]+)\t([^\t]*)\t(.*)$")
+      if name then
+        found[#found + 1] = { name = name, game = game, sets = sets }
+      end
+    end
+    games = found
+    render()
+  end)
+end
+
+-- The profiles of the games: each with what it sets, opened in the editor by its button
+local game_name = ""
+local function games_part()
+  local part = { section("A profile for each game") }
+  for _, game in ipairs(games) do
+    part[#part + 1] = row(game.name, ui.row({ gap = 8, align = "center" }, {
+      ui.label({ text = (game.game ~= "" and (game.game .. " · ") or "") .. (game.sets ~= "" and game.sets or "sets nothing"), fontFamily = "JetBrains Mono", fontSize = 12, flexGrow = 1 }),
+      ui.button({ text = "Edit", variant = "outline", controlSize = "sm", onClick = function()
+        noctalia.runInTerminal("kavat-game edit " .. game.name)
+        panel.close()
+      end }),
+    }))
+  end
+  part[#part + 1] = ui.row({ gap = 8, align = "center" }, {
+    ui.input({ key = "game-name", placeholder = "a name, and the game's number in Steam", flexGrow = 1, controlSize = "sm",
+      onChange = function(text) game_name = text end,
+      onSubmit = function(text) game_name = text end }),
+    ui.button({ text = "New profile", variant = "outline", controlSize = "sm", onClick = function()
+      local name, game = game_name:match("^%s*([%w._-]+)%s*([%w ._-]*)$")
+      if not name then
+        said = "A profile's name is letters, digits, dots and dashes."
+        render()
+        return
+      end
+      noctalia.runAsync(game ~= "" and { "kavat-game", "new", name, trim(game) } or { "kavat-game", "new", name }, function(result)
+        said = result.exitCode ~= 0 and trim(result.stderr) or ""
+        read_games()
+      end)
+    end }),
+  })
+  part[#part + 1] = note("A profile sets the performance monitor and the limit of frames (MangoHud), the game's own resolution and scaling (gamescope), and a profile of the card (LACT). In Steam, the game's launch options are `kavat-game run %command%`; the profile called default is for the games that have none of their own.")
+  return part
+end
+
 local function pages_gpu()
   if not gpu.name then
-    return { title = "GPU", sub = "the graphics card", left = { note("No graphics card answers here.") }, right = {} }
+    return { title = "GPU", sub = "the graphics card", file = "~/.config/kavat/games/", left = { note("No graphics card answers here.") }, right = games_part() }
   end
   local function meter(name, text, part)
     return row(name, ui.column({ gap = 4, flexGrow = 1 }, {
@@ -837,8 +891,9 @@ local function pages_gpu()
         panel.close()
       end }),
     }),
+    ui.column({ gap = 10 }, games_part()),
     section("Not built yet"),
-    note("The card's sensors on the bar, and a profile of the card for each game."),
+    note("The card's sensors on the bar."),
   } }
 end
 
@@ -932,10 +987,47 @@ local function pages_privacy()
     doors[1] = note("None: nothing from outside reaches this machine but the answers to what it asked for.")
   end
   local asking = privacy.opensnitch == "active"
+  local dns_on = privacy.dns:match("^on") ~= nil
+  local dns_who = privacy.dns:match("^on (.+)$") or ""
+  -- a change here is another program's: it is run, what it says when it fails is shown, and the page is read again
+  local function privacy_does(command)
+    busy = true
+    said = ""
+    render()
+    noctalia.runAsync(command, function(result)
+      busy = false
+      if result.exitCode ~= 0 then
+        said = trim(result.stderr ~= "" and result.stderr or result.stdout)
+      end
+      read_privacy()
+    end)
+  end
+  local boxes = {}
+  for _, box in ipairs(privacy.sandbox) do
+    if box.state == "app" then
+      boxes[#boxes + 1] = row(box.name, ui.label({ text = "kept in a sandbox", fontFamily = "JetBrains Mono", fontSize = 12 }))
+    elseif box.name == "browser" then
+      boxes[#boxes + 1] = row("The browser", ui.toggle({ checked = box.state == "on", enabled = not busy, onChange = function(now)
+        privacy_does({ "kavat-sandbox", now and "on" or "off", "browser" })
+      end }))
+    end
+  end
   return { title = "Privacy & network", sub = "what comes in, what goes out", file = "/etc/kavat/firewall.d/", left = {
     section("Firewall"),
     row("Everything incoming", ui.label({ text = privacy.firewall == "active" and "closed" or "NOT closed: the firewall is off", fontFamily = "JetBrains Mono", fontSize = 12,
       color = privacy.firewall == "active" and "on_surface" or "error" })),
+    section("Names asked for over TLS"),
+    row("Encrypted DNS", ui.row({ gap = 8, align = "center" }, {
+      ui.label({ text = dns_on and ("on · " .. dns_who) or "off", fontFamily = "JetBrains Mono", fontSize = 12 }),
+      ui.button({ text = dns_on and "Turn it off" or "Turn it on", variant = "outline", controlSize = "sm", enabled = not busy, onClick = function()
+        privacy_does(dns_on and { "kavat-dns", "off" } or { "kavat-dns", "on" })
+      end }),
+    })),
+    dns_on and row("Who answers", segmented({
+      { text = "Quad9", on = dns_who == "quad9", pick = function() privacy_does({ "kavat-dns", "on", "quad9" }) end },
+      { text = "Cloudflare", on = dns_who == "cloudflare", pick = function() privacy_does({ "kavat-dns", "on", "cloudflare" }) end },
+      { text = "Mullvad", on = dns_who == "mullvad", pick = function() privacy_does({ "kavat-dns", "on", "mullvad" }) end },
+    })) or note("Off, the names of the sites you go to are asked in the clear of the server the network gives. On, they go over TLS to one server and nothing is asked in the clear; a network that makes you sign in on a page of its own first will not let it through."),
     section("Doors you opened"),
     ui.column({ gap = 4 }, doors),
     note("A door is a line in a file of /etc/kavat/firewall.d/, as `add rule inet kavat_firewall in tcp dport 22 accept`, and then `sudo systemctl restart kavat-firewall`."),
@@ -952,11 +1044,14 @@ local function pages_privacy()
       end }),
     }),
     note("OpenSnitch asks the first time a program wants to reach the network, and keeps your answer as a rule. It is not on as the system comes: it asks often at first."),
+    section("Sandbox"),
+    ui.column({ gap = 6 }, boxes),
+    note("In its sandbox the browser sees its own folders, the downloads and the notes, and nothing else of your home folder: a file can only be uploaded from there. It is from the browser's next start. `kavat-sandbox app <name>` keeps an Electron app in one, with a home folder of its own."),
     section("Incognito"),
     row("VPN", ui.label({ text = privacy.vpn ~= "" and privacy.vpn or "none chosen", fontFamily = "JetBrains Mono", fontSize = 12 })),
     note("In Incognito mode everything goes out through this VPN and nothing goes out when it drops. It is chosen on the Modes page."),
     section("Not built yet"),
-    note("Who used the microphone, the camera and the screen, and encrypted DNS."),
+    note("Who used the microphone, the camera and the screen."),
   } }
 end
 
@@ -1039,6 +1134,56 @@ local function terminal()
     section("Behaviour"),
     row("Bell", conf_toggle("terminal", "enable_audio_bell", "yes", "no")),
     row("Ask before closing", conf_toggle("terminal", "confirm_os_window_close", "-1", "0")),
+  } }
+end
+
+-- what opens each kind of thing, as the desktop's own list says
+local shell_apps = {}
+local function read_shell_apps()
+  noctalia.runAsync("for pair in 'A link=x-scheme-handler/https' 'A folder=inode/directory' 'A text file=text/plain' 'An image=image/png' 'A video=video/mp4' 'A PDF=application/pdf'; do "
+    .. "printf '%s\\t%s\\n' \"${pair%%=*}\" \"$(xdg-mime query default \"${pair#*=}\" 2>/dev/null)\"; done", function(result)
+    local found = {}
+    for line in result.stdout:gmatch("[^\n]+") do
+      local what, name = line:match("^([^\t]+)\t(.*)$")
+      if what then
+        found[#found + 1] = { what = what, name = name ~= "" and name:gsub("%.desktop$", "") or "nothing set" }
+      end
+    end
+    shell_apps = found
+    render()
+  end)
+end
+
+local function shell()
+  local apps = {}
+  for _, app in ipairs(shell_apps) do
+    apps[#apps + 1] = row(app.what, ui.label({ text = app.name, fontFamily = "JetBrains Mono", fontSize = 12 }))
+  end
+  return { title = "Shell", sub = "zsh · from the next terminal opened", file = "~/.config/kavat/shell.conf", left = {
+    section("Prompt"),
+    row("Shows", conf_choice("shell", "prompt", { { "short", "Short" }, { "full", "Full" } })),
+    note("Short is who, where and the branch, and starts no program to draw itself. Full adds the state of the repository and how long the last command took; a large repository makes it slower. A prompt of your own in ~/.config/starship.toml takes the place of both."),
+    section("As you type"),
+    row("Suggestions from the history", conf_toggle("shell", "suggestions", "yes", "no")),
+    row("Colours for what is typed", conf_toggle("shell", "highlighting", "yes", "no")),
+    row("Tab opens the picker", conf_toggle("shell", "completion_picker", "yes", "no")),
+    section("History"),
+    row("Commands kept", conf_select("shell", "history_lines", { { "10000", "10,000" }, { "50000", "50,000" }, { "200000", "200,000" } })),
+    row("Shared between terminals", conf_toggle("shell", "shared_history", "yes", "no")),
+  }, right = {
+    section("Listing"),
+    row("ls is", conf_choice("shell", "listing", { { "lsd", "lsd" }, { "ls", "ls" } })),
+    section("Aliases and functions"),
+    ui.row({ gap = 8 }, {
+      ui.button({ text = "Open them in Neovim", variant = "outline", controlSize = "sm", onClick = function()
+        noctalia.runInTerminal("mkdir -p ~/.config/kavat && nvim ~/.config/kavat/aliases.zsh")
+        panel.close()
+      end }),
+    }),
+    note("Yours live in ~/.config/kavat/aliases.zsh, which every terminal reads; ~/.zshrc is read after everything and has the last word."),
+    section("Default apps"),
+    ui.column({ gap = 2 }, apps),
+    note("What opens a link, a folder, a text file, an image, a video and a PDF. `xdg-mime default <app>.desktop <type>` changes one."),
   } }
 end
 
@@ -1225,6 +1370,8 @@ local function language()
   } }
 end
 
+local displays_read = 0
+
 local function read_displays()
   noctalia.runAsync("kavat-displays; for name in $(kavat-displays | cut -f1); do echo \"== $name\"; kavat-displays modes $name; done", function(result)
     local found, part = {}, nil
@@ -1248,6 +1395,8 @@ local function read_displays()
     end
     table.sort(found, function(one, other) return one.x < other.x end)
     displays = found
+    -- what is read is what is drawn: a display dropped where it could not stay goes back
+    displays_read = displays_read + 1
     render()
   end)
 end
@@ -1286,22 +1435,24 @@ local function pages_displays()
       chosen = display
     end
   end
+  -- each display to scale, where it is: the room it takes is its size, turned and scaled
   for _, display in ipairs(displays) do
-    local on = display == chosen
     local sideways = display.turn == "90" or display.turn == "270"
-    local width, height = (sideways and display.height or display.width) / 14, (sideways and display.width or display.height) / 14
-    boxes[#boxes + 1] = ui.column({ key = "box-" .. display.name, width = width, minHeight = height, radius = 8, align = "center", justify = "center", gap = 2,
-      fill = on and "primary_container" or "surface_container", border = on and "primary" or "outline_variant", borderWidth = on and 2 or 1,
-      onClick = function() display_chosen = display.name; render() end }, {
-      ui.label({ text = display.name, fontWeight = "bold" }),
-      ui.label({ text = display.size .. " · " .. string.format("%.0f", tonumber(display.rate) or 0) .. " Hz", fontSize = 11, color = "on_surface_variant" }),
-    })
+    local scale = tonumber(display.scale) or 1
+    boxes[#boxes + 1] = { key = display.name, x = display.x, y = display.y,
+      width = math.floor((sideways and display.height or display.width) / scale + 0.5),
+      height = math.floor((sideways and display.width or display.height) / scale + 0.5),
+      label = display.name, sublabel = display.size .. " · " .. string.format("%.0f", tonumber(display.rate) or 0) .. " Hz",
+      selected = display == chosen }
     if display ~= chosen then
       names[#names + 1] = display.name
     end
   end
-  local top = ui.column({ gap = 10 }, {
-    ui.row({ gap = 6, align = "center", justify = "center" }, boxes),
+  local top = ui.column({ gap = 10, align = "center" }, {
+    -- dragged to where it goes: it ends against the nearest edge of another display
+    ui.arrange({ key = "arrangement", width = 560, height = 230, items = boxes, revision = displays_read,
+      onSelect = function(name) display_chosen = name; render() end,
+      onMove = function(name, x, y) display_does("place", name, tostring(x), tostring(y)) end }),
     display_tried > 0 and ui.row({ gap = 10, align = "center", justify = "center" }, {
       ui.label({ text = "Keep this arrangement? Unless it is kept, it goes back in ten seconds.", color = "primary" }),
       ui.button({ text = "Keep", variant = "primary", controlSize = "sm", onClick = function()
@@ -1312,7 +1463,7 @@ local function pages_displays()
         display_tried = 0
         noctalia.runAsync({ "kavat-displays", "undo" }, function() read_displays() end)
       end }),
-    }) or ui.label({ text = chosen.what, color = "on_surface_variant", fontSize = 12 }),
+    }) or ui.label({ text = #displays > 1 and (chosen.what .. " · drag a display to where it stands") or chosen.what, color = "on_surface_variant", fontSize = 12 }),
   })
 
   -- the sizes the display can show, and the rates of the size in use
@@ -1351,7 +1502,7 @@ local function pages_displays()
       place_values[#place_values + 1] = side[1] .. ":" .. name
     end
   end
-  return { title = "Displays", sub = #displays == 1 and "one display" or (#displays .. " displays · press one to change it"),
+  return { title = "Displays", sub = #displays == 1 and "one display" or (#displays .. " displays · drag them to where they stand, press one to change it"),
     file = "~/.config/hypr/monitors.lua", top = top, left = {
     section(chosen.name),
     row("Resolution", #sizes > 0 and select(sizes, size_at, function(index) display_does("set", chosen.name, "mode=" .. sizes[index]) end) or note(chosen.size)),
@@ -1365,7 +1516,7 @@ local function pages_displays()
     end)) or note("With one display there is nothing to arrange. A second one is put to the right of this one when it is plugged in."),
     note("Each set of displays keeps its own arrangement, known by what the displays are and not by where they are plugged in."),
     section("Not built yet"),
-    note("Placing by dragging, the main display, the workspaces of each display and night light."),
+    note("The main display, the workspaces of each display and night light."),
   } }
 end
 
@@ -1393,7 +1544,7 @@ local function keys()
 end
 
 local BUILT = { appearance = appearance, wallpaper = wallpaper, accessibility = accessibility, windows = windows, keys = keys,
-  displays = pages_displays, sound = sound, network = network, terminal = terminal, editor = editor, files = files, notes = notes,
+  displays = pages_displays, sound = sound, network = network, terminal = terminal, shell = shell, editor = editor, files = files, notes = notes,
   bar = bar, modes = pages_modes, backup = pages_backup, gpu = pages_gpu, browser = pages_browser, projects = pages_projects, privacy = pages_privacy, packages = pages_packages, boot = boot, login = login, language = language }
 
 local function waiting(entry)
@@ -1500,6 +1651,7 @@ function open_page(id)
   elseif id == "backup" then
     read_backup()
   elseif id == "gpu" then
+    read_games()
     read_gpu()
   elseif id == "browser" then
     read_browser()
@@ -1520,6 +1672,9 @@ function open_page(id)
     read_notes()
   elseif id == "terminal" or id == "editor" or id == "files" then
     read_conf(id)
+  elseif id == "shell" then
+    read_conf("shell")
+    read_shell_apps()
   elseif id == "login" then
     read_conf("lock")
   elseif id == "keys" then

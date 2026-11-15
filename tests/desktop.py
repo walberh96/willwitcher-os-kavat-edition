@@ -141,7 +141,42 @@ def main():
                       "kavat is one command for the system's own, the launcher has the system's things, the bar marks who listens and which keyboard, "
                       "the screen's text can be read in two languages, and the lights have their colour", output)
 
-        for page in ('wallpaper', 'displays', 'projects', 'privacy', 'gpu'):
+        print('placing a display, encrypted names, a game, the shell, the theme by itself', flush=True)
+        status, output = user('kavat-displays place Virtual-1 300 200 > /dev/null; sleep 1; kavat-displays | cut -f4; kavat-displays keep; '
+                              'kavat-shell msg plugins list | grep -c "kavat/settings.*enabled"; grep -c "ui.arrange" /usr/share/kavat/shell-plugins/settings/panel.luau')
+        checks.report(output.split() == ['0x0', '1', '1'], 'a display that is dropped anywhere ends where the arrangement starts when it is the only one', output)
+        status, output = machine.run('kavat-dns; kavat-dns on > /dev/null; kavat-dns; readlink /etc/resolv.conf; resolvectl status | grep -c "+DNSOverTLS"; '
+                                     'kavat-dns on nobody 2>&1 | grep -c "is not one of"; kavat-dns off > /dev/null; kavat-dns; systemctl is-active systemd-resolved; '
+                                     'test -L /etc/resolv.conf || echo a-file', 90)
+        checks.report(output.split('\n') == ['off', 'on\tquad9', '/run/systemd/resolve/stub-resolv.conf', '1', '1', 'off', 'inactive', 'a-file'],
+                      'encrypted DNS is off as the system comes, asks one server over TLS when on, and goes back whole', output)
+        status, output = user('kavat game new elden 1245620 > /dev/null; kavat-game | cut -f1,2; '
+                              'SteamAppId=1245620 kavat-game show /bin/true | grep -c -E "\\"profile\\": \\"elden\\"|MangoHud is not installed"; kavat-game run echo ran 2> /dev/null; '
+                              'kavat-game delete elden; kavat-game | wc -l')
+        checks.report(output.split('\n') == ['elden\t1245620', '2', 'ran', '0'],
+                      'a game has a profile of its own, found by its number in Steam, and starts all the same when what the profile asks for is not installed', output)
+        status, output = user('kavat-conf set shell prompt full; kavat-conf set shell listing ls; kavat-conf set shell history_lines 10000; '
+                              'zsh -i -c "echo \$HISTSIZE \$STARSHIP_CONFIG; alias ls" 2> /dev/null; echo "alias hey=\\"echo there\\"" > ~/.config/kavat/aliases.zsh; '
+                              'kavat-conf set shell prompt short; kavat-conf set shell listing lsd; kavat-conf set shell history_lines 50000; '
+                              'zsh -i -c "echo \$HISTSIZE \$STARSHIP_CONFIG; hey" 2> /dev/null; xdg-mime query default image/png; xdg-mime query default application/pdf')
+        checks.report(output.split('\n') == ['10000 /usr/share/kavat/starship-full.toml', "ls='ls --color=auto'", '50000 /usr/share/kavat/starship.toml', 'there',
+                                              'imv.desktop', 'org.pwmt.zathura.desktop'],
+                      "the Shell page's settings are worn by the next terminal, your aliases are read, and an image and a PDF open in their viewers", output)
+        status, output = user('kavat-theme profile save plain > /dev/null; kavat-theme set palette nord accent default > /dev/null; kavat-theme profile save cold > /dev/null; '
+                              'kavat-theme profile plain > /dev/null; printf "[[rule]]\nprofile = \\"cold\\"\ndisplay = \\"qemu\\"\n\n[[rule]]\nprofile = \\"plain\\"\n" > ~/.config/kavat/theme-rules.toml; '
+                              '/usr/lib/kavat/theme-rules show | cut -f1; /usr/lib/kavat/theme-rules; kavat-theme get palette; '
+                              'kavat-theme set palette gruvbox accent default > /dev/null; /usr/lib/kavat/theme-rules; kavat-theme get palette; '
+                              'rm ~/.config/kavat/theme-rules.toml; kavat-theme profile plain > /dev/null; systemctl --user is-active kavat-theme-rules.timer; '
+                              'kavat-theme set terminal.palette nord > /dev/null; grep -c -i "242933" ~/.local/state/kavat/theme/current/kitty/theme.conf; '
+                              'grep -c -i "f2a93b" ~/.local/state/kavat/theme/current/gtk/gtk-4.0.css; kavat-theme set terminal.palette system > /dev/null; '
+                              'kavat-theme set auto.sun true auto.latitude 40.4 auto.longitude -3.7 auto.follow true > /dev/null; /usr/lib/kavat/theme-auto; '
+                              'systemctl --user is-active kavat-theme-auto.timer; kavat-theme set auto.follow false auto.sun false mode dark > /dev/null; /usr/lib/kavat/theme-auto', 90)
+        lines = output.split('\n')
+        checks.report(len(lines) == 8 and lines[0] == '* cold' and lines[1].strip() == 'plain' and lines[2] == 'nord' and lines[3] == 'gruvbox'
+                      and lines[4] == 'active' and lines[5] != '0' and lines[6] != '0' and lines[7] == 'active',
+                      'a rule wears a profile when it starts to hold and leaves a change made by hand alone; the terminal can wear a palette of its own; the mode can follow the sun', output)
+
+        for page in ('wallpaper', 'displays', 'projects', 'privacy', 'gpu', 'shell'):
             user(f'kavat-shell msg panel-open kavat/settings:panel {page} > /dev/null')
             time.sleep(3)
             machine.screen.picture(f'{pictures}/desktop-{page}.png')

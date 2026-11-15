@@ -2,7 +2,7 @@
 id          = "kavat/settings"
 name        = "Kavat settings"
 version     = "0.1.0"
-plugin_api  = 43
+plugin_api  = 44
 author      = "kavat"
 license     = "LicenseRef-AllRightsReserved"
 icon        = "settings"
