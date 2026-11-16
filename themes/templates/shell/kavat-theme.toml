@@ -49,10 +49,18 @@ enabled  = true
 enabled = {{ animations }}
 speed   = {{ animation_speed }}
 
+# Until the background's picture is read, and around one that does not fill the screen, the
+# colour of the theme shows.
+[wallpaper]
+fill_color = "surface"
+
 # The system's mode has its switch on the bar. The bar is yours to arrange in the shell's
 # settings, which have the last word over this.
 [bar.default]
-start = ["launcher", "wallpaper", "workspaces", "kavat/modes:mode"]
+start = ["launcher", "workspaces", "kavat/modes:mode"]
+# The background is chosen on the Wallpaper page of the settings, and the control center
+# opens from the widgets of the network, Bluetooth and the volume: neither has a button of
+# its own here.
 # with the shell's own widgets: a mark when an app uses the microphone, the camera or the
 # screen, which of the two keyboards is in use, and how many notes are due
-end   = ["media", "privacy", "tray", "kavat/notes:due", "notifications", "clipboard", "keyboard-layout", "network", "bluetooth", "volume", "brightness", "battery", "control-center", "session"]
+end   = ["media", "privacy", "tray", "kavat/notes:due", "notifications", "clipboard", "keyboard_layout", "network", "bluetooth", "volume", "brightness", "battery", "session"]
