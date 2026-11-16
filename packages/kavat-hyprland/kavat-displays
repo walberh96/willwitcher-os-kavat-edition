@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 """kavat-displays: arrange the displays, and keep one arrangement for each set of them.
 
-usage: kavat-displays                          each display: its name, what it is, and how it is set
+usage: kavat-displays                          each display: its name, what it is, how it is set, and its workspaces
        kavat-displays modes <display>          the sizes and rates a display can show
        kavat-displays set <display> <setting>=<value>...
                                                mode=2560x1440@144  scale=1.25  rotate=0|90|180|270
                                                at=0x0, or at=right-of:<display>, left-of:, above:, below:
        kavat-displays place <display> <x> <y>  put a display near there, as dragging it does: it ends
                                                against the nearest edge of another, over none of them
+       kavat-displays workspaces <display> <numbers>
+                                               the workspaces that open on a display, from 1 to 10, as 1,2,3; `none`
+                                               leaves the display with the ones nobody else has
        kavat-displays keep                     keep the arrangement in view: without it, a change is undone in 10 seconds
        kavat-displays undo                     go back to the arrangement from before the last change
        kavat-displays restore                  at the start of a session: wear the arrangement kept for the displays connected
@@ -16,7 +19,8 @@ The arrangements live in ~/.config/hypr/monitors.lua, a table Hyprland's configu
 reads: one arrangement for each set of displays, the set known by what the displays are,
 their make, model and serial number, and not by the socket they are plugged into. A change
 is tried first: it is written, Hyprland reads its configuration again, and unless
-`kavat-displays keep` comes within ten seconds the file from before is put back.
+`kavat-displays keep` comes within ten seconds the file from before is put back. The
+workspaces of a display are not tried: they cannot leave a display black, so they stay.
 """
 import json
 import os
@@ -96,7 +100,7 @@ def write_file(kept):
         lines.append(f'    [{quoted(name)}] = {{')
         for rule in rules:
             lines.append('      { ' + ', '.join(f'{key} = {quoted(rule[key]) if isinstance(rule[key], str) else rule[key]}'
-                                                for key in ('output', 'mode', 'position', 'scale', 'transform') if key in rule) + ' },')
+                                                for key in ('output', 'mode', 'position', 'scale', 'transform', 'workspaces') if key in rule) + ' },')
         lines.append('    },')
     lines += ['  },', '}']
     os.makedirs(os.path.dirname(FILE), exist_ok=True)
@@ -162,14 +166,28 @@ def reload():
     hyprctl('reload')
 
 
+def numbers(rule):
+    """The workspaces a rule gives its display, in order."""
+    return [int(number) for number in re.findall(r'\d+', str(rule.get('workspaces', '')))]
+
+
+def current_rules(kept, found):
+    """The set of displays connected, as the file has it, or as the displays are now."""
+    rules = {rule['output']: rule for rule in kept['sets'].get(set_of(found), [])}
+    return {display['name']: dict(rules.get(rule_of(display)['output'], rule_of(display))) for display in found}
+
+
 def main():
     arguments = sys.argv[1:]
     found = [display for display in displays() if not display.get('disabled')]
     by_name = {display['name']: display for display in found}
     if not arguments:
+        kept_now = read_file()
         for display in found:
             rule = rule_of(display)
-            print(f'{display["name"]}\t{what(display)}\t{rule["mode"]}\t{rule["position"]}\t{rule["scale"]}\t{rule["transform"] * 90}')
+            own = current_rules(kept_now, found)[display['name']]
+            print(f'{display["name"]}\t{what(display)}\t{rule["mode"]}\t{rule["position"]}\t{rule["scale"]}\t{rule["transform"] * 90}'
+                  f'\t{",".join(str(number) for number in numbers(own)) or "-"}')
     elif arguments[0] == 'modes' and len(arguments) == 2 and arguments[1] in by_name:
         seen = dict.fromkeys(mode.replace('Hz', '') for mode in by_name[arguments[1]].get('availableModes', []))
         print('\n'.join(seen))
@@ -179,9 +197,7 @@ def main():
         kept = read_file()
         name = set_of(found)
         # the set as it is now, with what the file already says of it
-        rules = {rule['output']: rule for rule in kept['sets'].get(name, [])}
-        current = {display['name']: rules.get(rule_of(display)['output'], rule_of(display)) for display in found}
-        current = {name: dict(rule) for name, rule in current.items()}
+        current = current_rules(kept, found)
         rule = current[arguments[1]]
         if arguments[0] == 'place':
             settle(current, arguments[1], int(arguments[2]), int(arguments[3]))
@@ -223,6 +239,30 @@ def main():
         subprocess.Popen(['sh', '-c', f'sleep {SECONDS}; [ "$(cat "$1.stamp" 2> /dev/null)" = "$2" ] && exec "$0" undo', sys.argv[0], PENDING, stamp],
                          start_new_session=True, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         print(f'kavat-displays: `kavat-displays keep` within {SECONDS} seconds keeps it.')
+    elif arguments[0] == 'workspaces' and len(arguments) == 3 and arguments[1] in by_name \
+            and (arguments[2] == 'none' or re.fullmatch(r'\d+(,\d+)*', arguments[2])):
+        wanted = [] if arguments[2] == 'none' else sorted({int(number) for number in arguments[2].split(',')})
+        if any(not 1 <= number <= 10 for number in wanted):
+            sys.exit('kavat-displays: the workspaces go from 1 to 10')
+        kept = read_file()
+        name = set_of(found)
+        current = current_rules(kept, found)
+        for display, rule in current.items():
+            # a workspace is on one display: what this one takes, the others give up
+            mine = wanted if display == arguments[1] else [number for number in numbers(rule) if number not in wanted]
+            if mine:
+                rule['workspaces'] = ' '.join(str(number) for number in mine)
+            else:
+                rule.pop('workspaces', None)
+        kept['sets'][name] = list(current.values())
+        kept['active'] = name
+        write_file(kept)
+        # a change of display being tried goes on being tried, with this in it
+        reload()
+        # the workspaces that are open move to their display now; the rest open there
+        for display, rule in current.items():
+            for number in numbers(rule):
+                hyprctl('dispatch', f'hl.dsp.workspace.move({{ workspace = {number}, monitor = "{display}" }})')
     elif arguments == ['keep']:
         for path in (PENDING, PENDING + '.stamp'):
             try:

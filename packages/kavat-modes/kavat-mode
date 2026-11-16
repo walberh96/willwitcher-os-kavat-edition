@@ -117,8 +117,12 @@ def enter(word, mode):
     if mode.get('vpn'):
         name = load(SETTINGS, {}).get('vpn')
         if not name or name not in vpns():
-            sys.exit(f'kavat-mode: {mode.get("name", word)} needs a VPN, and none is chosen: `kavat-mode vpn <name>`, '
-                     'from the ones `kavat-mode vpns` lists, or the Modes page of the settings.')
+            if not vpns():
+                sys.exit(f'kavat-mode: {mode.get("name", word)} sends everything through a VPN, and this machine has none yet. '
+                         'Add your provider\'s WireGuard or OpenVPN file on the Network page of the settings, '
+                         'or with `kavat-network vpn add <file>`: Proton VPN, Mullvad and the others give that file on their site.')
+            sys.exit(f'kavat-mode: {mode.get("name", word)} sends everything through a VPN, and none is chosen for it: '
+                     'choose one on the Network page of the settings, or with `kavat-mode vpn <name>`.')
         was_up = name in (run('nmcli', '-t', '-f', 'NAME', 'connection', 'show', '--active') or '').splitlines()
         if not was_up and run('nmcli', 'connection', 'up', 'id', name, timeout=45) is None:
             sys.exit(f'kavat-mode: the VPN {name} did not come up, so the mode is not entered.')
@@ -321,5 +325,26 @@ def main():
         sys.exit(__doc__)
 
 
+def told(why):
+    """A mode asked for from the bar, a shortcut or the launcher was not entered: there is no
+    terminal to say why in, so a notification says it, and when it is a VPN that is
+    missing, the page where one is added opens."""
+    why = why.removeprefix('kavat-mode: ')
+    for command in (['notify-send', '-a', 'Kavat', '-u', 'critical', '-t', '15000', 'The mode was not entered', why],
+                    ['kavat-shell', 'msg', 'panel-open', 'kavat/settings:panel', 'network'] if 'VPN' in why else None):
+        if command:
+            try:
+                subprocess.run(command, capture_output=True, timeout=10, check=False)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+
+
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except SystemExit as stop:
+        asked = sys.argv[1:]
+        if isinstance(stop.code, str) and len(asked) == 1 and asked[0] not in ('help', 'show', 'list', 'vpn', 'vpns', 'auto', 'restore', 'watch') \
+                and not asked[0].startswith('-') and not sys.stderr.isatty():
+            told(stop.code)
+        raise

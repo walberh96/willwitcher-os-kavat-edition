@@ -22,6 +22,12 @@ do
         for _, display in ipairs(kept.sets[kept.active] or {}) do
             hl.monitor({ output = display.output, mode = display.mode, position = display.position,
                          scale = display.scale, transform = display.transform })
+            -- the workspaces that open on this display; the first of them is the one it starts on
+            local first = true
+            for number in tostring(display.workspaces or ""):gmatch("%d+") do
+                hl.workspace_rule({ workspace = number, monitor = display.output, default = first })
+                first = false
+            end
         end
     end
 end
@@ -38,6 +44,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("kavat-wallpaper restore")
     -- the arrangement kept for the displays that are connected now
     hl.exec_cmd("kavat-displays restore")
+    -- Wi-Fi and Bluetooth are turned off for who set them not to be on at startup
+    hl.exec_cmd("kavat-network startup")
     -- light by day and dark by night, for who asked for it
     hl.exec_cmd("/usr/lib/kavat/theme-auto")
     hl.exec_cmd("kavat-icons-apply")

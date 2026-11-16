@@ -125,9 +125,11 @@ def main():
         until('Super+Shift+M goes to the next mode', 'kavat-mode', 'gamer')
         machine.screen.click(*INCOGNITO)
         time.sleep(4)
-        status, output = user('kavat-mode; kavat-mode incognito 2>&1 | head -n 1')
-        checks.report(output.startswith('coder\n') and 'needs a VPN' in output,
-                      'without a VPN chosen Incognito is not entered, and the machine is left in Coder', output)
+        status, output = user('kavat-mode; kavat-mode incognito 2>&1 | head -n 1; sleep 1; '
+                              'grep -c "opened \\"kavat/settings:panel\\"" ~/.cache/kavat-shell/kavat-shell.log; kavat-shell msg panel-close > /dev/null')
+        lines = output.split('\n')
+        checks.report(len(lines) == 3 and lines[0] == 'coder' and 'this machine has none yet' in lines[1] and 'kavat-network vpn add' in lines[1] and lines[2] != '0',
+                      'without a VPN Incognito is not entered: it says how one is added, opens the Network page, and the machine is left in Coder', output)
         status, output = machine.run(VPN)
         status, output = user('kavat-mode vpns; kavat-mode vpn elsewhere 2>&1 | head -n 1; kavat-mode vpn nowhere; kavat-mode vpn')
         checks.report(output.split('\n')[0] == 'nowhere' and 'has no VPN called elsewhere' in output and output.endswith('nowhere'),

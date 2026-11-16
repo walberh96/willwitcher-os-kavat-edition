@@ -1,7 +1,7 @@
 # The system's modes: Coder, Gamer and Incognito, switched from the bar.
 pkgname=kavat-modes
 pkgver=0.1.0
-pkgrel=6
+pkgrel=7
 pkgdesc="Willwitcher-OS Kavat Edition: the modes of the system, and their switch on the bar"
 arch=('any')
 url="https://github.com/walberh96/willwitcher-os-kavat-edition"
