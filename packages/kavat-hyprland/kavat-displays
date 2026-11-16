@@ -14,6 +14,11 @@ usage: kavat-displays                          each display: its name, what it i
        kavat-displays keep                     keep the arrangement in view: without it, a change is undone in 10 seconds
        kavat-displays undo                     go back to the arrangement from before the last change
        kavat-displays restore                  at the start of a session: wear the arrangement kept for the displays connected
+       kavat-displays night                    the night light: off, on or auto; its warmth; and the hours it is on by itself
+       kavat-displays night off|on|auto        auto turns it on between its two hours
+       kavat-displays night warmth <2500-6500> the colour's temperature while it is on: lower is warmer
+       kavat-displays night hours <HH:MM> <HH:MM>
+                                               from when to when auto has it on
 
 The arrangements live in ~/.config/hypr/monitors.lua, a table Hyprland's configuration
 reads: one arrangement for each set of displays, the set known by what the displays are,
@@ -21,6 +26,8 @@ their make, model and serial number, and not by the socket they are plugged into
 is tried first: it is written, Hyprland reads its configuration again, and unless
 `kavat-displays keep` comes within ten seconds the file from before is put back. The
 workspaces of a display are not tried: they cannot leave a display black, so they stay.
+The night light is hyprsunset, which this starts and stops as a service of the session; what
+is set is in ~/.config/kavat/night.json, and the file hyprsunset reads is written from it.
 """
 import json
 import os
@@ -177,6 +184,44 @@ def current_rules(kept, found):
     return {display['name']: dict(rules.get(rule_of(display)['output'], rule_of(display))) for display in found}
 
 
+# ---- the night light
+
+NIGHT = f'{CONFIG}/kavat/night.json'
+SUNSET = f'{CONFIG}/hypr/hyprsunset.conf'
+
+
+def night():
+    kept = {'state': 'off', 'warmth': 4000, 'from': '20:00', 'to': '07:00'}
+    try:
+        with open(NIGHT, encoding='utf-8') as file:
+            kept.update({key: value for key, value in json.load(file).items() if key in kept})
+    except (OSError, ValueError, AttributeError):
+        pass
+    return kept
+
+
+def night_wear(kept, save=True):
+    if save:
+        os.makedirs(os.path.dirname(NIGHT), exist_ok=True)
+        with open(NIGHT + '.new', 'w', encoding='utf-8') as file:
+            json.dump(kept, file, indent=2)
+            file.write('\n')
+        os.replace(NIGHT + '.new', NIGHT)
+    if kept['state'] == 'off':
+        subprocess.run(['systemctl', '--user', 'stop', 'hyprsunset.service'], capture_output=True, check=False)
+        return
+    warm = f'profile {{\n    time = %s\n    temperature = {kept["warmth"]}\n}}\n'
+    plain = 'profile {\n    time = %s\n    identity = true\n}\n'
+    text = '# Written by kavat-displays night: what is set is in ~/.config/kavat/night.json\n\n'
+    text += warm % '0:00' if kept['state'] == 'on' else plain % kept['to'] + '\n' + warm % kept['from']
+    os.makedirs(os.path.dirname(SUNSET), exist_ok=True)
+    with open(SUNSET, 'w', encoding='utf-8') as file:
+        file.write(text)
+    done = subprocess.run(['systemctl', '--user', 'restart', 'hyprsunset.service'], capture_output=True, text=True, check=False)
+    if done.returncode != 0:
+        sys.exit('kavat-displays: the night light could not be started: ' + (done.stderr.strip().splitlines() or ['hyprsunset is missing'])[-1])
+
+
 def main():
     arguments = sys.argv[1:]
     found = [display for display in displays() if not display.get('disabled')]
@@ -283,6 +328,18 @@ def main():
                 except OSError:
                     pass
             reload()
+    elif arguments == ['night']:
+        kept = night()
+        print('\t'.join((kept['state'], str(kept['warmth']), kept['from'], kept['to'])))
+    elif arguments[0] == 'night' and arguments[1:] in (['off'], ['on'], ['auto']):
+        night_wear({**night(), 'state': arguments[1]})
+    elif arguments[:2] == ['night', 'warmth'] and len(arguments) == 3 and arguments[2].isdigit() and 2500 <= int(arguments[2]) <= 6500:
+        night_wear({**night(), 'warmth': int(arguments[2])})
+    elif arguments[:2] == ['night', 'hours'] and len(arguments) == 4 and all(re.fullmatch(r'([01]\d|2[0-3]):[0-5]\d', hour) for hour in arguments[2:]) \
+            and arguments[2] != arguments[3]:
+        night_wear({**night(), 'from': arguments[2], 'to': arguments[3]})
+    elif arguments == ['night', 'restore']:
+        night_wear(night(), save=False)
     elif arguments == ['restore']:
         kept = read_file()
         name = set_of(found)

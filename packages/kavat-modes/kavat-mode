@@ -20,6 +20,7 @@ notifications go back to what they were, the VPN it brought up comes down.
 import glob
 import json
 import os
+import shutil
 import subprocess
 import sys
 import time
@@ -111,27 +112,65 @@ def vpns():
             if line.rsplit(':', 1)[-1] in ('vpn', 'wireguard')]
 
 
+# Proton VPN's own app makes its connections itself, under names of its own, so it is
+# chosen by this word and not by a connection's name
+PROTON = 'proton'
+
+
+def choices():
+    """What Incognito can be given: the VPNs NetworkManager keeps and, when it is installed, Proton's own."""
+    return vpns() + ([PROTON] if shutil.which('protonvpn') else [])
+
+
+def active_vpns():
+    lines = run('nmcli', '-t', '-f', 'NAME,TYPE', 'connection', 'show', '--active') or ''
+    return [line.rsplit(':', 1)[0].replace('\\:', ':') for line in lines.splitlines()
+            if line.rsplit(':', 1)[-1] in ('vpn', 'wireguard')]
+
+
+def proton_up(mode_name):
+    """Proton VPN connected, by its own command: the connection it made, and whether it was up already."""
+    if not shutil.which('protonvpn'):
+        sys.exit(f'kavat-mode: {mode_name} is set to use Proton VPN, which is not installed: `kav install proton-vpn-gtk-app proton-vpn-cli`.')
+    before = active_vpns()
+    if before:
+        return before[0], True
+    if run('protonvpn', 'connect', timeout=90) is None:
+        sys.exit('kavat-mode: Proton VPN did not connect, so the mode is not entered. Sign in first, in its app or with `protonvpn signin <your name>`.')
+    for _ in range(20):
+        now = active_vpns()
+        if now:
+            return now[0], False
+        time.sleep(0.5)
+    run('protonvpn', 'disconnect', timeout=30)
+    sys.exit('kavat-mode: Proton VPN said it connected, but NetworkManager shows no VPN, so the mode is not entered.')
+
+
 def enter(word, mode):
     """Do what a mode asks for, and give back what has to be undone on leaving it."""
     undo = {}
     if mode.get('vpn'):
         name = load(SETTINGS, {}).get('vpn')
-        if not name or name not in vpns():
+        proton = name == PROTON
+        if proton:
+            name, was_up = proton_up(mode.get('name', word))
+        elif not name or name not in vpns():
             if not vpns():
                 sys.exit(f'kavat-mode: {mode.get("name", word)} sends everything through a VPN, and this machine has none yet. '
                          'Add your provider\'s WireGuard or OpenVPN file on the Network page of the settings, '
                          'or with `kavat-network vpn add <file>`: Proton VPN, Mullvad and the others give that file on their site.')
             sys.exit(f'kavat-mode: {mode.get("name", word)} sends everything through a VPN, and none is chosen for it: '
                      'choose one on the Network page of the settings, or with `kavat-mode vpn <name>`.')
-        was_up = name in (run('nmcli', '-t', '-f', 'NAME', 'connection', 'show', '--active') or '').splitlines()
-        if not was_up and run('nmcli', 'connection', 'up', 'id', name, timeout=45) is None:
-            sys.exit(f'kavat-mode: the VPN {name} did not come up, so the mode is not entered.')
+        if not proton:
+            was_up = name in (run('nmcli', '-t', '-f', 'NAME', 'connection', 'show', '--active') or '').splitlines()
+            if not was_up and run('nmcli', 'connection', 'up', 'id', name, timeout=45) is None:
+                sys.exit(f'kavat-mode: the VPN {name} did not come up, so the mode is not entered.')
         # nothing goes out from here on but through the VPN, also when it drops
         if run(*ROOT, 'guard', name) is None:
             if not was_up:
-                run('nmcli', 'connection', 'down', 'id', name)
+                run('protonvpn', 'disconnect', timeout=30) if proton else run('nmcli', 'connection', 'down', 'id', name)
             sys.exit('kavat-mode: the guard that lets nothing out but through the VPN could not be put up, so the mode is not entered.')
-        undo['vpn'] = {'name': name, 'bring_down': not was_up}
+        undo['vpn'] = {'name': name, 'bring_down': not was_up, 'proton': proton}
     if mode.get('power'):
         before = run('powerprofilesctl', 'get')
         if before and before != mode['power'] and run('powerprofilesctl', 'set', mode['power']) is not None:
@@ -163,10 +202,16 @@ def enter(word, mode):
     if mode.get('history') is False:
         open(NO_HISTORY, 'w').close()
         undo['history'] = True
+        # the files opened in the mode are not added to the list of recent ones that apps keep
+        recent = run('gsettings', 'get', 'org.gnome.desktop.privacy', 'remember-recent-files')
+        if recent == 'true' and run('gsettings', 'set', 'org.gnome.desktop.privacy', 'remember-recent-files', 'false') is not None:
+            undo['recent'] = True
     return undo
 
 
 def leave(undo):
+    if undo.get('recent'):
+        run('gsettings', 'set', 'org.gnome.desktop.privacy', 'remember-recent-files', 'true')
     if undo.get('history'):
         try:
             os.remove(NO_HISTORY)
@@ -193,7 +238,10 @@ def leave(undo):
     if undo.get('vpn'):
         run(*ROOT, 'unguard')
         if undo['vpn'].get('bring_down'):
-            run('nmcli', 'connection', 'down', 'id', undo['vpn']['name'])
+            if undo['vpn'].get('proton'):
+                run('protonvpn', 'disconnect', timeout=30)
+            else:
+                run('nmcli', 'connection', 'down', 'id', undo['vpn']['name'])
 
 
 def change(word, quiet=False):
@@ -239,7 +287,7 @@ def describe(word, mode):
     if mode.get('hide_browser'):
         lines.append('The browser opens private windows; the ones that were open are hidden until you leave')
     if mode.get('history') is False:
-        lines.append('The terminal keeps no history; the clipboard is emptied on leaving')
+        lines.append('The terminal keeps no history and apps no list of recent files; the clipboard is emptied on leaving')
     if len(lines) == 1 and word == 'coder':
         lines.append('Everything running')
     return lines
@@ -288,7 +336,7 @@ def main():
         words = list(modes())
         change(words[(words.index(state['mode']) + 1) % len(words)] if state['mode'] in words else 'coder')
     elif arguments == ['vpns']:
-        print('\n'.join(vpns()))
+        print('\n'.join(choices()))
     elif arguments[0] == 'vpn' and len(arguments) <= 2:
         settings = load(SETTINGS, {})
         if len(arguments) == 1:
@@ -296,9 +344,11 @@ def main():
         elif arguments[1] == 'none':
             settings.pop('vpn', None)
             save(SETTINGS, settings)
-        elif arguments[1] in vpns():
+        elif arguments[1] in choices():
             settings['vpn'] = arguments[1]
             save(SETTINGS, settings)
+        elif arguments[1] == PROTON:
+            sys.exit('kavat-mode: Proton VPN is not installed: `kav install proton-vpn-gtk-app proton-vpn-cli`.')
         else:
             sys.exit(f'kavat-mode: NetworkManager has no VPN called {arguments[1]}; it has: ' + (', '.join(vpns()) or 'none'))
     elif arguments[0] == 'auto' and len(arguments) <= 2:

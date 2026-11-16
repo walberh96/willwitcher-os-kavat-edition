@@ -7,5 +7,5 @@ vpn = true
 # true: the browser's windows that are open are put out of sight until the mode is left;
 # the windows it opens while in the mode are private ones, which is the browser's own doing
 hide_browser = true
-# false: the terminal keeps no history, and the clipboard is emptied on leaving
+# false: the terminal keeps no history, apps keep no list of recent files, and the clipboard is emptied on leaving
 history = false

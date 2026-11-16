@@ -1,7 +1,7 @@
 # The desktop's background: an image, or a video played by mpvpaper, and a palette made from it.
 pkgname=kavat-wallpaper
 pkgver=0.1.0
-pkgrel=1
+pkgrel=3
 pkgdesc="Willwitcher-OS Kavat Edition: the desktop's background, image or video, and the theme's colours from it"
 arch=('any')
 url="https://github.com/walberh96/willwitcher-os-kavat-edition"

@@ -1,9 +1,12 @@
 -- The system's mode on the bar: one button for each mode, the one in force in the accent.
 -- A press changes the mode; a press with the right button opens the Modes page. kavat-mode
 -- is asked what there is and what is in force, and tells this widget when that changes.
+-- While a VPN is up its name stands beside the modes, so that it is seen at a glance that
+-- what leaves the machine goes through it.
 
 local modes = {}      -- each: word, name, on
 local changing = nil  -- the word of the mode being entered, while it is
+local vpn = ""        -- the VPN that is up, when one is
 
 local function draw()
   local buttons = {}
@@ -19,6 +22,12 @@ local function draw()
         end
       end }, {
       ui.label({ text = mode.name, fontSize = 11, fontWeight = on and "bold" or "normal", color = on and "on_primary" or "on_surface_variant" }),
+    })
+  end
+  if vpn ~= "" then
+    buttons[#buttons + 1] = ui.row({ key = "vpn", align = "center", gap = 4, paddingH = 9, minHeight = 20, radius = 10,
+      onClick = function() noctalia.runAsync("kavat-shell msg panel-open kavat/settings:panel network") end }, {
+      ui.label({ text = barWidget.isVertical() and "VPN" or ("VPN · " .. vpn), fontSize = 11, fontWeight = "bold", color = "primary", maxWidth = 160 }),
     })
   end
   local container = barWidget.isVertical() and ui.column or ui.row
@@ -37,11 +46,19 @@ function read()
     modes = found
     draw()
   end)
+  -- the first VPN that is up, by its name in NetworkManager
+  noctalia.runAsync("nmcli -t -f TYPE,NAME connection show --active 2>/dev/null | grep -m 1 -E '^(vpn|wireguard):' | cut -d: -f2-", function(result)
+    local name = (result.stdout or ""):gsub("%s+$", "")
+    if name ~= vpn then
+      vpn = name
+      draw()
+    end
+  end)
 end
 
 function update() read() end
 function onIpc() read() end
 function onRightClick() noctalia.runAsync("kavat-shell msg panel-open kavat/settings:panel modes") end
 
-noctalia.setUpdateInterval(15000)
+noctalia.setUpdateInterval(5000)
 read()

@@ -3,14 +3,20 @@
 
 usage: kavat-wallpaper                  what the background is: theme, image or video, and its file
        kavat-wallpaper set <file>       an image (PNG, JPG, WebP, SVG) or a video (MP4, WebM, MKV, GIF)
+       kavat-wallpaper set <file> <display>   an image on one display only, the others keeping theirs
+       kavat-wallpaper same <display>   that display shows what the others show again
+       kavat-wallpaper displays         each display and the image of its own, or - when it has none
        kavat-wallpaper theme            back to the theme's own picture
        kavat-wallpaper list             the library: each file of ~/Pictures/Wallpapers, what it is, and a picture of it
        kavat-wallpaper add <file>       copy a file into the library
        kavat-wallpaper pause|resume     stop the video where it is, and let it go on
        kavat-wallpaper playing          whether a video is playing, paused, or there is none
-       kavat-wallpaper option [<name> <value>]   the video's settings: sound, fit, gpu
+       kavat-wallpaper option [<name> <value>]   the video's settings: sound, fit, gpu; and slideshow: off, or the
+                                        minutes after which the next image of the library is shown
+       kavat-wallpaper next             the next image of the library, in the order of their names
        kavat-wallpaper palette          make a palette from the background and wear it
-       kavat-wallpaper restore          at the start of a session: put the video back
+       kavat-wallpaper restore          at the start of a session: put the video back, and make the palette
+                                        the installer was asked to take from the background
 
 An image is drawn by the shell. A video is played by mpvpaper, over a still frame of it that
 the shell draws: that frame is what shows while the video is stopped, and what the palette
@@ -37,7 +43,8 @@ LIBRARY = {'image': f'{HOME}/Pictures/Wallpapers/images', 'video': f'{HOME}/Pict
 KINDS = {'image': ('.png', '.jpg', '.jpeg', '.webp', '.svg'), 'video': ('.mp4', '.webm', '.mkv', '.gif', '.mov')}
 SOCKET = f'{RUNTIME}/kavat-wallpaper.sock'
 UNIT = 'kavat-wallpaper-video'
-OPTIONS = {'sound': ('off', 'on'), 'fit': ('fill', 'fit', 'stretch'), 'gpu': ('on', 'off')}
+SLIDES = 'kavat-wallpaper-slideshow'
+OPTIONS = {'sound': ('off', 'on'), 'fit': ('fill', 'fit', 'stretch'), 'gpu': ('on', 'off'), 'slideshow': ('off', '5', '15', '30', '60')}
 
 
 def settings():
@@ -130,6 +137,72 @@ def tell_player(*command):
         return None
 
 
+def slideshow(now):
+    """A timer of the session that shows the next image every so many minutes, or none."""
+    run('systemctl', '--user', 'stop', f'{SLIDES}.timer')
+    run('systemctl', '--user', 'reset-failed', f'{SLIDES}.service')
+    minutes = now.get('slideshow', 'off')
+    if minutes != 'off':
+        run('systemd-run', '--user', '--quiet', '--collect', '--unit', SLIDES, '--description', 'The next background',
+            f'--on-active={minutes}m', f'--on-unit-active={minutes}m', 'kavat-wallpaper', 'next')
+
+
+def next_image():
+    folder = LIBRARY['image']
+    try:
+        images = [f'{folder}/{name}' for name in sorted(os.listdir(folder)) if kind_of(name) == 'image']
+    except OSError:
+        images = []
+    if not images:
+        sys.exit('kavat-wallpaper: there is no image in ' + folder)
+    current = settings().get('file')
+    set_to(images[(images.index(current) + 1) % len(images)] if current in images else images[0])
+
+
+def display_names():
+    # asked as the session does, and then by number: a command run from outside it has no session of its own
+    for instance in ([], ['--instance', '0']):
+        try:
+            return [monitor['name'] for monitor in json.loads(run('hyprctl', *instance, 'monitors', '-j') or '')]
+        except (ValueError, KeyError, TypeError):
+            continue
+    return []
+
+
+def set_on(path, display):
+    """An image of its own for one display. A video is one for them all, and covers this."""
+    path = os.path.abspath(os.path.expanduser(path))
+    if not os.path.isfile(path) or kind_of(path) != 'image':
+        sys.exit(f'kavat-wallpaper: {path} is not an image; a video plays on every display')
+    if display not in display_names():
+        sys.exit(f'kavat-wallpaper: there is no display called {display}')
+    now = settings()
+    if now.get('kind') == 'video':
+        sys.exit('kavat-wallpaper: a video is playing on every display; set an image or the theme first')
+    if run('kavat-shell', 'msg', 'wallpaper-set', display, path, timeout=5) is None:
+        sys.exit('kavat-wallpaper: the shell did not take the image')
+    now.setdefault('displays', {})[display] = path
+    save(now)
+
+
+def same_on(display):
+    now = settings()
+    if now.get('displays', {}).pop(display, None) is None:
+        return
+    save(now)
+    picture = now['file'] if now.get('kind') == 'image' and os.path.exists(now.get('file', '')) else theme_picture()
+    if picture:
+        run('kavat-shell', 'msg', 'wallpaper-set', display, picture, timeout=5)
+
+
+def displays_again():
+    """Put back the images of the displays that have one of their own, after all were given the same."""
+    names = display_names()
+    for display, path in settings().get('displays', {}).items():
+        if display in names and os.path.isfile(path):
+            run('kavat-shell', 'msg', 'wallpaper-set', display, path, timeout=5)
+
+
 def set_to(path):
     path = os.path.abspath(os.path.expanduser(path))
     kind = kind_of(path)
@@ -149,6 +222,7 @@ def set_to(path):
         stop_video()
         shell_shows(path)
     now.update(kind=kind, file=path)
+    now.pop('displays', None)
     save(now)
     follow()
 
@@ -158,6 +232,7 @@ def to_theme():
     now = settings()
     now.pop('kind', None)
     now.pop('file', None)
+    now.pop('displays', None)
     save(now)
     picture = theme_picture()
     if picture:
@@ -261,6 +336,23 @@ def wear_palette():
     return subprocess.run(['kavat-theme', 'set', 'palette', 'wallpaper', 'accent', first], check=False).returncode
 
 
+def first_palette(now):
+    """The installer's "From wallpaper": the palette is made at the first session, once.
+
+    The installer cannot make it: there is no background until somebody logs in. It leaves
+    the wish in the settings every new user starts with, and it is granted here. When the
+    palette cannot be made, the wish stays for the next session."""
+    if now.get('colours') != 'background':
+        return
+    try:
+        made = wear_palette() == 0
+    except SystemExit:
+        made = False
+    if made:
+        del now['colours']
+        save(now)
+
+
 def follow():
     """With the theme taking its colours from the background, a new background is new colours."""
     if run('kavat-theme', 'get', 'palette') == 'wallpaper':
@@ -274,6 +366,16 @@ def main():
         print(now.get('kind', 'theme'), now.get('file', theme_picture() or ''))
     elif arguments[0] == 'set' and len(arguments) == 2:
         set_to(arguments[1])
+    elif arguments[0] == 'set' and len(arguments) == 3:
+        set_on(arguments[1], arguments[2])
+    elif arguments[0] == 'same' and len(arguments) == 2:
+        same_on(arguments[1])
+    elif arguments == ['displays']:
+        own = now.get('displays', {})
+        for name in display_names():
+            print(f'{name}\t{own.get(name, "-")}')
+    elif arguments == ['displays', 'again']:
+        displays_again()
     elif arguments == ['theme']:
         to_theme()
     elif arguments == ['list']:
@@ -308,11 +410,18 @@ def main():
             sys.exit('kavat-wallpaper: the options are ' + '; '.join(f'{name}: {", ".join(values)}' for name, values in OPTIONS.items()))
         now[name] = value
         save(now)
+        if name == 'slideshow':
+            slideshow(now)
+            return
         if now.get('kind') == 'video' and os.path.exists(now.get('file', '')):
             play(now['file'], now)
     elif arguments == ['palette']:
         sys.exit(wear_palette())
+    elif arguments == ['next']:
+        next_image()
     elif arguments == ['restore']:
+        first_palette(now)
+        slideshow(now)
         if now.get('kind') == 'video' and os.path.exists(now.get('file', '')):
             still = still_of(now['file'])
             if still:

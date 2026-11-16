@@ -33,6 +33,11 @@ do
 end
 
 -- The shell: bar, launcher, notifications and wallpaper
+-- A display plugged in or taken out during a session: the arrangement kept for the
+-- displays there are now is worn, as it is at the start.
+hl.on("monitor.added", function() hl.exec_cmd("kavat-displays restore") end)
+hl.on("monitor.removed", function() hl.exec_cmd("kavat-displays restore") end)
+
 hl.on("hyprland.start", function()
     hl.exec_cmd("kavat-shell --daemon")
     -- The cursor and the icons are the theme's: the cursor is packed from what kavat-theme
@@ -44,6 +49,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("kavat-wallpaper restore")
     -- the arrangement kept for the displays that are connected now
     hl.exec_cmd("kavat-displays restore")
+    -- the night light, when it is on or comes on by the hour
+    hl.exec_cmd("kavat-displays night restore")
     -- Wi-Fi and Bluetooth are turned off for who set them not to be on at startup
     hl.exec_cmd("kavat-network startup")
     -- light by day and dark by night, for who asked for it
@@ -69,6 +76,8 @@ end)
 
 -- the agent that holds the SSH keys, for every app of the session
 hl.env("SSH_AUTH_SOCK", (os.getenv("XDG_RUNTIME_DIR") or ("/run/user/" .. (os.getenv("UID") or "1000"))) .. "/ssh-agent.socket")
+-- Qt apps take their colours from qt6ct, which the theme writes for
+hl.env("QT_QPA_PLATFORMTHEME", "qt6ct")
 hl.env("XCURSOR_SIZE", "24")
 hl.env("HYPRCURSOR_SIZE", "24")
 
