@@ -54,13 +54,28 @@ speed   = {{ animation_speed }}
 [wallpaper]
 fill_color = "surface"
 
+# The calendar of the control center marks the days the notes have something on: a
+# reminder, or a task that is due. kavat-notes keeps them as a calendar in a folder, which
+# the shell reads and watches. The notes remind by themselves, so the shell does not.
+[calendar]
+enabled = true
+
+[calendar.reminders]
+enabled = false
+
+[calendar.account.notes]
+type = "vdir"
+name = "Notes"
+path = "~/.local/share/kavat/notes/calendar"
+
 # The system's mode has its switch on the bar. The bar is yours to arrange in the shell's
 # settings, which have the last word over this.
 [bar.default]
 start = ["launcher", "workspaces", "kavat/modes:mode"]
 # The background is chosen on the Wallpaper page of the settings, and the control center
-# opens from the widgets of the network, Bluetooth and the volume: neither has a button of
-# its own here.
+# opens from the widgets of Bluetooth and the volume: neither has a button of its own here.
+# The network's widget is the system's: a press opens the Network page, and on the
+# installer's medium it says in words whether there is a network.
 # with the shell's own widgets: a mark when an app uses the microphone, the camera or the
 # screen, which of the two keyboards is in use, and how many notes are due
-end   = ["media", "privacy", "tray", "kavat/notes:due", "notifications", "clipboard", "keyboard_layout", "network", "bluetooth", "volume", "brightness", "battery", "session"]
+end   = ["media", "privacy", "tray", "kavat/notes:due", "notifications", "clipboard", "keyboard_layout", "kavat/settings:network", "bluetooth", "volume", "brightness", "battery", "session"]

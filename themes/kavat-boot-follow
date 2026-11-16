@@ -1,0 +1,35 @@
+#!/bin/sh
+# Part of kavat-theme: the boot menu, the loading screen and the login screen follow the
+# desktop's theme by themselves. They are files of the system and making them again takes
+# about half a minute, so it is not done at each change of the theme: it is done once, as
+# the machine is turned off, and only when the theme is another than the one they wear.
+# It is switched on with `kavat-boot-settings set follow=yes`, the Boot page of the settings.
+
+[ -r /etc/kavat/boot.conf ] && . /etc/kavat/boot.conf
+[ "$KAVAT_BOOT_FOLLOW" = yes ] || exit 0
+
+# the desktop that is followed is that of the first person of the machine
+user="$(getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 { print $3, $1 }' | sort -n | head -n 1 | cut -d' ' -f2)"
+[ -n "$user" ] || exit 0
+now="$(runuser -l "$user" -c 'kavat-theme get' 2> /dev/null)" || exit 0
+[ -n "$now" ] || exit 0
+
+worn=/var/lib/kavat/theme/followed
+[ "$now" = "$(cat "$worn" 2> /dev/null)" ] && exit 0
+
+# each line is `key = value`: they are handed over as kavat-theme boot takes them, in pairs.
+# kavat-theme checks every one, and a palette that is only in that person's folder is refused.
+set --
+while IFS= read -r line; do
+  case "$line" in
+    *' = '*) set -- "$@" "${line%% = *}" "${line#* = }" ;;
+  esac
+done << END
+$now
+END
+
+if kavat-theme boot "$@"; then
+  mkdir -p "${worn%/*}"
+  printf '%s\n' "$now" > "$worn"
+fi
+exit 0

@@ -1,0 +1,17 @@
+#!/bin/sh
+# Part of kavat-theme: Qt apps wear the theme's colours through qt6ct. Its settings file
+# names the list of colours by its whole path, so it is written here, for whoever has none
+# or has one that names another list; then it is touched, which is how qt6ct tells the
+# apps that are open to read the colours again.
+config="${XDG_CONFIG_HOME:-$HOME/.config}/qt6ct"
+colours="$config/colors/kavat.conf"
+[ -e "$colours" ] || exit 0
+if ! grep -q "^color_scheme_path=$colours\$" "$config/qt6ct.conf" 2> /dev/null; then
+  if [ -e "$config/qt6ct.conf" ] && grep -q '^color_scheme_path=' "$config/qt6ct.conf"; then
+    # a file of your own keeps everything but the list of colours
+    sed -i -e "s|^color_scheme_path=.*|color_scheme_path=$colours|" -e 's|^custom_palette=.*|custom_palette=true|' "$config/qt6ct.conf"
+  else
+    printf '[Appearance]\ncolor_scheme_path=%s\ncustom_palette=true\nstandard_dialogs=xdgdesktopportal\nstyle=Fusion\n' "$colours" > "$config/qt6ct.conf"
+  fi
+fi
+touch "$config/qt6ct.conf"

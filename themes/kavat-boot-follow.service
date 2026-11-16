@@ -1,0 +1,14 @@
+# Part of kavat-theme. As the machine is turned off, the boot menu, the loading screen and
+# the login screen take the desktop's theme, when that was asked for and the theme changed.
+[Unit]
+Description=The boot and the login follow the desktop's theme
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/bin/true
+ExecStop=/usr/lib/kavat/boot-follow
+TimeoutStopSec=300
+
+[Install]
+WantedBy=multi-user.target

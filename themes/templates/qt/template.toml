@@ -1,0 +1,11 @@
+# Qt apps: their colours. Qt has no theme of its own to hand colours to, so they go through
+# qt6ct, which the session names as Qt's platform theme: it reads a list of colours, this
+# one, and a settings file that points at it, which /usr/lib/kavat/qt-look writes once.
+#
+# qt6ct tells the apps that are open when its settings file changes, so the same script
+# touches it after each change of the theme.
+reload = [["/usr/lib/kavat/qt-look"]]
+
+[[file]]
+from = "kavat.conf"
+link = "config:qt6ct/colors/kavat.conf"

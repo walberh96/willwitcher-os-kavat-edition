@@ -1,15 +1,15 @@
 pkgname=kavat-theme
 pkgver=0.1.0
-pkgrel=25
+pkgrel=28
 pkgdesc="Willwitcher-OS Kavat Edition: the theme system, with its palettes and its templates"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # the two fonts the default theme names; what makes the pictures and finds the fonts for
 # the boot menu and the loading screen; and where GTK apps, and the others that ask the
-# desktop, read whether the theme is light or dark
+# desktop, read whether the theme is light or dark; and what hands Qt apps their colours
 depends=('gcc-libs' 'inter-font' 'ttf-jetbrains-mono' 'librsvg' 'fontconfig' 'polkit'
-         'dconf' 'gsettings-desktop-schemas')
+         'dconf' 'gsettings-desktop-schemas' 'qt6ct')
 optdepends=('grub: the boot menu follows the theme'
             'plymouth: the loading screen follows the theme')
 makedepends=('cargo')
@@ -35,10 +35,16 @@ package() {
   install -Dm755 "$startdir/kavat-wallpaper" "$pkgdir/usr/lib/kavat/wallpaper"
   install -Dm755 "$startdir/kavat-theme-auto" "$pkgdir/usr/lib/kavat/theme-auto"
   install -Dm755 "$startdir/kavat-lights" "$pkgdir/usr/lib/kavat/lights"
+  install -Dm755 "$startdir/kavat-qt-look" "$pkgdir/usr/lib/kavat/qt-look"
   # the rules that wear a profile by themselves, looked at by a timer of every session
   install -Dm755 "$startdir/kavat-theme-rules" "$pkgdir/usr/lib/kavat/theme-rules"
   install -Dm644 -t "$pkgdir/usr/lib/systemd/user" "$startdir/kavat-theme-rules.service" "$startdir/kavat-theme-rules.timer"
   install -d "$pkgdir/usr/lib/systemd/user/timers.target.wants"
   ln -s ../kavat-theme-rules.timer "$pkgdir/usr/lib/systemd/user/timers.target.wants/kavat-theme-rules.timer"
+  # the boot and the login take the desktop's theme as the machine is turned off, when asked to
+  install -Dm755 "$startdir/kavat-boot-follow" "$pkgdir/usr/lib/kavat/boot-follow"
+  install -Dm644 -t "$pkgdir/usr/lib/systemd/system" "$startdir/kavat-boot-follow.service"
+  install -d "$pkgdir/usr/lib/systemd/system/multi-user.target.wants"
+  ln -s ../kavat-boot-follow.service "$pkgdir/usr/lib/systemd/system/multi-user.target.wants/kavat-boot-follow.service"
   chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat"
 }

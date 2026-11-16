@@ -5,6 +5,8 @@ usage: kavat-boot-settings                     the settings, a name and its valu
        kavat-boot-settings set <name>=<value>...
                                                timeout=0|1|3|5|10|30   the seconds the menu waits; with 0 it is not
                                                                        shown unless Shift or Esc is held as the machine starts
+                                               default=kavat|other     what starts when the wait ends: the system, or
+                                                                       the first of the other systems, as Windows
                                                quiet=yes|no            no messages of the kernel while it starts
                                                splash=yes|no           the loading screen, instead of the messages
                                                fallback=yes|no         the Fallback kernel entry
@@ -12,6 +14,8 @@ usage: kavat-boot-settings                     the settings, a name and its valu
                                                recovery=yes|no         the Recovery entry
                                                firmware=yes|no         the Firmware settings entry
                                                other=yes|no            the Other systems entry
+                                               follow=yes|no           the boot menu, the loading screen and the login
+                                                                       take the desktop's theme as the machine is turned off
 
 The settings are in /etc/kavat/boot.conf, which the scripts that write the menu read. A
 change asks for an administrator's password and writes the menu again; it shows at the
@@ -24,9 +28,9 @@ import sys
 
 FILE = '/etc/kavat/boot.conf'
 SNAPSHOTS = '/etc/default/grub-btrfs/config'
-SETTINGS = {'timeout': (['0', '1', '3', '5', '10', '30'], '5'), 'quiet': (['yes', 'no'], 'yes'), 'splash': (['yes', 'no'], 'yes'),
+SETTINGS = {'timeout': (['0', '1', '3', '5', '10', '30'], '5'), 'default': (['kavat', 'other'], 'kavat'), 'quiet': (['yes', 'no'], 'yes'), 'splash': (['yes', 'no'], 'yes'),
             'fallback': (['yes', 'no'], 'yes'), 'snapshots': (['yes', 'no'], 'yes'), 'recovery': (['yes', 'no'], 'yes'),
-            'firmware': (['yes', 'no'], 'yes'), 'other': (['yes', 'no'], 'yes')}
+            'firmware': (['yes', 'no'], 'yes'), 'other': (['yes', 'no'], 'yes'), 'follow': (['yes', 'no'], 'no')}
 
 
 def read():
@@ -55,6 +59,8 @@ def main():
         if name not in SETTINGS or value not in SETTINGS[name][0]:
             sys.exit(f'kavat-boot-settings: {pair} is not a setting of the boot, or not a value it takes\n\n' + __doc__)
         kept[name] = value
+    if kept['default'] == 'other' and kept['other'] == 'no':
+        sys.exit('kavat-boot-settings: the other systems cannot be what starts while their entry is off')
     if os.geteuid() != 0:
         # the menu is a file of the system: the same command again, as an administrator
         os.execvp('pkexec', ['pkexec', '/usr/bin/kavat-boot-settings', *arguments])

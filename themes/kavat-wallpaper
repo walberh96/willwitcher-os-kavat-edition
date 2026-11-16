@@ -26,5 +26,8 @@ until now="$(kavat-shell msg wallpaper-get 2> /dev/null)"; do
 done
 case "$now" in
   "$picture") ;;
-  '' | */kavat/theme/* | */kavat-shell-wallpaper.png) kavat-shell msg wallpaper-set "$picture" > /dev/null 2>&1 ;;
+  '' | */kavat/theme/* | */kavat-shell-wallpaper.png)
+    kavat-shell msg wallpaper-set "$picture" > /dev/null 2>&1
+    # a display with an image of its own keeps it
+    command -v kavat-wallpaper > /dev/null && kavat-wallpaper displays again ;;
 esac
