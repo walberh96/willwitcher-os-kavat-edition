@@ -1,6 +1,6 @@
 pkgname=kavat-greeter
 pkgver=0.2.0
-pkgrel=2
+pkgrel=3
 pkgdesc="Willwitcher-OS Kavat Edition: the login screen, a web page drawn on Wayland, behind greetd"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

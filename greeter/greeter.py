@@ -224,20 +224,46 @@ def main():
     channel = QWebChannel()
     channel.registerObject('greeter', greeter)
     guard = OnlyThisMachine()
-    views = []
-    for screen in application.screens():
+    views = {}
+
+    def show_on(screen):
+        """The page on one screen: the main one asks who logs in, the others show the clock."""
+        if screen in views:
+            return
         view = QWebEngineView()
         view.page().profile().setUrlRequestInterceptor(guard)
         view.page().setBackgroundColor(QColor(0, 0, 0, 0))
         view.page().setWebChannel(channel)
-        # the main screen asks who logs in; the others show the clock
-        page = 'index.html' if screen == application.primaryScreen() else 'beside.html'
-        view.setUrl(QUrl.fromLocalFile(os.path.join(PAGE, page)))
+        asks = not any(other.property('asks') for other in views.values())
+        view.setProperty('asks', asks)
+        view.setUrl(QUrl.fromLocalFile(os.path.join(PAGE, 'index.html' if asks else 'beside.html')))
         view.setGeometry(screen.geometry())
         view.winId()
         view.windowHandle().setScreen(screen)
         view.showFullScreen()
-        views.append(view)
+        views[screen] = view
+
+    def gone(screen):
+        view = views.pop(screen, None)
+        if view is None:
+            return
+        asked = view.property('asks')
+        view.close()
+        view.deleteLater()
+        # the screen that asked who logs in was unplugged: another one asks
+        if asked and views:
+            other = next(iter(views.values()))
+            other.setProperty('asks', True)
+            other.setUrl(QUrl.fromLocalFile(os.path.join(PAGE, 'index.html')))
+
+    # the main screen first, so that it is the one that asks
+    show_on(application.primaryScreen())
+    for screen in application.screens():
+        show_on(screen)
+    # a screen may wake up after the session has started, or be plugged in later: it gets
+    # its page then, and is not left black
+    application.screenAdded.connect(show_on)
+    application.screenRemoved.connect(gone)
     sys.exit(application.exec())
 
 
