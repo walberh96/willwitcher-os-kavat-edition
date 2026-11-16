@@ -135,7 +135,7 @@ def main():
                       and lines[3] == '2' and lines[4] == lines[1] and lines[5] == '*' and 'there is no nothing' in lines[6],
                       'a project opens its terminal and its editor on a workspace of its own, and opening it again only goes there', output)
         status, output = user('hyprctl --instance 0 dispatch "hl.dsp.focus({ workspace = 1 })" > /dev/null; kavat mode; kavat theme get mode; kavat-shell msg plugins list | grep -c "kavat/palette.*enabled"; '
-                              'kavat-shell msg config-get bar.default.end | grep -c -E "privacy|keyboard-layout"; tesseract --list-langs 2> /dev/null | grep -c -x -E "eng|spa"; '
+                              'kavat-shell msg config-get bar.default.end | grep -c -E "privacy|keyboard_layout"; tesseract --list-langs 2> /dev/null | grep -c -x -E "eng|spa"; '
                               'cat ~/.local/state/kavat/theme/current/lights/colour; grep -c "screen-text" /usr/share/kavat/hypr/hyprland.lua')
         checks.report(output.split() == ['coder', 'dark', '1', '2', '2', 'f2a93b', '1'],
                       "kavat is one command for the system's own, the launcher has the system's things, the bar marks who listens and which keyboard, "
@@ -145,6 +145,33 @@ def main():
         status, output = user('kavat-displays place Virtual-1 300 200 > /dev/null; sleep 1; kavat-displays | cut -f4; kavat-displays keep; '
                               'kavat-shell msg plugins list | grep -c "kavat/settings.*enabled"; grep -c "ui.arrange" /usr/share/kavat/shell-plugins/settings/panel.luau')
         checks.report(output.split() == ['0x0', '1', '1'], 'a display that is dropped anywhere ends where the arrangement starts when it is the only one', output)
+        status, output = user('kavat-displays workspaces Virtual-1 1,2,3 > /dev/null; kavat-displays | cut -f7; grep -c "workspaces = \\"1 2 3\\"" ~/.config/hypr/monitors.lua; '
+                              'hyprctl --instance 0 workspacerules | grep -c "^Workspace rule"; kavat-displays workspaces Virtual-1 none; kavat-displays | cut -f7; '
+                              'kavat-displays workspaces Virtual-1 11 2>&1 | grep -c "from 1 to 10"')
+        checks.report(output.split() == ['1,2,3', '1', '3', '-', '1'], 'a display is given workspaces of its own, which Hyprland holds as rules, and gives them up', output)
+        status, output = user('kavat-shell msg config-get bar.default.start | grep -c wallpaper; kavat-shell msg config-get bar.default.end | grep -c -E "control-center"; '
+                              'kavat-shell msg config-get bar.default.end | grep -c keyboard_layout; kavat-shell msg config-get wallpaper.fill_color; '
+                              'kavat-shell msg wallpaper-get | grep -c "kavat/theme/"; '
+                              'kavat-sound | cut -f1 | sort -u | tr "\\n" " "; echo; kavat-sound volume output 40; kavat-sound | grep ^output | cut -f5; kavat-sound volume output 100; '
+                              'kavat-sound volume output loud 2>&1 | grep -c usage')
+        lines = output.split('\n')
+        checks.report(len(lines) == 8 and lines[:3] == ['0', '0', '1'] and 'surface' in lines[3] and lines[4] == '1' and 'output' in lines[5] and lines[6:] == ['40', '1'],
+                      "the bar has neither the shell's background picker nor its control center, the background is the theme's, and the Sound page's program sets a volume", output)
+        status, output = machine.run('printf "[Interface]\\nPrivateKey = 6NJepbdEduV97+1+dCqYLcZ3XGGXGPdkQjxgLqvdZHI=\\nAddress = 10.2.0.2/32\\n\\n[Peer]\\n'
+                                     'PublicKey = GuR0sfhk5vS6mQUcXz4qR7VGzcE7H0jmAbFPMZ8bJXM=\\nAllowedIPs = 0.0.0.0/0\\nEndpoint = 192.0.2.10:51820\\n" > /tmp/kavat-test-vpn-file.conf; '
+                                     'kavat-network vpn add /tmp/kavat-test-vpn-file.conf > /dev/null; kavat-network | grep ^vpn | cut -f2,3,4,5; '
+                                     'nmcli -g connection.autoconnect connection show kavat-test-vpn-file; '
+                                     'kavat-network vpn add /tmp/nothing.conf 2>&1 | grep -c "there is no file"; kavat-network vpn remove kavat-test-vpn-file; kavat-network | grep -c ^vpn; '
+                                     'kavat-network wifi startup off; kavat-network | grep ^wifi | cut -f3; kavat-network wifi startup on; kavat-network | grep ^wifi | cut -f3; '
+                                     'systemctl is-enabled bluetooth; which bluetoothctl', 90)
+        checks.report(output.split('\n') == ['kavat-test-vpn-file\twireguard\t-\tincognito', 'no', '1', '0', 'off', 'on', 'enabled', '/usr/bin/bluetoothctl'],
+                      "a VPN is added from its provider's file, under its own name, for Incognito, and removed; what is on at startup is kept; Bluetooth is installed", output)
+        status, output = machine.run('kavat-boot-settings set timeout=3 recovery=no > /dev/null; kavat-boot-settings | tr "\\t" "=" | grep -E "timeout|recovery" | tr "\\n" " "; echo; '
+                                     'grep -c "menuentry .Recovery" /boot/grub/grub.cfg; grep -c "set timeout=3" /boot/grub/grub.cfg | sed "s/[1-9][0-9]*/some/"; '
+                                     'kavat-boot-settings set timeout=5 recovery=yes > /dev/null; grep -c "menuentry .Recovery" /boot/grub/grub.cfg; '
+                                     'kavat-boot-settings set timeout=7 2>&1 | grep -c "not a setting"', 240)
+        checks.report(output.split('\n') == ['timeout=3 recovery=no ', '0', 'some', '1', '1'],
+                      'the boot menu waits as long as it is set to and leaves out an entry that is turned off, and gets it back', output)
         status, output = machine.run('kavat-dns; kavat-dns on > /dev/null; kavat-dns; readlink /etc/resolv.conf; resolvectl status | grep -c "+DNSOverTLS"; '
                                      'kavat-dns on nobody 2>&1 | grep -c "is not one of"; kavat-dns off > /dev/null; kavat-dns; systemctl is-active systemd-resolved; '
                                      'test -L /etc/resolv.conf || echo a-file', 90)

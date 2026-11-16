@@ -115,7 +115,7 @@ def main():
         checks.report(lines[0] == 'keyboard_first us' and 'es,us' in lines[1] and 'us,es' in lines[2] and 'grp:alt_shift_toggle' in lines[3],
                       'the keyboard is the one of the installation, with the other behind it, and the first can be changed', output)
         # every page that is built has to draw: one that fails leaves a line in the shell's log
-        pages = 'wallpaper accessibility windows displays sound network terminal editor files notes bar packages boot login language'
+        pages = 'wallpaper accessibility windows displays sound network terminal editor files notes shell browser bar modes packages boot login language'
         status, output = user(f'for page in {pages}; do kavat-shell msg panel-open kavat/settings:panel $page > /dev/null; sleep 1.2; done; '
                               'grep -c -i "kavat/settings.*error\\|luau.*error\\|panel.luau:" ~/.cache/kavat-shell/kavat-shell.log', 60)
         checks.report(output == '0', 'each of the pages that are built is drawn without a failure', output)

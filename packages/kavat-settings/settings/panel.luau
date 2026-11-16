@@ -326,8 +326,9 @@ end
 local function read_browser()
   noctalia.runAsync("echo \"default $(xdg-settings get default-web-browser 2>/dev/null)\"; "
     .. "echo \"widevine $(sed -n 's/.*\"version\": *\"\\([^\"]*\\)\".*/\\1/p' /usr/lib/chromium/WidevineCdm/manifest.json 2>/dev/null | head -n 1)\"; "
-    .. "echo \"commands $(grep -c '^\\[\\[command\\]\\]' ~/.config/kavat/browser/commands.toml 2>/dev/null)\"", function(result)
-    local found = { default = "", widevine = "", commands = "0" }
+    .. "echo \"commands $(grep -c '^\\[\\[command\\]\\]' ~/.config/kavat/browser/commands.toml 2>/dev/null)\"; "
+    .. "echo \"background $(sed -n 's/^start_background *= *\"\\(.*\\)\"/\\1/p' ~/.config/kavat/browser/browser.toml 2>/dev/null | head -n 1)\"", function(result)
+    local found = { default = "", widevine = "", commands = "0", background = "" }
     for line in result.stdout:gmatch("[^\n]+") do
       local name, value = line:match("^(%S+) ?(.*)$")
       if name then
@@ -666,48 +667,140 @@ local function windows()
   return { title = "Windows", sub = "Hyprland · changes apply live", left = left, right = right, file = "~/.config/kavat/theme.toml" }
 end
 
-local function boot_button()
-  return ui.row({ gap = 8 }, {
-    ui.button({ text = "Give them the look in force", variant = "primary", enabled = not busy,
-      onClick = function()
-        busy = true
-        boot_said = "Working…"
-        render()
-        noctalia.runAsync({ "kavat-theme", "boot" }, function(result)
-          busy = false
-          boot_said = result.exitCode == 0 and "Done: the next boot wears it." or trim(result.stderr ~= "" and result.stderr or result.stdout)
-          render()
-        end)
-      end }),
+-- The boot: what kavat-boot-settings keeps, and the look the system's own screens wear
+local boot_now = { timeout = "5", quiet = "yes", splash = "yes", fallback = "yes", snapshots = "yes", recovery = "yes", firmware = "yes", other = "yes" }
+local boot_look = {}  -- the palette, the mode and the accent of the boot menu, the loading screen and the login
+
+local function read_boot()
+  noctalia.runAsync("kavat-boot-settings; echo '== look'; cat /etc/kavat/theme.toml 2>/dev/null", function(result)
+    local look = false
+    boot_look = {}
+    for line in result.stdout:gmatch("[^\n]+") do
+      if line == "== look" then
+        look = true
+      elseif look then
+        local key, value = line:match('^(%w+)%s*=%s*"([^"]*)"')
+        if key then
+          boot_look[key] = value
+        end
+      else
+        local key, value = line:match("^(%w+)\t(%w+)$")
+        if key then
+          boot_now[key] = value
+        end
+      end
+    end
+    render()
+  end)
+end
+
+local function boot_set(name, value)
+  busy = true
+  said = ""
+  boot_said = "Waiting for your password, then writing the boot menu again…"
+  render()
+  noctalia.runAsync({ "kavat-boot-settings", "set", name .. "=" .. value }, function(result)
+    busy = false
+    boot_said = ""
+    if result.exitCode ~= 0 then
+      said = trim(result.stderr ~= "" and result.stderr or result.stdout):gsub("^kavat%-boot%-settings: ", "")
+      if said == "" then said = "The password was not given, so nothing changed." end
+    else
+      news = "Changed. It shows the next time the machine starts."
+    end
+    read_boot()
+  end)
+end
+
+local function boot_toggle(name)
+  return ui.row({ justify = "end", flexGrow = 1 }, {
+    ui.toggle({ checked = boot_now[name] == "yes", enabled = not busy, onChange = function(now) boot_set(name, now == "true" and "yes" or "no") end }),
   })
 end
 
+local function pretty(word)
+  return word and word ~= "" and (word:sub(1, 1):upper() .. word:sub(2)) or "?"
+end
+
+-- The boot menu, the loading screen and the login screen are shown before anybody logs in,
+-- so they cannot follow the desktop's theme by themselves: this says which look they have
+-- and, when the desktop's is another, offers to copy it to them.
+local function system_look()
+  local theirs = pretty(boot_look.palette) .. " · " .. pretty(boot_look.mode) .. " · " .. pretty(boot_look.accent)
+  local accent = theme.accent == "default" and boot_look.accent or theme.accent
+  local same = boot_look.palette == theme.palette and boot_look.mode == theme.mode and (theme.accent == "default" or boot_look.accent == theme.accent)
+  local parts = {
+    row("They wear", ui.label({ text = boot_look.palette and theirs or "…", fontWeight = "medium" })),
+    row("Your desktop", ui.label({ text = theme.palette and (pretty(theme.palette) .. " · " .. pretty(theme.mode) .. " · " .. pretty(accent)) or "…", fontWeight = "medium" })),
+  }
+  if boot_look.palette and theme.palette and same then
+    parts[#parts + 1] = note("They already look like your desktop.")
+  else
+    parts[#parts + 1] = ui.row({ gap = 8 }, {
+      ui.button({ text = "Make them look like my desktop", variant = "primary", enabled = not busy,
+        onClick = function()
+          busy = true
+          boot_said = "Waiting for your password, then making their pictures…"
+          render()
+          noctalia.runAsync({ "kavat-theme", "boot" }, function(result)
+            busy = false
+            boot_said = result.exitCode == 0 and "Done: you will see it the next time the machine starts." or trim(result.stderr ~= "" and result.stderr or result.stdout)
+            read_boot()
+          end)
+        end }),
+    })
+  end
+  parts[#parts + 1] = note("The boot menu, the loading screen and the login screen show before anybody logs in, so they do not change when you change the desktop's theme: they keep their own palette, mode and accent until you ask for it here. It asks for your password, because they are files of the system.")
+  if boot_said ~= "" then
+    parts[#parts + 1] = ui.label({ text = boot_said, color = "primary", maxWidth = 440 })
+  end
+  return parts
+end
+
 local function boot()
-  return { title = "Boot", sub = "GRUB and the loading screen", file = "/etc/kavat/theme.toml", left = {
+  local waits, wait_names = { "0", "1", "3", "5", "10", "30" },
+    { "Not shown · hold Shift or Esc to see it", "1 second", "3 seconds", "5 seconds", "10 seconds", "30 seconds" }
+  local right = {
+    section("While it starts"),
+    row("Loading screen", boot_toggle("splash")),
+    row("No kernel messages", boot_toggle("quiet")),
+    note("With the loading screen off, the system starts showing its messages. Esc shows them from the loading screen too."),
     section("Look"),
-    note("The boot menu and the loading screen are shown before anybody logs in, so they have a look of their own, kept with the system. This gives them, and the login screen, the look in force now. It asks for your password."),
-    boot_button(),
-    ui.label({ text = boot_said, color = "on_surface_variant", maxWidth = 440 }),
-  }, right = {
-    section("Menu"),
-    note("The timeout, the default entry and which entries show are not on this page yet."),
-  } }
+  }
+  for _, part in ipairs(system_look()) do
+    right[#right + 1] = part
+  end
+  return { title = "Boot", sub = "the boot menu and the loading screen", file = "/etc/kavat/boot.conf", left = {
+    section("Boot menu"),
+    row("Show menu for", select(wait_names, index_of(waits, boot_now.timeout), function(index) boot_set("timeout", waits[index]) end)),
+    section("Entries on the menu"),
+    row("Fallback kernel", boot_toggle("fallback")),
+    row("Safe mode", ui.row({ justify = "end", align = "center", gap = 8, flexGrow = 1 }, {
+      ui.label({ text = "always shown", fontSize = 12, color = "on_surface_variant" }), ui.toggle({ checked = true, enabled = false }) })),
+    row("Snapshots", boot_toggle("snapshots")),
+    row("Recovery", boot_toggle("recovery")),
+    row("Firmware settings", boot_toggle("firmware")),
+    row("Other systems", boot_toggle("other")),
+    note("A change asks for your password and writes the menu again; you see it the next time the machine starts. After a start that failed, the menu opens by itself on Safe mode."),
+  }, right = right }
 end
 
 local MINUTES = { { "0", "Never" }, { "1", "1 minute" }, { "5", "5 minutes" }, { "10", "10 minutes" }, { "15", "15 minutes" },
   { "30", "30 minutes" }, { "60", "1 hour" } }
 
 local function login()
-  return { title = "Login & lock", sub = "kavat-greeter · hyprlock", file = "/etc/kavat/theme.toml", left = {
-    section("Look"),
-    note("The login screen takes its look with the boot menu and the loading screen. It asks for your password."),
-    boot_button(),
-    ui.label({ text = boot_said, color = "on_surface_variant", maxWidth = 440 }),
-  }, right = {
+  local left = { section("Login screen") }
+  for _, part in ipairs(system_look()) do
+    left[#left + 1] = part
+  end
+  left[#left + 1] = note("With more than one display, the main one asks who logs in and the others show the clock.")
+  return { title = "Login & lock", sub = "kavat-greeter · hyprlock", file = "~/.config/hypr/hypridle.conf", left = left, right = {
     section("Lock"),
     row("Lock after", conf_select("lock", "lock_after", MINUTES)),
     row("Screen off after", conf_select("lock", "screen_off_after", MINUTES)),
-    note("Super+Shift+L locks at once. The lock screen wears the theme, with the same picture as the login."),
+    note("Super+Shift+L locks at once, and the screen locks before the machine sleeps. The lock screen follows the desktop's theme by itself."),
+    section("Not built yet"),
+    note("Logging in without a password, a clock of twelve hours and the list of users on the login screen."),
   } }
 end
 
@@ -918,6 +1011,18 @@ local function pages_browser()
       ui.button({ text = "Its own settings", variant = "outline", controlSize = "sm", onClick = open("chrome://settings") }),
     }),
     note("Super+B opens it. In Incognito mode every window it opens is a private one, and the ones that were open are hidden until the mode is left; in Gamer the tabs out of view go to sleep."),
+    section("New tab"),
+    row("Background", segmented({
+      { text = "Theme", on = browser.background == "" or browser.background == "theme", pick = function()
+        noctalia.runAsync({ "kavat-browser", "background", "theme" }, function() read_browser() end) end },
+      { text = "Wallpaper", on = browser.background == "wallpaper", pick = function()
+        noctalia.runAsync({ "kavat-browser", "background", "wallpaper" }, function() read_browser() end) end },
+      { text = "A picture…", on = browser.background ~= "" and browser.background ~= "theme" and browser.background ~= "wallpaper", pick = function()
+        noctalia.runInTerminal("chosen=$(mktemp); yazi --chooser-file=\"$chosen\" ~/Pictures; [ -s \"$chosen\" ] && kavat-browser background \"$(head -n 1 \"$chosen\")\"; rm -f \"$chosen\"")
+        panel.close()
+      end },
+    })),
+    note("What a new tab shows behind its clock: the theme's colour, the desktop's background, or a picture of yours, picked in Yazi. The new tab has a Background button of its own, at its foot, for the same."),
     section("Command console"),
     row("Yours", ui.label({ text = browser.commands .. " in the file below", fontFamily = "JetBrains Mono", fontSize = 12 })),
     note("Ctrl+Shift+K opens the console in the browser: type to find a command, Enter runs it. Your own are in the file at the foot of this page, each a name and an address to open or a command to run. `kavat-browser command \"zen mode\"` asks the open browser for one from outside."),
@@ -1320,39 +1425,455 @@ local function accessibility()
   } }
 end
 
+-- The outputs, the inputs and what is playing, as kavat-sound lists them
+local sound_now = { outputs = {}, inputs = {}, apps = {} }
+
+local function read_sound()
+  noctalia.runAsync({ "kavat-sound" }, function(result)
+    local found = { outputs = {}, inputs = {}, apps = {} }
+    for line in result.stdout:gmatch("[^\n]+") do
+      local parts = {}
+      for part in (line .. "\t"):gmatch("([^\t]*)\t") do
+        parts[#parts + 1] = part
+      end
+      if parts[1] == "output" or parts[1] == "input" then
+        local list = parts[1] == "output" and found.outputs or found.inputs
+        list[#list + 1] = { name = parts[2], what = parts[3], default = parts[4] == "default", volume = tonumber(parts[5]) or 0, muted = parts[6] == "muted" }
+      elseif parts[1] == "app" then
+        found.apps[#found.apps + 1] = { number = parts[2], name = parts[3], volume = tonumber(parts[4]) or 0, muted = parts[5] == "muted" }
+      end
+    end
+    sound_now = found
+    render()
+  end)
+end
+
+local function sound_does(...)
+  said = ""
+  noctalia.runAsync({ "kavat-sound", ... }, function(result)
+    if result.exitCode ~= 0 then
+      said = trim(result.stderr ~= "" and result.stderr or result.stdout):gsub("^kavat%-sound: ", "")
+    end
+    read_sound()
+  end)
+end
+
+-- The device in use of a kind, picked from a list, with its volume and whether it is muted
+local function sound_device(kind, list, volume_name)
+  local names, at, chosen = {}, 1, nil
+  for index, device in ipairs(list) do
+    names[index] = device.what
+    if device.default then
+      at, chosen = index, device
+    end
+  end
+  if #list == 0 then
+    return { note(kind == "output" and "No output: nothing to play through." or "No microphone.") }
+  end
+  chosen = chosen or list[1]
+  return {
+    row(kind == "output" and "Device" or "Microphone", select(names, at, function(index) sound_does(kind, list[index].name) end)),
+    row(volume_name, ui.row({ gap = 10, align = "center", flexGrow = 1 }, {
+      ui.slider({ key = kind .. "-volume", min = 0, max = 100, step = 1, value = math.min(chosen.volume, 100), flexGrow = 1, controlSize = "sm",
+        onDragEnd = function(now) sound_does("volume", kind, tostring(math.floor(now + 0.5))) end }),
+      ui.label({ text = chosen.volume .. "%", fontSize = 12, color = "on_surface_variant", width = 40 }),
+    })),
+    row("Muted", ui.row({ justify = "end", flexGrow = 1 }, {
+      ui.toggle({ checked = chosen.muted, onChange = function(now) sound_does("mute", kind, now == "true" and "on" or "off") end }),
+    })),
+  }
+end
+
 local function sound()
-  return { title = "Sound", sub = "PipeWire", file = "~/.config/pipewire/pipewire.conf.d/", left = {
-    section("Volume and devices"),
-    note("The output, the input and the volume of each app are in the shell's control center."),
-    ui.row({ gap = 8 }, { shell_panel("Open the sound controls", "panel-toggle control-center audio") }),
-  }, right = {
-    section("Microphone"),
-    row("Noise removed", conf_toggle("sound", "noise_suppression", "on", "off")),
-    note("Adds a microphone to the list, \"Microphone, noise removed\", that lets the voice through and leaves out keys, fans and the room. Calls use it unless another is chosen. Changing this restarts the sound for a moment."),
-  } }
+  local left, right = { section("Output") }, { section("Playing now") }
+  for _, part in ipairs(sound_device("output", sound_now.outputs, "Volume")) do
+    left[#left + 1] = part
+  end
+  left[#left + 1] = section("Input")
+  for _, part in ipairs(sound_device("input", sound_now.inputs, "Level")) do
+    left[#left + 1] = part
+  end
+  left[#left + 1] = row("Noise removed", conf_toggle("sound", "noise_suppression", "on", "off"))
+  left[#left + 1] = note("Adds a microphone to the list, \"Microphone, noise removed\", that lets the voice through and leaves out keys, fans and the room. Changing this restarts the sound for a moment.")
+  if #sound_now.apps == 0 then
+    right[#right + 1] = note("Nothing is playing. An app that plays something shows here, with a volume of its own.")
+  end
+  for _, app in ipairs(sound_now.apps) do
+    right[#right + 1] = ui.row({ key = "app-" .. app.number, align = "center", gap = 10, paddingH = 10, minHeight = 38, radius = 8, fill = "surface_container" }, {
+      ui.label({ text = app.name, width = 170, maxWidth = 170 }),
+      ui.slider({ key = "app-volume-" .. app.number, min = 0, max = 100, step = 1, value = math.min(app.volume, 100), flexGrow = 1, controlSize = "sm",
+        onDragEnd = function(now) sound_does("app", app.number, tostring(math.floor(now + 0.5))) end }),
+      ui.label({ text = app.volume .. "%", fontSize = 12, color = "on_surface_variant", width = 40 }),
+    })
+  end
+  right[#right + 1] = ui.row({ gap = 8 }, { ui.button({ text = "Read again", variant = "outline", controlSize = "sm", onClick = function() read_sound() end }) })
+  right[#right + 1] = note("The same controls are a press away on the bar, in the volume's own panel.")
+  return { title = "Sound", sub = "PipeWire", file = "~/.config/pipewire/pipewire.conf.d/", left = left, right = right }
+end
+
+-- The connections and the Bluetooth devices, as kavat-network lists them
+local net = { wired = {}, wifi = "none", wifi_startup = true, networks = {}, vpns = {}, bluetooth = "none", bluetooth_startup = true, devices = {} }
+local net_asking = ""    -- the Wi-Fi network whose password is being typed
+local net_password = ""
+local net_working = ""   -- what is being waited for: a scan, a pairing
+
+local function read_net()
+  noctalia.runAsync({ "kavat-network" }, function(result)
+    local found = { wired = {}, wifi = "none", wifi_startup = true, networks = {}, vpns = {}, bluetooth = "none", bluetooth_startup = true, devices = {} }
+    for line in result.stdout:gmatch("[^\n]+") do
+      local parts = {}
+      for part in (line .. "\t"):gmatch("([^\t]*)\t") do
+        parts[#parts + 1] = part
+      end
+      if parts[1] == "wired" then
+        found.wired[#found.wired + 1] = { device = parts[2], state = parts[3], speed = parts[4] }
+      elseif parts[1] == "wifi" then
+        found.wifi, found.wifi_startup = parts[2], parts[3] == "on"
+      elseif parts[1] == "network" then
+        found.networks[#found.networks + 1] = { name = parts[2], signal = tonumber(parts[3]) or 0, locked = parts[4] == "locked",
+          saved = parts[5] == "saved", connected = parts[6] == "connected" }
+      elseif parts[1] == "vpn" then
+        found.vpns[#found.vpns + 1] = { name = parts[2], kind = parts[3], up = parts[4] == "up", incognito = parts[5] == "incognito" }
+      elseif parts[1] == "bluetooth" then
+        found.bluetooth, found.bluetooth_startup = parts[2], parts[3] == "on"
+      elseif parts[1] == "device" then
+        found.devices[#found.devices + 1] = { address = parts[2], name = parts[3], state = parts[4], battery = parts[5] }
+      end
+    end
+    net = found
+    render()
+  end)
+end
+
+-- Ask kavat-network for something; `working` is what the page says while it takes
+local function net_does(working, ...)
+  busy = true
+  said = ""
+  news = ""
+  net_working = working or ""
+  render()
+  noctalia.runAsync({ "kavat-network", ... }, function(result)
+    busy = false
+    net_working = ""
+    if result.exitCode ~= 0 then
+      said = trim(result.stderr ~= "" and result.stderr or result.stdout):gsub("^kavat%-network: ", "")
+    elseif trim(result.stdout) ~= "" then
+      news = trim(result.stdout)
+    end
+    read_net()
+  end)
+end
+
+-- One thing of a list: its name, what is said of it, and the buttons that act on it
+local function net_line(key, name, state, good, buttons)
+  local parts = {
+    ui.column({ gap = 1, flexGrow = 1 }, {
+      ui.label({ text = name, maxWidth = 300 }),
+      ui.label({ text = state, fontSize = 11, color = good and "primary" or "on_surface_variant" }),
+    }),
+  }
+  for _, button in ipairs(buttons or {}) do
+    parts[#parts + 1] = ui.button({ key = key .. "-" .. button[1], text = button[1], controlSize = "sm", variant = button[3] or "ghost",
+      enabled = not busy, onClick = button[2] })
+  end
+  return ui.row({ key = key, align = "center", gap = 8, paddingH = 10, paddingV = 5, minHeight = 40, radius = 8, fill = "surface_container" }, parts)
+end
+
+local function switch(checked, change)
+  return ui.row({ justify = "end", flexGrow = 1 }, { ui.toggle({ checked = checked, enabled = not busy, onChange = function(now) change(now == "true") end }) })
 end
 
 local function network()
-  return { title = "Network", sub = "NetworkManager · BlueZ", left = {
-    section("Connections"),
-    note("Cable, Wi-Fi and VPNs are in the shell's control center."),
-    ui.row({ gap = 8 }, { shell_panel("Open the network", "panel-toggle control-center network") }),
-  }, right = {
-    section("Bluetooth"),
-    note("Devices and their battery."),
-    ui.row({ gap = 8 }, { shell_panel("Open Bluetooth", "panel-toggle control-center bluetooth") }),
-  } }
+  local left, right = { section("Wired") }, { section("Bluetooth") }
+  if #net.wired == 0 then
+    left[#left + 1] = note("No cable connection on this machine.")
+  end
+  for _, wired in ipairs(net.wired) do
+    left[#left + 1] = net_line("wired-" .. wired.device, wired.device .. (wired.speed ~= "-" and " · " .. wired.speed or ""), wired.state, wired.state == "connected")
+  end
+
+  left[#left + 1] = section("Wi-Fi")
+  if net.wifi == "none" then
+    left[#left + 1] = note("This machine has no Wi-Fi.")
+  else
+    left[#left + 1] = row("Enabled", switch(net.wifi == "on", function(on) net_does(nil, "wifi", on and "on" or "off") end))
+    left[#left + 1] = row("On at startup", switch(net.wifi_startup, function(on) net_does(nil, "wifi", "startup", on and "on" or "off") end))
+    for _, network in ipairs(net.networks) do
+      local state = network.connected and "connected" or (network.signal > 0 and (network.signal .. "%") or "not in reach") .. (network.saved and " · saved" or network.locked and " · locked" or "")
+      local buttons = {}
+      if network.connected then
+        buttons[1] = { "Forget", function() net_does(nil, "wifi", "forget", network.name) end }
+      elseif network.signal > 0 then
+        buttons[1] = { "Connect", function()
+          if network.locked and not network.saved then
+            net_asking, net_password = network.name, ""
+            render()
+          else
+            net_does("Connecting to " .. network.name .. "…", "wifi", "connect", network.name)
+          end
+        end, "outline" }
+      end
+      if network.saved and not network.connected then
+        buttons[#buttons + 1] = { "Forget", function() net_does(nil, "wifi", "forget", network.name) end }
+      end
+      left[#left + 1] = net_line("wifi-" .. network.name, network.name, state, network.connected, buttons)
+      if net_asking == network.name then
+        local connect = function()
+          local name, password = net_asking, net_password
+          net_asking, net_password = "", ""
+          net_does("Connecting to " .. name .. "…", "wifi", "connect", name, password)
+        end
+        left[#left + 1] = ui.row({ key = "wifi-password", gap = 8, align = "center" }, {
+          ui.input({ key = "wifi-password-" .. network.name, placeholder = "Password of " .. network.name, password = true, focus = true, controlSize = "sm", flexGrow = 1,
+            onChange = function(text) net_password = text end, onSubmit = connect }),
+          ui.button({ text = "Connect", variant = "primary", controlSize = "sm", onClick = connect }),
+          ui.button({ text = "Cancel", variant = "ghost", controlSize = "sm", onClick = function() net_asking = ""; render() end }),
+        })
+      end
+    end
+    if net.wifi == "on" then
+      left[#left + 1] = ui.row({ gap = 8 }, { ui.button({ text = "Look again", variant = "outline", controlSize = "sm", enabled = not busy,
+        onClick = function() net_does("Looking for networks…", "wifi", "scan") end }) })
+    end
+  end
+
+  left[#left + 1] = section("VPN")
+  for _, vpn in ipairs(net.vpns) do
+    local buttons = { { vpn.up and "Disconnect" or "Connect", function() net_does((vpn.up and "Disconnecting " or "Connecting ") .. vpn.name .. "…", "vpn", vpn.up and "down" or "up", vpn.name) end, "outline" } }
+    if not vpn.incognito then
+      buttons[#buttons + 1] = { "Use for Incognito", function() net_does(nil, "vpn", "use", vpn.name) end }
+    end
+    buttons[#buttons + 1] = { "Remove", function() net_does(nil, "vpn", "remove", vpn.name) end }
+    left[#left + 1] = net_line("vpn-" .. vpn.name, vpn.name .. " · " .. (vpn.kind == "wireguard" and "WireGuard" or vpn.kind == "openvpn" and "OpenVPN" or vpn.kind),
+      (vpn.up and "connected" or "saved") .. (vpn.incognito and " · used by Incognito" or ""), vpn.up, buttons)
+  end
+  left[#left + 1] = ui.row({ gap = 8 }, { ui.button({ text = "+ Add a VPN", variant = #net.vpns == 0 and "primary" or "outline", controlSize = "sm", onClick = function()
+    noctalia.runInTerminal("kavat-network vpn add; echo; read -r -p 'Enter closes this window. ' _")
+    panel.close()
+  end }) })
+  left[#left + 1] = note(#net.vpns == 0
+    and "Incognito mode sends everything through a VPN, and there is none yet. Your provider gives a file for it on its site: at Proton VPN, account.protonvpn.com, Downloads, WireGuard configuration; Mullvad and the others have the same. Download it, press Add a VPN and pick it."
+    or "A VPN is added from the file its provider gives, WireGuard or OpenVPN. The one Incognito uses comes up when that mode is entered.")
+
+  if net.bluetooth == "none" then
+    right[#right + 1] = note("This machine has no Bluetooth, or its service is not running.")
+  else
+    right[#right + 1] = row("Enabled", switch(net.bluetooth == "on", function(on) net_does(nil, "bluetooth", on and "on" or "off") end))
+    right[#right + 1] = row("On at startup", switch(net.bluetooth_startup, function(on) net_does(nil, "bluetooth", "startup", on and "on" or "off") end))
+    right[#right + 1] = section("Devices")
+    if #net.devices == 0 then
+      right[#right + 1] = note(net.bluetooth == "on" and "No device yet. Put one in pairing mode and press Pair a device." or "Bluetooth is off.")
+    end
+    for _, device in ipairs(net.devices) do
+      local state = device.state == "near" and "nearby" or device.state .. (device.battery ~= "-" and " · battery " .. device.battery .. "%" or "")
+      local buttons
+      if device.state == "connected" then
+        buttons = { { "Disconnect", function() net_does(nil, "bluetooth", "disconnect", device.address) end }, { "Forget", function() net_does(nil, "bluetooth", "forget", device.address) end } }
+      elseif device.state == "paired" then
+        buttons = { { "Connect", function() net_does("Connecting to " .. device.name .. "…", "bluetooth", "connect", device.address) end, "outline" },
+          { "Forget", function() net_does(nil, "bluetooth", "forget", device.address) end } }
+      else
+        buttons = { { "Pair", function() net_does("Pairing with " .. device.name .. "…", "bluetooth", "pair", device.address) end, "outline" } }
+      end
+      right[#right + 1] = net_line("bt-" .. device.address, device.name, state, device.state == "connected", buttons)
+    end
+    if net.bluetooth == "on" then
+      right[#right + 1] = ui.row({ gap = 8 }, { ui.button({ text = "Pair a device", variant = "primary", controlSize = "sm", enabled = not busy,
+        onClick = function() net_does("Looking for devices nearby for ten seconds…", "bluetooth", "scan") end }) })
+      right[#right + 1] = note("Put the device in pairing mode first. The ones found show in the list with a Pair button.")
+    end
+  end
+  if net_working ~= "" then
+    right[#right + 1] = ui.label({ text = net_working, color = "primary" })
+  end
+  right[#right + 1] = note("The firewall and who uses the network are in Privacy & network.")
+  return { title = "Network", sub = "connections and Bluetooth devices", file = "~/.config/kavat/network.toml", left = left, right = right }
 end
 
+-- The bar and the notifications are the shell's: what it says of them is read, and changed,
+-- through the shell itself, which keeps what is changed in its own file.
+local bar_now = { position = "top", margin_edge = 0, thickness = 34, auto_hide = false, start = {}, center = {}, ["end"] = {},
+  notify_position = "top_right", notify_focused = false }
+local bar_adding = "end"  -- the part of the bar a widget is added to
+
+-- Every widget the bar can show, by its name in the shell's file
+local WIDGETS = {
+  { "launcher", "Launcher" }, { "workspaces", "Workspaces" }, { "active_window", "Window title" }, { "taskbar", "Open windows" },
+  { "clock", "Clock and date" }, { "kavat/modes:mode", "Mode switcher" }, { "kavat/notes:due", "Notes due" }, { "media", "What is playing" },
+  { "sysmon", "Processor and memory" }, { "privacy", "Recording indicator" }, { "tray", "Tray" }, { "notifications", "Notifications" },
+  { "clipboard", "Clipboard" }, { "keyboard_layout", "Keyboard in use" }, { "network", "Network" }, { "bluetooth", "Bluetooth" },
+  { "volume", "Volume" }, { "brightness", "Brightness" }, { "battery", "Battery" }, { "session", "Power" },
+  { "control-center", "Control center" }, { "wallpaper", "Background picker" }, { "weather", "Weather" }, { "nightlight", "Night light" },
+  { "caffeine", "Keep awake" }, { "power_profile", "Power profile" }, { "screenshot", "Screenshot" }, { "theme_mode", "Light or dark" },
+  { "lock_keys", "Caps and Num lock" }, { "audio_visualizer", "Sound bars" }, { "settings", "Shell settings" }, { "spacer", "Empty space" },
+}
+
+local function widget_name(id)
+  for _, widget in ipairs(WIDGETS) do
+    if widget[1] == id then
+      return widget[2]
+    end
+  end
+  return id
+end
+
+local function read_bar()
+  noctalia.runAsync("for key in bar.default.position bar.default.margin_edge bar.default.thickness bar.default.auto_hide bar.default.start bar.default.center bar.default.end "
+    .. "notification.position notification.follow_focused_output; do echo \"$key = $(kavat-shell msg config-get $key | tr -d '\\n')\"; done", function(result)
+    local found = { position = "top", margin_edge = 0, thickness = 34, auto_hide = false, start = {}, center = {}, ["end"] = {},
+      notify_position = "top_right", notify_focused = false }
+    for line in result.stdout:gmatch("[^\n]+") do
+      local key, value = line:match("^(%S+) = (.*)$")
+      if key then
+        local name = key:match("([%w_]+)$")
+        if name == "start" or name == "center" or name == "end" then
+          for widget in value:gmatch("'([^']+)'") do
+            found[name][#found[name] + 1] = widget
+          end
+        elseif key == "notification.position" then
+          found.notify_position = value:gsub("'", "")
+        elseif key == "notification.follow_focused_output" then
+          found.notify_focused = value == "true"
+        elseif name == "position" then
+          found.position = value:gsub("'", "")
+        elseif name == "auto_hide" then
+          found.auto_hide = value == "true"
+        else
+          found[name] = tonumber(value) or found[name]
+        end
+      end
+    end
+    bar_now = found
+    render()
+  end)
+end
+
+-- Set one of the shell's settings; the value is written as the shell's file writes it
+local function bar_set(key, value)
+  said = ""
+  noctalia.runAsync({ "kavat-shell", "msg", "config-set", key, value }, function(result)
+    if result.exitCode ~= 0 then
+      said = trim(result.stderr ~= "" and result.stderr or result.stdout)
+    else
+      keep("Bar: " .. key .. " " .. value)
+    end
+    read_bar()
+  end)
+end
+
+local function bar_widgets(part, list)
+  local quoted = {}
+  for index, widget in ipairs(list) do
+    quoted[index] = '"' .. widget .. '"'
+  end
+  bar_set("bar.default." .. part, "[" .. table.concat(quoted, ", ") .. "]")
+end
+
+local PARTS = { { "start", "Left" }, { "center", "Center" }, { "end", "Right" } }
+
 local function bar()
-  return { title = "Bar & widgets", sub = "Kavat Shell", file = "~/.config/kavat-shell/config.toml", left = {
-    section("The bar, the launcher and the notifications"),
-    note("Where the bar is, its widgets and their order, the launcher and the notifications are in the shell's own settings window."),
-    ui.row({ gap = 8 }, { shell_panel("Open the shell's settings", "settings-open") }),
-  }, right = {
-    section("Mind the theme"),
-    note("The shell's settings have a page for colours too. The system's colours are set on Appearance: what is changed there is put back at the next change of theme."),
-  } }
+  local vertical = bar_now.position == "left" or bar_now.position == "right"
+  local positions = {}
+  for _, position in ipairs({ { "top", "Top" }, { "bottom", "Bottom" }, { "left", "Left" }, { "right", "Right" } }) do
+    positions[#positions + 1] = { text = position[2], on = bar_now.position == position[1], pick = function() bar_set("bar.default.position", '"' .. position[1] .. '"') end }
+  end
+  local sizes = {}
+  for _, size in ipairs({ { 28, "Compact" }, { 34, "Normal" }, { 42, "Large" } }) do
+    sizes[#sizes + 1] = { text = size[2], on = bar_now.thickness == size[1], pick = function() bar_set("bar.default.thickness", tostring(size[1])) end }
+  end
+  local places, place_names, place_at = { "top_right", "top_center", "top_left", "bottom_right", "bottom_center", "bottom_left" },
+    { "Top right", "Top center", "Top left", "Bottom right", "Bottom center", "Bottom left" }, 1
+  for index, place in ipairs(places) do
+    if place == bar_now.notify_position then
+      place_at = index
+    end
+  end
+
+  -- the widgets, part by part of the bar; each can go up, down, to the next part, or away
+  local right, on_bar = { section("Widgets") }, {}
+  for at, part in ipairs(PARTS) do
+    local list = bar_now[part[1]]
+    right[#right + 1] = ui.label({ text = (vertical and ({ "Top", "Middle", "Bottom" })[at] or part[2]), fontSize = 12, fontWeight = "bold", color = "primary" })
+    if #list == 0 then
+      right[#right + 1] = note("Nothing here.")
+    end
+    for index, widget in ipairs(list) do
+      on_bar[widget] = true
+      local function move(to_part, to_index)
+        local from, into = {}, nil
+        for _, other in ipairs(list) do
+          if other ~= widget then from[#from + 1] = other end
+        end
+        if to_part == part[1] then
+          table.insert(from, to_index, widget)
+          bar_widgets(part[1], from)
+        else
+          into = { table.unpack(bar_now[to_part]) }
+          table.insert(into, to_index == 0 and #into + 1 or 1, widget)
+          -- two changes, one after the other: the widget leaves one part and enters the next
+          noctalia.runAsync({ "kavat-shell", "msg", "config-set", "bar.default." .. part[1], "[" .. (function()
+            local quoted = {}
+            for i, other in ipairs(from) do quoted[i] = '"' .. other .. '"' end
+            return table.concat(quoted, ", ")
+          end)() .. "]" }, function() bar_widgets(to_part, into) end)
+        end
+      end
+      local key = "widget-" .. part[1] .. "-" .. index
+      right[#right + 1] = ui.row({ key = key, align = "center", gap = 4, paddingH = 10, minHeight = 30, radius = 8, fill = "surface_container" }, {
+        ui.label({ text = widget_name(widget), flexGrow = 1 }),
+        ui.button({ key = key .. "-up", text = "↑", controlSize = "sm", variant = "ghost", tooltip = "Earlier on the bar",
+          enabled = index > 1 or at > 1, onClick = function()
+            if index > 1 then move(part[1], index - 1) else move(PARTS[at - 1][1], 0) end
+          end }),
+        ui.button({ key = key .. "-down", text = "↓", controlSize = "sm", variant = "ghost", tooltip = "Later on the bar",
+          enabled = index < #list or at < #PARTS, onClick = function()
+            if index < #list then move(part[1], index + 1) else move(PARTS[at + 1][1], 1) end
+          end }),
+        ui.button({ key = key .. "-remove", text = "✕", controlSize = "sm", variant = "ghost", tooltip = "Take it off the bar", onClick = function()
+          local rest = {}
+          for _, other in ipairs(list) do
+            if other ~= widget then rest[#rest + 1] = other end
+          end
+          bar_widgets(part[1], rest)
+        end }),
+      })
+    end
+  end
+  local spare, spare_names = {}, { "Add a widget…" }
+  for _, widget in ipairs(WIDGETS) do
+    if not on_bar[widget[1]] or widget[1] == "spacer" then
+      spare[#spare + 1] = widget[1]
+      spare_names[#spare_names + 1] = widget[2]
+    end
+  end
+  local parts = {}
+  for at, part in ipairs(PARTS) do
+    parts[#parts + 1] = { text = vertical and ({ "Top", "Middle", "Bottom" })[at] or part[2], on = bar_adding == part[1], pick = function() bar_adding = part[1]; render() end }
+  end
+
+  return { title = "Bar & widgets", sub = "Kavat Shell", file = "~/.local/state/kavat-shell/settings.toml", left = {
+    section("Bar"),
+    row("Position", segmented(positions)),
+    row("Floating", switch(bar_now.margin_edge > 0, function(on) bar_set("bar.default.margin_edge", on and "8" or "0") end)),
+    row("Density", segmented(sizes)),
+    row("Hides by itself", switch(bar_now.auto_hide, function(on) bar_set("bar.default.auto_hide", on and "true" or "false") end)),
+    section("Notifications"),
+    row("Position", select(place_names, place_at, function(index) bar_set("notification.position", '"' .. places[index] .. '"') end)),
+    row("On the display in use", switch(bar_now.notify_focused, function(on) bar_set("notification.follow_focused_output", on and "true" or "false") end)),
+    note("Gamer mode keeps them quiet by itself."),
+    section("Add"),
+    row("To the", segmented(parts)),
+    row("Widget", select(spare_names, 1, function(index)
+      if index > 1 then
+        local list = { table.unpack(bar_now[bar_adding]) }
+        list[#list + 1] = spare[index - 1]
+        bar_widgets(bar_adding, list)
+      end
+    end)),
+    section("Everything else"),
+    ui.row({ gap = 8 }, { shell_panel("Open the shell's own settings", "settings-open") }),
+    note("Each widget's own settings, the launcher, the dock and the desktop's widgets are there. Its page for colours is not for this system: the colours come from Appearance."),
+  }, right = right }
 end
 
 local function language()
@@ -1377,14 +1898,17 @@ local function read_displays()
     local found, part = {}, nil
     for line in result.stdout:gmatch("[^\n]+") do
       local heading = line:match("^== (.+)$")
-      local name, what, mode, position, scale, turn = line:match("^([^\t]+)\t([^\t]*)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)$")
+      local name, what, mode, position, scale, turn, spaces = line:match("^([^\t]+)\t([^\t]*)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)$")
       if heading then
         part = heading
       elseif part == nil and name then
         local width, height, rate = mode:match("^(%d+)x(%d+)@([%d.]+)")
         local x, y = position:match("^(-?%d+)x(-?%d+)")
         found[#found + 1] = { name = name, what = what, mode = mode, size = width .. "x" .. height, rate = rate, width = tonumber(width), height = tonumber(height),
-          x = tonumber(x), y = tonumber(y), scale = scale, turn = turn, modes = {} }
+          x = tonumber(x), y = tonumber(y), scale = scale, turn = turn, modes = {}, spaces = {} }
+        for number in spaces:gmatch("%d+") do
+          found[#found].spaces[tonumber(number)] = true
+        end
       elseif part then
         for _, display in ipairs(found) do
           if display.name == part then
@@ -1401,24 +1925,45 @@ local function read_displays()
   end)
 end
 
--- A change of a display is tried: it stays only when it is kept before ten seconds go by
+-- A change of a display is tried: it stays only when it is kept before ten seconds go by.
+-- The seconds left are counted in view, and every change made meanwhile is part of the
+-- same try: they are kept, or undone, together.
+local display_left = 0     -- the seconds left to keep what is being tried
+local display_undone = false
+local display_token = 0    -- one for each try, so that the count of an earlier one stops
+
+local function display_count(this)
+  noctalia.runAsync("sleep 1", function()
+    if display_tried ~= this then
+      return
+    end
+    display_left = display_left - 1
+    if display_left <= 0 then
+      display_tried = 0
+      display_undone = true
+      -- kavat-displays undoes it by itself; what is drawn is read again once it has
+      noctalia.runAsync("sleep 1.5", function() read_displays() end)
+    else
+      display_count(this)
+    end
+    render()
+  end)
+end
+
 local function display_does(...)
   busy = true
   said = ""
+  display_undone = false
   render()
   noctalia.runAsync({ "kavat-displays", ... }, function(result)
     busy = false
     if result.exitCode ~= 0 then
       said = trim(result.stderr ~= "" and result.stderr or result.stdout)
     else
-      display_tried = display_tried + 1
-      local this = display_tried
-      noctalia.runAsync("sleep 11", function()
-        if display_tried == this then
-          display_tried = 0
-          read_displays()
-        end
-      end)
+      display_token = display_token + 1
+      display_tried = display_token
+      display_left = 10
+      display_count(display_token)
     end
     read_displays()
   end)
@@ -1453,17 +1998,23 @@ local function pages_displays()
     ui.arrange({ key = "arrangement", width = 560, height = 230, items = boxes, revision = displays_read,
       onSelect = function(name) display_chosen = name; render() end,
       onMove = function(name, x, y) display_does("place", name, tostring(x), tostring(y)) end }),
-    display_tried > 0 and ui.row({ gap = 10, align = "center", justify = "center" }, {
-      ui.label({ text = "Keep this arrangement? Unless it is kept, it goes back in ten seconds.", color = "primary" }),
-      ui.button({ text = "Keep", variant = "primary", controlSize = "sm", onClick = function()
+    display_tried > 0 and ui.row({ key = "keep", gap = 14, align = "center", padding = 12, radius = 10, fill = "primary", width = 760 }, {
+      ui.column({ gap = 2, flexGrow = 1 }, {
+        ui.label({ text = "Keep these display settings?", fontWeight = "bold", fontSize = 15, color = "on_primary" }),
+        ui.label({ text = "Everything goes back to how it was in " .. display_left .. (display_left == 1 and " second" or " seconds")
+          .. " unless you press Keep. You can change more first: it is all kept together.", color = "on_primary", fontSize = 12 }),
+      }),
+      ui.button({ text = "Keep", variant = "secondary", onClick = function()
         display_tried = 0
         noctalia.runAsync({ "kavat-displays", "keep" }, function() read_displays() end)
       end }),
-      ui.button({ text = "Undo", variant = "outline", controlSize = "sm", onClick = function()
+      ui.button({ text = "Undo now", variant = "outline", onClick = function()
         display_tried = 0
         noctalia.runAsync({ "kavat-displays", "undo" }, function() read_displays() end)
       end }),
-    }) or ui.label({ text = #displays > 1 and (chosen.what .. " · drag a display to where it stands") or chosen.what, color = "on_surface_variant", fontSize = 12 }),
+    }) or ui.label({ text = display_undone and "The last change was not kept, so it was undone. Press Keep after a change to make it stay."
+        or (#displays > 1 and (chosen.what .. " · drag a display to where it stands") or chosen.what),
+      color = display_undone and "error" or "on_surface_variant", fontSize = 12 }),
   })
 
   -- the sizes the display can show, and the rates of the size in use
@@ -1495,6 +2046,36 @@ local function pages_displays()
     end
     return segmented(list)
   end
+  -- the ten workspaces: the ones of this display lit, the ones of another named in their tooltip
+  local spaces = {}
+  for number = 1, 10 do
+    local owner
+    for _, display in ipairs(displays) do
+      if display.spaces[number] then
+        owner = display.name
+      end
+    end
+    spaces[number] = ui.button({ key = "space-" .. number, text = tostring(number), controlSize = "sm", width = 42,
+      variant = owner == chosen.name and "primary" or owner and "outline" or "ghost", enabled = not busy and #displays > 1,
+      tooltip = owner == chosen.name and "On this display" or owner and ("On " .. owner) or "On no display in particular",
+      onClick = function()
+        local mine = {}
+        for other = 1, 10 do
+          if (chosen.spaces[other] and other ~= number) or (other == number and owner ~= chosen.name) then
+            mine[#mine + 1] = tostring(other)
+          end
+        end
+        busy = true
+        render()
+        noctalia.runAsync({ "kavat-displays", "workspaces", chosen.name, #mine > 0 and table.concat(mine, ",") or "none" }, function(result)
+          busy = false
+          if result.exitCode ~= 0 then
+            said = trim(result.stderr ~= "" and result.stderr or result.stdout)
+          end
+          read_displays()
+        end)
+      end })
+  end
   local places, place_values = { "Where it is" }, { "" }
   for _, name in ipairs(names) do
     for _, side in ipairs({ { "right-of", "Right of " }, { "left-of", "Left of " }, { "above", "Above " }, { "below", "Below " } }) do
@@ -1515,8 +2096,12 @@ local function pages_displays()
       if index > 1 then display_does("set", chosen.name, "at=" .. place_values[index]) end
     end)) or note("With one display there is nothing to arrange. A second one is put to the right of this one when it is plugged in."),
     note("Each set of displays keeps its own arrangement, known by what the displays are and not by where they are plugged in."),
+    section("Workspaces on " .. chosen.name),
+    ui.row({ gap = 4 }, spaces),
+    note(#displays > 1 and "The workspaces that open on this display: press a number to give it to this display, or to let it go. A workspace is on one display, so what this one takes the others give up; the first of them is the one the display starts on. One nobody has opens on the display in use."
+      or "With one display every workspace is on it. With a second one, each display can have its own."),
     section("Not built yet"),
-    note("The main display, the workspaces of each display and night light."),
+    note("Night light."),
   } }
 end
 
@@ -1661,8 +2246,13 @@ function open_page(id)
     read_privacy()
   elseif id == "modes" then
     read_modes()
+  elseif id == "network" then
+    read_net()
+  elseif id == "bar" then
+    read_bar()
   elseif id == "sound" then
     read_conf("sound")
+    read_sound()
   elseif id == "wallpaper" then
     read_walls()
     read_theme()
@@ -1677,6 +2267,11 @@ function open_page(id)
     read_shell_apps()
   elseif id == "login" then
     read_conf("lock")
+    read_theme()
+    read_boot()
+  elseif id == "boot" then
+    read_theme()
+    read_boot()
   elseif id == "keys" then
     read_shortcuts()
     render()

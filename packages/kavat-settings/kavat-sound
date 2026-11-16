@@ -1,0 +1,91 @@
+#!/usr/bin/env python3
+"""kavat-sound: the outputs, the inputs and what is playing, as the Sound page shows them.
+
+usage: kavat-sound                          what there is, one thing to a line, its parts between tabs:
+                                              output <name> <what it is> <default|-> <volume> <muted|->
+                                              input <name> <what it is> <default|-> <volume> <muted|->
+                                              app <number> <the app> <volume> <muted|->
+       kavat-sound output <name>            the output everything plays through from now on
+       kavat-sound input <name>             the microphone in use from now on
+       kavat-sound volume output|input <0-150>
+       kavat-sound mute output|input on|off
+       kavat-sound app <number> <0-150>     the volume of one app that is playing
+
+It is PipeWire that does the work, asked through pactl: this puts what it says in one list
+and its commands under one name. The volumes are percentages of the device's full volume.
+"""
+import json
+import re
+import subprocess
+import sys
+
+
+def out(*command):
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def does(*command):
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=10, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        sys.exit('kavat-sound: the sound does not answer')
+    if done.returncode != 0:
+        sys.exit('kavat-sound: ' + (done.stderr.strip() or done.stdout.strip() or 'that could not be done').splitlines()[-1])
+
+
+def listed(what):
+    try:
+        return json.loads(out('pactl', '-f', 'json', 'list', what) or '[]')
+    except ValueError:
+        return []
+
+
+def volume_of(thing):
+    """The loudest of a device's channels, as a percentage."""
+    values = [int(channel.get('value_percent', '0%').rstrip('%') or 0) for channel in (thing.get('volume') or {}).values() if isinstance(channel, dict)]
+    return str(max(values)) if values else '0'
+
+
+def show():
+    lines = []
+    for kind, what, default in (('output', 'sinks', (out('pactl', 'get-default-sink') or '').strip()),
+                                ('input', 'sources', (out('pactl', 'get-default-source') or '').strip())):
+        for device in listed(what):
+            name = device.get('name', '')
+            # what an output plays can be recorded from it: that is not a microphone
+            if kind == 'input' and (name.endswith('.monitor') or device.get('properties', {}).get('device.class') == 'monitor'):
+                continue
+            lines.append((kind, name, device.get('description') or name, 'default' if name == default else '-',
+                          volume_of(device), 'muted' if device.get('mute') else '-'))
+    for stream in listed('sink-inputs'):
+        properties = stream.get('properties', {})
+        name = properties.get('application.name') or properties.get('media.name') or properties.get('node.name') or 'an app'
+        lines.append(('app', str(stream.get('index', '')), name, volume_of(stream), 'muted' if stream.get('mute') else '-'))
+    for line in lines:
+        print('\t'.join(part.replace('\t', ' ') for part in line))
+
+
+def main():
+    arguments = sys.argv[1:]
+    if not arguments:
+        show()
+    elif arguments[0] in ('output', 'input') and len(arguments) == 2:
+        does('pactl', 'set-default-sink' if arguments[0] == 'output' else 'set-default-source', arguments[1])
+    elif arguments[0] == 'volume' and len(arguments) == 3 and arguments[1] in ('output', 'input') and re.fullmatch(r'\d{1,3}', arguments[2]):
+        default = '@DEFAULT_SINK@' if arguments[1] == 'output' else '@DEFAULT_SOURCE@'
+        does('pactl', 'set-sink-volume' if arguments[1] == 'output' else 'set-source-volume', default, f'{min(int(arguments[2]), 150)}%')
+    elif arguments[0] == 'mute' and len(arguments) == 3 and arguments[1] in ('output', 'input') and arguments[2] in ('on', 'off'):
+        default = '@DEFAULT_SINK@' if arguments[1] == 'output' else '@DEFAULT_SOURCE@'
+        does('pactl', 'set-sink-mute' if arguments[1] == 'output' else 'set-source-mute', default, '1' if arguments[2] == 'on' else '0')
+    elif arguments[0] == 'app' and len(arguments) == 3 and arguments[1].isdigit() and re.fullmatch(r'\d{1,3}', arguments[2]):
+        does('pactl', 'set-sink-input-volume', arguments[1], f'{min(int(arguments[2]), 150)}%')
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()

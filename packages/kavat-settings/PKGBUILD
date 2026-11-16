@@ -1,14 +1,15 @@
 pkgname=kavat-settings
 pkgver=0.1.0
-pkgrel=11
+pkgrel=12
 pkgdesc="Willwitcher-OS Kavat Edition: the system's settings, as a panel of the shell"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # the shell that draws the panel, and the programs its pages show and change
-depends=('kavat-shell' 'kavat-theme' 'kav' 'kavat-notes' 'kitty' 'python' 'pciutils')
-source=('kavat-conf' 'gpu-state')
-sha256sums=('SKIP' 'SKIP')
+depends=('kavat-shell' 'kavat-theme' 'kav' 'kavat-notes' 'kitty' 'python' 'pciutils'
+         'networkmanager' 'bluez-utils' 'libpulse' 'pipewire-pulse' 'yazi')
+source=('kavat-conf' 'gpu-state' 'kavat-network' 'kavat-sound')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 # A plugin of the shell, in a folder the shell is pointed at by the theme's settings for it.
 package() {
@@ -17,5 +18,8 @@ package() {
   cp -r "$startdir/palette" "$pkgdir/usr/share/kavat/shell-plugins/palette"
   chmod -R u=rwX,go=rX "$pkgdir/usr/share/kavat"
   install -Dm755 kavat-conf "$pkgdir/usr/bin/kavat-conf"
+  # what the Network and the Sound pages show and change
+  install -Dm755 kavat-network "$pkgdir/usr/bin/kavat-network"
+  install -Dm755 kavat-sound "$pkgdir/usr/bin/kavat-sound"
   install -Dm755 gpu-state "$pkgdir/usr/lib/kavat/gpu-state"
 }

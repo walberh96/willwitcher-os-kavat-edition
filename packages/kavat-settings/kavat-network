@@ -1,0 +1,284 @@
+#!/usr/bin/env python3
+"""kavat-network: the connections and the Bluetooth devices, as the Network page shows them.
+
+usage: kavat-network                              what there is, one thing to a line, its parts between tabs:
+                                                    wired <device> <state> <speed>
+                                                    wifi <on|off|none> <startup: on|off>
+                                                    network <name> <signal> <open|locked> <saved|-> <connected|->
+                                                    vpn <name> <wireguard|openvpn|...> <up|-> <incognito|->
+                                                    bluetooth <on|off|none> <startup: on|off>
+                                                    device <address> <name> <connected|paired|near> <battery|->
+       kavat-network wifi on|off                  the Wi-Fi radio
+       kavat-network wifi startup on|off          whether Wi-Fi is on when a session starts
+       kavat-network wifi scan                    look for networks again
+       kavat-network wifi connect <name> [password]
+       kavat-network wifi forget <name>
+       kavat-network vpn add [file]               add a VPN from a provider's file: WireGuard (.conf) or OpenVPN (.ovpn);
+                                                  with no file, in a terminal, the file is picked in Yazi
+       kavat-network vpn up|down|remove <name>
+       kavat-network vpn use <name>|none          the VPN Incognito uses
+       kavat-network bluetooth on|off
+       kavat-network bluetooth startup on|off     whether Bluetooth is on when a session starts
+       kavat-network bluetooth scan               look for devices nearby for ten seconds
+       kavat-network bluetooth pair|connect|disconnect|forget <address>
+       kavat-network startup                      at the start of a session: turn off what is not to be on
+
+It is NetworkManager and BlueZ that do the work, through nmcli and bluetoothctl: this puts
+what they say in one list and their commands under one name. The two "on at startup"
+settings are in ~/.config/kavat/network.toml.
+"""
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import tomllib
+
+HOME = os.path.expanduser('~')
+FILE = (os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config') + '/kavat/network.toml'
+ADDRESS = r'[0-9A-Fa-f]{2}(:[0-9A-Fa-f]{2}){5}'
+
+
+def out(*command, timeout=30):
+    """What a command prints, or None when it fails."""
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def does(*command, timeout=60):
+    """Run a command of the two programs and end as it does, with what it says when it fails."""
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    except subprocess.TimeoutExpired:
+        sys.exit(f'kavat-network: {command[0]} did not answer in {timeout} seconds')
+    except OSError:
+        sys.exit(f'kavat-network: {command[0]} is not installed')
+    if done.returncode != 0:
+        said = (done.stderr.strip() or done.stdout.strip()).splitlines()
+        sys.exit('kavat-network: ' + (said[-1] if said else f'{command[0]} failed'))
+    return done.stdout
+
+
+def fields(line):
+    """The parts of a line of `nmcli -t`: split at the colons that are not escaped."""
+    return [part.replace('\\:', ':').replace('\\\\', '\\') for part in re.split(r'(?<!\\):', line)]
+
+
+def settings():
+    try:
+        with open(FILE, 'rb') as file:
+            return tomllib.load(file)
+    except (OSError, tomllib.TOMLDecodeError):
+        return {}
+
+
+def at_startup(key):
+    return settings().get(key) is not False
+
+
+def set_startup(key, on):
+    kept = {'wifi_at_startup': at_startup('wifi_at_startup'), 'bluetooth_at_startup': at_startup('bluetooth_at_startup'), key: on}
+    os.makedirs(os.path.dirname(FILE), exist_ok=True)
+    with open(FILE, 'w', encoding='utf-8') as file:
+        file.write('# Written by kavat-network: what is on when a session starts. The Network page of the\n# settings changes it.\n')
+        for name, value in kept.items():
+            file.write(f'{name} = {"true" if value else "false"}\n')
+
+
+# ---- what there is
+
+def connections():
+    """Each connection NetworkManager keeps: its name, its type, and whether it is up."""
+    lines = out('nmcli', '-t', '-f', 'NAME,TYPE,ACTIVE', 'connection', 'show') or ''
+    return [fields(line) for line in lines.splitlines() if len(fields(line)) == 3]
+
+
+def kind_of(name, kind):
+    if kind == 'wireguard':
+        return 'wireguard'
+    service = (out('nmcli', '-g', 'vpn.service-type', 'connection', 'show', 'id', name) or '').strip()
+    return service.rsplit('.', 1)[-1] or 'vpn'
+
+
+def has_bluetooth():
+    """Whether there is a Bluetooth adapter: with none BlueZ is not running, and bluetoothctl would wait for it."""
+    try:
+        return bool(shutil.which('bluetoothctl')) and bool(os.listdir('/sys/class/bluetooth'))
+    except OSError:
+        return False
+
+
+def bluetooth_devices():
+    """Each device BlueZ knows: its address, its name, how it stands, and its battery."""
+    found = []
+    for line in (out('bluetoothctl', '--timeout', '5', 'devices', timeout=8) or '').splitlines():
+        match = re.match(rf'Device ({ADDRESS}) (.*)$', line)
+        if not match:
+            continue
+        info = out('bluetoothctl', '--timeout', '5', 'info', match.group(1), timeout=8) or ''
+        state = 'connected' if 'Connected: yes' in info else 'paired' if 'Paired: yes' in info else 'near'
+        battery = re.search(r'Battery Percentage: 0x[0-9a-fA-F]+ \((\d+)\)', info)
+        # a device with no name of its own is listed under its address: those nearby are not worth showing
+        if state == 'near' and match.group(3).replace('-', ':') == match.group(1):
+            continue
+        found.append((match.group(1), match.group(3), state, battery.group(1) if battery else '-'))
+    order = {'connected': 0, 'paired': 1, 'near': 2}
+    return sorted(found, key=lambda device: (order[device[2]], device[1].lower()))
+
+
+def show():
+    lines = []
+    devices = [fields(line) for line in (out('nmcli', '-t', '-f', 'DEVICE,TYPE,STATE', 'device') or '').splitlines()]
+    for device in devices:
+        if len(device) == 3 and device[1] == 'ethernet':
+            try:
+                speed = int(open(f'/sys/class/net/{device[0]}/speed', encoding='utf-8').read())
+            except (OSError, ValueError):
+                speed = 0
+            speed = f'{speed // 1000} Gb/s' if speed >= 1000 and speed % 1000 == 0 else f'{speed / 1000:.1f} Gb/s' if speed >= 1000 else f'{speed} Mb/s' if speed > 0 else '-'
+            lines.append(('wired', device[0], device[2].split(' ')[0], speed))
+    kept = connections()
+    has_wifi = any(len(device) == 3 and device[1] == 'wifi' for device in devices)
+    radio = (out('nmcli', '-t', '-f', 'WIFI', 'radio') or '').strip()
+    lines.append(('wifi', 'none' if not has_wifi else 'on' if radio == 'enabled' else 'off', 'on' if at_startup('wifi_at_startup') else 'off'))
+    if has_wifi:
+        saved = {name for name, kind, _ in kept if kind == '802-11-wireless'}
+        seen = {}
+        for line in (out('nmcli', '-t', '-f', 'IN-USE,SSID,SIGNAL,SECURITY', 'device', 'wifi', 'list', '--rescan', 'no') or '').splitlines():
+            parts = fields(line)
+            if len(parts) == 4 and parts[1] and (parts[1] not in seen or parts[0] == '*'):
+                seen[parts[1]] = ('network', parts[1], parts[2], 'locked' if parts[3] not in ('', '--') else 'open',
+                                  'saved' if parts[1] in saved else '-', 'connected' if parts[0] == '*' else '-')
+        # the one in use, then the saved ones, then by how well they are heard
+        lines += sorted(seen.values(), key=lambda network: (network[5] != 'connected', network[4] != 'saved', -int(network[2] or 0)))
+        lines += [('network', name, '0', 'locked', 'saved', '-') for name in sorted(saved - set(seen))]
+    incognito = (out('kavat-mode', 'vpn') or '').strip()
+    for name, kind, active in kept:
+        if kind in ('vpn', 'wireguard'):
+            lines.append(('vpn', name, kind_of(name, kind), 'up' if active == 'yes' else '-', 'incognito' if name == incognito else '-'))
+    controller = out('bluetoothctl', '--timeout', '5', 'show', timeout=8) if has_bluetooth() else None
+    lines.append(('bluetooth', 'none' if not controller else 'on' if 'Powered: yes' in controller else 'off',
+                  'on' if at_startup('bluetooth_at_startup') else 'off'))
+    if controller:
+        lines += [('device', *device) for device in bluetooth_devices()]
+    for line in lines:
+        print('\t'.join(line))
+
+
+# ---- VPNs
+
+def pick_file():
+    """A file picked in Yazi, when there is a terminal to show it in."""
+    if not sys.stdin.isatty() or not shutil.which('yazi'):
+        sys.exit('kavat-network: name the file: kavat-network vpn add <file>')
+    print('Pick the file your VPN provider gave you: a WireGuard .conf or an OpenVPN .ovpn. Enter picks it, q leaves.')
+    with tempfile.NamedTemporaryFile(prefix='kavat-vpn-') as chosen:
+        start = f'{HOME}/Downloads' if os.path.isdir(f'{HOME}/Downloads') else HOME
+        subprocess.run(['yazi', f'--chooser-file={chosen.name}', start], check=False)
+        path = open(chosen.name, encoding='utf-8').read().strip().splitlines()
+    if not path:
+        sys.exit('kavat-network: no file was picked')
+    return path[0]
+
+
+def vpn_add(path):
+    path = os.path.expanduser(path)
+    if not os.path.isfile(path):
+        sys.exit(f'kavat-network: there is no file {path}')
+    stem, extension = os.path.splitext(os.path.basename(path))
+    text = open(path, encoding='utf-8', errors='replace').read()
+    if extension == '.conf' and '[Interface]' in text:
+        kind = 'wireguard'
+    elif extension == '.ovpn' or re.search(r'^\s*remote\s', text, re.M):
+        kind = 'openvpn'
+    else:
+        sys.exit('kavat-network: that is neither a WireGuard file, a .conf with [Interface] in it, nor an OpenVPN one, a .ovpn')
+    name = re.sub(r'[^A-Za-z0-9 ._-]', '', stem).strip() or 'vpn'
+    names = {connection[0] for connection in connections()}
+    if name in names:
+        sys.exit(f'kavat-network: there is already a connection called {name}; remove it first, or rename the file')
+    # a WireGuard connection takes the file's name as its device's, which can have 15 letters:
+    # it is imported under a short name and given its own afterwards
+    with tempfile.TemporaryDirectory(prefix='kavat-vpn-') as folder:
+        number = 0
+        while f'kavat{number}' in names or os.path.exists(f'/sys/class/net/kavat{number}'):
+            number += 1
+        short = f'kavat{number}'
+        copy = f'{folder}/{short}{".conf" if kind == "wireguard" else ".ovpn"}'
+        shutil.copyfile(path, copy)
+        does('nmcli', 'connection', 'import', 'type', kind, 'file', copy)
+    # it comes up when it is asked for, not by itself: Incognito, or the Network page
+    does('nmcli', 'connection', 'modify', 'id', short, 'connection.id', name, 'connection.autoconnect', 'no')
+    out('nmcli', 'connection', 'down', 'id', name)
+    said = f'{name} is added.'
+    if not (out('kavat-mode', 'vpn') or '').strip() and out('kavat-mode', 'vpn', name) is not None:
+        said += ' Incognito uses it.'
+    print(said)
+
+
+def main():
+    arguments = sys.argv[1:]
+    if not arguments:
+        show()
+    elif arguments == ['startup']:
+        if not at_startup('wifi_at_startup'):
+            out('nmcli', 'radio', 'wifi', 'off')
+        if not at_startup('bluetooth_at_startup') and has_bluetooth():
+            out('bluetoothctl', 'power', 'off')
+    elif arguments[0] == 'wifi' and arguments[1:] in (['on'], ['off']):
+        does('nmcli', 'radio', 'wifi', arguments[1])
+    elif arguments[0] == 'wifi' and arguments[1:2] == ['startup'] and arguments[2:] in (['on'], ['off']):
+        set_startup('wifi_at_startup', arguments[2] == 'on')
+    elif arguments == ['wifi', 'scan']:
+        does('nmcli', 'device', 'wifi', 'rescan')
+    elif arguments[0] == 'wifi' and arguments[1:2] == ['connect'] and len(arguments) in (3, 4):
+        saved = any(name == arguments[2] and kind == '802-11-wireless' for name, kind, _ in connections())
+        if saved and len(arguments) == 3:
+            does('nmcli', 'connection', 'up', 'id', arguments[2])
+        else:
+            does('nmcli', 'device', 'wifi', 'connect', arguments[2], *(['password', arguments[3]] if len(arguments) == 4 else []))
+    elif arguments[0] == 'wifi' and arguments[1:2] == ['forget'] and len(arguments) == 3:
+        does('nmcli', 'connection', 'delete', 'id', arguments[2])
+    elif arguments[:2] == ['vpn', 'add'] and len(arguments) in (2, 3):
+        vpn_add(arguments[2] if len(arguments) == 3 else pick_file())
+    elif arguments[0] == 'vpn' and arguments[1:2] in (['up'], ['down'], ['remove']) and len(arguments) == 3:
+        if not any(name == arguments[2] and kind in ('vpn', 'wireguard') for name, kind, _ in connections()):
+            sys.exit(f'kavat-network: there is no VPN called {arguments[2]}')
+        if arguments[1] == 'remove':
+            if (out('kavat-mode', 'vpn') or '').strip() == arguments[2]:
+                out('kavat-mode', 'vpn', 'none')
+            does('nmcli', 'connection', 'delete', 'id', arguments[2])
+        else:
+            does('nmcli', 'connection', arguments[1], 'id', arguments[2], timeout=45)
+    elif arguments[:2] == ['vpn', 'use'] and len(arguments) == 3:
+        does('kavat-mode', 'vpn', arguments[2])
+    elif arguments[0] == 'bluetooth' and arguments[1:2] != ['startup'] and not has_bluetooth():
+        sys.exit('kavat-network: this machine has no Bluetooth adapter')
+    elif arguments[0] == 'bluetooth' and arguments[1:] in (['on'], ['off']):
+        does('bluetoothctl', 'power', arguments[1])
+    elif arguments[0] == 'bluetooth' and arguments[1:2] == ['startup'] and arguments[2:] in (['on'], ['off']):
+        set_startup('bluetooth_at_startup', arguments[2] == 'on')
+    elif arguments == ['bluetooth', 'scan']:
+        out('bluetoothctl', '--timeout', '10', 'scan', 'on', timeout=20)
+    elif arguments[0] == 'bluetooth' and arguments[1:2] in (['pair'], ['connect'], ['disconnect'], ['forget']) and len(arguments) == 3 \
+            and re.fullmatch(ADDRESS, arguments[2]):
+        address = arguments[2]
+        if arguments[1] == 'pair':
+            does('bluetoothctl', '--timeout', '30', 'pair', address, timeout=40)
+            # a device that is trusted connects by itself the next time it is turned on
+            out('bluetoothctl', 'trust', address)
+            out('bluetoothctl', '--timeout', '15', 'connect', address, timeout=25)
+        elif arguments[1] == 'forget':
+            does('bluetoothctl', 'remove', address)
+        else:
+            does('bluetoothctl', '--timeout', '15', arguments[1], address, timeout=25)
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()
