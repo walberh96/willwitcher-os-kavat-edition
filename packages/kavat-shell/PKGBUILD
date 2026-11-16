@@ -1,6 +1,6 @@
 pkgname=kavat-shell
 pkgver=5.4.1
-pkgrel=3
+pkgrel=4
 pkgdesc="Willwitcher-OS Kavat Edition: Kavat Shell, the desktop shell; it began as Noctalia and asks the network for nothing by itself"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -60,9 +60,9 @@ makedepends=(
   'wayland-protocols'
 )
 source=("noctalia-$pkgver.tar.gz::https://github.com/noctalia-dev/noctalia/archive/refs/tags/v$pkgver.tar.gz"
-        'no-ping.patch' 'no-network.patch' 'arrange.patch' 'rename.py')
+        'no-ping.patch' 'no-network.patch' 'arrange.patch' 'no-first-wallpaper.patch' 'rename.py')
 sha256sums=('6069d922e9d72488c74e4ce335314ce2203f08bd4641380bfe1bd137004597fa'
-            'SKIP' 'SKIP' 'SKIP' 'SKIP')
+            'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 options=('!debug')
 
 # What the fork changes, in this order:
@@ -75,12 +75,16 @@ options=('!debug')
 #   arrange.patch      one more control for plugins, ui.arrange: rectangles drawn to scale
 #                      that are placed by dragging them, their edges snapping to each
 #                      other. The Displays page of the settings is made with it.
+#   no-first-wallpaper.patch
+#                      the picture Noctalia shows as the background until one is chosen
+#                      is never shown: the background is the theme's from the first frame.
 #   rename.py          the name: the command, the folders, the D-Bus names and every text.
 prepare() {
   cd "noctalia-$pkgver"
   patch -p1 < "$srcdir/no-ping.patch"
   patch -p1 < "$srcdir/no-network.patch"
   patch -p1 < "$srcdir/arrange.patch"
+  patch -p1 < "$srcdir/no-first-wallpaper.patch"
   python "$srcdir/rename.py" .
 }
 

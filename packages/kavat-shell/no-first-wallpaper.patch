@@ -1,0 +1,35 @@
+diff --git a/src/config/config_overrides.cpp b/src/config/config_overrides.cpp
+index 6307cbb..b5763c2 100644
+--- a/src/config/config_overrides.cpp
++++ b/src/config/config_overrides.cpp
+@@ -1252,7 +1252,7 @@ bool ConfigService::markSetupWizardCompleted() {
+ 
+   // The bundled wallpaper is served via firstRunWallpaperPath() until setup
+   // completes. Persist it so finishing the wizard does not clear the desktop.
+-  if (!hasConfiguredWallpaper()) {
++  if (false && !hasConfiguredWallpaper()) {
+     const auto bundled = paths::assetPath("noctalia-wallpaper.png");
+     std::error_code ec;
+     if (std::filesystem::exists(bundled, ec)) {
+@@ -2216,18 +2216,9 @@ bool ConfigService::hasConfiguredWallpaper() const {
+ }
+ 
+ std::string ConfigService::firstRunWallpaperPath() const {
+-  if (m_setupMarkerPath.empty() || std::filesystem::exists(m_setupMarkerPath)) {
+-    return {};
+-  }
+-  if (hasConfiguredWallpaper()) {
+-    return {};
+-  }
+-  const auto path = paths::assetPath("noctalia-wallpaper.png");
+-  std::error_code ec;
+-  if (!std::filesystem::exists(path, ec)) {
+-    return {};
+-  }
+-  return path.string();
++  // Kavat: the desktop's background is the theme's, set by the system when the session
++  // starts. A picture of the shell's own is never shown in its place.
++  return {};
+ }
+ 
+ std::string ConfigService::getWallpaperPath(const std::string& connectorName) const {
