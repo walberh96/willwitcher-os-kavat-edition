@@ -30,6 +30,13 @@ def main():
         if checks.report(machine.wait_for_agent(BOOT_TIMEOUT), 'the system boots'):
             check_desktop(machine, checks, 'live')
             check_packages(machine, checks)
+            # nobody types a password to enter the live session, so nothing may ask for one
+            # to make a keyring: the shell keeps the key of its clipboard history in a file
+            time.sleep(6)
+            status, output = machine.run('pgrep -c -x gcr-prompter; runuser -u live -- env XDG_RUNTIME_DIR=/run/user/1000 hyprctl --instance 0 clients | grep -c -i "gcr\\|keyring"; '
+                                         'runuser -u live -- cat /home/live/.config/kavat-shell/storage-key | wc -c; '
+                                         'cat /home/live/.cache/kavat-shell/kavat-shell.log | grep -c -i "storage.*\\(locked\\|secret service\\)"; ls /home/live/.cache/kavat-shell/ | grep -c kavat-shell.log')
+            checks.report(output.split() == ['0', '0', '65', '0', '1'], 'nothing asks for a keyring to be made, with a password, in the live session', output)
             if checks.failed:
                 print_journal(machine)
             else:

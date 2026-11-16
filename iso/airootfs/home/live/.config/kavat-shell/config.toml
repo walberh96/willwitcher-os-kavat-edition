@@ -1,0 +1,11 @@
+# The live session is there to install from: the shell's first-run dialog would open over
+# the installer and take the keyboard.
+[shell]
+setup_wizard_enabled = false
+
+# Nobody types a password to enter the live session, so no keyring is opened in it, and the
+# shell would ask for one to be made, with a password, to keep the key of its clipboard
+# history. Here that key is a file: nothing of the live session outlasts it anyway.
+[storage]
+key_source = "file"
+key_file   = "/home/live/.config/kavat-shell/storage-key"

@@ -29,6 +29,12 @@ dosfstools
 networkmanager
 iwd
 wireless-regdb
+# a VPN from a provider's OpenVPN file; WireGuard needs nothing more
+networkmanager-openvpn
+
+# Bluetooth: its service is on, and the Network page of the settings pairs the devices
+bluez
+bluez-utils
 
 # Loading screen of the installed system. Its look comes from kavat-theme.
 plymouth
