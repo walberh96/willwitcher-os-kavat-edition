@@ -35,7 +35,7 @@ Mark each line as you go. For anything that fails, the line says what to note do
 - [ ] **Windows page.** Gaps, corner radius and border move the windows as the slider is let go; Blur, Transparency, Shadows and Animations switch.
 - [ ] **The cursor.** Its body is light on a dark theme and dark on a light one, and its edge is the accent. It changes when the accent does. *Note any app where the cursor is a different one.*
 - [ ] **The folders' icons.** Open the launcher (`Super+D`) or any list with folder icons: they are the accent's colour and change with it. *Nothing but the launcher shows icons yet, so this may be hard to see.*
-- [ ] **Boot and login look.** On the Boot page, press "Give them the look in force" with a light theme: it asks for your password in a dialog of the shell. Restart: the boot menu, the loading screen and the login are light. Put it back to dark the same way.
+- [ ] **Boot and login look.** On the Boot page, press "Make them look like my desktop" with a light theme: it asks for your password in a dialog of the shell. Restart: the boot menu, the loading screen and the login are light. Put it back to dark the same way.
 - [ ] **The shell's name.** `kavat-shell --help` in a terminal answers; nothing on the screen says Noctalia. *Note any place that still does.*
 - [ ] **Music.** Play something in an app: the bar's media widget shows it. A cover that comes from the network is not shown, on purpose; say if you want it back.
 - [ ] **Icon style and cursor size.** Tinted paints the app icons in the launcher with the palette; Line draws the folders as outlines; 32 and 48 make the cursor bigger at once.
@@ -231,6 +231,25 @@ With the network:
 - [ ] Recovery in the boot menu ends in its own menu.
 - [ ] Windows and CachyOS still boot from "Other systems".
 
+## 18. The second pass: what was found, to try again
+
+Each of these is something found on the PC on 15 November 2026 and corrected. One installation from the USB stick covers them all.
+
+- [ ] **The live session asks for no keyring.** From the USB stick to the installer's last page, nothing asks for a password to make a keyring.
+- [ ] **The login on two displays.** The main one asks who logs in; the other shows the clock over the same picture, not black. Turn the second display off and on at the login: it gets the clock again.
+- [ ] **No picture of Noctalia at the start.** After the login the background is the theme's picture from the first moment; at most the theme's plain colour shows for an instant before it.
+- [ ] **The bar** has no background picker beside the workspaces and no owl beside the power button, and it shows which keyboard is in use, `us` or `es`: `Alt+Shift` changes it.
+- [ ] **Displays, keeping a change.** Set a display to 144 Hz: an amber band asks "Keep these display settings?" and counts down from ten. Without pressing anything, change the rotation too: the count starts again. Press **Keep**: both stay. Change the scale and let the count end: it goes back, and the page says the change was not kept.
+- [ ] **Workspaces on each display.** On Displays, press the second display, then 6, 7, 8, 9 and 10 under "Workspaces on": `Super+6` opens on that display from then on, and a window sent with `Super+Shift+6` goes there. Log out and in: it is kept.
+- [ ] **Network, Wi-Fi.** The Network page lists the cable with its speed and, on a machine with Wi-Fi, the networks in reach: Connect on a locked one asks for its password in the page and connects.
+- [ ] **Network, Bluetooth.** Enabled is on. Put a controller or headphones in pairing mode, press **Pair a device**, wait ten seconds, press **Pair** on its line: it ends "connected", with its battery when the device says it. Disconnect, Connect and Forget do what they say.
+- [ ] **A VPN for Incognito.** With no VPN yet, press Incognito on the bar: a notification says it needs a VPN and how one is added, and the Network page opens. Download a WireGuard file from your provider (Proton VPN: account.protonvpn.com, Downloads, WireGuard configuration), press **+ Add a VPN**, pick it in Yazi: it shows on the page as "used by Incognito". Press Incognito again: the mode is entered, and `curl ifconfig.me` gives the VPN's address. This is also the test of the network cut that waited from before.
+- [ ] **Sound.** The Sound page lists the outputs and the microphones: choosing another output moves what is playing to it, the two sliders change the volumes, and a video playing in the browser shows under "Playing now" with a slider of its own.
+- [ ] **Bar & widgets.** Position Bottom moves the bar at once; Top brings it back. The arrows move a widget along the bar, ✕ takes it off, and "Add a widget" puts one on: add "Processor and memory" to the right.
+- [ ] **Boot.** The page says which look the boot menu, the loading screen and the login wear, beside the desktop's. Set "Show menu for" to 3 seconds and turn Recovery off: it asks for your password once; at the next start the menu waits three seconds and has no Recovery. Turn it back on.
+- [ ] **The look of the boot, said plainly.** Change the desktop to Light on Appearance, open Boot: "They wear" and "Your desktop" differ, and the button "Make them look like my desktop" is there. Press it, restart: the boot menu, the loading screen and the login are light.
+- [ ] **A new tab's background.** In a new tab, the **Background** button at its foot: "The desktop's background" puts the wallpaper behind the clock, "A picture of yours…" opens the file window and puts that one, "The theme's colour" takes it away. The Browser page of the settings shows the same choice.
+
 ## What to send back
 
 For each line that failed: its number, what you did, what you saw. A photo of the screen is enough for anything before the login. After the login, `journalctl -b > ~/log.txt` right after it happens.
@@ -247,7 +266,26 @@ The user went through this list on the PC on 14 November 2026. Everything worked
 | In `kav`, after `i`, it was not clear that it waited for the password | A window says what it will run and where the password is asked for, and sudo's line says what it is for |
 | A note with a time made the note and no reminder | The notes on the PC's disk showed what was typed: "stand up in two minutes", with the number in words, and then a time inside quotes. Neither was understood. Numbers in words, quotes and the usual short forms are now, and the notification on saving says whether a reminder was set |
 | `Ctrl+D` in the notes flashed an error and listed nothing | With nothing due, the preview tried to show a file that was not there. It says "Nothing is due" now |
-| The login shows on one screen only | Left as it is: it looks good. The design says one screen |
+| The login shows on one screen only | Left as it was then; on the second pass the other screen was black, and that was fixed: see below |
+
+## Found on the second pass
+
+The user went through the list on the PC on 15 November 2026 and left what was found in `~/Documents/testing.md`. All of it was done; section 18 tries each again.
+
+| What was seen | What was done |
+| --- | --- |
+| In the installer, a window asked for a password to make a keyring | It was the shell, keeping the key of its clipboard history: nobody types a password to enter the live session, so no keyring was open. In the live session that key is a file now |
+| At the login, the second display was black | The display woke up after the login had started, and only the screens there at that moment got a page. A screen gets its page when it appears |
+| At the start, Noctalia's background showed before Kavat's | The shell showed its own picture until the system set the theme's. That picture is out of the shell; the theme's colour shows until its picture is read |
+| A change of a display was undone at the next change | It was the ten seconds to keep a change: the question was a line of small text and went unseen. It is a band across the page now, with the seconds counted and the Keep button in it, and the page says when a change was undone |
+| Network, Bluetooth and others were a button to the shell's controls | Network, Sound, Bar & widgets, Boot and Login & lock have the controls themselves now. Bluetooth was not installed at all: BlueZ comes with the system and is on |
+| Incognito did nothing: no VPN, and nowhere to set one | A notification says why and the Network page opens; a VPN is added there from the provider's file |
+| The background picker and the owl on the bar looked out of place | Both are off the bar. The background is chosen on the Wallpaper page; the control center opens from the network, Bluetooth and volume widgets |
+| "Give them the look in force" was not understood | The Boot and the Login pages say which look those screens wear, which the desktop wears, and offer to make them the same |
+| No way to choose a new tab's background | The theme's colour, the desktop's background or a picture, from the tab itself and from the settings |
+| No way to say which workspaces go on which display | Each display has its workspaces on the Displays page |
+
+Seen on the way: the keyboard's indicator was not on the bar, its name misspelt in the shell's settings. It is there now.
 
 ## Known and not built
 
@@ -256,7 +294,9 @@ These are not failures: they are listed in the design document as left for later
 - The settings panel has twenty-four pages of twenty-six; the other two wait for the agent.
 - The boot following the desktop's theme by itself, and the theme for Qt apps.
 - In the modes: all that waits for the agent and the browser, and the VPN's state on the bar.
-- Displays: the main display, the workspaces of each display, and a background for each display.
+- Displays: night light, and a background for each display.
+- Login & lock: logging in without a password, a clock of twelve hours and the list of users.
+- Network: a VPN that needs a name and a password typed, as some OpenVPN ones do, and a Bluetooth device that asks for a code.
 - In the browser: the palette on the pages Chromium draws itself, hiding its native panels, and the agent's panel.
 - Your aliases and functions from Endgame: they wait for you to go over them.
 - In the installer: the programs that are only in the AUR, and repeating an installation from its answer file.
