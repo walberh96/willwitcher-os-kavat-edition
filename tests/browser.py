@@ -156,7 +156,9 @@ def main():
                               + OPEN + ' | grep -c "^page "; ' + OPEN + f' | grep -c "^page chrome-extension://{KAVAT}/start.html\\|^page chrome://newtab"')
         lines = output.split()
         checks.report(len(lines) == 2 and lines[0].isdigit() and before.isdigit() and int(lines[0]) == int(before) + 1 and lines[1] != '0',
-                      'a command asked for from outside reaches the open browser, and a new tab is the start page of the system', f'{before} before\n{output}')
+                      'a command asked for from outside reaches the open browser, and a new tab is the start page of the system',
+                      # when it fails: whether the command is still waiting, and which hosts there are to take it
+                      f'{before} before\n{output}\n' + user('ls -la $XDG_RUNTIME_DIR/kavat-browser/; pgrep -a -f "[b]rowser-host"; date +%T')[1])
         time.sleep(2)
         machine.screen.picture(f'{pictures}/browser-tab.png')
         status, output = user('sleep 2; kavat-browser tabs | grep -c "^[0-9][0-9]*\t"; ls $XDG_RUNTIME_DIR/kavat-browser/tabs | grep -c "json$"; '
