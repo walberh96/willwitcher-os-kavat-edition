@@ -166,7 +166,7 @@ Icons and the cursor are made from the same theme: folders, system icons and the
 
 ## Everything is set in one place
 
-A settings panel inside the shell configures the whole core, on twenty-six pages: from appearance, windows and keybindings to GPU, sound, notes, projects, backups, privacy and boot.
+A settings panel inside the shell configures the whole core, on twenty-seven pages: from appearance, windows and keybindings to GPU, sound, notes, projects, backups, privacy and boot.
 
 - **One place per setting.** Each setting lives in its app's own config file, or in `~/.config/kavat/` for the system's own.
 - **Live and reversible.** Every change shows instantly, has undo and lands in a history.
@@ -266,6 +266,7 @@ A Chromium of its own, with ten changes.
 - **A password dialog of its own.** When something needs your password, the shell draws the dialog and says who is asking and what for.
 - **Firmware too.** `kav update` offers firmware for the board, the SSD and peripherals as one more step.
 - **Privacy in plain sight.** The bar shows when an app uses the microphone, camera or screen, and a per-app firewall asks the first time an app reaches for the network. Games launched by Steam use Steam's rule.
+- **Reach it from anywhere, only when you say so.** Remote access is off as the system comes. One switch joins your own Tailscale network and opens a terminal over SSH and the desktop through Sunshine to your devices only; the router needs no open port.
 
 ## From power button to desktop
 

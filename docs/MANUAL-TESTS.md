@@ -326,7 +326,7 @@ Seen on the way: the keyboard's indicator was not on the bar, its name misspelt 
 
 These are not failures: they are listed in the design document as left for later.
 
-- The settings panel has twenty-four pages of twenty-six; the other two wait for the agent.
+- The settings panel has twenty-four pages of twenty-seven; two wait for the agent, and Remote access is not built.
 - In the modes: all that waits for the agent and the browser.
 - Wallpaper: a video of its own for each display, and the login and the lock showing a video's still frame.
 - In the browser: the palette on the pages Chromium draws itself and hiding its native panels, which are to be built with a Chromium compiled here (D46); and the agent's panel.
@@ -337,4 +337,4 @@ These are not failures: they are listed in the design document as left for later
 - Neovim's side panels with Claude.
 - In `kav`: really building a package of the AUR was never tried, for want of a network in the test machine.
 - In the settings: changing a shortcut from the panel. In Incognito: notifications without their content.
-- Asked for on 16 November 2026 and in the design document: `port-kill` and `y`, the `sudo` and `zsh-completions` plugins, wallpapers searched online, YouTube Shorts hidden, and web apps. The agent's tools for containers, git and ports are phase 4.
+- Asked for on 16 November 2026 and in the design document: `port-kill` and `y`, the `sudo` and `zsh-completions` plugins, wallpapers searched online, YouTube Shorts hidden, and web apps. The agent's tools for containers, git and ports are phase 4. Remote access too, approved that day as D50: Tailscale, the SSH server and Sunshine behind one switch, off as the system comes.

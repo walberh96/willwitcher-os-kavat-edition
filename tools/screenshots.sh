@@ -71,6 +71,7 @@ shots=(
   "settings-notes|scene=settings&spage=notes"
   "settings-privacy|scene=settings&spage=privacy"
   "settings-projects|scene=settings&spage=projects"
+  "settings-remote|scene=settings&spage=remote&remote=true"
   "settings-shell|scene=settings&spage=shell"
   "settings-skills|scene=settings&spage=skills"
   "settings-terminal|scene=settings&spage=terminal"
