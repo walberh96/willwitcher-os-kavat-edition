@@ -9,10 +9,12 @@ Works on the disk that tests/install.py leaves in out/test/, through a copy-on-w
 so that disk does not change. It logs in as a user who never took a note. A line of text
 has to become a note in the inbox, with its tags, and a day and a time at its end have to
 become a reminder: a line in the note and a timer of the session. nb has to list what is
-due without asking anything first. A reminder set a minute ahead has to come up as a
+due without asking anything first. The note has to be in the index, and its day in the
+calendar the shell reads. A reminder set a minute ahead has to come up as a
 notification, and one whose time passed has to be listed as overdue. Then, on the desktop,
 Super+N has to open a line to type a note in, and Enter has to save it. A site has to be
-kept in an album as a bookmark with a small picture, once, and be opened, archived and
+kept in an album as a bookmark with a small picture, which the notes' screen has to draw
+when the terminal is Kitty, once, and be opened, archived and
 found again by its address; a second clipping of a page has to land in the note of the
 first; a template has to make a note, and today's daily note has to be made once. In Gamer
 mode a reminder has to wait until the mode is left, unless its note says it is urgent.
@@ -41,15 +43,16 @@ keys, words = sys.argv[1].split(","), sys.argv[2].split(",")
 pid, fd = pty.fork()
 if pid == 0:
     os.environ["TERM"] = "xterm-256color"
+    os.environ["KITTY_WINDOW_ID"] = "1"  # as in Kitty, where the screen draws pictures
     os.execv("/usr/bin/kavat-notes-tui", ["kavat-notes-tui"])
-fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 34, 130, 0, 0))
+fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 34, 130, 1300, 680))
 drawn = b""
 wide = 130
 def whole():
     # a screen only draws what changed; a new size makes it draw everything again
     global wide
     wide = 261 - wide
-    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 34, wide, 0, 0))
+    fcntl.ioctl(fd, termios.TIOCSWINSZ, struct.pack("HHHH", 34, wide, wide * 10, 680))
     watch(0.8)
 def watch(seconds):
     global drawn
@@ -139,6 +142,17 @@ def main():
         machine.screen.picture(f'{pictures}/notes-reminder.png')
         status, output = user('kavat-notes due')
         checks.report('Overdue' in output and 'stand up' in output, 'one that was not answered is listed as overdue', output)
+        status, output = user('index=$(kavat-notes index); echo "$index"; cut -f 3,4,5,9 "$index" | grep -c "^inbox.call the bank.open.#money$"; '
+                              'cut -f 1,2 "$index" | sort > /tmp/index-before; kavat-notes count > /dev/null; '
+                              'cut -f 1,2 "$(kavat-notes index)" | sort | cmp -s - /tmp/index-before && echo kept')
+        checks.report(output.splitlines() == [f'{HOME}/.cache/kavat/notes/index', '1', 'kept'],
+                      'the notes have an index, with a note\'s title, what it is and its tags, which is kept while nothing changes', output)
+        status, output = user('cd ~/.local/share/kavat/notes/calendar && cat displayname && grep -l "^SUMMARY:stand up" *.ics | wc -l && '
+                              'grep -h -c "^DTSTART:[0-9]*T[0-9]*00" $(grep -l "^SUMMARY:stand up" *.ics); '
+                              'kavat-shell msg config-get calendar.enabled; kavat-shell msg config-get calendar.reminders.enabled')
+        lines = output.splitlines()
+        checks.report(lines[:3] == ['Notes', '1', '1'] and len(lines) == 5 and 'true' in lines[3] and 'false' in lines[4],
+                      'the day of a reminder is an event of a calendar, which the shell is set to read, without reminding by itself', output)
         user('pkill -x notify-send')
 
         print('the quick note', flush=True)
@@ -184,6 +198,8 @@ def main():
                               'kavat-notes album show my-sites | cut -f 1,2; kavat-notes album show my-sites | cut -f 3,4 | grep -c "bookmark.md.*jpg$"')
         checks.report(output == 'Arch Linux, the site\thttps://archlinux.org/\nRust docs\thttps://docs.rs/\n1',
                       'a site that is already there is brought up to date, not kept twice', output)
+        status, output = user('python3 /var/tmp/screen.py "6,b" "Albums,my-sites,Arch Linux,_Ga=T"', 60)
+        checks.report(output == 'missing: \nended: 0', "the notes' screen lists the sites of an album, and draws the picture of the one under the cursor", output)
         status, output = user('PATH=/var/tmp/stub:$PATH kavat-notes album open my-sites; sleep 1; cat /tmp/opened')
         checks.report(output == 'https://archlinux.org/ https://docs.rs/', 'an album opens whole in the browser, in one call', output)
         status, output = user('file=$(kavat-notes album add read-later "To read" https://example.org/long); kavat-notes album read "$file"; '

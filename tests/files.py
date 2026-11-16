@@ -6,7 +6,8 @@ usage: tests/files.py [--encrypted]
 
 Works on the disk that tests/install.py leaves in out/test/, through a copy-on-write layer,
 so that disk does not change. It logs in and opens Yazi with Super+E: Ctrl+C and Ctrl+V have
-to copy a file and Delete has to send it to the trash. Then it asks the desktop for a file,
+to copy a file, Delete has to send it to the trash and W has to set a picture as the
+desktop's background. Then it asks the desktop for a file,
 as an app does when it says "open": Yazi has to come up as a floating window, and the file
 picked there with Enter has to be the answer the app gets. Last, it asks the file manager
 to show a file, as an app does with "show in folder", and Yazi has to open there.
@@ -76,11 +77,11 @@ def main():
             _, found = user(command)
         return checks.report(wanted in found, what, f'wanted {wanted}, found {found}')
 
-    def to_file():
+    def to_file(name=FILE):
         """Put Yazi's cursor on the test's file: the folders of the home folder come before it."""
         machine.screen.press('/')
         time.sleep(1)
-        machine.screen.type(FILE)
+        machine.screen.type(name)
         machine.screen.press('enter')
         time.sleep(1)
 
@@ -119,7 +120,12 @@ def main():
         machine.screen.press('y')
         until('Delete sends one of the two to the trash', 'ls ~/.local/share/Trash/files/ 2>&1; ls ~ | grep -c "^0-first"', '0-first')
         until('and takes it out of the folder', 'echo "left: $(ls ~ | grep -c "^0-first")"', 'left: 1')
-        user(f'rm -f ~/0-first*; echo picked > ~/{FILE}')
+        user('rm -f ~/0-first*; ffmpeg -loglevel error -y -f lavfi -i testsrc=size=640x360 -frames:v 1 ~/0-first.png', 60)
+        time.sleep(2)
+        to_file('0-first.png')
+        machine.screen.press('shift', 'w')
+        until("W sets the picture under the cursor as the desktop's background", 'kavat-wallpaper', f'image {HOME}/0-first.png')
+        user(f'kavat-wallpaper theme; rm -f ~/0-first*; echo picked > ~/{FILE}')
         machine.screen.press('q')
         until('q leaves Yazi', 'pgrep -c -x yazi; echo left', '0\nleft')
 

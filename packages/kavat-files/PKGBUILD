@@ -1,6 +1,6 @@
 pkgname=kavat-files
 pkgver=0.1.0
-pkgrel=7
+pkgrel=9
 pkgdesc="Willwitcher-OS Kavat Edition: Yazi as the file manager of the whole system"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

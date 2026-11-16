@@ -1,6 +1,6 @@
 pkgname=kavat-notes
 pkgver=7.25.6
-pkgrel=7
+pkgrel=10
 pkgdesc="Willwitcher-OS Kavat Edition: notes in Markdown, on a fork of nb, with reminders and a quick note"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -54,4 +54,7 @@ package() {
   # the templates a note is made from, and the count of what is due, for the shell's bar
   install -Dm644 -t "$pkgdir/usr/share/kavat/notes/templates" "$startdir"/templates/*.md
   install -Dm644 -t "$pkgdir/usr/share/kavat/shell-plugins/notes" "$startdir"/shell/*
+  # the folder the days that have something are kept in, as a calendar: a new user has it
+  # from the start, so the shell finds it, and watches it, the first time it looks
+  install -dm755 "$pkgdir/etc/skel/.local/share/kavat/notes/calendar"
 }

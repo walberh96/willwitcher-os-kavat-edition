@@ -1,10 +1,12 @@
 //! kavat-notes-tui: the notes on one screen, as the design draws it.
 //!
-//! It reads the notes as nb keeps them, Markdown files in ~/Notes, one folder to a
-//! notebook, and shows them by what they are for: what is due today, the inbox, every note,
-//! the tasks and the reminders, and the albums of sites the browser keeps. It changes nothing
-//! by itself: each key that changes a note or an album runs kavat-notes for it, which is what
-//! keeps the history and sets the reminders.
+//! The notes are Markdown files in ~/Notes, as nb keeps them, one folder to a notebook. What
+//! the lists say of them comes from the index kavat-notes keeps, which is brought up to date
+//! and read each time, so no note is opened to make a list. They are shown by what they are
+//! for: what is due today, the inbox, every note, the tasks and the reminders, and the albums
+//! of sites the browser keeps, each site with its picture when the terminal is Kitty. It
+//! changes nothing by itself: each key that changes a note or an album runs kavat-notes for
+//! it, which is what keeps the history and sets the reminders.
 
 use ratatui::crossterm::event::{self, Event, KeyCode, KeyEventKind, KeyModifiers};
 use ratatui::layout::{Constraint, Layout, Rect};
@@ -13,6 +15,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph, Wrap};
 use ratatui::{DefaultTerminal, Frame};
 use std::collections::BTreeMap;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
@@ -58,7 +61,6 @@ struct Note {
     /// "2026-11-13"
     due: String,
     tags: Vec<String>,
-    tasks: Vec<(bool, String)>,
     related: Vec<String>,
     /// seconds since 1970, for the order of the lists
     changed: u64,
@@ -81,54 +83,46 @@ impl Note {
     }
 }
 
-fn read_note(path: &Path, notebook: &str) -> Option<Note> {
-    let text = std::fs::read_to_string(path).ok()?;
-    let mut note = Note { path: path.to_path_buf(), notebook: notebook.to_string(), ..Note::default() };
-    note.changed = std::fs::metadata(path).ok()?.modified().ok()?.duration_since(std::time::UNIX_EPOCH).ok()?.as_secs();
-    let mut lines = text.lines().peekable();
-    if lines.peek() == Some(&"---") {
-        lines.next();
-        for line in lines.by_ref() {
-            if line == "---" {
-                break;
-            }
-            if let Some(value) = line.strip_prefix("remind: ") {
-                note.remind = value.trim().to_string();
-            } else if let Some(value) = line.strip_prefix("repeat: ") {
-                note.repeat = value.trim().to_string();
-            }
+/// One line of the index kavat-notes keeps, as a note: the file, when it was changed and its
+/// size, the notebook, the title, what it is, the reminder, the repetition, the day it is
+/// due, the tags and the links, parted by tabs.
+fn read_line(line: &str) -> Option<Note> {
+    let fields: Vec<&str> = line.split('\t').collect();
+    let [path, stamp, notebook, title, state, remind, repeat, due, tags, related] = fields[..] else {
+        return None;
+    };
+    Some(Note {
+        path: PathBuf::from(path),
+        notebook: notebook.to_string(),
+        title: title.to_string(),
+        done: match state {
+            "open" => Some(false),
+            "done" => Some(true),
+            _ => None,
+        },
+        remind: remind.to_string(),
+        repeat: repeat.to_string(),
+        due: due.to_string(),
+        tags: tags.split_whitespace().map(String::from).collect(),
+        related: related.split('\u{1f}').filter(|link| !link.is_empty()).map(String::from).collect(),
+        changed: stamp.split(['.', ' ']).next()?.parse().ok()?,
+    })
+}
+
+/// The lines under "## Tasks" of a note, each with whether it is done. The index does not
+/// keep them: they are read from the note under the cursor.
+fn tasks_of(path: &Path) -> Vec<(bool, String)> {
+    let text = std::fs::read_to_string(path).unwrap_or_default();
+    let mut tasks = Vec::new();
+    let mut inside = false;
+    for line in text.lines() {
+        if let Some(heading) = line.strip_prefix("## ") {
+            inside = heading.trim().eq_ignore_ascii_case("tasks");
+        } else if inside && line.starts_with("- [") {
+            tasks.push((line.starts_with("- [x]") || line.starts_with("- [X]"), line.get(6..).unwrap_or("").to_string()));
         }
     }
-    let mut section = String::new();
-    for line in lines {
-        if let Some(heading) = line.strip_prefix("# ") {
-            if note.title.is_empty() {
-                let (done, title) = match heading {
-                    _ if heading.starts_with("[ ] ") => (Some(false), &heading[4..]),
-                    _ if heading.starts_with("[x] ") || heading.starts_with("[X] ") => (Some(true), &heading[4..]),
-                    _ => (None, heading),
-                };
-                note.done = done;
-                note.title = title.to_string();
-            }
-        } else if let Some(heading) = line.strip_prefix("## ") {
-            section = heading.trim().to_lowercase();
-        } else if section == "due" && note.due.is_empty() && line.len() >= 10 && line.as_bytes()[4] == b'-' {
-            note.due = line[..10].to_string();
-        } else if section == "tasks" && line.starts_with("- [") {
-            note.tasks.push((line.starts_with("- [x]") || line.starts_with("- [X]"), line.get(6..).unwrap_or("").to_string()));
-        } else if section == "related" && line.starts_with("- ") {
-            note.related.push(line[2..].to_string());
-        } else if section.is_empty() || section == "tags" {
-            for word in line.split_whitespace().filter(|word| word.len() > 1 && word.starts_with('#') && !word[1..].starts_with('#')) {
-                note.tags.push(word.to_string());
-            }
-        }
-    }
-    if note.title.is_empty() {
-        note.title = path.file_stem()?.to_string_lossy().into_owned();
-    }
-    Some(note)
+    tasks
 }
 
 /// One site of an album: a bookmark as nb writes it, and its thumbnail when it has one.
@@ -200,30 +194,11 @@ fn read_books(folder: &Path) -> Vec<String> {
     books
 }
 
-fn read_notes(folder: &Path) -> Vec<Note> {
-    let mut notes = Vec::new();
-    // the sites of the albums are not notes: they have their own tab
+/// The notes, from the index, the newest first. The sites of the albums are not notes: they
+/// have their own tab.
+fn read_notes(index: &str, folder: &Path) -> Vec<Note> {
     let albums = folder.join("home/albums");
-    for notebook in std::fs::read_dir(folder).into_iter().flatten().filter_map(Result::ok) {
-        let name = notebook.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') || !notebook.path().is_dir() {
-            continue;
-        }
-        let mut folders = vec![notebook.path()];
-        while let Some(inside) = folders.pop() {
-            for entry in std::fs::read_dir(&inside).into_iter().flatten().filter_map(Result::ok) {
-                let path = entry.path();
-                let hidden = entry.file_name().to_string_lossy().starts_with('.');
-                if path.is_dir() && !hidden {
-                    if path != albums {
-                        folders.push(path);
-                    }
-                } else if !hidden && path.extension().is_some_and(|ending| ending == "md") {
-                    notes.extend(read_note(&path, &name));
-                }
-            }
-        }
-    }
+    let mut notes: Vec<Note> = index.lines().filter_map(read_line).filter(|note| !note.path.starts_with(&albums)).collect();
     notes.sort_by(|a, b| b.changed.cmp(&a.changed));
     notes
 }
@@ -295,6 +270,12 @@ struct App {
     help: bool,
     said: String,
     now: String,
+    /// whether the terminal is Kitty, which draws pictures
+    kitty: bool,
+    /// the picture the screen asks for, and where: the thumbnail of the site under the cursor
+    wanted: Option<(PathBuf, Rect)>,
+    /// the picture that is drawn
+    pictured: Option<(PathBuf, Rect)>,
 }
 
 impl App {
@@ -320,6 +301,9 @@ impl App {
             help: false,
             said: String::new(),
             now: String::new(),
+            kitty: std::env::var_os("KITTY_WINDOW_ID").is_some(),
+            wanted: None,
+            pictured: None,
         };
         app.read();
         app
@@ -330,7 +314,9 @@ impl App {
     }
 
     fn read(&mut self) {
-        self.notes = read_notes(&self.folder);
+        // kavat-notes brings its index up to date and says where it is
+        let index = self.ask(&["index"]).and_then(|path| std::fs::read_to_string(path).ok());
+        self.notes = read_notes(&index.unwrap_or_default(), &self.folder);
         self.books = read_books(&self.folder);
         if self.book.as_ref().is_some_and(|book| !self.books.contains(book)) {
             self.book = None;
@@ -613,10 +599,11 @@ impl App {
             if let Some(folder) = note.related.iter().find_map(|link| folder_of(link)) {
                 about.push(Line::from(vec![dim(format!("{:<10}", "Folder")), self.bold(folder), dim("  o opens it in Yazi")]));
             }
-            if !note.tasks.is_empty() {
+            let tasks = tasks_of(&note.path);
+            if !tasks.is_empty() {
                 about.push(Line::from(""));
                 about.push(Line::from(dim("TASKS")));
-                for (done, task) in &note.tasks {
+                for (done, task) in &tasks {
                     about.push(if *done { Line::from(dim(format!("[x] {task}"))) } else { Line::from(format!("[ ] {task}")) });
                 }
             }
@@ -637,6 +624,19 @@ impl App {
             about.push(Line::from(""));
             about.push(Line::from(dim("↵ opens it in the browser · O the whole album")));
             about.push(Line::from(dim("R it has been read · x takes it out")));
+        }
+        // the site's picture goes under what is said of it, in what is left of the pane; not
+        // while something is open over the screen, which the picture would cover
+        self.wanted = None;
+        if let Some(thumbnail) = self.site().and_then(|site| site.thumbnail.clone()).filter(|_| self.kitty && !self.help && self.choosing.is_none()) {
+            let inside = Block::default().borders(Borders::ALL).inner(detail);
+            // a line that does not fit takes the rows it fills, and one more for where it breaks
+            let rows = |line: &Line| if line.width() as u16 > inside.width { (line.width() as u16).div_ceil(inside.width.max(1)) + 1 } else { 1 };
+            let used: u16 = about.iter().map(rows).sum();
+            let top = inside.y + used + 1;
+            if inside.width >= 8 && inside.bottom() >= top + 3 {
+                self.wanted = Some((thumbnail, Rect::new(inside.x, top, inside.width, inside.bottom() - top)));
+            }
         }
         frame.render_widget(Paragraph::new(about).wrap(Wrap { trim: false }).block(pane(name, false)), detail);
 
@@ -682,6 +682,31 @@ impl App {
         }
     }
 
+    /// Bring the picture on the screen to the one it asks for. Kitty draws it, with its own
+    /// way of showing pictures in a terminal: the one before is taken away, and icat, which
+    /// comes with Kitty, places the new one in its cells.
+    fn picture(&mut self) {
+        if self.wanted == self.pictured {
+            return;
+        }
+        if self.pictured.is_some() {
+            let mut screen = std::io::stdout();
+            let _ = screen.write_all(b"\x1b_Ga=d,d=A\x1b\\").and_then(|()| screen.flush());
+        }
+        if let Some((path, area)) = &self.wanted {
+            let place = format!("{}x{}@{}x{}", area.width, area.height, area.x, area.y);
+            let _ = Command::new("kitten").args(["icat", "--stdin", "no", "--transfer-mode", "memory", "--align", "left", "--place", &place, "--"])
+                .arg(path).stdin(Stdio::null()).stderr(Stdio::null()).status();
+        }
+        self.pictured = self.wanted.clone();
+    }
+
+    /// Take the picture away, before the screen is given to something else.
+    fn no_picture(&mut self) {
+        self.wanted = None;
+        self.picture();
+    }
+
     /// Ask kavat-notes for something it answers with a line, like the file of a note it made.
     fn ask(&mut self, arguments: &[&str]) -> Option<String> {
         let output = Command::new("kavat-notes").args(arguments).stdin(Stdio::null()).output();
@@ -710,6 +735,7 @@ impl App {
 
     /// Open a note in the editor, which takes the terminal and gives it back.
     fn edit(&mut self, terminal: &mut DefaultTerminal, path: &str) {
+        self.no_picture();
         ratatui::restore();
         let editor = std::env::var("EDITOR").ok().filter(|value| !value.is_empty()).unwrap_or_else(|| "nvim".into());
         let _ = Command::new(editor).arg(path).status();
@@ -938,6 +964,7 @@ fn main() {
         if let Err(error) = terminal.draw(|frame| app.draw(frame)) {
             break Err(error.to_string());
         }
+        app.picture();
         match event::read() {
             Ok(Event::Key(key)) if key.kind == KeyEventKind::Press => {
                 if !app.key(&mut terminal, key.code, key.modifiers) {
@@ -948,6 +975,7 @@ fn main() {
             Err(error) => break Err(error.to_string()),
         }
     };
+    app.no_picture();
     ratatui::restore();
     if let Err(problem) = ended {
         eprintln!("kavat-notes-tui: {problem}");
@@ -960,20 +988,32 @@ mod tests {
     use super::*;
 
     #[test]
-    fn a_note_is_read_with_its_reminder_its_day_its_tags_and_its_lists() {
+    fn a_note_is_read_from_its_line_of_the_index_and_its_tasks_from_its_file() {
         let folder = std::env::temp_dir().join(format!("kavat-notes-tui-test-{}", std::process::id()));
         std::fs::create_dir_all(folder.join("kav")).unwrap();
         let path = folder.join("kav/review.todo.md");
-        std::fs::write(&path, "---\nremind: 2026-11-13 09:00\nrepeat: weekly\n---\n# [ ] Review the kav PR\n\n#kav #review\n\n## Due\n\n2026-11-13\n\n## Tasks\n\n- [x] Read the diff\n- [ ] Merge\n\n## Related\n\n- [[~/Projects/kav]]\n").unwrap();
-        let notes = read_notes(&folder);
+        std::fs::write(&path, "# [ ] Review the kav PR\n\n## Tasks\n\n- [x] Read the diff\n- [ ] Merge\n\n## Related\n\n- [[~/Projects/kav]]\n").unwrap();
+        let index = format!(
+            "{}\t1794808516.4351720560 205\tkav\tReview the kav PR\topen\t2026-11-13 09:00\tweekly\t2026-11-13\t#kav #review\t[[~/Projects/kav]]\u{1f}[[Allowlist policy]]\n\
+             {}/inbox/idea.md\t1794808517.1 20\tinbox\tAn idea\tnote\t\t\t\t\t\n\
+             half a line\tof the index\n",
+            path.display(),
+            folder.display()
+        );
+        let notes = read_notes(&index, &folder);
+        let tasks = tasks_of(&path);
         std::fs::remove_dir_all(&folder).unwrap();
-        assert_eq!(notes.len(), 1);
-        let note = &notes[0];
-        assert_eq!((note.notebook.as_str(), note.title.as_str(), note.done), ("kav", "Review the kav PR", Some(false)));
+        // the newest first, and a line that is not whole is left out
+        assert_eq!(notes.iter().map(|note| note.title.as_str()).collect::<Vec<_>>(), ["An idea", "Review the kav PR"]);
+        assert_eq!((notes[0].notebook.as_str(), notes[0].done, notes[0].when().as_str()), ("inbox", None, ""));
+        assert!(notes[0].tags.is_empty() && notes[0].related.is_empty());
+        let note = &notes[1];
+        assert_eq!((note.notebook.as_str(), note.done, note.changed), ("kav", Some(false), 1794808516));
         assert_eq!((note.remind.as_str(), note.repeat.as_str(), note.due.as_str()), ("2026-11-13 09:00", "weekly", "2026-11-13"));
         assert_eq!(note.tags, ["#kav", "#review"]);
-        assert_eq!(note.tasks, [(true, "Read the diff".to_string()), (false, "Merge".to_string())]);
+        assert_eq!(note.related, ["[[~/Projects/kav]]", "[[Allowlist policy]]"]);
         assert_eq!(folder_of(&note.related[0]).as_deref(), Some("~/Projects/kav"));
+        assert_eq!(tasks, [(true, "Read the diff".to_string()), (false, "Merge".to_string())]);
     }
 
     #[test]
@@ -985,8 +1025,13 @@ mod tests {
         std::fs::write(album.join("20261115100000-docs.jpg"), "picture").unwrap();
         std::fs::write(album.join("20261115100001-book.bookmark.md"), "# The book\n\n<https://doc.rust-lang.org/book/>\n\n#album\n").unwrap();
         std::fs::write(album.join("archive/20261115090000-old.bookmark.md"), "# Old\n\n<https://old.example/>\n\n#album\n").unwrap();
-        std::fs::write(folder.join("home/plain.md"), "# A note\n").unwrap();
-        let (albums, notes, books) = (read_albums(&folder), read_notes(&folder), read_books(&folder));
+        // the index has the sites too, as the files they are: the notes leave them out
+        let index = format!(
+            "{0}/home/plain.md\t1794808516.1 9\thome\tA note\tnote\t\t\t\t\t\n\
+             {0}/home/albums/rust/20261115100000-docs.bookmark.md\t1794808516.2 40\thome\tRust docs\tnote\t\t\t\t#album\t\n",
+            folder.display()
+        );
+        let (albums, notes, books) = (read_albums(&folder), read_notes(&index, &folder), read_books(&folder));
         std::fs::remove_dir_all(&folder).unwrap();
         assert_eq!(albums.iter().map(|album| (album.name.as_str(), album.sites.len())).collect::<Vec<_>>(), [("read-later", 0), ("rust", 2)]);
         let site = &albums[1].sites[0];

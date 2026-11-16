@@ -1,5 +1,6 @@
 -- Copy or cut, as Yazi does, and leave the files on the clipboard too, so that they can be
--- pasted into another program: a chat, a mail, another file manager.
+-- pasted into another program: a chat, a mail, another file manager. While they wait, the
+-- status bar says how many are ready to paste.
 
 -- the selection, or the file under the cursor, as Yazi itself takes them
 local chosen = ya.sync(function()
@@ -14,9 +15,32 @@ local chosen = ya.sync(function()
 	return paths
 end)
 
+-- the line in the status bar while something waits to be pasted: how many items, and
+-- whether they will be copied or moved. It is put there the first time something is
+-- copied, and says nothing once they are pasted or let go
+local reminder = ya.sync(function(self)
+	if self.status then
+		return
+	end
+	self.status = Status:children_add(function()
+		local count = 0
+		for _ in pairs(cx.yanked) do
+			count = count + 1
+		end
+		if count == 0 then
+			return ""
+		end
+		return ui.Line {
+			ui.Span(count .. (count == 1 and " item" or " items") .. " ready to paste"):fg("blue"):bold(),
+			ui.Span(cx.yanked.is_cut and " · as a move " or " · as a copy "):fg("darkgray"),
+		}
+	end, 300, Status.RIGHT)
+end)
+
 return {
 	entry = function(_, job)
 		local paths = chosen()
+		reminder()
 		ya.emit("yank", { cut = job.args[1] == "cut" })
 		if #paths == 0 then
 			return

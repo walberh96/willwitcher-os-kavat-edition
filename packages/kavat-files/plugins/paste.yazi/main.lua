@@ -4,7 +4,7 @@
 --
 -- The copy is done here, one item after another, with cp and mv, and followed by looking
 -- at what has arrived. A copy that is over at once never shows the window. Esc leaves it
--- working out of sight, and it says when it is done.
+-- working out of sight: the status bar says how far it is, and it says when it is done.
 
 local KEYS = {
 	{ on = "r", run = "replace" },
@@ -35,6 +35,40 @@ local window = ya.sync(function(self, on)
 		self.children = nil
 	end
 	ui.render()
+end)
+
+-- the line in the status bar while the copy works out of sight: how far it is, and how
+-- many of its items are done
+local indicator = ya.sync(function(self, on)
+	if on and not self.status then
+		self.status = Status:children_add(function()
+			local shown = self.shown
+			if not shown then
+				return ""
+			end
+			local finished = 0
+			for _, item in ipairs(shown.items) do
+				finished = finished + ((item.state == "done" or item.state == "skipped") and 1 or 0)
+			end
+			local part = shown.total > 0 and math.floor(100 * shown.done / shown.total) or 0
+			return ui.Line {
+				ui.Span((shown.moving and "Moving " or "Copying ") .. part .. "%"):fg("blue"):bold(),
+				ui.Span(" · " .. finished .. " of " .. #shown.items .. " "):fg("darkgray"),
+			}
+		end, 400, Status.RIGHT)
+	elseif not on and self.status then
+		Status:children_remove(self.status, Status.RIGHT)
+		self.status = nil
+	end
+	ui.render()
+end)
+
+-- whether a copy is working, which only one does at a time: they share the window
+local working = ya.sync(function(self, on)
+	if on == nil then
+		return self.working == true
+	end
+	self.working = on
 end)
 
 -- what the window says: the whole of it, or one of its items
@@ -203,6 +237,8 @@ function M:entry()
 	local files, folder, moving, regular = waiting()
 	if #files == 0 then
 		return ya.notify { title = "Paste", content = "Nothing was copied or cut.", timeout = 3 }
+	elseif working() then
+		return ya.notify { title = "Paste", content = "A copy is still working. Paste again when it is done.", timeout = 4, level = "warn" }
 	elseif not regular then
 		-- a folder that is not on a disk of this machine: Yazi's own way knows how
 		return ya.emit("paste", {})
@@ -219,6 +255,7 @@ function M:entry()
 		total = total + file.size
 		items[at] = { name = file.name, size = file.size, done = 0, state = "" }
 	end
+	working(true)
 	say { items = items, folder = folder, moving = moving, total = total, done = 0, speed = 0, ask = false, all = false, at = 1 }
 
 	local visible, hidden, asking, finished, cancelled = false, false, false, false, false
@@ -230,6 +267,7 @@ function M:entry()
 	local function show()
 		if not visible then
 			visible = true
+			indicator(false)
 			window(true)
 			wake:send(true)
 		end
@@ -259,6 +297,7 @@ function M:entry()
 				elseif key == "hide" and not asking then
 					visible, hidden = false, true
 					window(false)
+					indicator(true)
 				end
 			end
 			if finished then
@@ -393,7 +432,10 @@ function M:entry()
 		end
 		wake:send(false)
 		window(false)
+		indicator(false)
+		working(false)
 
+		-- what was moved whole does not wait to be pasted any more; a copy can be pasted again elsewhere
 		if moving and not cancelled and failed == 0 then
 			ya.emit("unyank", {})
 		end

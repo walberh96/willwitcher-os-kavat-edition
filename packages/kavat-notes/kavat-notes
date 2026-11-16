@@ -15,7 +15,8 @@
 #        kavat-notes todo <note>           make a note a task, or a task a note again
 #        kavat-notes due <note> <day>      give a task the day it is due: "friday", "2026-12-01"
 #        kavat-notes sync                  set the timers for every reminder written in the notes
-#        kavat-notes clip <title> <address> [picture]  a page of the web as a note: what comes on the input is its quote
+#        kavat-notes index                 bring the index of the notes up to date, and say where it is
+#        kavat-notes clip [--comment <text>] [--tags <words>] <title> <address> [picture]  a page of the web as a note: what comes on the input is its quote
 #        kavat-notes about <address>       the notes, clippings and album sites that mention that site
 #        kavat-notes album                 the albums of sites, and how many each one has
 #        kavat-notes album show <album>    its sites: title, address, file and thumbnail
@@ -47,6 +48,10 @@ self=/usr/bin/kavat-notes
 [[ $0 == */* ]] && self=$(realpath "$0")
 fired="${XDG_RUNTIME_DIR:-/tmp}/kavat-notes-fired"
 albums="$notes/home/albums"
+# what is known of every note, kept from one time to the next
+index="${XDG_CACHE_HOME:-$HOME/.cache}/kavat/notes/index"
+# the days that have something, as a calendar the shell reads
+calendar="${XDG_DATA_HOME:-$HOME/.local/share}/kavat/notes/calendar"
 # the system's templates, or the ones beside this script when it is run from its source
 templates=/usr/share/kavat/notes/templates
 [[ -d $templates ]] || templates="$(dirname "$self")/templates"
@@ -142,8 +147,17 @@ picture() {
 # A page of the web as a note in the inbox: its title, the tag clip, its address and, from
 # the input, what was selected in it, as a quote. The browser saves a page this way. A page
 # that already has its note gets the new quote added to it, and a picture of the page is
-# kept beside the note, under the note's name.
+# kept beside the note, under the note's name. --comment <text> and --tags <words>, before
+# the title, are what was written when saving: the comment goes above the quote, and the
+# tags beside the tag clip, each once.
 clip() {
+  local comment='' tags='' tag seen=''
+  # each once, so that a page whose title is one of these words is still a title
+  while [[ ${1:-} == --comment || ${1:-} == --tags ]] && [[ $seen != *"$1"* ]]; do
+    seen+=$1
+    [[ $1 == --comment ]] && comment=$(one_line "${2:-}") || tags=${2:-}
+    shift $(($# > 1 ? 2 : 1))
+  done
   local title address=${2:-} shot=${3:-} file='' quote name number=1
   ready
   title=$(one_line "${1:-}")
@@ -157,6 +171,9 @@ clip() {
     file="$(fresh "$notes/inbox").md"
     printf '# %s\n\n#clip\n\n%s\n' "$title" "$address" > "$file"
   fi
+  for tag in $(grep -oE '[[:alnum:]_-]+' <<< "$tags"); do
+    grep -qE "(^| )#$tag( |\$)" "$file" || sed -i -E "0,/(^| )#clip( |\$)/ s/(^| )#clip( |\$).*/& #$tag/" "$file"
+  done
   if [[ -n $shot ]]; then
     # the first picture has the note's name; the ones after it, a number too
     name="$(basename "$file" .md).jpg"
@@ -165,6 +182,7 @@ clip() {
     done
     picture "$shot" "$(dirname "$file")/$name" 1280 && printf '\n![](%s)\n' "$name" >> "$file"
   fi
+  [[ -n $comment ]] && printf '\n%s\n' "$comment" >> "$file"
   [[ -n $quote ]] && { echo; sed 's/^/> /' <<< "$quote"; } >> "$file"
   keep "$file" "Clip"
   echo "$file"
@@ -398,6 +416,7 @@ mode() {
 # Keep a change in the notebook's history, as nb does with its own
 keep() {
   local file=$1 notebook
+  mark_days
   notebook=$(git -C "$(dirname "$file")" rev-parse --show-toplevel 2> /dev/null) || return 0
   git -C "$notebook" add -A > /dev/null 2>&1
   git -C "$notebook" commit -q -m "[kavat-notes] $2: $(basename "$file")" > /dev/null 2>&1 || true
@@ -485,21 +504,121 @@ quick() {
   rm -f "$fired.said"
 }
 
+# The index: one line for each note of a notebook, with its title, its tags, its links and
+# its dates, so that the lists are made without opening every note. It is kept from one time
+# to the next, and bringing it up to date reads only the notes whose file has changed since.
+# The fields of a line, parted by tabs: the file; when it was changed and its size; the
+# notebook; the title; note, open or done; the reminder, as "2026-11-13 09:00"; the
+# repetition; the day it is due; the tags, parted by spaces; and the links under
+# "## Related", parted by the character 037.
+bring_index() {
+  local made
+  mkdir -p "$(dirname "$index")"
+  made=$(mktemp "$index.XXXXXX") || return 1
+  find "$notes" -mindepth 1 -name '.*' -prune -o -type f -name '*.md' -printf '%T@ %s\t%p\n' 2> /dev/null \
+    | awk -F '\t' -v old="$index" -v notes="$notes" '
+      function trimmed(text) { gsub(/^[ \t]+|[ \t]+$/, "", text); return text }
+      # a time as the lists compare it; one written another way is read by date
+      function moment(value,    command, found) {
+        value = trimmed(value)
+        if (value ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9] [0-9][0-9]:[0-9][0-9]$/) return value
+        gsub(/\047/, "", value)
+        command = "date -d \047" value "\047 \047+%Y-%m-%d %H:%M\047 2> /dev/null"
+        found = ""
+        command | getline found
+        close(command)
+        return found
+      }
+      function read(file, stamp, notebook,    line, number, front, section, title, state, remind, again, due, tags, links, words, count, at) {
+        state = "note"
+        while ((getline line < file) > 0) {
+          number++
+          if (number == 1 && line == "---") { front = 1; continue }
+          if (front) {
+            if (line == "---") front = 0
+            else if (index(line, "remind: ") == 1) remind = moment(substr(line, 9))
+            else if (index(line, "repeat: ") == 1) again = trimmed(substr(line, 9))
+            continue
+          }
+          if (index(line, "# ") == 1) {
+            if (title == "") {
+              title = substr(line, 3)
+              if (title ~ /^\[ \] /) { state = "open"; title = substr(title, 5) }
+              else if (title ~ /^\[[xX]\] /) { state = "done"; title = substr(title, 5) }
+            }
+          } else if (index(line, "## ") == 1) {
+            section = tolower(trimmed(substr(line, 4)))
+          } else if (section == "due") {
+            if (due == "" && line ~ /^[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/) due = substr(line, 1, 10)
+          } else if (section == "related") {
+            if (index(line, "- ") == 1) links = links (links == "" ? "" : "\037") substr(line, 3)
+          } else if (section == "" || section == "tags") {
+            count = split(line, words, /[ \t]+/)
+            for (at = 1; at <= count; at++) if (words[at] ~ /^#[^#]/) tags = tags (tags == "" ? "" : " ") words[at]
+          }
+        }
+        close(file)
+        if (title == "") { title = file; sub(/.*\//, "", title); sub(/\.md$/, "", title) }
+        gsub(/\t/, " ", title); gsub(/\t/, " ", links); gsub(/\t/, " ", again)
+        return file "\t" stamp "\t" notebook "\t" title "\t" state "\t" remind "\t" again "\t" due "\t" tags "\t" links
+      }
+      BEGIN {
+        while ((getline line < old) > 0) { split(line, known, "\t"); stamps[known[1]] = known[2]; lines[known[1]] = line }
+        close(old)
+      }
+      {
+        inside = substr($2, length(notes) + 2)
+        slash = index(inside, "/")
+        if (!slash) next # a file that is in no notebook
+        print (stamps[$2] == $1 ? lines[$2] : read($2, $1, substr(inside, 1, slash - 1)))
+      }' > "$made" && mv "$made" "$index" || { rm -f "$made"; return 1; }
+}
+
 # Every note that has something due, one to a line: when, what kind, the file. A reminder
-# counts by its time and a task by the date under "## Due".
+# counts by its time and an open task by the date under "## Due".
 dated() {
-  local file when
-  while IFS= read -r file; do
-    when=$(field "$file" remind)
-    if [[ -n $when ]] && when=$(date -d "$when" '+%Y-%m-%d %H:%M' 2> /dev/null); then
-      printf '%s\treminder\t%s\n' "$when" "$file"
-      continue
-    fi
-    # an open task with a date
-    grep -q -m 1 '^# \[ \]' "$file" || continue
-    when=$(awk '/^## Due/ { due = 1; next } due && /[0-9]{4}-[0-9]{2}-[0-9]{2}/ { print $1; exit } due && /^#/ { exit }' "$file")
-    [[ -n $when ]] && printf '%s 23:59\ttask\t%s\n' "$when" "$file"
-  done < <(grep -rlE --include='*.md' --exclude-dir=.git '^(remind: |## Due)' "$notes" 2> /dev/null) | sort
+  bring_index || return 1
+  awk -F '\t' '$6 != "" { print $6 "\treminder\t" $1; next } $5 == "open" && $8 != "" { print $8 " 23:59\ttask\t" $1 }' "$index" | sort
+}
+
+# The days that have something, for the calendar of the control center to mark: each
+# reminder and each open task with a day is an event, one to a file, in a folder the shell
+# reads as a calendar. A reminder that repeats is on every day it comes back. A file is
+# written only when what it says has changed, and the ones of what is gone are taken away.
+mark_days() {
+  local wanted file
+  bring_index || return 1
+  mkdir -p "$calendar"
+  # -s and not -f: a machine turned off right after the first login can leave the file there and empty
+  [[ -s $calendar/displayname ]] || echo Notes > "$calendar/displayname"
+  wanted=$(awk -F '\t' -v notes="$notes" -v folder="$calendar" '
+    function escaped(text) { gsub(/\\/, "\\\\\\\\", text); gsub(/;/, "\\;", text); gsub(/,/, "\\,", text); return text }
+    function day(text) { return substr(text, 1, 4) substr(text, 6, 2) substr(text, 9, 2) }
+    $6 != "" || ($5 == "open" && $8 != "") {
+      name = substr($1, length(notes) + 2)
+      gsub(/\//, "%", name)
+      event = "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//Kavat//kavat-notes//EN\r\nBEGIN:VEVENT\r\n"
+      event = event "UID:" escaped(name) "@kavat-notes\r\nDTSTAMP:" strftime("%Y%m%dT%H%M%SZ", int($2), 1) "\r\n"
+      if ($6 != "") {
+        event = event "DTSTART:" day($6) "T" substr($6, 12, 2) substr($6, 15, 2) "00\r\n"
+        if ($7 == "daily" || $7 == "weekly" || $7 == "monthly") event = event "RRULE:FREQ=" toupper($7) "\r\n"
+      } else {
+        event = event "DTSTART;VALUE=DATE:" day($8) "\r\n"
+      }
+      event = event "SUMMARY:" escaped($4) "\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n"
+      file = folder "/" name ".ics"
+      RS = "^$"
+      there = ""
+      getline there < file
+      close(file)
+      RS = "\n"
+      if (there != event) { printf "%s", event > file; close(file) }
+      print name ".ics"
+    }' "$index")
+  for file in "$calendar"/*.ics; do
+    [[ -e $file && $'\n'"$wanted"$'\n' != *$'\n'"${file##*/}"$'\n'* ]] && rm -f "$file"
+  done
+  return 0
 }
 
 due() {
@@ -539,6 +658,7 @@ timer_of() {
 
 sync_timers() {
   local now when kind file unit wanted=' ' running
+  mark_days
   command -v systemctl > /dev/null && systemctl --user show-environment > /dev/null 2>&1 || return 0
   now=$(date '+%Y-%m-%d %H:%M')
   mkdir -p "$fired"
@@ -682,12 +802,11 @@ fire() {
   sync_timers
 }
 
-# Every note, one to a line: its place, then its title
+# Every note, the newest first, one to a line: its place, then its title
 listed() {
-  local file
-  while IFS= read -r file; do
-    printf '%s\t%s\t  \e[2m%s\e[0m\n' "$file" "$(title_of "$file")" "${file#"$notes"/}"
-  done < <(find "$notes" -name .git -prune -o -name '.*' -prune -o -type f -name '*.md' -printf '%T@ %p\n' 2> /dev/null | sort -rn | cut -d ' ' -f 2-)
+  bring_index || return 1
+  sort -t $'\t' -k 2,2nr "$index" \
+    | awk -F '\t' -v notes="$notes" '{ printf "%s\t%s\t  \033[2m%s\033[0m\n", $1, $4, substr($1, length(notes) + 2) }'
 }
 
 browse() {
@@ -748,6 +867,7 @@ case ${1:-} in
   browse) browse ;;
   remind) shift; remind "$@" ;;
   sync) sync_timers ;;
+  index) bring_index && echo "$index" ;;
   fire) fire "${2:-}" ;;
   --listed) listed ;;
   --due-listed)
@@ -773,7 +893,7 @@ case ${1:-} in
     file=$(add "${@:2}") && exec "${EDITOR:-nvim}" "$file"
     ;;
   *)
-    sed -n '2,42s/^# \{0,1\}//p' "$0" >&2
+    sed -n '2,43s/^# \{0,1\}//p' "$0" >&2
     exit 2
     ;;
 esac
