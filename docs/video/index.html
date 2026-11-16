@@ -6,47 +6,102 @@
 <!--
   The film behind docs/video/kavat-tour.mp4. Kavat, the system's agent, shows the system around,
   as the finished system it will be.
-  Every picture is the interactive mockup (docs/mockup/index.html), loaded in frames, one per shot.
 
-  Open this file in a browser to watch it play, without sound. tools/make-video.cjs renders it
-  to a video: it speaks each line with Supertonic-3, the voice model of the design, tells this page how long each one lasts, and then asks for
-  one frame at a time through setT(seconds). Nothing here reads the clock while rendering.
+  Every picture is the interactive mockup (docs/mockup/index.html), loaded in frames. A shot is one
+  state of the mockup; while it lasts the camera moves over it, a pointer presses its real controls
+  and the mockup answers as it does by hand. Nothing is drawn here that the mockup does not draw.
+
+  Open this file in a browser to watch it play, without sound. A browser does not let one file reach
+  into another, so there the pointer stays hidden and nothing is pressed. tools/make-video.cjs
+  renders it to a video: it speaks each line with Supertonic-3, the voice model the design gives
+  Kavat, tells this page how long each line lasts and how loud the voice is at every frame, and then
+  asks for one frame at a time through setT(seconds). Nothing here reads the clock while rendering.
 -->
 <style>
 *{box-sizing:border-box;margin:0}
-html,body{background:#07080c;overflow:hidden;height:100%}
-body{font-family:Inter,-apple-system,"SF Pro Display","Segoe UI",sans-serif;color:#e9e6df}
-#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;
-  background:radial-gradient(1200px 700px at 78% 8%,#3a2a12 0,transparent 60%),radial-gradient(900px 600px at 8% 96%,#1b2440 0,transparent 62%),#0b0d13}
-#shots{position:absolute;left:240px;top:28px;width:1440px;height:900px;border-radius:22px;overflow:hidden;
-  box-shadow:0 0 0 1px #262a33,0 40px 110px #000c,0 0 90px -20px #f2a93b55}
-.shot{position:absolute;left:0;top:0;width:1600px;height:1000px;border:0;transform-origin:0 0;opacity:0;background:#0e1016}
-#chapter{position:absolute;left:60px;top:44px;width:160px;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:#f2a93b;line-height:1.5}
-#chapter b{display:block;font-size:44px;letter-spacing:0;color:#e9e6df;opacity:.22;font-weight:700;margin-bottom:6px}
-#bar{position:absolute;left:0;bottom:0;height:4px;background:#f2a93b}
-#cap{position:absolute;left:390px;right:120px;top:946px;height:120px;display:flex;align-items:center;font-size:35px;line-height:1.32;font-weight:500;letter-spacing:-.01em}
-#cap span{color:#77736b}
-#cap span.said{color:#e9e6df}
-#cap span.now{color:#14110a;background:#f2a93b;border-radius:8px;box-shadow:0 0 0 5px #f2a93b}
+html,body{background:#05060a;overflow:hidden;height:100%}
+body{font-family:Inter,-apple-system,"SF Pro Display","Segoe UI",sans-serif;color:#ece9e2;--acc:#f2a93b}
+#stage{position:absolute;left:0;top:0;width:1920px;height:1080px;transform-origin:0 0;overflow:hidden;background:#07080d}
+.blob{position:absolute;width:1500px;height:1500px;margin:-750px 0 0 -750px;border-radius:50%}
+#grid{position:absolute;inset:-60px;background-image:radial-gradient(#ffffff17 1.2px,transparent 1.7px);background-size:46px 46px;
+  -webkit-mask-image:radial-gradient(1000px 600px at 50% 45%,#000 0,transparent 100%);mask-image:radial-gradient(1000px 600px at 50% 45%,#000 0,transparent 100%)}
+#vig{position:absolute;inset:0;background:linear-gradient(transparent 80%,#07080dee 93%),radial-gradient(1350px 820px at 50% 44%,transparent 52%,#000b 100%)}
+
+/* the wall of screens, at the start and at the end */
+#wallrig{position:absolute;inset:0;perspective:2300px;perspective-origin:50% 44%}
+#wall{position:absolute;left:960px;top:482px;width:0;height:0}
+.tile{position:absolute;left:0;top:0;width:1600px;height:1000px;transform-origin:0 0;border-radius:44px;overflow:hidden;background:#0e1016;will-change:transform;
+  box-shadow:0 0 0 5px #ffffff22,0 90px 180px #000d}
+.tile iframe{width:1600px;height:1000px;border:0;display:block}
+
+/* the monitor */
+#rig{position:absolute;inset:0;perspective:2600px;perspective-origin:50% 44%}
+#mon{position:absolute;left:160px;top:-18px;width:1600px;height:1000px;border-radius:20px;overflow:hidden;background:#0e1016;
+  box-shadow:0 0 0 1.5px #ffffff1f,0 60px 140px #000e,0 0 170px -34px var(--acc)}
+.shot{position:absolute;left:0;top:0;width:1600px;height:1000px;border:0;transform-origin:0 0;visibility:hidden;background:#0e1016}
+#shots{position:absolute;inset:0;isolation:isolate}
+#tips,#ring,#cur,#glass{z-index:5}
+#tips{position:absolute;left:0;top:0}
+#glass{position:absolute;inset:0;pointer-events:none;background:linear-gradient(118deg,#ffffff10 0,transparent 26%,transparent 74%,#ffffff08 100%)}
+#cur{position:absolute;left:0;top:0;width:34px;height:34px;transform-origin:4px 3px;filter:drop-shadow(0 4px 8px #000a)}
+#ring{position:absolute;left:0;top:0;width:90px;height:90px;margin:-45px 0 0 -45px;border-radius:50%;border:4px solid var(--acc)}
+.tip{position:absolute;left:0;top:0;display:flex;align-items:center;gap:11px;padding:10px 20px 10px 15px;border-radius:999px;white-space:nowrap;
+  background:#0a0c12f2;border:1.5px solid var(--acc);font-size:23px;font-weight:650;letter-spacing:-.005em;box-shadow:0 14px 36px #000c,0 0 30px -8px var(--acc)}
+.tip i{width:10px;height:10px;border-radius:50%;background:var(--acc);box-shadow:0 0 0 5px color-mix(in srgb,var(--acc) 28%,transparent)}
+
+/* the chapter card: a slab of the accent that crosses the picture */
+#card,#card2{position:absolute;inset:0}
+#card2{background:#0a0c12}
+#card{background:var(--acc);color:#14110a}
+#card .k{position:absolute;left:190px;top:372px;font-size:27px;letter-spacing:.34em;text-transform:uppercase;font-weight:750;opacity:.62}
+#card .t{position:absolute;left:184px;top:420px;width:1400px;font-size:116px;font-weight:800;letter-spacing:-.04em;line-height:1.02}
+#card .n{position:absolute;right:110px;bottom:-70px;font-size:560px;font-weight:850;letter-spacing:-.06em;line-height:1;opacity:.13}
+
+/* Kavat and what it says */
 #kavat{position:absolute;left:0;top:0;width:340px;height:120px;transform-origin:170px 60px}
-#kavat .head{fill:#f2a93b}
-#kavat .eye{fill:#0e1016;transform-box:fill-box;transform-origin:center}
-#kavat .wh{fill:none;stroke:#f2a93b;stroke-width:2.4;stroke-linecap:round}
+#kavat .head{fill:var(--acc)}
+#kavat .eye{transform-box:fill-box;transform-origin:center}
+#kavat .wh{fill:none;stroke:var(--acc);stroke-width:2.4;stroke-linecap:round}
+.halo{position:absolute;left:0;top:0;width:600px;height:600px;margin:-300px 0 0 -300px;border-radius:50%;border:2.5px solid var(--acc)}
+#lab{position:absolute;left:424px;top:958px;font-size:17px;letter-spacing:.26em;text-transform:uppercase;color:var(--acc);font-weight:750}
+#lab b{color:#ece9e2;opacity:.38;margin-right:14px;font-weight:750}
+#cap{position:absolute;left:422px;top:984px;height:64px;display:flex;align-items:center;font-size:35px;font-weight:600;letter-spacing:-.012em;white-space:nowrap;transform-origin:0 50%}
+#cap span{color:#6f6b64}
+#cap span.said{color:#ece9e2}
+#cap span.now{color:#14110a;background:var(--acc);border-radius:8px;box-shadow:0 0 0 5px var(--acc)}
+#prog{position:absolute;left:0;bottom:0;width:1920px;height:5px;background:#ffffff12}
+#prog i{position:absolute;left:0;top:0;height:5px;background:var(--acc)}
+#prog u{position:absolute;top:0;width:3px;height:5px;background:#07080d}
+
+/* the first and the last picture */
 #title,#end{position:absolute;left:0;right:0;text-align:center}
-#title{top:620px}
-#title h1{font-size:92px;letter-spacing:-.03em;font-weight:750}
-#title h1 small{display:block;font-size:34px;letter-spacing:.34em;text-transform:uppercase;color:#f2a93b;font-weight:600;margin-top:14px}
-#end{top:600px;font-size:30px;color:#a9a59c;line-height:1.7}
-#end b{display:block;font-size:64px;color:#e9e6df;letter-spacing:-.02em}
-#end i{font-style:normal;color:#f2a93b}
+#title{top:612px}
+#title h1{font-size:112px;letter-spacing:-.04em;font-weight:800;line-height:1}
+#title h1 span{display:inline-block}
+#title p{font-size:31px;letter-spacing:.42em;text-transform:uppercase;color:var(--acc);font-weight:700;margin-top:26px}
+#end{top:505px}
+#end h2{font-size:88px;letter-spacing:-.035em;font-weight:800;line-height:1}
+#end h2 i{font-style:normal;color:var(--acc)}
+#end p{font-size:31px;color:#b4b0a6;margin-top:20px;letter-spacing:.01em}
+#stats{display:flex;justify-content:center;gap:74px;margin-top:66px}
+#stats div{font-size:19px;letter-spacing:.2em;text-transform:uppercase;color:#a09c93;font-weight:650}
+#stats b{display:block;font-size:84px;letter-spacing:-.04em;color:#ece9e2;font-weight:800;line-height:1.05;font-variant-numeric:tabular-nums}
+#black{position:absolute;inset:0;background:#000}
 </style>
 </head>
 <body>
 <div id="stage">
-  <div id="shots"></div>
-  <div id="chapter"></div>
-  <div id="title"><h1>Willwitcher-OS<small>Kavat Edition</small></h1></div>
-  <div id="end"><b>Willwitcher-OS <i>Kavat Edition</i></b>Arch, with an opinion. And a cat.</div>
+  <div class="blob" id="b1"></div><div class="blob" id="b2"></div><div class="blob" id="b3"></div>
+  <div id="grid"></div>
+  <div id="wallrig"><div id="wall"></div></div>
+  <div id="vig"></div>
+  <div id="rig"><div id="mon"><div id="shots"></div><div id="glass"></div><div id="tips"></div><div id="ring"></div>
+    <svg id="cur" viewBox="0 0 34 34"><path d="M4 3 L4 27 L10.5 21 L15 31 L19.5 29 L15 19.5 L24 19.5 Z" fill="#fff" stroke="#111" stroke-width="2" stroke-linejoin="round"/></svg>
+  </div></div>
+  <div id="title"><h1></h1><p>Kavat Edition</p></div>
+  <div id="end"><h2>Willwitcher-OS <i>Kavat Edition</i></h2><p>Arch, with an opinion. And a cat.</p>
+    <div id="stats"><div><b data-n="27">0</b>settings pages</div><div><b data-n="7">0</b>palettes</div><div><b data-n="3">0</b>modes</div><div><b data-n="0">0</b>clouds</div><div><b data-n="1">0</b>cat</div></div></div>
+  <div class="halo"></div><div class="halo"></div><div class="halo"></div>
   <svg id="kavat" viewBox="0 0 340 120">
     <g id="whs"></g>
     <g transform="translate(110 0) scale(1.2)">
@@ -54,83 +109,261 @@ body{font-family:Inter,-apple-system,"SF Pro Display","Segoe UI",sans-serif;colo
       <path class="eye" d="M30 50 L42 56 L30 60 Z"/><path class="eye" d="M70 50 L58 56 L70 60 Z"/>
     </g>
   </svg>
+  <div id="lab"></div>
   <div id="cap"></div>
-  <div id="bar"></div>
+  <div id="card2"></div>
+  <div id="card"><div class="n"></div><div class="k"></div><div class="t"></div></div>
+  <div id="prog"><i></i></div>
+  <div id="black"></div>
 </div>
 <script>
-// One entry per line Kavat says. `say` is the caption; `shots` are states of the mockup,
-// shown one after another while the line lasts. An empty `shots` leaves the stage to Kavat.
+// ---------------------------------------------------------------- the film
+// One entry per line Kavat says. `say` is the caption and what the voice reads.
+// A shot is {s: a state of the mockup, w: how long it lasts beside the others,
+//   cam: where the camera is, as [x, y, zoom] over the mockup's 1600 by 1000, one or several,
+//   acts: [{at: when, from 0 to 1, sel: the control the pointer presses, set: what that changes,
+//           run: something for the mockup to do, once, as that moment passes}],
+//   tips: [{at, til, x, y, t}], a label over the picture}.
+const PAGES=['wallpaper','access','windows','keys','displays','gpu','sound','network','remote','terminal','editor','files','notes','shell','browser','bar','modes','projects','agent','skills','packages','backup','privacy','boot','login','lang','appearance'];
 const SEG = [
-  {ch:'Meet Kavat', say:"Hi! I'm Kavat. I live inside this computer, and I can't wait to show you around.", shots:[]},
-  {ch:'Arch, with an opinion', say:"This is Willwitcher OS, Kavat Edition. Underneath, it's pure Arch Linux. On top, it has an opinion: ten minutes to install, and it's already set up the way you work.", shots:['scene=desk']},
-  {ch:'A voice of its own', say:"And you can just talk to me! I run right here on this machine, offline, in four gigabytes of the graphics card. When I answer, an island drops from the bar, my whiskers dance with my voice, and even the keyboard lights pulse along.", shots:['scene=voice&voice=speak','scene=settings&spage=agent']},
-  {ch:'Typed tools, not a shell', say:"I'm not a chatbot with a shell. I use typed tools, with four levels of permission. Reading is free. Anything bigger asks you first and takes a snapshot. Everything I do is logged, and all of it can be undone.", shots:['scene=agent','scene=settings&spage=agent']},
-  {ch:'Skills', say:"My skills are one click, one phrase, or one key away. Say start stream, and I open OBS, switch to Gamer mode, and silence your notifications. You can teach me new ones, too!", shots:['scene=settings&spage=skills','scene=agent']},
-  {ch:'Notes and reminders', say:"Notes are my favorite. Say, remind me to order thermal paste on Friday at six, and it's saved, tagged and scheduled before you finish the sentence. I file my own notes, bring you a summary every morning, and find anything by what it means, not just by its words.", shots:['scene=desk&cap=true&rem=true','scene=notes','scene=note','scene=settings&spage=notes']},
-  {ch:'One theme, every app', say:"One theme dresses everything! The desktop, the terminal, the editor, the boot screen, even the icons and the cursor. Ask me for night mode, and the whole system follows in under a second.", shots:['scene=themes','scene=themes&pal=tokyo','scene=themes&pal=rose&mode=light','scene=desk&pal=everforest','scene=settings&spage=appearance&pal=gruvbox']},
-  {ch:'Three modes', say:"Three modes switch the whole machine. Coder, for every day. Gamer starts by itself when you launch a game: I step aside and hand the game every last megabyte. And in Incognito, all traffic leaves through a VPN, and I keep no history.", shots:['scene=settings&spage=modes','scene=desk&sys=gamer','scene=desk&sys=incog']},
-  {ch:'kav', say:"Need an app? Ask me, and kav installs it. Official packages are free. The AUR only gets in through a reviewed list, pinned to a commit. I can summarize a change for you, but I can never approve it. And every install takes a snapshot you can boot back into.", shots:['scene=kav&ktab=dash','scene=kav&ktab=browse','scene=kav&ktab=aur','scene=kav&ktab=snaps']},
-  {ch:'Two-way settings', say:"Every setting lives in a plain file. Change it in the panel, change it in Neovim, or just tell me, raise the gaps to ten. It's the same value, with the same undo.", shots:['scene=settings&spage=windows','scene=editor&cfg=windows','scene=settings&spage=keys']},
-  {ch:'Editor, terminal, files', say:"For code, there's Neovim with the shortcuts you already know, and Claude in a panel right beside it. In the terminal, one key and I explain the last error. And Yazi handles your files, with previews and drag and drop.", shots:['scene=editor','scene=claude','scene=files']},
-  {ch:'A browser of its own', say:"The browser is ours, too. It follows the theme, blocks ads from the first start, and has me in its side panel. Clip any page straight into your notes, and keep your favorite sites as albums.", shots:['scene=browser','scene=browser&clip=true','scene=albums']},
-  {ch:'Ask what is running', say:"When something runs hot, I notice. Ask me, and I'll tell you what it is, who started it, and whether to worry. I even remember the last twenty four hours.", shots:['scene=desk&notices=true','scene=top','scene=top&ttab=history']},
-  {ch:'Built for a gaming desktop', say:"It's built for a gaming desktop. Drag your displays into place. Tune the fans. Give every game its own profile. And find anything, or do the math, from one palette.", shots:['scene=settings&spage=displays&dsel=1','scene=settings&spage=gpu','scene=launcher','scene=launcher&calc=true']},
-  {ch:'Hard to break', say:"And it's very hard to break. Bootable snapshots. Hourly copies of your files. A firewall that asks before any app goes online. And a safe mode that is always there.", shots:['scene=kav&ktab=snaps','scene=settings&spage=backup','scene=settings&spage=privacy','scene=grub&gsel=safe']},
-  {ch:'Ten minutes', say:"Ten minutes, from a USB stick to your desktop. It's your computer, and I come with it. I'm Kavat. Come in!", shots:['scene=install&istep=software','scene=boot','scene=login']},
+  {ch:'Meet Kavat', say:"Hi! I'm Kavat. I live inside this computer, and today I get to show it off.", shots:[]},
+  {ch:'Arch, with an opinion', say:"This is Willwitcher OS, Kavat Edition. Pure Arch Linux underneath. On top: one theme, one voice, and a desktop that already knows how you work.", shots:[
+    {wall:1, w:1.15},
+    {s:'scene=desk', cam:[[800,500,1],[800,500,1.05]], tips:[{at:.3,x:1250,y:930,t:'Arch Linux · Hyprland · Kavat Shell'}]}]},
+  {ch:'A voice of its own', say:"Talk to me! I run right here, on this machine. Offline. No cloud, no account. When I answer, an island drops from the bar, my whiskers move with my voice, and even your keyboard lights pulse along.", shots:[
+    {s:'scene=voice&voice=listen', w:2.9, cam:[[800,320,1.2],[800,200,1.6]], acts:[{at:.4,run:"S.voice='auto';vt=11;vox()"}]},
+    {s:'scene=settings&spage=agent', cam:[[800,520,1.08],[800,330,1.28]], tips:[{at:.3,x:1150,y:168,t:'4 GB of the GPU. Never more.'}]}]},
+  {ch:'Tools, not a shell', say:"I'm not a chatbot with a shell. I work through typed tools, on four levels of permission. Reading is free. Anything bigger asks first and takes a snapshot. And nothing I read can ever give me orders.", shots:[
+    {s:'scene=agent', w:6, cam:[[800,460,1.25],[800,470,1.45]], tips:[{at:.4,x:1000,y:350,t:'every call is typed, logged and undoable'}]},
+    {s:'scene=settings&spage=agent', w:12, cam:[[650,540,1.4],[650,590,1.62],[650,600,1.66]], tips:[{at:.12,til:.7,x:1030,y:500,t:'four levels · you set each one'}]}]},
+  {ch:'Your stack, handled', say:"I look after your work, too. Ask what's running in Docker. Bring a whole stack up. Check a branch. Or free port four thousand: I name the program before I stop it.", shots:[
+    {s:'scene=agent', w:9.4, cam:[[800,560,1.45],[800,640,1.62]]},
+    {s:'scene=settings&spage=skills', w:3.8, cam:[[640,360,1.35],[640,390,1.58]], tips:[{at:.25,x:900,y:300,t:'“free port 4000” · it asks first'}]},
+    {s:'scene=settings&spage=shell', w:3.4, cam:[[1170,300,1.45],[1170,300,1.62]], tips:[{at:.25,x:1200,y:410,t:'or type it: port-kill 4000'}]}]},
+  {ch:'Skills', say:"Skills are one click, one phrase, or one key away. Say start stream: OBS opens, Gamer mode kicks in, and notifications go quiet. Teach me a new one, and it's a button forever.", shots:[
+    {s:'scene=settings&spage=skills', w:12.4, cam:[[800,480,1.08],[800,480,1.14],[1180,330,1.5],[1180,340,1.56]]},
+    {s:'scene=agent', w:5, cam:[[800,270,1.5],[800,290,1.66]]}]},
+  {ch:'Notes and reminders', say:"Notes are my favorite. Say: remind me to order thermal paste on Friday at six. Saved, tagged and scheduled before you finish the sentence. Every morning I bring you a summary. And I find things by what they mean, not just by their words.", shots:[
+    {s:'scene=desk&cap=true&rem=true', w:11.5, cam:[[800,340,1.3],[800,340,1.62],[1400,130,1.7]]},
+    {s:'scene=notes', w:3.4, cam:[[800,500,1.1],[640,340,1.45]]},
+    {s:'scene=note', w:3, cam:[[800,460,1.12],[840,330,1.4]]},
+    {s:'scene=settings&spage=notes', w:4.6, cam:[[620,700,1.5],[620,740,1.7]], tips:[{at:.25,x:900,y:800,t:'search by meaning, on this machine'}]}]},
+  {ch:'One theme, every app', say:"One theme dresses everything. The desktop, the terminal, the editor, the browser, even the icons and the cursor. Seven palettes, any accent, light or dark. And the whole system follows in under a second.", shots:[
+    {s:'scene=themes', w:3.2, cam:[[800,500,1],[800,500,1.03]], acts:[
+      {at:.12,sel:'[data-pal="tokyo"]',set:{pal:'tokyo'}},{at:.25,sel:'[data-pal="rose"]',set:{pal:'rose'}},
+      {at:.38,sel:'[data-mode="light"]',set:{mode:'light'}},{at:.51,sel:'[data-pal="everforest"]',set:{pal:'everforest'}},
+      {at:.64,sel:'[data-mode="dark"]',set:{mode:'dark'}},{at:.77,sel:'[data-pal="gruvbox"]',set:{pal:'gruvbox'}},
+      {at:.9,sel:'[data-pal="kavat"]',set:{pal:'kavat'}}]},
+    {s:'scene=settings&spage=appearance', cam:[[660,640,1.45],[660,670,1.62]], acts:[
+      {at:.3,sel:'[data-ico="tinted"]',set:{ico:'tinted'}},{at:.6,sel:'[data-ico="line"]',set:{ico:'line'}},{at:.88,sel:'[data-ico="colour"]',set:{ico:'colour'}}]}]},
+  {ch:'Wallpapers that move', say:"Wallpapers can move. A still image, a looping video, a different one on every display. Search online without leaving the picker. And if you like, I'll pull the palette straight from the picture.", shots:[
+    {s:'scene=settings&spage=wallpaper', w:12.5, cam:[[800,480,1.1],[650,400,1.4],[650,540,1.46]], acts:[
+      {at:.2,sel:'[data-wall="dunes"]',set:{wall:'dunes'}},{at:.36,sel:'[data-wall="aurora"]',set:{wall:'aurora'}},{at:.52,sel:'[data-wall="ember"]',set:{wall:'ember'}}],
+      tips:[{at:.68,x:1010,y:640,t:'search online · add your own sources'}]},
+    {s:'scene=desk&wall=ember', w:6.5, cam:[[800,500,1],[800,500,1.06]]}]},
+  {ch:'Three modes', say:"Three modes switch the whole machine. Coder, for every day. Gamer starts by itself when you launch a game: I step aside, and hand it every last megabyte. And in Incognito, everything leaves through a VPN, and I keep no history.", shots:[
+    {s:'scene=settings&spage=modes', w:6.2, cam:[[800,480,1.1],[915,330,1.42]]},
+    {s:'scene=desk', w:16.4, cam:[[960,300,1.3],[1090,150,1.62],[1090,150,1.62],[1090,150,1.62],[1090,150,1.62],[960,440,1.2]], acts:[
+      {at:.1,sel:'[data-sys="gamer"]',set:{sys:'gamer'}},{at:.56,sel:'[data-sys="incog"]',set:{sys:'incog'}}]}]},
+  {ch:'kav', say:"Need an app? Ask me, and kav installs it. Official packages go straight in. The AUR only enters through a reviewed list, pinned to the exact commit. I can summarize a change for you, but I can never approve it. And every install leaves a snapshot you can boot back into.", shots:[
+    {s:'scene=kav&ktab=dash', cam:[[800,500,1.1],[800,510,1.17]], acts:[
+      {at:.15,sel:'[data-ktab="browse"]',set:{ktab:'browse'}},{at:.28,sel:'[data-ktab="aur"]',set:{ktab:'aur'}},{at:.77,sel:'[data-ktab="snaps"]',set:{ktab:'snaps'}}],
+      tips:[{at:.46,til:.74,x:1060,y:345,t:'two flagged lines · only a person approves'},{at:.84,x:560,y:300,t:'boot back into any of them'}]}]},
+  {ch:'Two-way settings', say:"Twenty seven pages of settings, and every one is a plain file. Change it in the panel, change it in Neovim, or just tell me: raise the gaps to ten. Same value, same undo.", shots:[
+    {s:'scene=settings&spage=appearance', w:6.4, cam:[[800,510,1.1],[800,510,1.14]], acts:PAGES.map((p,j)=>({at:.05+j*.9/PAGES.length,set:{spage:p},q:1}))},
+    {s:'scene=settings&spage=windows', w:3.6, cam:[[800,400,1.25],[650,290,1.6]], acts:[{at:.6,sel:'[data-bind="gap"]',set:{gap:1}}]},
+    {s:'scene=editor&cfg=windows', w:8, cam:[[520,300,1.4],[430,280,1.75],[430,280,1.78]], acts:[{at:.5,set:{gap:1.43},q:1}], tips:[{at:.58,x:680,y:440,t:'the same value, in a plain file'}]}]},
+  {ch:'Editor, files, search', say:"For code, there's Neovim with the shortcuts you already know, and Claude in a panel right beside it. Yazi is the file manager of the whole system: every app opens and saves through it. And one search finds any file on the disk, by its name or by what's inside.", shots:[
+    {s:'scene=editor', w:6, cam:[[800,480,1.1],[820,480,1.24]]},
+    {s:'scene=claude', w:3.8, cam:[[800,480,1.1],[1090,310,1.36]]},
+    {s:'scene=files', w:4.5, cam:[[800,500,1.1],[800,500,1.18]]},
+    {s:'scene=files&pick=true', w:3.7, cam:[[800,520,1.1],[800,330,1.36]], tips:[{at:.25,x:800,y:108,t:'every app opens and saves through Yazi'}]},
+    {s:'scene=find', w:7.6, cam:[[800,500,1.14],[800,480,1.24]], acts:[{at:.55,sel:'[data-fnd="text"]',set:{fnd:'text'}}]}]},
+  {ch:'A browser of its own', say:"The browser is ours, too. It wears the theme, blocks ads from the first start, and hides YouTube Shorts. Protected video just plays. Any site becomes an app, with its own window. And you can clip a page straight into your notes.", shots:[
+    {s:'scene=browser', w:4.6, cam:[[800,500,1.1],[800,480,1.2]]},
+    {s:'scene=settings&spage=browser', w:13.2, cam:[[660,300,1.5],[660,330,1.5],[660,660,1.5],[1170,560,1.5],[1170,570,1.54]], tips:[
+      {at:.14,til:.4,x:1010,y:332,t:'no Shorts, from the first start'},{at:.46,til:.64,x:1020,y:716,t:'protected video, built in'},{at:.74,x:1170,y:486,t:'any site becomes an app'}]},
+    {s:'scene=browser&clip=true', w:3, cam:[[800,500,1.1],[650,360,1.4]]},
+    {s:'scene=albums', w:2.2, cam:[[800,500,1.1],[800,520,1.2]]}]},
+  {ch:'Ask what is running', say:"When something runs hot, I notice. Ask, and I'll tell you what it is, who started it, and whether to worry. I remember the last twenty four hours, too.", shots:[
+    {s:'scene=desk&notices=true', w:3.8, cam:[[800,500,1.05],[1390,190,1.6]]},
+    {s:'scene=top', w:11.4, cam:[[800,500,1.1],[1060,640,1.36],[1060,660,1.36],[800,500,1.12],[800,700,1.24]], acts:[{at:.62,sel:'[data-ttab="history"]',set:{ttab:'history'}}]}]},
+  {ch:'Built for a gaming desktop', say:"It's built for a gaming desktop. Drag your displays into place. Tune the fans. Give every game its own profile. And one palette finds anything: apps, files, settings, even your open tabs.", shots:[
+    {s:'scene=settings&spage=displays&dsel=1', w:6.1, cam:[[800,480,1.1],[650,290,1.5]]},
+    {s:'scene=settings&spage=gpu', w:4.5, cam:[[800,420,1.2],[1170,330,1.5]]},
+    {s:'scene=launcher', w:5, cam:[[800,400,1.15],[800,330,1.4]]},
+    {s:'scene=launcher&calc=true', w:2.4, cam:[[800,300,1.4],[800,250,1.6]]}]},
+  {ch:'Reach it from anywhere', say:"And when you're away? Flip one switch. Your computer joins your own private network, and you get a terminal and the whole desktop, on your laptop or your phone. No open ports. And while it's off, nothing is listening at all.", shots:[
+    {s:'scene=settings&spage=remote', cam:[[800,480,1.08],[650,310,1.5],[650,310,1.5],[650,400,1.46],[1170,330,1.5],[1170,330,1.5],[1000,130,1.55],[1000,130,1.55]], acts:[{at:.17,sel:'[data-tog="remote"]',set:{remote:true}}],
+      tips:[{at:.3,til:.5,x:660,y:650,t:'only your own devices · no open ports'},{at:.58,til:.8,x:1170,y:650,t:'terminal and desktop, from anywhere'}]}]},
+  {ch:'Hard to break', say:"And it's very hard to break. Bootable snapshots. Hourly copies of your files. A firewall that asks before any app goes online. Your password, only when it matters. And a safe mode that's always there.", shots:[
+    {s:'scene=kav&ktab=snaps', w:4.7, cam:[[800,500,1.1],[540,230,1.42]]},
+    {s:'scene=settings&spage=backup', w:2.8, cam:[[800,480,1.1],[650,300,1.42]]},
+    {s:'scene=settings&spage=privacy', w:4.8, cam:[[800,480,1.1],[1170,300,1.46]]},
+    {s:'scene=auth', w:3.6, cam:[[800,420,1.2],[800,400,1.5]]},
+    {s:'scene=grub&gsel=safe', w:3.8, cam:[[800,500,1.02],[500,360,1.36]]}]},
+  {ch:'Ten minutes', say:"Ten minutes, from a USB stick to your desktop. Pick your software. Pick your look. And it boots straight into your theme. It's your computer, and I come with it. I'm Kavat. Come in!", shots:[
+    {s:'scene=install&istep=software', w:6.5, cam:[[800,500,1.05],[900,420,1.26]]},
+    {s:'scene=install', w:3, cam:[[800,540,1.1],[800,560,1.2]], acts:[{at:.5,sel:'[data-pal="tokyo"]',set:{pal:'tokyo'}}]},
+    {s:'scene=boot&pal=tokyo', w:2, cam:[[800,500,1.02],[800,480,1.1]]},
+    {s:'scene=login&pal=tokyo', w:7.5, cam:[[800,500,1.02],[800,520,1.12]]}]},
 ];
-const LEAD=.35, TAIL=.75, FADE=.45, INTRO=1.6, OUTRO=2.6;
-const $=s=>document.querySelector(s), clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
-const ease=u=>{u=clamp(u);return u*u*(3-2*u)}, mix=(a,b,u)=>a+(b-a)*u;
+// the wall: twelve screens, four by three; the desktop is the one the camera dives into
+const WALL=['scene=themes&pal=tokyo','scene=notes&pal=gruvbox','scene=browser&pal=nord','scene=top&pal=rose',
+  'scene=kav&ktab=dash&pal=catppuccin','scene=desk','scene=editor&pal=everforest','scene=settings&spage=appearance&pal=rose&mode=light',
+  'scene=files&pal=tokyo','scene=launcher&pal=nord','scene=albums&pal=catppuccin','scene=login&pal=gruvbox'];
+const DIVE=5, TW=480, TH=300, TG=30;
 
-// shots: one frame of the mockup each, stacked; setT decides which ones show
-const frames=[];
-SEG.forEach((s,i)=>{s.f=s.shots.map(h=>{const f=document.createElement('iframe');f.className='shot';f.src='../mockup/index.html#bare=true&'+h;$('#shots').appendChild(f);frames.push(f);return f})});
-window.ready=Promise.all(frames.map(f=>new Promise(r=>f.addEventListener('load',r)))).then(()=>new Promise(r=>setTimeout(r,600)));
+const CARD=1.25, TAIL=.5, INTRO=2.7, OUTRO=7, XF=.34, TRAVEL=.62, MS=.92, FPS=30, WARM=1.2, FAINT=.012;
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v)), mix=(a,b,u)=>a+(b-a)*u;
+const ease=u=>{u=clamp(u);return u*u*(3-2*u)}, out3=u=>1-(1-clamp(u))**3, back=u=>{u=clamp(u);const c=1.9;return 1+(c+1)*(u-1)**3+c*(u-1)**2};
 
-// each line is split into sentences, and each sentence into words, for the captions
-SEG.forEach(s=>{s.sent=s.say.match(/[^.!?:]+[.!?:]+/g).map(x=>x.trim());s.chars=s.sent.reduce((a,x)=>a+x.length,0)});
-function setDurations(d){let t=0;SEG.forEach((s,i)=>{s.speech=d?d[i]:s.say.split(' ').length/2.6;s.lead=LEAD+(i===0?INTRO:0);s.len=s.lead+s.speech+TAIL+(i===SEG.length-1?OUTRO:0);s.t0=t;t+=s.len});window.total=t;return t}
+// ---------------------------------------------------------------- the frames of the mockup
+const shots=[], loads=[];
+const frame=(h,cls,into)=>{const f=document.createElement('iframe');f.className=cls;f.src='../mockup/index.html#bare=true&'+h;into.appendChild(f);loads.push(new Promise(r=>f.addEventListener('load',r)));return f};
+SEG.forEach((s,i)=>s.shots.forEach((sh,k)=>{sh.seg=i;sh.k=k;sh.w=sh.w||1;if(!Array.isArray(sh.cam&&sh.cam[0]))sh.cam=[sh.cam||[800,500,1]];
+  if(sh.s)sh.f=frame(sh.s,'shot',$('#shots'));shots.push(sh)}));
+const tiles=WALL.map((h,j)=>{const d=document.createElement('div');d.className='tile';$('#wall').appendChild(d);frame(h,'',d);
+  return {d,x:((j%4)-1.5)*(TW+TG),y:(Math.floor(j/4)-1)*(TH+TG),o:(j%4)+Math.floor(j/4)}});
+shots.forEach(sh=>(sh.tips||[]).forEach(tp=>{tp.el=document.createElement('div');tp.el.className='tip';tp.el.innerHTML='<i></i>'+tp.t;$('#tips').appendChild(tp.el)}));
+// what each shot's mockup held when it loaded, so that going back in time puts it back
+window.ready=Promise.all(loads).then(()=>new Promise(r=>setTimeout(r,700))).then(()=>shots.forEach(sh=>{if(!sh.f)return;
+  try{const w=sh.f.contentWindow,all=JSON.parse(w.eval('JSON.stringify(S)'));sh.win=w;sh.base={};(sh.acts||[]).forEach(a=>Object.keys(a.set||{}).forEach(k=>sh.base[k]=all[k]))}catch(e){sh.win=null}}));
+
+// ---------------------------------------------------------------- time
+// a line is cut into phrases short enough for one row of caption
+const phrases=say=>{const o=[];for(const s of say.match(/[^.!?:]+[.!?:]+/g).map(x=>x.trim())){
+  if(s.length>66&&s.includes(', ')){const at=[...s.matchAll(/, /g)].map(m=>m.index+1),c=at.reduce((a,b)=>Math.abs(b-s.length/2)<Math.abs(a-s.length/2)?b:a);o.push(s.slice(0,c),s.slice(c).trim())}
+  else if(o.length&&o[o.length-1].length<14)o[o.length-1]+=' '+s;else o.push(s)}return o};
+SEG.forEach(s=>{s.ph=phrases(s.say);s.chars=s.ph.reduce((a,x)=>a+x.length,0)});
+function setDurations(d){let t=0;const n=SEG.length;
+  SEG.forEach((s,i)=>{s.speech=d?d[i]:s.say.split(' ').length/3;s.lead=i?CARD*.72:INTRO;s.len=s.lead+s.speech+TAIL+(i===n-1?OUTRO:0);s.t0=t;t+=s.len});
+  // a line's shots share the time from the middle of its card to the middle of the next one
+  SEG.forEach((s,i)=>{const a=s.t0+(i?CARD*.46:0),b=i<n-1?SEG[i+1].t0+CARD*.46:s.t0+s.len-OUTRO+.5,sum=s.shots.reduce((x,sh)=>x+sh.w,0);let c=a;
+    s.shots.forEach(sh=>{sh.a=c;c+=(b-a)*sh.w/sum;sh.b=c})});
+  window.total=t;
+  $('#prog').querySelectorAll('u').forEach(e=>e.remove());SEG.slice(1).forEach(s=>{const u=document.createElement('u');u.style.left=(s.t0/t*1920-1.5)+'px';$('#prog').appendChild(u)});
+  return t}
 setDurations();
 window.setDurations=setDurations;
-// where each line starts speaking, for the tool that lays the voice under the picture
-window.cues=()=>SEG.map(s=>({at:s.t0+s.lead,say:s.say}));
+// where each line starts speaking and where each card starts, for the tool that lays the sound
+window.cues=()=>SEG.map((s,i)=>({at:s.t0+s.lead,say:s.say,card:i?s.t0:null}));
+// how loud the voice is at each frame, from 0 to 1; without it the whiskers make it up
+let LV=null;window.setLevels=a=>{LV=a};
 
-// whiskers: three a side, drawn as waves that travel away from the face while Kavat speaks
+// ---------------------------------------------------------------- Kavat
 const WH=[[-7,10,2.2,5.2,0],[0,12,2.8,6.4,1.7],[7,10,3.3,5.8,3.1]];
 $('#whs').innerHTML=WH.map(([a])=>[1,-1].map(s=>`<g transform="translate(${170+s*36} 62) scale(${s} 1) rotate(${a})"><path class="wh"/></g>`).join('')).join('');
-const whp=[...document.querySelectorAll('.wh')];
-function whiskers(t,loud){whp.forEach((el,i)=>{const [,amp,k,sp,f]=WH[i>>1];const l=.07+loud*(.3+.7*Math.abs(Math.sin(t*2.3+f)*Math.sin(t*3.7+f*2+(i&1)*.5))**.6);
-  let d='M0 0';for(let j=1;j<=48;j++){const u=j/48;d+=` L${(128*u).toFixed(1)} ${(amp*l*2.3*Math.sqrt(u)*(1-u)**.9*Math.sin(2*Math.PI*k*u-sp*t+f)).toFixed(2)}`}el.setAttribute('d',d)})}
+const whp=$$('.wh');
+function whiskers(t,loud,grow){whp.forEach((el,i)=>{const [,amp,k,sp,f]=WH[i>>1];const l=.07+loud*(.35+.65*Math.abs(Math.sin(t*2.3+f)*Math.sin(t*3.7+f*2+(i&1)*.5))**.6);
+  let d='M0 0';for(let j=1;j<=48;j++){const u=j/48*grow;d+=` L${(128*u).toFixed(1)} ${(amp*l*2.3*Math.sqrt(u)*(1-u)**.9*Math.sin(2*Math.PI*k*u-sp*t+f)).toFixed(2)}`}el.setAttribute('d',d)})}
+$('#title h1').innerHTML=[...'Willwitcher-OS'].map(c=>`<span>${c}</span>`).join('');
+const letters=$$('#title h1 span'), halos=$$('.halo'), stats=$$('#stats b');
 
+// ---------------------------------------------------------------- one frame
+const camAt=(sh,u)=>{const c=sh.cam,n=c.length-1;if(!n)return c[0];const x=clamp(u)*n,j=Math.min(n-1,Math.floor(x)),e=ease(x-j);return c[j].map((v,q)=>mix(v,c[j+1][q],e))};
+const view=([cx,cy,z])=>({z,tx:clamp(800-cx*z,1600-1600*z,0),ty:clamp(500-cy*z,1000-1000*z,0)});
+const spot=(sh,sel)=>{try{for(const el of sh.win.document.querySelectorAll(sel)){const r=el.getBoundingClientRect();if(r.width&&r.top>=0&&r.top<1000&&r.left>=0&&r.left<1600)return [r.left+r.width/2,r.top+r.height/2]}}catch(e){}return null};
+let accent=[242,169,59];
 function setT(t){
   t=clamp(t,0,window.total-.001);
-  const i=SEG.findIndex(s=>t<s.t0+s.len), s=SEG[i], lt=t-s.t0, last=i===SEG.length-1;
-  const speak=clamp((lt-s.lead)/s.speech), talking=lt>s.lead&&lt<s.lead+s.speech;
-  // shots
-  SEG.forEach((x,j)=>x.f.forEach((f,k)=>{
-    const n=x.f.length, span=(x.len-(j===SEG.length-1?OUTRO:0))/n, a=x.t0+k*span, b=a+span;
-    const first=j===1&&k===0, end=j===SEG.length-1&&k===n-1;
-    let o=ease((t-a)/FADE+(first?0:.5))*(1-ease((t-b)/FADE+.5));
-    if(end)o=ease((t-a)/FADE+.5)*(1-ease((t-b+.3)/.8));
-    f.style.opacity=o;f.style.visibility=o>0?'visible':'hidden';
-    const z=.9*mix(1,1.012,clamp((t-a)/span));f.style.transform=`scale(${z}) translate(${-800*(1-.9/z)}px,${-500*(1-.9/z)}px)`}));
+  const n=SEG.length, i=SEG.findIndex(s=>t<s.t0+s.len), s=SEG[i], lt=t-s.t0, last=i===n-1;
+  const said=clamp((lt-s.lead)/s.speech), talking=lt>s.lead&&lt<s.lead+s.speech;
+  const fr=Math.floor(t*FPS), loud=LV?(LV[fr]||0):talking?.55+.45*Math.sin(t*9)*Math.sin(t*5.3):0;
+  const end=last?lt-(s.len-OUTRO):-1, bye=ease(end/1.1);          // the last picture, from 0 to 1
+  const wsh=shots.find(x=>x.wall), dive=ease((t-(wsh.b-1.15))/1.15);
+
+  // the shots: which ones show, where the camera is, and what has been pressed in them
+  let top=null;
+  shots.forEach((sh,j)=>{ if(!sh.f)return;
+    const first=sh.k===0, after=shots[j-1]&&shots[j-1].wall, next=shots[j+1], cut=!next||next.k===0;
+    const a=after?sh.a-.5:sh.a, o=t<a?0:first||after?1:ease((t-a)/XF), gone=t>=sh.b+(cut?0:XF);
+    const warm=o<=0&&t>=a-WARM, on=(o>0||warm)&&!gone; sh.f.style.visibility=on?'visible':'hidden';
+    if(!on){sh.on=false;return}
+    const u=(t-sh.a)/(sh.b-sh.a), v=view(camAt(sh,u)); sh.v=v;
+    sh.f.style.opacity=warm?1:o; sh.f.style.zIndex=warm?0:j+1;
+    sh.f.style.transform=warm?`translate(${v.tx}px,${v.ty}px) scale(${v.z})`:`translate(${v.tx}px,${v.ty+(1-o)*14}px) scale(${v.z*(1+(1-o)*.035)})`;
+    if(sh.win){
+      const st=Object.assign({},sh.base);(sh.acts||[]).forEach(x=>{if(u<x.at){x.ran=0;return}Object.assign(st,x.set);
+        if(x.run&&!x.ran){x.ran=1;try{sh.win.eval(x.run)}catch(e){}}});
+      const key=JSON.stringify(st);if(key!==sh.key){sh.key=key;try{sh.win.eval('Object.assign(S,'+key+');apply()')}catch(e){}}}
+    sh.on=true; if(o>=.5)top=sh; sh.u=u});
+
+  // the accent of the picture on top colours everything around it
+  if(top&&top.win)try{const m=getComputedStyle(top.win.document.querySelector('.screen')).getPropertyValue('--accent').trim().match(/^#(..)(..)(..)$/);
+    if(m)accent=accent.map((c,q)=>mix(c,parseInt(m[q+1],16),.16))}catch(e){}
+  if(i===0||bye>.5)accent=accent.map((c,q)=>mix(c,[242,169,59][q],.2));
+  const acc=`rgb(${accent.map(Math.round).join(',')})`;document.body.style.setProperty('--acc',acc);
+  [['#b1',1500,170,.3,.42],['#b2',380,930,.22,.3],['#b3',1000,520,.17,.13]].forEach(([id,x,y,sp,al],q)=>{const e=$(id);
+    e.style.left=(x+Math.sin(t*sp+q*2)*190)+'px';e.style.top=(y+Math.cos(t*sp*.8+q)*120)+'px';
+    e.style.background=`radial-gradient(closest-side,rgba(${q===1?'60,84,150':accent.map(Math.round).join(',')},${al}) 0,transparent 100%)`});
+  $('#grid').style.transform=`translate(${Math.sin(t*.11)*18}px,${(t*5)%46}px)`;
+
+  // the pointer and the labels, which ride on the camera of the picture on top
+  const cur=$('#cur'), ring=$('#ring'); let seen=0;
+  if(top&&top.win&&top.acts){const A=top.acts.filter(x=>x.sel), dur=top.b-top.a, tt=top.u*dur;
+    if(A.length){const pos=A.map(x=>x.p||(x.p=spot(top,x.sel))); let p=null, press=0, rg=-1;
+      A.forEach((x,q)=>{const at=x.at*dur, from=q?pos[q-1]:[pos[0]?pos[0][0]+260:1000,pos[0]?pos[0][1]+230:700], to=pos[q]; if(!to||!from)return;
+        if(tt>=at-TRAVEL-.12&&(q===A.length-1||tt<A[q+1].at*dur-TRAVEL-.12)||(!p&&tt<at)){const e=ease((tt-(at-TRAVEL-.12))/TRAVEL);p=[mix(from[0],to[0],e),mix(from[1],to[1],e)-Math.sin(e*Math.PI)*26]}
+        if(tt>=at-.08&&tt<at+.14)press=1; if(tt>=at&&tt<at+.5)rg=(tt-at)/.5});
+      if(p){seen=ease(tt/.35)*(1-ease((tt-(A[A.length-1].at*dur+.7))/.4));const v=top.v,x=p[0]*v.z+v.tx,y=p[1]*v.z+v.ty;
+        cur.style.transform=`translate(${x}px,${y}px) scale(${1.5*(press?.82:1)})`;
+        ring.style.transform=`translate(${x}px,${y}px) scale(${rg<0?0:.25+out3(rg)*1.1})`;ring.style.opacity=rg<0?0:1-rg}
+      else A.forEach(x=>x.p=null)}}
+  cur.style.opacity=seen; if(!seen)ring.style.opacity=0;
+  shots.forEach(sh=>(sh.tips||[]).forEach(tp=>{const dur=sh.b-sh.a, tt=(sh.u||0)*dur, a=tp.at*dur, b=(tp.til||1)*dur-.1;
+    const o=sh===top?back((tt-a)/.42)*(1-ease((tt-b)/.25)):0, v=sh.v;
+    tp.el.style.opacity=clamp(o*1.4); if(o>0&&v)tp.el.style.transform=`translate(${tp.x*v.z+v.tx}px,${tp.y*v.z+v.ty}px) translate(-50%,-50%) scale(${.6+.4*o})`}));
+
+  // the monitor: it tilts as it breathes, lands after each card, and leaves at the end
+  const land=i>=1&&!(i===1&&t<wsh.b)?1-out3((lt-CARD*.46)/1.0):0, wallOn=i===1&&t<wsh.b+.1;
+  const mo=i===0?0:wallOn?ease((t-(wsh.b-.42))/.34):1-bye;
+  $('#mon').style.opacity=mo; $('#rig').style.visibility=mo>0?'visible':'hidden';
+  $('#mon').style.transform=`translateY(${Math.sin(t*.5)*3-land*10+bye*-40}px) rotateX(${1.6+Math.sin(t*.31)*.7+land*2.5}deg) rotateY(${Math.sin(t*.23)*2+land*-7+bye*10}deg) scale(${MS*(1-land*.045)*(1-bye*.3)*(wallOn?mix(.985,1,ease((t-(wsh.b-.42))/.6)):1)})`;
+  $('#glass').style.opacity=.6+Math.sin(t*.23)*.4;
+
+  // the wall
+  const wIn=wsh.a, early=t<wIn||(last&&end>-2.5&&end<=0), wo=early?FAINT:i===1&&t<wsh.b+.1?1-ease((t-(wsh.b-.3))/.34):bye*.34;
+  $('#wallrig').style.visibility=wo>0?'visible':'hidden';
+  if(wo>0){const k=1-dive, sc=bye?1.16+end*.012:mix(1.1+(t-wIn)*.03,MS*1600/TW,dive), dx=-tiles[DIVE].x*sc*dive;
+    $('#wall').style.opacity=wo;
+    $('#wall').style.transform=`translate(${dx+(bye?Math.sin(t*.2)*30:0)}px,${(bye?-20:0)}px) rotateX(${(bye?20:26)*k}deg) rotateY(${(bye?-10:-16)*k}deg) rotateZ(${(bye?3:5)*k}deg) scale(${sc})`;
+    tiles.forEach(tl=>{const p=bye||early?1:back((t-wIn-.05-tl.o*.07)/.55);tl.d.style.opacity=clamp(p*1.5);
+      tl.d.style.transform=`translate(${tl.x-TW/2}px,${tl.y-TH/2+(1-p)*60}px) scale(${TW/1600*(.86+.14*p)})`})}
+
+  // the chapter card
+  const cu=i?lt/CARD:2, ca=out3(cu/.34), cb=ease((cu-.6)/.4), slab=(a,b)=>`polygon(${b*2400-200}px 0,${a*2400}px 0,${a*2400-300}px 1080px,${b*2400-500}px 1080px)`;
+  $('#card').style.visibility=$('#card2').style.visibility=cu<1?'visible':'hidden';
+  if(cu<1){$('#card2').style.clipPath=slab(out3(cu/.26),ease((cu-.66)/.34));$('#card').style.clipPath=slab(ca,cb);
+    $('#card .n').textContent=String(i).padStart(2,'0');$('#card .k').textContent='Chapter '+i+' of '+(n-1);$('#card .t').textContent=s.ch;
+    $('#card .t').style.transform=$('#card .k').style.transform=`translateX(${(1-ca)*-140+cb*260}px)`;$('#card .n').style.transform=`translateX(${(1-ca)*-320+cb*420}px)`}
+
   // Kavat: centre stage for the first line and at the very end, in the corner in between
-  const out=last?ease((lt-(s.len-OUTRO))/.9):0, m=i===0?0:i===1?ease(lt/.8):1-out;
-  const sc=mix(3.4,1.05,m)*ease(t/.9+.02), bob=Math.sin(t*1.7)*4*(1-m*.6);
-  $('#shots').style.opacity=i===0?0:i===1?ease(lt/.7):1-out;
-  $('#kavat').style.transform=`translate(${mix(790,20,m)}px,${mix(340,946,m)+bob}px) scale(${sc})`;
-  const blink=(t%3.7)<.13?.12:1;document.querySelectorAll('#kavat .eye').forEach(e=>e.style.transform=`scaleY(${blink})`);
-  whiskers(t,talking?1:0);
-  // words
-  $('#title').style.opacity=i===0?ease((t-.7)/.8):0;$('#title').style.transform=`translateY(${i===0?mix(24,0,ease((t-.7)/.8)):0}px)`;
-  $('#end').style.opacity=out;$('#end').style.transform=`translateY(${mix(24,0,out)}px)`;
-  $('#chapter').innerHTML=i?`<b>${String(i).padStart(2,'0')}</b>${s.ch}`:'';$('#chapter').style.opacity=i?(1-out)*ease(lt/.5):0;
+  const m=i===0?0:i===1?ease(lt/(CARD*.5)):1-bye, born=ease((t-.5)/.8), open=ease((t-.12)/.3);
+  const kx=mix(790,70,m), ky=mix(bye?165:300,955,m)+Math.sin(t*1.7)*4*(1-m*.7), ks=mix(3.3,1,m)*(1+loud*.035);
+  $('#kavat').style.transform=`translate(${kx}px,${ky}px) scale(${ks})`;
+  $('#kavat .head').style.opacity=i?1:born;
+  const blink=(t%3.7)<.13&&t>2?.12:1; $$('#kavat .eye').forEach(e=>{e.style.transform=`scaleY(${blink*(i?1:open)})`;e.style.fill=i||born>.6?'#0e1016':acc});
+  whiskers(t,Math.max(loud,i?0:.2*ease((t-1.1)/.3)*(1-ease((t-1.9)/.5))),i?1:ease((t-1)/.6));
+  halos.forEach((h,q)=>{const p=(t*.55+q/3)%1, on=(i===0?ease((t-1.2)/.6):bye)*(1-m);h.style.opacity=on*(1-p)*(.1+loud*.5);h.style.transform=`translate(${kx+170}px,${ky+60}px) scale(${.35+p*1.5})`});
+
+  // the words
+  letters.forEach((l,q)=>{const p=i?0:back((t-1.25-q*.045)/.5);l.style.opacity=i?0:clamp(p*1.6);l.style.transform=`translateY(${(1-p)*46}px)`});
+  $('#title').style.visibility=i?'hidden':'visible';$('#title p').style.opacity=ease((t-2)/.6);$('#title p').style.letterSpacing=mix(.9,.42,out3((t-2)/.9))+'em';
+  $('#end').style.opacity=ease((end-.6)/.8);$('#end').style.visibility=end>0?'visible':'hidden';$('#end h2').style.transform=`translateY(${(1-out3((end-.6)/.9))*30}px)`;
+  stats.forEach((b,q)=>{const p=out3((end-1.5-q*.16)/1.1);b.textContent=Math.round(+b.dataset.n*p);b.parentNode.style.opacity=ease((end-1.4-q*.16)/.5);b.parentNode.style.transform=`translateY(${(1-out3((end-1.4-q*.16)/.6))*24}px)`});
+  const capO=(i===0?ease((lt-INTRO+.2)/.4):1)*(1-ease(end/.5));
+  $('#lab').innerHTML=i?`<b>${String(i).padStart(2,'0')}</b>${s.ch}`:'';$('#lab').style.opacity=i?capO*ease((lt-CARD*.6)/.4):0;
   let done=0,html='';
-  for(const x of s.sent){const a=done/s.chars,b=(done+x.length)/s.chars;done+=x.length;
-    if(speak<b||x===s.sent[s.sent.length-1]){const w=x.split(' '),n=Math.floor(clamp((speak-a)/(b-a))*w.length);
-      html=w.map((v,j)=>`<span class="${j<n?'said':j===n&&talking?'now':''}">${v}</span>`).join(' ');break}}
-  $('#cap').innerHTML='<div>'+html+'</div>';$('#cap').style.opacity=(i===0?ease((lt-INTRO+.2)/.4):1)*(1-out);
-  $('#bar').style.width=(t/window.total*1920)+'px';
+  for(const x of s.ph){const a=done/s.chars,b=(done+x.length)/s.chars;done+=x.length;
+    if(said<b||x===s.ph[s.ph.length-1]){const w=x.split(' '),k=Math.floor(clamp((said-a)/(b-a))*w.length);
+      html=w.map((v,j)=>`<span class="${j<k?'said':j===k&&talking?'now':''}">${v}</span>`).join(' ');break}}
+  const cap=$('#cap');cap.style.transform='';cap.innerHTML='<div>'+html+'</div>';cap.style.opacity=capO*(i?ease((lt-CARD*.55)/.3):1);
+  if(i===0){cap.style.left='0';cap.style.width='1920px';cap.style.justifyContent='center';cap.style.top='872px'}
+  else{cap.style.left='422px';cap.style.width='';cap.style.justifyContent='';cap.style.top='984px';const wd=cap.firstChild.scrollWidth;if(wd>1400)cap.style.transform=`scale(${1400/wd})`}
+  $('#prog i').style.width=(t/window.total*1920)+'px';$('#prog').style.opacity=1-ease(end/.5);
+  $('#black').style.opacity=Math.max(1-ease(t/.5),ease((t-(window.total-.7))/.6));
 }
 window.setT=setT;setT(0);
 
@@ -138,7 +371,8 @@ window.setT=setT;setT(0);
 if(!location.hash.includes('render')){
   const fit=()=>{const k=Math.min(innerWidth/1920,innerHeight/1080);$('#stage').style.transform=`translate(${(innerWidth-1920*k)/2}px,${(innerHeight-1080*k)/2}px) scale(${k})`};
   fit();addEventListener('resize',fit);
-  window.ready.then(()=>{const t0=performance.now();(function loop(){setT(((performance.now()-t0)/1000)%window.total);requestAnimationFrame(loop)})()});
+  const at=+(location.hash.match(/t=([\d.]+)/)||[0,0])[1];
+  window.ready.then(()=>{const t0=performance.now();(function loop(){setT((at+(performance.now()-t0)/1000)%window.total);requestAnimationFrame(loop)})()});
 }
 </script>
 </body>
