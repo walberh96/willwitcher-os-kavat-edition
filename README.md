@@ -87,6 +87,7 @@ The mockup is a single HTML file with no dependencies: open [`docs/mockup/index.
 - **Small model, made reliable.** It starts on Qwen3.5 4B. For each request it sees only the five to eight tools that fit, a skill with several steps is a single call, and an exact phrase never reaches the model.
 - **It has a voice.** It listens and speaks through VoiceStudio, also locally.
 - **You can see it speak.** While it talks, an island drops from the bar with Kavat's face. Its whiskers are the sound of its voice, and the words appear as captions, lit one by one. The same island shows what it heard you say and which tool it is calling, and the keyboard and case lights pulse along.
+- **It looks after your containers, git and ports.** Ask what is running in Docker, have a stack brought up, or free port 4000; lazydocker and lazygit are there when you want the whole screen.
 - **It has no shell.** It talks to `kavatd`, a daemon of typed tools with four permission levels. Reading is free. Changing a theme is free and logged. Installing something asks first and takes a snapshot. Touching disks, users or the network asks for your password.
 - **It cannot grant itself permissions**, and everything it does can be undone.
 - **What it reads is never an order.** A web page, a file or a command's output is only information. Only your messages, your clicks and the skills you launch can make it act.
@@ -225,11 +226,13 @@ Notes are part of the system, built on a fork of [`nb`](https://github.com/xwmx/
 
 ## The browser
 
-A Chromium of its own, with eight changes.
+A Chromium of its own, with ten changes.
 
 - **It follows the modes.** In Incognito it opens private windows; in Gamer it suspends tabs.
 - **It follows the theme.** It changes colour with the rest of the system, internal pages included.
 - **It blocks out of the box.** Ads and trackers, from the first start.
+- **No YouTube Shorts.** They are hidden from the first start, and a switch brings them back.
+- **Any page can be an app.** `kavat webapp install` gives a site its own window, its own icon and its own entry in the launcher.
 - **It plays protected video.** Netflix, Prime Video and the rest work through Widevine, built into a package of its own on your machine and never published; on Linux the services cap the quality, usually at 720p.
 - **It has Kavat beside it.** A panel that reads the page and acts in the browser, with the same permissions as in the system.
 - **It has a console.** A palette of its own commands: `hide-tabs`, `hide-sidebar`, `zen`, and the ones you define.

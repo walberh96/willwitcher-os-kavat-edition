@@ -105,7 +105,7 @@ The Development category brings what is needed to work on lanequarters, includin
 
 | Group | Programs | What for |
 | --- | --- | --- |
-| Essentials | git, github-cli, mise, pnpm, docker with compose, claude-code | The projects require Node 22 or higher and pnpm; mise sets each one's Node version |
+| Essentials | git, lazygit, github-cli, mise, pnpm, docker with compose, lazydocker, claude-code | The projects require Node 22 or higher and pnpm; mise sets each one's Node version |
 | Web | supabase, postgresql (`psql` client), stripe-cli | `supabase start` brings up the local database in Docker; `stripe listen` receives the webhooks |
 | Rust | rustup with rustc, cargo, rustfmt, clippy and rust-analyzer; lldb, gcc and pkg-config | `kav` and `kavatd` are written in Rust |
 | Mobile, Android | jdk17-openjdk, Android SDK with emulator, android-tools, watchman, maestro | Build the Expo app for Android and test it on the emulator or on a phone |
@@ -369,7 +369,7 @@ A Settings panel inside Kavat Shell configures the whole core of the system from
 | Files (Yazi) | Shortcut preset, drag and drop, copier with pop-up, system file picker, what clicking a download does, previews, open with | Not planned: plugins; fork only if a plugin falls short |
 | Notes (nb) | Notes folder, default notebook, quick note, reminders and how long they snooze, task views, which notebooks the agent reads, encryption and sync | Fork of nb (kavat-notes) |
 | Shell (zsh) | Prompt, plugins, history, aliases, default apps | No |
-| Browser | Blocker, appearance, profile per mode, protected video, console commands, clips and albums | The Chromium fork already planned |
+| Browser | Blocker, YouTube Shorts, appearance, profile per mode, protected video, web apps, console commands, clips and albums | The Chromium fork already planned |
 | Bar & widgets | Position and density of the bar, widgets and their order, launcher, notifications | Kavat Shell |
 | Modes | What each mode does, automation with Steam, Incognito VPN, new modes | Own |
 | Projects | Saved projects: folder, terminals, editor, browser profile and windows of each one | Own |
@@ -427,7 +427,7 @@ Rule for the forks: an app is forked when it does not allow changing its configu
 
 ## Browser
 
-`kavat-browser` is a fork of Chromium with eight changes: it follows the system modes, changes theme with the system, blocks ads out of the box, talks to the agent, has a command console, uses Yazi as its file explorer, saves clippings and albums to the notes and plays protected video.
+`kavat-browser` is a fork of Chromium with ten changes: it follows the system modes, changes theme with the system, blocks ads out of the box, hides YouTube Shorts, talks to the agent, has a command console, uses Yazi as its file explorer, saves clippings and albums to the notes, plays protected video and installs a page as an app.
 
 | Change | What it does |
 | --- | --- |
@@ -439,6 +439,8 @@ Rule for the forks: an app is forked when it does not allow changing its configu
 | Yazi as file explorer | Uploading a file and "save as" open Yazi; clicking a download opens Yazi in the downloads folder with the file selected |
 | Clippings and albums | Saves the page to the notes with the selection as a quote and a screenshot; gathers favorite sites into albums with a thumbnail, and shows in a panel the notes you already have about the site. The details are in the Notes section |
 | Protected video | Plays DRM content through Widevine, which comes out of the box. Its conditions and its limits are further down |
+| No YouTube Shorts | Shorts are hidden on YouTube from the first start: the shelf on the home page, the entry at the side, the tab of a channel and the ones in the subscriptions. A switch brings them back |
+| Web apps | A page is installed as an app: its own window with no tabs or address bar, its own icon and its own entry in the launcher |
 
 How to keep it cheap:
 
@@ -451,6 +453,10 @@ Added ideas:
 - **The console commands are also agent tools**: what you can type in the console, you can ask Kavat for, and `kavatd` can trigger it from outside (for example, when the mode changes).
 - **Commands in a file**: your own commands are defined in a TOML file in `~/.config/kavat/browser/`, with a name, a shortcut and an action.
 - **In Incognito the agent does not save** anything it reads in the browser.
+- **YouTube Shorts hidden**: the rules are the list `gijsdev/ublock-hide-yt-shorts`, the one Chris Titus Tech's guide gives for uBlock Origin's "My filters" (<https://christitus.com/remove-youtube-shorts/>). The list is fetched as released when the package is built, as the blocker is, so it works with no network. Asked for on 16 November 2026.
+- **How those rules are applied** is the open part. The guide is for uBlock Origin, which Chromium no longer loads; this browser carries uBlock Origin Lite. If Lite takes the list as custom filters set from the system's files, it applies them. If it does not, the Kavat extension hides the same parts of the page with the same rules. It is checked when it is built, and it is in the list of assumptions.
+- **Web apps**: `kavat webapp install` asks for a name, an address and an icon, and writes an entry in `~/.local/share/applications/` that runs `kavat-browser --app=<address>`. The app opens in a window of its own, is found in the launcher like any program and can have its window rules. `kavat webapp list` and `kavat webapp remove <name>` are the rest; the Browser page of the settings lists them, and the console's `install-app` installs the page in view. The mechanism is Omarchy's, read in its `omarchy-webapp-install` and `omarchy-launch-webapp`, approved on 16 November 2026 and renamed.
+- **What differs from Omarchy's**: the address has to be `http` or `https`, because Chromium's app mode would also run `javascript:`, `file:` and `data:` addresses; the icon is taken from the site itself and not from Google's icon service; and the browser is always Kavat Browser. A web app shares the browser's profile, so it is logged in where the browser is.
 - **Protected video (DRM)**: the browser is built with Widevine support, to watch Netflix, Prime Video, Disney+ or Spotify web. The Widevine module comes out of the box: a `kavat-widevine` package in `[kavat]`, which `kavat-browser` depends on, downloads it from Google when it is built on your PC. It goes in the ISO, so it also works on an install with no network.
 - **Condition of protected video**: Widevine is proprietary to Google and cannot be distributed to others. The source repo only holds the PKGBUILD, without the binary; the `[kavat]` binary repo and the ISO that carry it are not published. That is fine because the system is only for you; if it is ever published, the package goes away and Widevine is downloaded at install time instead.
 - **Maintenance**: Google retires old versions of the module, so `kavat-widevine` is rebuilt when it stops working; `kav doctor` checks it.
@@ -474,6 +480,7 @@ Added ideas:
 - **A clipping carries a picture** of the page, kept beside the note; a second clipping of the same page adds its quote to the same note. `Ctrl+Shift+S` and the right button save at once, with what the tab shows. "save to notes" in the console asks first: a comment, tags, and which picture, what is in view, a region you drag over the page, or the whole page, which is scrolled and put together a screen at a time, up to twelve screens. The tags go beside `#clip`, each once, and the comment above the quote.
 - **The sandbox**: with `kavat-sandbox on browser`, or its switch on the Privacy & network page, the browser sees only its own folders, the downloads and the notes; the "Security and recovery" section covers it.
 - **A new tab's background** is the theme's colour, the desktop's background or a picture of yours: the start page has a Background button at its foot, the Browser page of the settings has the same three, and `kavat-browser background theme|wallpaper|<file>` sets it from a terminal. The extension cannot read a file, so `browser-host` makes the picture one it can show, no wider than a screen, once for each picture, and the browser keeps it for the next tab. A video background gives one frame.
+- **To be built, asked for on 16 November 2026**: hiding YouTube Shorts and the web apps, both described above.
 - **To be built**: the patches of layer 2, the palette on Chromium's internal pages and hiding its native panels, with a Chromium of the system's own, compiled here: decided on 16 November 2026, knowing what it costs to build. **Left for later**: the agent's side panel, which is phase 4.
 
 ## Editor
@@ -987,6 +994,7 @@ How it works:
 - **Theme from the wallpaper**: the "from wallpaper" palette also works with videos, using the still frame.
 - **Per screen**: each monitor can have its own wallpaper; there is also a timed image slideshow.
 - **Outside the panel**: `kavat wallpaper set <file>` and the agent do the same.
+- **Online**: the picker also searches wallpapers on the network, as Noctalia's did. The Online tab takes some words, shows what the sources answer as pictures, and the one you press is downloaded to the `images` folder and set. More sites can be added as sources. Asked for on 16 November 2026.
 
 mpvpaper is in the AUR and not in the official repos, so it comes in through `[kavat]` already built. If it caused problems, any other wallpaper player would do: the panel talks to a layer of its own, not to mpvpaper directly.
 
@@ -998,6 +1006,7 @@ mpvpaper is in the AUR and not in the official repos, so it comes in through `[k
 - **The theme from the background**: `kavat-wallpaper palette` reads the picture, or the video's still frame, and writes a palette: the neutrals take the hue most of the picture has, and the accents are the hues that stand out in it. `kavat-theme` then adjusts it for contrast as it does any palette. While the theme wears that palette, a new background makes it again.
 - **A background for each display**: `kavat-wallpaper set <file> <display>` gives one display an image of its own, and `kavat-wallpaper same <display>` takes it back; the Wallpaper page has the displays to choose for when there is more than one. A change of the theme's picture leaves those images where they are. A video plays on every display.
 - **The slideshow**: `kavat-wallpaper option slideshow 5|15|30|60` shows the next image of the library every so many minutes, in the order of their names, by a timer of the session; `off` stops it, and `kavat-wallpaper next` goes on by hand.
+- **To be built: the online search.** `kavat-wallpaper search <words>` asks each source that is on and lists what it answers; the Wallpaper page draws that list. A source is a small file, the system's in `/usr/share/kavat/wallpaper-sources/` and yours in `~/.config/kavat/wallpaper-sources/`: its name, the address a search is sent to, and where in the answer the small picture, the full one and its size are. Wallhaven comes with the system. A site can be a source when it answers a search with data; one that only has pages for people cannot. Nothing is fetched until you search: the shell still asks the network for nothing by itself.
 - **Left for later**: the moving preview of a video in the library, and the login and the lock showing the still frame.
 
 ## Local agent
@@ -1060,6 +1069,24 @@ Deliberate limit: the agent can summarize a `kav review` diff, but it cannot app
 - **The talk key**: releasing it sends what you said; while Kavat is speaking, a tap silences it and holding it is answering it.
 - **Three switches**: island, subtitles and lights are turned off separately on the Agent & voice page or in `agent.toml`, under `[voice.feedback]`. All three come switched on.
 
+**Containers, git and ports.** Asked for on 16 November 2026, for phase 4. Kavat starts, stops, lists and looks after your Docker containers, works with git in a project, and frees a port.
+
+| Tools | What they do | Confirmation |
+| --- | --- | --- |
+| `containers.list`, `containers.logs`, `containers.stats` | What is running or stopped, what a container wrote, what it uses | None: they read |
+| `containers.start`, `containers.stop`, `containers.restart`, `compose.up`, `compose.down` | Start and stop a container, or a project's whole set | None; it stays in the log |
+| `containers.remove`, `containers.prune` | Delete a container, or the images and volumes nothing uses | One confirmation that names what is lost |
+| `git.status`, `git.log`, `git.diff`, `git.branches` | Where a project stands | None: they read |
+| `git.commit`, `git.switch`, `git.branch`, `git.stash` | Changes that git itself can undo | None; it stays in the log |
+| `git.pull`, `git.fetch`, `git.push` | What goes to the network or comes from it | Off until the network tools are turned on; a push asks first |
+| `git.reset`, `git.clean`, a forced push | What cannot be brought back | One confirmation that names what is lost |
+| `ports.list` | The ports in use, each with its program | None: it reads |
+| `ports.kill` | Stops what listens on a port, as `port-kill` does | One confirmation that names the program; the password if it is not yours |
+
+- **Typed tools, not a screen driven by the model.** lazydocker and lazygit were the suggestion, and they are screens made for a person: a small model cannot read them reliably. The tools ask `docker` and `git` themselves, which answer with data. This is the recommendation, to be confirmed when phase 4 is built.
+- **lazydocker and lazygit are your screens.** Both come with the Development category. "Show me" opens the matching one in a terminal, on the container or the project that was being talked about; lazygit is already Neovim's `<leader>gg`.
+- **A limit to keep in mind**: whoever can talk to Docker can do anything on the machine, so `kavatd` offers only the verbs of the table and never passes a command of the model's to Docker.
+
 **Skills.** A skill is an action already defined that the agent knows how to do, such as opening the browser. It appears as a button in its panel and can be pressed, asked for by voice or typed.
 
 | Part of a skill | What it holds |
@@ -1103,7 +1130,7 @@ Terminal, shell, editor and browser are already decided; the rest are the usual 
 | System monitor | btop | `kavat-top` (fork) |
 | Screenshots and recording | grim + slurp, recorder built into the shell | Built into `kavat-shell` |
 | Clipboard | cliphist with history in the launcher | Built into `kavat-shell` |
-| Development | git, github-cli, mise, pnpm, docker, claude-code, supabase, postgresql and stripe-cli; Rust with rustup; for Android, JDK 17, the SDK with emulator, android-tools, watchman and maestro | Development category of the installer |
+| Development | git, lazygit, github-cli, mise, pnpm, docker, lazydocker, claude-code, supabase, postgresql and stripe-cli; Rust with rustup; for Android, JDK 17, the SDK with emulator, android-tools, watchman and maestro | Development category of the installer |
 | Terminal utilities | zoxide, lsd, ripgrep, fd, fzf, bat and jq | In the base system |
 | Archives and disks | 7zip, so that Yazi opens archives out of the box; ntfs-3g, to mount NTFS disks | In the base system |
 | Headset | headsetcontrol | In the base system |
@@ -1131,11 +1158,14 @@ A `kavat-desktop` metapackage depends on all of the above, so that an existing A
 - **zsh is the shell of the user the installer creates.** The system configuration is in `/etc/zsh/zshrc`; your `~/.zshrc` is read afterwards and wins. The live session stays on bash.
 - **The prompt** is a starship file, `/usr/share/kavat/starship.toml`: user, folder, branch and the `❯`, green or red. It uses the terminal's colors, so it follows the theme. The branch is read from the repository's files, without launching git. If you have `~/.config/starship.toml`, yours is used.
 - **Three plugins**, loaded directly: history suggestions, colors as you type and `fzf-tab`, which shows the completions in the file search's picker. The list of completions is computed once a day and saved.
+- **Two more plugins**, asked for on 16 November 2026 and to be built: `zsh-completions`, which brings completions for many more commands, and `sudo`, which puts `sudo` in front of the line when `Esc` is pressed twice. The second is oh-my-zsh's; only its one file is taken, with no framework. Each has its switch on the Shell page.
 - **With the shell come** zoxide (`z`), lsd in place of `ls`, the file search and its keys (`Ctrl+R`, `Ctrl+T`, `Alt+C`, `Ctrl+G`), ripgrep, fd, bat and jq. The history is shared between terminals and does not keep duplicates.
 - **The budget is met**: the test opens the shell five times and requires the fastest one to come in under 100 ms.
 - **The Shell page's settings** are in `~/.config/kavat/shell.conf`, a name and its value to a line, which the system's zshrc reads without starting a program: the prompt, short or full, where full adds the state of the repository and how long the last command took; the suggestions, the colours and the picker; how much history is kept and whether terminals share it; and whether `ls` is lsd. A terminal opened after a change has it.
 - **Your aliases and functions** go in `~/.config/kavat/aliases.zsh`, which every terminal reads.
-- **Left for later**: the aliases and functions inherited from Endgame, which wait for you to go over them.
+- **Two commands of yours** come written in that file for every new user. You went over the ones from Endgame on 16 November 2026 and these are all for now; they are to be built.
+  - `port-kill <port>` stops whatever listens on that port, and says what it was. `port-kill` alone lists the ports in use, each with its program. It is for web development, where a server left running holds its port.
+  - `y` opens Yazi and, on leaving it, leaves the terminal in the folder Yazi was in. It is the wrapper Yazi's own documentation gives.
 
 ## Inherited from Willwitcher-OS Endgame
 
@@ -1269,7 +1299,7 @@ What follows from this:
 
 ## Ideas from other distros
 
-Of the 20 ideas that the report recommended, the four for `kav` were approved and the rest were discarded so as not to complicate the system. The full catalog stays in the report in case any of them becomes interesting again.
+Of the 20 ideas that the report recommended, the four for `kav` were approved first and web apps on 16 November 2026; the rest were discarded so as not to complicate the system. The full catalog stays in the report in case any of them becomes interesting again.
 
 | Code | Approved idea | Where it comes from |
 | --- | --- | --- |
@@ -1277,8 +1307,9 @@ Of the 20 ideas that the report recommended, the four for `kav` were approved an
 | A2 | Arch manual interventions as guided steps | Garuda, EndeavourOS |
 | A8 | Two guards during the update | Omarchy |
 | R10 | Health check that remembers the last good snapshot | openSUSE |
+| C4 | Web pages installed as apps | Omarchy |
 
-They are described in "Package manager".
+The first four are described in "Package manager", and web apps in "Browser".
 
 What the report recommends not copying: the CachyOS binary repos, because its policy forbids it; the immutable image model; putting the screen lock inside the shell; global performance daemons; and the hardening that breaks Steam.
 
@@ -1344,6 +1375,11 @@ The decisions in this table are made; those that the analysis of other distros l
 | Agent, also | Push to talk, voice island with subtitles, help in the terminal and discreet alerts |
 | Icons and cursor | Generated from the theme: icons in the Colour style by default, with Tinted and Line as options, and a cursor with the accent |
 | Wallpapers | Image by default or video with mpvpaper, selectable from Kavat Shell |
+| Wallpapers from the network | The picker searches online sources, Wallhaven to begin with, and more can be added as files; nothing is fetched until you search |
+| Shell commands and plugins | `port-kill` and `y` come written for every user; `zsh-completions` and the `sudo` plugin join the three plugins there were |
+| YouTube Shorts | Hidden by default in Kavat Browser, with the rules of `gijsdev/ublock-hide-yt-shorts` |
+| Web apps | A page installed as an app with `kavat webapp install`, Omarchy's mechanism renamed |
+| Containers, git and ports | Kavat manages Docker containers, git and ports through typed tools; lazydocker and lazygit are the screens for you |
 | Tests | Each ISO is booted and installed in a virtual machine; the gates of the roadmap are those tests |
 | Reproducible build | ISO with versions pinned by date and measured performance budgets |
 | Hyprland shortcuts | Those of Willwitcher-OS Endgame |
@@ -1381,6 +1417,8 @@ These assumptions of the design are not decisions: they are confirmed when imple
 | The hourly snapshots of `/home` do not degrade the disk or the CPU | 3 |
 | The browser's sandbox profile does not weaken Chromium's own sandbox | 3 |
 | The video services accept `kavat-browser` with Widevine, even though it is not a browser signed by Google; it is tested service by service | 3 |
+| uBlock Origin Lite takes the list that hides YouTube Shorts from the system's files, or the Kavat extension hides the same parts as well | 3 |
+| Wallhaven answers a search with data and without a key | 3 |
 | Ollama accelerates well on the RX 6800, the chosen model fits loaded in 4 GB of VRAM and the voice has plenty of room on the CPU | 4 |
 | Model and voice fit together in 4 GB with acceptable quality | 4 |
 | The agent reliably tells apart what it reads from what you ask of it | 4 |

@@ -337,3 +337,4 @@ These are not failures: they are listed in the design document as left for later
 - Neovim's side panels with Claude.
 - In `kav`: really building a package of the AUR was never tried, for want of a network in the test machine.
 - In the settings: changing a shortcut from the panel. In Incognito: notifications without their content.
+- Asked for on 16 November 2026 and in the design document: `port-kill` and `y`, the `sudo` and `zsh-completions` plugins, wallpapers searched online, YouTube Shorts hidden, and web apps. The agent's tools for containers, git and ports are phase 4.

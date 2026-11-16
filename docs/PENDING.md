@@ -16,6 +16,7 @@ Nothing waits for a decision.
 
 Settled on 16 November 2026:
 
+- **D45**, the aliases and functions from Endgame, gone over: two for now, `port-kill <port>` and `y`, Yazi's wrapper. They are in the design document, under "Preinstalled software".
 - **D46**, Kavat Browser's last part, which needs Chromium compiled: yes, it is compiled here. It was known from the start.
 - **D47**, the network said in the installer: as the mockup draws it, on the bar of the live session; and the bar's network widget, there and on the installed system, opens the Network page when pressed. The installer's side bar does not say it, and nothing is asked of a mirror.
 - **D48**, logging in by itself and the keyring: nothing asks for a password after that login. It is chosen in the installer, on the page where the password is set; that person's passwords are kept in a keyring with no password.
