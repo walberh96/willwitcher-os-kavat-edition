@@ -65,6 +65,20 @@ body.albums { padding: 28px 5vw; }
 .albums nav a.on { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .albums nav a.on .muted { color: inherit; opacity: 0.8; }
 .albums .grow { flex: 1; }
+/* the start page over a picture: the picture fills it, dimmed towards the theme's colour so
+   that what is written stays readable */
+body.start { --scrim: color-mix(in srgb, var(--bg) 45%, transparent); }
+body.start.pictured { background-size: cover; background-position: center; background-attachment: fixed; background-repeat: no-repeat; }
+body.start.pictured .clock, body.start.pictured .day { text-shadow: 0 1px 12px var(--bg); }
+body.start.pictured .day, body.start.pictured .hint { color: var(--text); }
+.start .background { position: fixed; right: 18px; bottom: 12px; display: grid; justify-items: end; gap: 6px; }
+.start .background > button { font: inherit; font-size: 12px; padding: 0.3em 0.9em; border-radius: 99px; background: var(--surface); color: var(--muted); border: 1px solid var(--border); cursor: pointer; opacity: 0.55; }
+.start .background > button:hover { opacity: 1; color: var(--text); border-color: var(--accent); }
+.start .background .menu { order: -1; display: grid; padding: 4px; border-radius: var(--radius); background: var(--surface); border: 1px solid var(--border); }
+.start .background .menu[hidden] { display: none; }
+.start .background .menu button { font: inherit; font-size: 13px; text-align: left; padding: 0.5em 0.9em; border: 0; border-radius: calc(var(--radius) - 3px); background: none; color: var(--text); cursor: pointer; }
+.start .background .menu button:hover { background: var(--surface2); }
+
 /* the start page with an album under its sites */
 body.start.with-album { place-items: start center; padding: 9vh 0 60px; }
 .start.with-album main { margin-top: 0; width: min(960px, 92vw); }

@@ -18,6 +18,15 @@
     <div id="album" class="grid"></div>
   </main>
   <div class="hint muted"><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>K</kbd> the command console · <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>S</kbd> save the page to the notes</div>
+  <div id="background" class="background">
+    <button id="background-button" type="button" title="What this page shows behind it">Background</button>
+    <div id="background-menu" class="menu" hidden>
+      <button type="button" data-value="theme">The theme's colour</button>
+      <button type="button" data-value="wallpaper">The desktop's background</button>
+      <button type="button" data-value="picture">A picture of yours…</button>
+    </div>
+    <input id="background-file" type="file" accept="image/*" hidden>
+  </div>
   <script type="module" src="start.js"></script>
 </body>
 </html>

@@ -95,25 +95,28 @@ def commands():
 
 
 def settings():
-    """What the browser is set to in its file: the album of the start page."""
+    """What the browser is set to in its file: the album of the start page, and what the
+    start page shows behind it, with a mark that changes when that picture does."""
     try:
         with open(SETTINGS, 'rb') as file:
             found = tomllib.load(file)
     except (OSError, tomllib.TOMLDecodeError):
-        return {}
-    return {'start_album': str(found.get('start_album') or '')}
+        found = {}
+    kept = {'start_album': str(found.get('start_album') or ''), 'start_background': str(found.get('start_background') or 'theme')}
+    source = background_source(kept['start_background'])
+    kept['start_background_stamp'] = f'{source}:{os.path.getmtime(source)}' if source else ''
+    return kept
 
 
-def set_start_album(message):
-    """Write the start page's album in the settings file: that one line, and nothing else of it."""
-    name = re.sub(r'[^A-Za-z0-9 _-]', '', str(message.get('name') or '')).strip()[:60]
+def set_line(key, value):
+    """Write one setting in the settings file: that one line, and nothing else of it."""
     try:
         with open(SETTINGS, encoding='utf-8') as file:
             text = file.read()
     except OSError:
         text = ''
-    line = f'start_album = {json.dumps(name)}'
-    text, changed = re.subn(r'^#?\s*start_album\s*=.*$', line, text, count=1, flags=re.M)
+    line = f'{key} = {json.dumps(value)}'
+    text, changed = re.subn(rf'^#?\s*{key}\s*=.*$', lambda _: line, text, count=1, flags=re.M)
     if not changed:
         # before any table of the file, where a line of its own belongs
         text = line + '\n' + text
@@ -121,6 +124,78 @@ def set_start_album(message):
     with open(SETTINGS, 'w', encoding='utf-8') as file:
         file.write(text)
     return {'settings': settings()}
+
+
+def set_start_album(message):
+    return set_line('start_album', re.sub(r'[^A-Za-z0-9 _-]', '', str(message.get('name') or '')).strip()[:60])
+
+
+# ---- what the start page shows behind it
+
+OWN_BACKGROUND = f'{CONFIG}/kavat/browser/start-background.jpg'
+CACHE = (os.environ.get('XDG_CACHE_HOME') or f'{HOME}/.cache') + '/kavat/browser'
+
+
+def background_source(choice):
+    """The file the start page's background is made from; None for the theme's own colour."""
+    if choice == 'wallpaper':
+        # the desktop's background, as kavat-wallpaper names it: its kind, then its file
+        said = (out('kavat-wallpaper') or '').strip().split(' ', 1)
+        return said[1] if len(said) == 2 and os.path.isfile(said[1]) else None
+    if choice in ('', 'theme'):
+        return None
+    path = os.path.expanduser(choice)
+    return path if os.path.isfile(path) else None
+
+
+def start_background():
+    """The background as a picture the page can show: a JPEG no wider than a screen, small
+    enough for one message to the browser, made once for each picture and kept."""
+    kept = settings()
+    source, stamp = background_source(kept['start_background']), kept['start_background_stamp']
+    if not source:
+        return {'stamp': ''}
+    import hashlib
+    made = f'{CACHE}/start-{hashlib.sha1(stamp.encode()).hexdigest()[:16]}.jpg'
+    if not os.path.exists(made):
+        os.makedirs(CACHE, exist_ok=True)
+        for old in os.listdir(CACHE):
+            if old.startswith('start-'):
+                os.remove(f'{CACHE}/{old}')
+        given = source
+        if source.endswith('.svg'):
+            # the theme's own picture is a drawing: it is made a picture first
+            given = f'{CACHE}/start-drawing.png'
+            out('rsvg-convert', '-w', '1920', '-o', given, source, timeout=30)
+        for quality in ('4', '9', '15', '22'):
+            # one frame, of a video too
+            out('ffmpeg', '-y', '-loglevel', 'error', '-i', given, '-frames:v', '1', '-vf', "scale='min(1920,iw)':-2",
+                '-q:v', quality, made, timeout=60)
+            if os.path.exists(made) and os.path.getsize(made) < 700_000:
+                break
+        if given != source and os.path.exists(given):
+            os.remove(given)
+    try:
+        with open(made, 'rb') as file:
+            return {'stamp': stamp, 'picture': 'data:image/jpeg;base64,' + base64.b64encode(file.read()).decode()}
+    except OSError:
+        return {'stamp': '', 'failed': 'the picture could not be read'}
+
+
+def set_start_background(message):
+    """Choose it: the theme's colour, the desktop's background, a file, or a picture the page hands over."""
+    value = str(message.get('value') or '')
+    picture = str(message.get('picture') or '')
+    if picture.startswith('data:image/') and ';base64,' in picture:
+        os.makedirs(os.path.dirname(OWN_BACKGROUND), exist_ok=True)
+        with open(OWN_BACKGROUND, 'wb') as file:
+            file.write(base64.b64decode(picture.split(';base64,', 1)[1]))
+        value = OWN_BACKGROUND
+    elif value not in ('theme', 'wallpaper'):
+        value = os.path.abspath(os.path.expanduser(value))
+        if not os.path.isfile(value):
+            return {'failed': f'there is no file {value}'}
+    return set_line('start_background', value)
 
 
 def page(message):
@@ -249,6 +324,10 @@ def answer(message):
         return {'settings': settings()}
     if ask == 'start-album':
         return set_start_album(message)
+    if ask == 'start-background':
+        return start_background()
+    if ask == 'start-background-set':
+        return set_start_background(message)
     if ask in ('albums', 'album', 'album-picture', 'album-add', 'album-remove', 'album-read'):
         return albums(message)
     if ask == 'about':
@@ -265,6 +344,15 @@ def answer(message):
 
 
 def main():
+    if sys.argv[1:2] == ['background']:
+        # from a terminal, or the settings: kavat-browser background theme|wallpaper|<file>
+        if len(sys.argv) != 3:
+            sys.exit('usage: kavat-browser background theme|wallpaper|<file>')
+        done = set_start_background({'value': sys.argv[2]})
+        if done.get('failed'):
+            sys.exit(f'kavat-browser: {done["failed"]}')
+        print(done['settings']['start_background'])
+        return
     os.makedirs(ASKED, mode=0o700, exist_ok=True)
     last_mode = mode()
     while True:

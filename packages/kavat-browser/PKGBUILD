@@ -3,13 +3,14 @@
 # inside; the Kavat extension is this package's own.
 pkgname=kavat-browser
 pkgver=0.1.0
-pkgrel=5
+pkgrel=6
 _ubol=2026.1110.1816
 pkgdesc="Willwitcher-OS Kavat Edition: the browser, with the blocker, the command console and the system's modes"
 arch=('any')
 url="https://github.com/walberh96/willwitcher-os-kavat-edition"
 license=('LicenseRef-AllRightsReserved' 'GPL-3.0-or-later')
-depends=('chromium' 'kavat-widevine' 'kavat-theme' 'kavat-modes' 'kavat-notes' 'kavat-files' 'python' 'xdg-user-dirs' 'xdg-desktop-portal')
+depends=('chromium' 'kavat-widevine' 'kavat-theme' 'kavat-modes' 'kavat-notes' 'kavat-files' 'kavat-wallpaper' 'python' 'xdg-user-dirs' 'xdg-desktop-portal'
+         'ffmpeg' 'librsvg')
 makedepends=('librsvg' 'python')
 source=(kavat-browser browser-host dev.kavat.browser.json policies.json kavat-browser.desktop mimeapps.list commands.toml browser.toml icon.svg
         "uBOLite_$_ubol.chromium.zip::https://github.com/uBlockOrigin/uBOL-home/releases/download/$_ubol/uBOLite_$_ubol.chromium.zip")

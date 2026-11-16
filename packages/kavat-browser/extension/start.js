@@ -50,17 +50,90 @@ async function mode() {
   }
 }
 
-// the album chosen for the start page, on the albums' page or in the browser's settings file
-async function album() {
+// What the page shows behind it: the theme's colour, the desktop's background or a picture
+// of yours. The picture is kept by the browser, so a new tab shows it at once; the system
+// is asked whether it is still the one, and only then for the picture itself.
+function wear(picture) {
+  document.body.classList.toggle('pictured', Boolean(picture));
+  document.body.style.backgroundImage = picture ? `linear-gradient(var(--scrim), var(--scrim)), url("${picture}")` : '';
+}
+
+async function background(settings) {
+  const kept = await chrome.storage.local.get(['backgroundStamp', 'backgroundPicture']);
+  const stamp = (settings && settings.start_background_stamp) || '';
+  if (stamp && stamp === kept.backgroundStamp) {
+    return;
+  }
+  if (!stamp) {
+    wear('');
+    await chrome.storage.local.remove(['backgroundStamp', 'backgroundPicture']);
+    return;
+  }
+  const answer = await chrome.runtime.sendMessage({ ask: 'start-background' });
+  if (answer && answer.picture) {
+    wear(answer.picture);
+    await chrome.storage.local.set({ backgroundStamp: answer.stamp, backgroundPicture: answer.picture });
+  }
+}
+
+// a picture of yours is made no wider than a screen here, and handed to the system to keep
+function shrunk(file) {
+  return new Promise((done, failed) => {
+    const picture = new Image();
+    picture.onload = () => {
+      const scale = Math.min(1, 1920 / picture.naturalWidth);
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(picture.naturalWidth * scale);
+      canvas.height = Math.round(picture.naturalHeight * scale);
+      canvas.getContext('2d').drawImage(picture, 0, 0, canvas.width, canvas.height);
+      URL.revokeObjectURL(picture.src);
+      done(canvas.toDataURL('image/jpeg', 0.82));
+    };
+    picture.onerror = failed;
+    picture.src = URL.createObjectURL(file);
+  });
+}
+
+async function choose(message) {
+  const answer = await chrome.runtime.sendMessage({ ask: 'start-background-set', ...message });
+  if (answer && answer.settings) {
+    await background(answer.settings);
+  }
+}
+
+const menu = document.getElementById('background-menu');
+document.getElementById('background-button').addEventListener('click', () => { menu.hidden = !menu.hidden; });
+menu.addEventListener('click', (event) => {
+  const value = event.target.dataset.value;
+  menu.hidden = true;
+  if (value === 'picture') {
+    document.getElementById('background-file').click();
+  } else if (value) {
+    choose({ value });
+  }
+});
+document.getElementById('background-file').addEventListener('change', async (event) => {
+  const file = event.target.files[0];
+  if (file) {
+    choose({ picture: await shrunk(file) });
+  }
+});
+
+// the settings of the start page: the album chosen for it, on the albums' page or in the
+// browser's settings file, and its background
+async function settings() {
   const answer = await chrome.runtime.sendMessage({ ask: 'settings' });
   const name = answer && answer.settings && answer.settings.start_album;
   if (name) {
     document.body.classList.add('with-album');
     grid(document.getElementById('album'), name);
   }
+  background(answer && answer.settings);
 }
+// the picture kept from last time shows before anything is asked
+chrome.storage.local.get(['backgroundPicture']).then((kept) => kept.backgroundPicture && wear(kept.backgroundPicture));
 theme();
-album();
+settings();
 tick();
 setInterval(tick, 5000);
 sites();

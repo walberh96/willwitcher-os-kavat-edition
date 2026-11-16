@@ -54,6 +54,22 @@ host.stdin.close()
 '''
 # The albums, asked of the host the same way: a site is added twice and is there once, with
 # its picture; the start page's album is a line of the settings file; the notes about a site.
+# The start page's background, asked of the host as the extension does: the desktop's as a
+# picture, kept for the next time, then a picture handed over by the page.
+BACKGROUND = r'''
+import base64, importlib.machinery, importlib.util, os
+loader = importlib.machinery.SourceFileLoader("host", "/usr/lib/kavat/browser-host")
+host = importlib.util.module_from_spec(importlib.util.spec_from_loader("host", loader))
+loader.exec_module(host)
+first = host.answer({"ask": "start-background"})
+print(first.get("picture", "")[:23])
+print("kept" if first.get("stamp") and first["stamp"] == host.answer({"ask": "settings"})["settings"]["start_background_stamp"] and len(first["picture"]) < 1000000 else "not kept")
+with open("/tmp/album.png", "rb") as file:
+    own = "data:image/png;base64," + base64.b64encode(file.read()).decode()
+host.answer({"ask": "start-background-set", "picture": own})
+print("own", host.answer({"ask": "start-background"}).get("picture", "")[:23])
+'''
+
 ALBUMS = r'''
 import base64, json, struct, subprocess, sys
 host = subprocess.Popen(["/usr/lib/kavat/browser-host"], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
@@ -149,6 +165,13 @@ def main():
                       and lines[3] == 'data:image/jpeg;base64,' and lines[4] == 'there is no such picture' and "'start_album': 'reading'" in lines[5]
                       and lines[6] == "['album', 'clip']" and lines[7] == '0' and lines[8] == '1',
                       'a site goes into an album once, with its picture; the start page takes an album; the notes about a site are found', output)
+        status, output = user('kavat-browser background wallpaper; grep -c "^start_background = \\"wallpaper\\"" ~/.config/kavat/browser/browser.toml; '
+                              'cat > /tmp/background.py << "END"\n' + BACKGROUND + 'END\npython3 /tmp/background.py; '
+                              'kavat-browser background /tmp/nothing.png 2>&1 | grep -c "there is no file"; kavat-browser background theme', 90)
+        lines = output.split('\n')
+        checks.report(len(lines) == 7 and lines[:2] == ['wallpaper', '1'] and lines[2] == 'data:image/jpeg;base64,' and lines[3] == 'kept'
+                      and lines[4] == 'own data:image/jpeg;base64,' and lines[5:] == ['1', 'theme'],
+                      "a new tab's background is the desktop's, made a picture the page can show, or a picture of your own, or the theme's colour again", output)
         # the browser's own bars are the palette's: the frame behind the tabs is the theme's background, and follows a change
         frame = POINT.format(x=1500, y=70)
         status, output = user(f'kavat-theme tokens | grep "^bg " | cut -c5-; {frame}; echo; kavat-theme set palette nord accent default > /dev/null; sleep 4; '

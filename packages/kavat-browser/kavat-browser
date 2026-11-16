@@ -3,6 +3,9 @@
 #
 # usage: kavat-browser [address ...]            open the browser, or a tab in the one that is open
 #        kavat-browser --private [address ...]  a window that keeps nothing
+#        kavat-browser background theme|wallpaper|<file>
+#                                               what a new tab shows behind it: the theme's colour, the
+#                                               desktop's background, or a picture of yours
 #        kavat-browser command "<name>" [what]  ask the open browser for a command of its console:
 #                                               "sleep other tabs", "zen mode", "new tab"…
 #
@@ -13,6 +16,9 @@
 # every window it opens is a private one, and a mode can have a profile of its own, named in
 # ~/.config/kavat/browser/browser.toml: a window opened in that mode is that profile's.
 set -u
+if [[ ${1:-} == background ]]; then
+  exec /usr/lib/kavat/browser-host "$@"
+fi
 data="${XDG_CONFIG_HOME:-$HOME/.config}/kavat-browser"
 # The two extensions come with the system, but Chromium writes beside an extension it loads
 # from a folder, so they are loaded from a copy in your own, made again when the system's change.
