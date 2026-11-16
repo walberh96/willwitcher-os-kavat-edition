@@ -9,7 +9,7 @@
     "use strict";
 
     const TEXTS = {
-        session: "Session", keyboard: "Keyboard", wrong: "That password is not right",
+        session: "Session", keyboard: "Keyboard", wrong: "That password is not right", who: "Your name",
         suspend: "Suspend", restart: "Restart", shutdown: "Switch off",
     };
 
@@ -23,13 +23,15 @@
         session: null,
         layouts: [],
         layout: null,
+        clock12: false,   // the clock counts twelve hours
+        ask_name: false,  // nobody is shown: the name is typed
         asked: false,     // greetd is waiting for the password
         typed: null,      // a password entered before greetd asked for it
     };
 
     function clock() {
         const now = new Date();
-        $("clock").textContent = now.toLocaleTimeString(state.locale, { hour: "2-digit", minute: "2-digit", hour12: false });
+        $("clock").textContent = now.toLocaleTimeString(state.locale, { hour: state.clock12 ? "numeric" : "2-digit", minute: "2-digit", hour12: state.clock12 });
         $("date").textContent = now.toLocaleDateString(state.locale, { weekday: "long", month: "long", day: "numeric" });
     }
 
@@ -98,6 +100,16 @@
 
     function answer() {
         const password = $("password").value;
+        if (state.ask_name) {
+            // the name is typed: the conversation with greetd starts when it is known
+            const name = $("who").value.trim();
+            if (!name) { $("who").focus(); return; }
+            if (!state.person || state.person.username !== name) {
+                state.person = { username: name, display_name: name, image: "" };
+                state.asked = false;
+                greeter.authenticate(name);
+            }
+        }
         if (state.asked) {
             state.asked = false;
             $("form").classList.add("busy");
@@ -122,6 +134,7 @@
 
     function ready() {
         locale();
+        state.clock12 = Boolean(greeter.clock12);
         clock();
         setInterval(clock, 1000);
 
@@ -166,7 +179,15 @@
             $("form").classList.remove("wrong");
             void $("form").offsetWidth;   // so that the shake plays again
             $("form").classList.add("wrong");
-            choose(state.person);
+            if (state.ask_name) {
+                state.person = null;
+                state.asked = false;
+                $("password").value = "";
+                $("form").classList.remove("busy");
+                $("password").focus();
+            } else {
+                choose(state.person);
+            }
         });
 
         $("form").onsubmit = (event) => {
@@ -186,12 +207,23 @@
         });
         // Typing goes to the password, wherever the last click was.
         addEventListener("keydown", (event) => {
-            if (event.key.length === 1 && document.activeElement !== $("password")) $("password").focus();
+            if (event.key.length === 1 && document.activeElement !== $("password") && document.activeElement !== $("who")) $("password").focus();
         });
-        addEventListener("mouseup", () => $("password").focus());
+        addEventListener("mouseup", (event) => { if (event.target !== $("who")) $("password").focus(); });
 
         state.people = greeter.users || [];
-        if (state.people.length) choose(state.people[0]);
+        state.ask_name = Boolean(greeter.ask_name);
+        if (state.ask_name) {
+            for (const id of ["people", "avatar", "name"]) $(id).hidden = true;
+            $("whobox").hidden = false;
+            $("who").placeholder = state.texts.who;
+            $("who").onkeydown = (event) => {
+                if (event.key === "Enter") { event.preventDefault(); $("password").focus(); }
+            };
+            $("who").focus();
+        } else if (state.people.length) {
+            choose(state.people[0]);
+        }
     }
 
     // Opened in a browser instead of the greeter, the page stands in for it with one made-up

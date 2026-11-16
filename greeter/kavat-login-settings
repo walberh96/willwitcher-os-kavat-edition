@@ -1,0 +1,140 @@
+#!/usr/bin/env python3
+"""kavat-login-settings: how the login screen asks who logs in.
+
+usage: kavat-login-settings                    the settings, a name and its value to a line
+       kavat-login-settings set <name>=<value>...
+                                               clock=24|12        the hours of the login screen's clock
+                                               users=yes|no       show who can log in, to be picked; with no, the
+                                                                  name is typed, and the screen names nobody
+                                               auto=<login name>  that person's desktop opens by itself when the
+                                               auto=none          machine starts, with no password asked
+
+The settings are in /etc/kavat/login.conf, which the login screen reads. A change asks for
+an administrator's password and shows the next time the login screen does. Logging in by
+itself happens once, as the machine starts: after logging out the login screen asks as
+always. The keyring is opened by the password typed at the login, and with nobody typing it
+there it would ask for it at every start: so the person who logs in by itself is given a
+keyring that has no password, Kavat, as the one apps keep their passwords in from then on.
+What is kept in it is not encrypted: whoever can read the disk can read it, unless the disk
+itself is encrypted. With auto=none the keyring of the login is the one in use again.
+"""
+import os
+import pwd
+import re
+import sys
+
+FILE = '/etc/kavat/login.conf'
+GREETD = '/usr/share/kavat-greeter/greetd.toml'   # greetd's settings as the system brings them
+OURS = '/etc/kavat/greetd.toml'                   # the same with who logs in by itself, while someone does
+DEFAULTS = {'clock': '24', 'users': 'yes', 'auto': 'none'}
+
+
+def people():
+    return [entry.pw_name for entry in pwd.getpwall()
+            if 1000 <= entry.pw_uid < 60000 and not entry.pw_shell.endswith(('nologin', 'false'))]
+
+
+def keyring(person, plain):
+    """Which keyring a person's apps keep passwords in: one with no password, or the login's."""
+    try:
+        entry = pwd.getpwnam(person)
+    except KeyError:
+        return
+    folder = os.path.join(entry.pw_dir, '.local/share/keyrings')
+    made = []
+    try:
+        if plain:
+            path = entry.pw_dir
+            for part in ('.local', 'share', 'keyrings'):
+                path = os.path.join(path, part)
+                if not os.path.isdir(path):
+                    os.mkdir(path, 0o700)
+                    made.append(path)
+            if not os.path.exists(f'{folder}/Kavat.keyring'):
+                with open(f'{folder}/Kavat.keyring', 'w', encoding='utf-8') as file:
+                    # a keyring written as text is one with no password
+                    file.write('[keyring]\ndisplay-name=Kavat\nctime=0\nmtime=0\nlock-on-idle=false\nlock-after=false\n')
+                made.append(f'{folder}/Kavat.keyring')
+            with open(f'{folder}/default', 'w', encoding='utf-8') as file:
+                file.write('Kavat')
+            made.append(f'{folder}/default')
+        elif os.path.exists(f'{folder}/default') and open(f'{folder}/default', encoding='utf-8').read().strip() == 'Kavat':
+            with open(f'{folder}/default', 'w', encoding='utf-8') as file:
+                file.write('login')
+            made.append(f'{folder}/default')
+        for path in made:
+            os.chown(path, entry.pw_uid, entry.pw_gid)
+            os.chmod(path, 0o700 if os.path.isdir(path) else 0o600)
+    except OSError as error:
+        print(f'kavat-login-settings: the keyring of {person} was left as it was: {error}', file=sys.stderr)
+
+
+def takes(name, value):
+    if name == 'clock':
+        return value in ('24', '12')
+    if name == 'users':
+        return value in ('yes', 'no')
+    return name == 'auto' and (value == 'none' or value in people())
+
+
+def read():
+    kept = dict(DEFAULTS)
+    try:
+        text = open(FILE, encoding='utf-8').read()
+    except OSError:
+        text = ''
+    for name, value in re.findall(r'^KAVAT_LOGIN_(\w+)=([\w.-]+)$', text, re.M):
+        if name.lower() in kept and takes(name.lower(), value):
+            kept[name.lower()] = value
+    return kept
+
+
+def main():
+    arguments = sys.argv[1:]
+    if not arguments:
+        for name, value in read().items():
+            print(f'{name}\t{value}')
+        return
+    if arguments[0] != 'set' or len(arguments) < 2:
+        sys.exit(__doc__)
+    kept = read()
+    before = kept['auto']
+    for pair in arguments[1:]:
+        name, _, value = pair.partition('=')
+        if name not in DEFAULTS or not takes(name, value):
+            sys.exit(f'kavat-login-settings: {pair} is not a setting of the login, or not a value it takes\n\n' + __doc__)
+        kept[name] = value
+    if os.geteuid() != 0:
+        # the login screen's settings are files of the system: the same command again, as an administrator
+        os.execvp('pkexec', ['pkexec', '/usr/bin/kavat-login-settings', *arguments])
+    os.makedirs(os.path.dirname(FILE), exist_ok=True)
+    with open(FILE + '.new', 'w', encoding='utf-8') as file:
+        file.write('# Written by kavat-login-settings: how the login screen asks who logs in.\n'
+                   '# The Login & lock page of the settings changes it.\n')
+        for name, value in kept.items():
+            file.write(f'KAVAT_LOGIN_{name.upper()}={value}\n')
+    os.chmod(FILE + '.new', 0o644)
+    os.replace(FILE + '.new', FILE)
+    if kept['auto'] != before:
+        if before != 'none':
+            keyring(before, False)
+        if kept['auto'] != 'none':
+            keyring(kept['auto'], True)
+    # who logs in by itself is greetd's to do: it reads our copy of its settings while there is one
+    if kept['auto'] == 'none':
+        try:
+            os.remove(OURS)
+        except OSError:
+            pass
+    else:
+        text = open(GREETD, encoding='utf-8').read().rstrip('\n')
+        text += ('\n\n# Added by kavat-login-settings: this person\'s desktop opens by itself, once, as the machine starts.\n'
+                 f'[initial_session]\ncommand = "env XDG_SESSION_TYPE=wayland XDG_SESSION_DESKTOP=kavat XDG_CURRENT_DESKTOP=Hyprland kavat-session"\nuser = "{kept["auto"]}"\n')
+        with open(OURS + '.new', 'w', encoding='utf-8') as file:
+            file.write(text)
+        os.replace(OURS + '.new', OURS)
+    print('Changed: it shows the next time the login screen does.')
+
+
+if __name__ == '__main__':
+    main()

@@ -17,6 +17,7 @@ import os
 import pwd
 import shlex
 import socket
+import re
 import struct
 import subprocess
 import sys
@@ -75,6 +76,18 @@ def people():
     return found
 
 
+def login_settings():
+    """What kavat-login-settings keeps: the clock's hours, and whether who can log in is shown."""
+    kept = {'clock': '24', 'users': 'yes'}
+    try:
+        text = open('/etc/kavat/login.conf', encoding='utf-8').read()
+    except OSError:
+        text = ''
+    for name, value in re.findall(r'^KAVAT_LOGIN_(\w+)=([\w.-]+)$', text, re.M):
+        kept[name.lower()] = value
+    return kept
+
+
 def sessions():
     """The desktop sessions installed, each with the command that starts it."""
     found = []
@@ -114,6 +127,15 @@ class Greeter(QObject):
     @Property(list, notify=nothing)
     def users(self):
         return people()
+
+    @Property(bool, notify=nothing)
+    def clock12(self):
+        return login_settings()['clock'] == '12'
+
+    @Property(bool, notify=nothing)
+    def ask_name(self):
+        # with nobody to show, the name is typed too
+        return login_settings()['users'] == 'no' or not people()
 
     @Property(list, notify=nothing)
     def sessions(self):

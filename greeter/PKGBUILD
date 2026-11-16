@@ -1,6 +1,6 @@
 pkgname=kavat-greeter
 pkgver=0.2.0
-pkgrel=3
+pkgrel=5
 pkgdesc="Willwitcher-OS Kavat Edition: the login screen, a web page drawn on Wayland, behind greetd"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -12,14 +12,19 @@ install=kavat-greeter.install
 optdepends=('kavat-theme: the login screen follows the theme of the system')
 # greetd wants a greeter beside it, and this is one
 provides=('greetd-greeter')
-source=('greeter.py' 'kavat-greeter' 'greetd.toml' 'greetd.conf' 'hyprland.lua')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+source=('greeter.py' 'kavat-greeter' 'greetd.toml' 'greetd.conf' 'hyprland.lua' 'kavat-login-settings'
+        'org.kavat.login.policy' 'greetd-start')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
   install -Dm644 greeter.py "$pkgdir/usr/lib/kavat-greeter/greeter.py"
   # the greeter's user cannot write beside the program, so Python's compiled file is made here
   python -m compileall -q -d /usr/lib/kavat-greeter "$pkgdir/usr/lib/kavat-greeter"
   install -Dm755 kavat-greeter "$pkgdir/usr/bin/kavat-greeter"
+  # how the login asks who logs in, and what changes it with an administrator's password
+  install -Dm755 kavat-login-settings "$pkgdir/usr/bin/kavat-login-settings"
+  install -Dm644 org.kavat.login.policy "$pkgdir/usr/share/polkit-1/actions/org.kavat.login.policy"
+  install -Dm755 greetd-start "$pkgdir/usr/lib/kavat-greeter/greetd-start"
   install -Dm644 hyprland.lua "$pkgdir/usr/share/kavat-greeter/hyprland.lua"
   install -Dm644 greetd.toml "$pkgdir/usr/share/kavat-greeter/greetd.toml"
   install -Dm644 greetd.conf "$pkgdir/usr/lib/systemd/system/greetd.service.d/kavat-greeter.conf"

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- Part of kavat-greeter. What the password dialog says when kavat-login-settings asks to change
+     the login screen, and who may say yes: an administrator, whose password is good for a few minutes. -->
+<policyconfig>
+  <vendor>Willwitcher-OS Kavat Edition</vendor>
+  <vendor_url>https://github.com/walberh96/willwitcher-os-kavat-edition</vendor_url>
+  <action id="org.kavat.login.settings">
+    <description>Change how the login screen asks who logs in</description>
+    <message>The login screen's settings are files of the system. Your password lets them change.</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/kavat-login-settings</annotate>
+  </action>
+</policyconfig>

@@ -118,6 +118,8 @@ main {
   font: inherit;
   letter-spacing: .3em;
 }
+.who { margin-bottom: .6em; }
+.who input { letter-spacing: 0; }
 .password .enter { border: 0; background: none; color: var(--muted); font: inherit; cursor: pointer; padding: 0; }
 .password.busy { opacity: .6; }
 .password.wrong { border-color: var(--danger); animation: no .3s; }

@@ -1,0 +1,6 @@
+#!/bin/sh
+# Part of kavat-greeter: start greetd with the system's settings, or with the copy of them
+# that names who logs in by itself, when kavat-login-settings has made one.
+settings=/usr/share/kavat-greeter/greetd.toml
+[ -r /etc/kavat/greetd.toml ] && settings=/etc/kavat/greetd.toml
+exec greetd --config "$settings"
