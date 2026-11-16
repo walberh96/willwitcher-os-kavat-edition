@@ -61,7 +61,8 @@ local news = ""  -- something done that is worth saying, as `said` is for what w
 local backup = { snapshots = "0", place = "", every = "never", last = "", history = {}, remote = "" }  -- as kavat-backup and kavat-history say it
 local display_chosen = ""  -- the display whose settings are in view
 local display_tried = 0    -- above zero while a change of the displays waits to be kept
-local walls = { list = {}, kind = "theme", file = "", sound = "off", fit = "fill", gpu = "on" }  -- the background, as kavat-wallpaper says it
+local walls = { list = {}, displays = {}, kind = "theme", file = "", sound = "off", fit = "fill", gpu = "on" }  -- the background, as kavat-wallpaper says it
+local wall_display = ""  -- the display a background is being chosen for; none is all of them
 local wall_filter = "all"
 local modes = { list = {}, vpn = "", vpns = {}, auto = true }  -- the system's modes, as kavat-mode says them
 local boot_said = ""
@@ -219,8 +220,8 @@ end
 
 -- The background: the library, what is in force and the video's settings, as kavat-wallpaper says them
 local function read_walls()
-  noctalia.runAsync("kavat-wallpaper; echo '== list'; kavat-wallpaper list; echo '== option'; kavat-wallpaper option", function(result)
-    local found, part = { list = {}, kind = "theme", file = "", sound = "off", fit = "fill", gpu = "on" }, nil
+  noctalia.runAsync("kavat-wallpaper; echo '== list'; kavat-wallpaper list; echo '== displays'; kavat-wallpaper displays; echo '== option'; kavat-wallpaper option", function(result)
+    local found, part = { list = {}, displays = {}, kind = "theme", file = "", sound = "off", fit = "fill", gpu = "on" }, nil
     for line in result.stdout:gmatch("[^\n]+") do
       local heading = line:match("^== (.+)$")
       if heading then
@@ -233,12 +234,24 @@ local function read_walls()
           found.list[#found.list + 1] = { kind = kind, file = file, thumb = thumb,
             name = kind == "theme" and "Kavat" or (file:match("([^/]+)%.[^.]+$") or file) }
         end
+      elseif part == "displays" then
+        local name, file = line:match("^([^\t]+)\t(.+)$")
+        if name then
+          found.displays[#found.displays + 1] = { name = name, file = file ~= "-" and file or nil }
+        end
       else
         local name, value = line:match("^(%S+) (%S+)$")
         if name then
           found[name] = value
         end
       end
+    end
+    local still = false
+    for _, display in ipairs(found.displays) do
+      still = still or display.name == wall_display
+    end
+    if not still then
+      wall_display = ""
     end
     walls = found
     render()
@@ -428,12 +441,22 @@ end
 
 -- The pieces every page is made of ------------------------------------------------------
 
+-- While this is a list, the names of the sections and of the settings that are drawn are
+-- added to it: that is how the search knows what each page has without a list kept by hand.
+local gathering = nil
+
 local function section(text)
+  if gathering then
+    gathering[#gathering + 1] = text
+  end
   return ui.label({ text = text:upper(), fontSize = 11, fontWeight = "medium", color = "on_surface_variant" })
 end
 
 -- One setting: its name on the left, its control on the right
 local function row(name, control)
+  if gathering then
+    gathering[#gathering + 1] = name
+  end
   return ui.row({ key = "row-" .. name, align = "center", gap = 12, minHeight = 34 }, {
     ui.column({ width = 150, minWidth = 150 }, { ui.label({ text = name, color = "on_surface" }) }),
     control,
@@ -671,25 +694,36 @@ end
 local boot_now = { timeout = "5", quiet = "yes", splash = "yes", fallback = "yes", snapshots = "yes", recovery = "yes", firmware = "yes", other = "yes" }
 local boot_look = {}  -- the palette, the mode and the accent of the boot menu, the loading screen and the login
 
+local login_now = { clock = "24", users = "yes", auto = "none", people = {} }  -- how the login screen asks, as kavat-login-settings says it
+
 local function read_boot()
-  noctalia.runAsync("kavat-boot-settings; echo '== look'; cat /etc/kavat/theme.toml 2>/dev/null", function(result)
-    local look = false
+  noctalia.runAsync("kavat-boot-settings; echo '== look'; cat /etc/kavat/theme.toml /var/lib/kavat/theme/settings.toml 2>/dev/null; echo '== login'; kavat-login-settings 2>/dev/null; "
+    .. "echo '== people'; getent passwd | awk -F: '$3 >= 1000 && $3 < 60000 && $7 !~ /(nologin|false)$/ { print $1 }'", function(result)
+    local part = "boot"
+    local found = { clock = "24", users = "yes", auto = "none", people = {} }
     boot_look = {}
     for line in result.stdout:gmatch("[^\n]+") do
-      if line == "== look" then
-        look = true
-      elseif look then
+      local heading = line:match("^== (%a+)$")
+      if heading then
+        part = heading
+      elseif part == "look" then
+        -- the look the machine was installed with, then what was handed to the boot since: the later one counts
         local key, value = line:match('^(%w+)%s*=%s*"([^"]*)"')
         if key then
           boot_look[key] = value
         end
+      elseif part == "people" then
+        found.people[#found.people + 1] = line
       else
-        local key, value = line:match("^(%w+)\t(%w+)$")
-        if key then
+        local key, value = line:match("^(%w+)\t([%w._-]+)$")
+        if key and part == "boot" then
           boot_now[key] = value
+        elseif key then
+          found[key] = value
         end
       end
     end
+    login_now = found
     render()
   end)
 end
@@ -770,9 +804,15 @@ local function boot()
   for _, part in ipairs(system_look()) do
     right[#right + 1] = part
   end
+  right[#right + 1] = row("Follow my desktop", boot_toggle("follow"))
+  right[#right + 1] = note("With this on they take the desktop's theme by themselves, as the machine is turned off: that turning off takes about half a minute longer when the theme changed.")
   return { title = "Boot", sub = "the boot menu and the loading screen", file = "/etc/kavat/boot.conf", left = {
     section("Boot menu"),
     row("Show menu for", select(wait_names, index_of(waits, boot_now.timeout), function(index) boot_set("timeout", waits[index]) end)),
+    row("Starts by itself", segmented({
+      { text = "This system", on = boot_now.default ~= "other", pick = function() boot_set("default", "kavat") end },
+      { text = "The other system", on = boot_now.default == "other", pick = function() boot_set("default", "other") end },
+    })),
     section("Entries on the menu"),
     row("Fallback kernel", boot_toggle("fallback")),
     row("Safe mode", ui.row({ justify = "end", align = "center", gap = 8, flexGrow = 1 }, {
@@ -794,13 +834,44 @@ local function login()
     left[#left + 1] = part
   end
   left[#left + 1] = note("With more than one display, the main one asks who logs in and the others show the clock.")
+  local login_set = function(name, value)
+    busy = true
+    said = ""
+    boot_said = "Waiting for your password…"
+    render()
+    noctalia.runAsync({ "kavat-login-settings", "set", name .. "=" .. value }, function(result)
+      busy = false
+      boot_said = ""
+      if result.exitCode ~= 0 then
+        said = trim(result.stderr ~= "" and result.stderr or result.stdout):gsub("^kavat%-login%-settings: ", "")
+        if said == "" then said = "The password was not given, so nothing changed." end
+      else
+        news = "Changed. It shows the next time the login screen does."
+      end
+      read_boot()
+    end)
+  end
+  local who, who_at = { "Nobody: the password is asked" }, 1
+  for index, name in ipairs(login_now.people) do
+    who[#who + 1] = name
+    if name == login_now.auto then
+      who_at = index + 1
+    end
+  end
+  left[#left + 1] = section("Who logs in")
+  left[#left + 1] = row("Clock", segmented({
+    { text = "24 hours", on = login_now.clock ~= "12", pick = function() login_set("clock", "24") end },
+    { text = "12 hours", on = login_now.clock == "12", pick = function() login_set("clock", "12") end },
+  }))
+  left[#left + 1] = row("Show who can log in", ui.row({ justify = "end", flexGrow = 1 }, {
+    ui.toggle({ checked = login_now.users ~= "no", enabled = not busy, onChange = function(now) login_set("users", now == "true" and "yes" or "no") end }) }))
+  left[#left + 1] = row("Logs in by itself", select(who, who_at, function(index) login_set("auto", index == 1 and "none" or who[index]) end))
+  left[#left + 1] = note("With nobody shown, the name is typed too. Someone who logs in by itself does so once, as the machine starts, and the keyring, which the password typed at the login opens, then asks for it once the desktop is up.")
   return { title = "Login & lock", sub = "kavat-greeter · hyprlock", file = "~/.config/hypr/hypridle.conf", left = left, right = {
     section("Lock"),
     row("Lock after", conf_select("lock", "lock_after", MINUTES)),
     row("Screen off after", conf_select("lock", "screen_off_after", MINUTES)),
     note("Super+Shift+L locks at once, and the screen locks before the machine sleeps. The lock screen follows the desktop's theme by itself."),
-    section("Not built yet"),
-    note("Logging in without a password, a clock of twelve hours and the list of users on the login screen."),
   } }
 end
 
@@ -1330,14 +1401,34 @@ end
 
 local function wallpaper()
   local tiles, rows = {}, {}
+  local own = nil  -- the image of the display being chosen for, when it has one
+  for _, display in ipairs(walls.displays) do
+    if display.name == wall_display then
+      own = display.file
+    end
+  end
   for _, item in ipairs(walls.list) do
-    if wall_filter == "all" or item.kind == wall_filter or item.kind == "theme" then
+    -- a video plays on every display: one display takes an image, or what the others show
+    if (wall_filter == "all" or item.kind == wall_filter or item.kind == "theme") and (wall_display == "" or item.kind ~= "video") then
       local on = (item.kind == "theme" and walls.kind == "theme") or item.file == walls.file
+      if wall_display ~= "" then
+        on = own ~= nil and item.file == own or own == nil and on
+      end
       tiles[#tiles + 1] = ui.column({ key = "wall-" .. item.file, gap = 4, width = 178 }, {
         ui.image({ path = item.thumb, width = 178, height = 100, radius = 8, fit = "cover",
           border = on and "primary" or "outline_variant", borderWidth = on and 3 or 1,
           onClick = function()
-            if item.kind == "theme" then wall_does("theme") else wall_does("set", item.file) end
+            if wall_display ~= "" then
+              if item.file == walls.file or (item.kind == "theme" and walls.kind == "theme") then
+                wall_does("same", wall_display)
+              else
+                wall_does("set", item.file, wall_display)
+              end
+            elseif item.kind == "theme" then
+              wall_does("theme")
+            else
+              wall_does("set", item.file)
+            end
           end }),
         ui.row({ gap = 6, align = "center" }, {
           ui.label({ text = item.name, fontSize = 12, maxWidth = 120 }),
@@ -1362,6 +1453,17 @@ local function wallpaper()
     }),
     ui.column({ gap = 12 }, rows),
   })
+  if #walls.displays > 1 then
+    local choices = { { text = "All displays", on = wall_display == "", pick = function() wall_display = ""; render() end } }
+    for _, display in ipairs(walls.displays) do
+      choices[#choices + 1] = { text = display.name .. (display.file and " •" or ""), on = wall_display == display.name,
+        pick = function() wall_display = display.name; render() end }
+    end
+    top = ui.column({ gap = 12 }, {
+      ui.row({ gap = 12, align = "center" }, { ui.label({ text = "Background of", color = "on_surface_variant" }), ui.row({ width = 150 * #choices }, { segmented(choices) }) }),
+      top,
+    })
+  end
   local live = walls.kind == "video"
   return { title = "Wallpaper", sub = "image or live video · " .. (live and "a video is playing" or walls.kind == "image" and "an image of yours" or "the theme's picture"),
     file = "~/.config/kavat/wallpaper.json", top = top, left = {
@@ -1396,7 +1498,15 @@ local function wallpaper()
       ui.toggle({ checked = walls.gpu == "on", enabled = not busy, onChange = function(now) wall_does("option", "gpu", now == "true" and "on" or "off") end }),
     })),
     note("The video is played by mpvpaper. It stops while a window covers the whole screen, and in Gamer mode."),
-    note("A different background for each display and a slideshow are not built yet."),
+    section("Slideshow"),
+    row("Next image", segmented({
+      { text = "Off", on = (walls.slideshow or "off") == "off", pick = function() wall_does("option", "slideshow", "off") end },
+      { text = "5 min", on = walls.slideshow == "5", pick = function() wall_does("option", "slideshow", "5") end },
+      { text = "15", on = walls.slideshow == "15", pick = function() wall_does("option", "slideshow", "15") end },
+      { text = "30", on = walls.slideshow == "30", pick = function() wall_does("option", "slideshow", "30") end },
+      { text = "1 h", on = walls.slideshow == "60", pick = function() wall_does("option", "slideshow", "60") end },
+    })),
+    note("The images of the library are shown one after another, in the order of their names, on every display. With more than one display, each can have an image of its own, chosen above; a video plays on them all."),
   } }
 end
 
@@ -1512,14 +1622,15 @@ local function sound()
 end
 
 -- The connections and the Bluetooth devices, as kavat-network lists them
-local net = { wired = {}, wifi = "none", wifi_startup = true, networks = {}, vpns = {}, bluetooth = "none", bluetooth_startup = true, devices = {} }
+local net = { wired = {}, wifi = "none", wifi_startup = true, networks = {}, vpns = {}, proton = false, proton_incognito = false, bluetooth = "none", bluetooth_startup = true, devices = {} }
 local net_asking = ""    -- the Wi-Fi network whose password is being typed
 local net_password = ""
+local net_user = ""
 local net_working = ""   -- what is being waited for: a scan, a pairing
 
 local function read_net()
   noctalia.runAsync({ "kavat-network" }, function(result)
-    local found = { wired = {}, wifi = "none", wifi_startup = true, networks = {}, vpns = {}, bluetooth = "none", bluetooth_startup = true, devices = {} }
+    local found = { wired = {}, wifi = "none", wifi_startup = true, networks = {}, vpns = {}, proton = false, proton_incognito = false, bluetooth = "none", bluetooth_startup = true, devices = {} }
     for line in result.stdout:gmatch("[^\n]+") do
       local parts = {}
       for part in (line .. "\t"):gmatch("([^\t]*)\t") do
@@ -1533,7 +1644,9 @@ local function read_net()
         found.networks[#found.networks + 1] = { name = parts[2], signal = tonumber(parts[3]) or 0, locked = parts[4] == "locked",
           saved = parts[5] == "saved", connected = parts[6] == "connected" }
       elseif parts[1] == "vpn" then
-        found.vpns[#found.vpns + 1] = { name = parts[2], kind = parts[3], up = parts[4] == "up", incognito = parts[5] == "incognito" }
+        found.vpns[#found.vpns + 1] = { name = parts[2], kind = parts[3], up = parts[4] == "up", incognito = parts[5] == "incognito", login = parts[6] == "login" }
+      elseif parts[1] == "proton" then
+        found.proton, found.proton_incognito = parts[2] == "installed", parts[3] == "incognito"
       elseif parts[1] == "bluetooth" then
         found.bluetooth, found.bluetooth_startup = parts[2], parts[3] == "on"
       elseif parts[1] == "device" then
@@ -1639,21 +1752,52 @@ local function network()
 
   left[#left + 1] = section("VPN")
   for _, vpn in ipairs(net.vpns) do
-    local buttons = { { vpn.up and "Disconnect" or "Connect", function() net_does((vpn.up and "Disconnecting " or "Connecting ") .. vpn.name .. "…", "vpn", vpn.up and "down" or "up", vpn.name) end, "outline" } }
+    local sign_in = function() net_asking, net_user, net_password = "vpn:" .. vpn.name, "", ""; render() end
+    local buttons = { vpn.login and { "Sign in", sign_in, "primary" }
+      or { vpn.up and "Disconnect" or "Connect", function() net_does((vpn.up and "Disconnecting " or "Connecting ") .. vpn.name .. "…", "vpn", vpn.up and "down" or "up", vpn.name) end, "outline" } }
     if not vpn.incognito then
       buttons[#buttons + 1] = { "Use for Incognito", function() net_does(nil, "vpn", "use", vpn.name) end }
     end
     buttons[#buttons + 1] = { "Remove", function() net_does(nil, "vpn", "remove", vpn.name) end }
     left[#left + 1] = net_line("vpn-" .. vpn.name, vpn.name .. " · " .. (vpn.kind == "wireguard" and "WireGuard" or vpn.kind == "openvpn" and "OpenVPN" or vpn.kind),
-      (vpn.up and "connected" or "saved") .. (vpn.incognito and " · used by Incognito" or ""), vpn.up, buttons)
+      (vpn.up and "connected" or vpn.login and "asks for your name and password" or "saved") .. (vpn.incognito and " · used by Incognito" or ""), vpn.up, buttons)
+    if net_asking == "vpn:" .. vpn.name then
+      local keep = function()
+        local user, password = net_user, net_password
+        if user == "" or password == "" then
+          return
+        end
+        net_asking, net_user, net_password = "", "", ""
+        net_does(nil, "vpn", "login", vpn.name, user, password)
+      end
+      left[#left + 1] = ui.row({ key = "vpn-login", gap = 8, align = "center" }, {
+        ui.input({ key = "vpn-user-" .. vpn.name, placeholder = "Name", focus = true, controlSize = "sm", flexGrow = 1, onChange = function(text) net_user = text end }),
+        ui.input({ key = "vpn-password-" .. vpn.name, placeholder = "Password", password = true, controlSize = "sm", flexGrow = 1,
+          onChange = function(text) net_password = text end, onSubmit = keep }),
+        ui.button({ text = "Keep", variant = "primary", controlSize = "sm", onClick = keep }),
+        ui.button({ text = "Cancel", variant = "ghost", controlSize = "sm", onClick = function() net_asking = ""; render() end }),
+      })
+      left[#left + 1] = note("The name and the password your provider gave for OpenVPN, which are not always those of its site. They are kept by NetworkManager, where only root reads them.")
+    end
+  end
+  -- Proton VPN's own app, with its login: it makes its connections itself, so it is a line of its own
+  if net.proton then
+    local buttons = { { "Open", function() noctalia.runAsync("setsid -f protonvpn-app > /dev/null 2>&1"); panel.close() end, "outline" } }
+    if not net.proton_incognito then
+      buttons[#buttons + 1] = { "Use for Incognito", function() net_does(nil, "vpn", "use", "proton") end }
+    end
+    left[#left + 1] = net_line("vpn-proton-app", "Proton VPN · its own app", "signed in and connected from the app" .. (net.proton_incognito and " · used by Incognito" or ""), false, buttons)
   end
   left[#left + 1] = ui.row({ gap = 8 }, { ui.button({ text = "+ Add a VPN", variant = #net.vpns == 0 and "primary" or "outline", controlSize = "sm", onClick = function()
     noctalia.runInTerminal("kavat-network vpn add; echo; read -r -p 'Enter closes this window. ' _")
     panel.close()
-  end }) })
-  left[#left + 1] = note(#net.vpns == 0
-    and "Incognito mode sends everything through a VPN, and there is none yet. Your provider gives a file for it on its site: at Proton VPN, account.protonvpn.com, Downloads, WireGuard configuration; Mullvad and the others have the same. Download it, press Add a VPN and pick it."
-    or "A VPN is added from the file its provider gives, WireGuard or OpenVPN. The one Incognito uses comes up when that mode is entered.")
+  end }), not net.proton and ui.button({ text = "Install Proton VPN", variant = "outline", controlSize = "sm", onClick = function()
+    noctalia.runInTerminal("kav install proton-vpn-gtk-app proton-vpn-cli; echo; read -r -p 'Enter closes this window. ' _")
+    panel.close()
+  end }) or nil })
+  left[#left + 1] = note(#net.vpns == 0 and not net.proton
+    and "Incognito mode sends everything through a VPN, and there is none yet. Your provider gives a file for it on its site: at Proton VPN, account.protonvpn.com, Downloads, WireGuard configuration; Mullvad and the others have the same. Download it, press Add a VPN and pick it. Proton VPN's own app, with its login, can be installed and used instead."
+    or "A VPN is added from the file its provider gives, WireGuard or OpenVPN. The one Incognito uses comes up when that mode is entered. One whose name or password was typed wrong is removed and added again.")
 
   if net.bluetooth == "none" then
     right[#right + 1] = note("This machine has no Bluetooth, or its service is not running.")
@@ -1673,14 +1817,31 @@ local function network()
         buttons = { { "Connect", function() net_does("Connecting to " .. device.name .. "…", "bluetooth", "connect", device.address) end, "outline" },
           { "Forget", function() net_does(nil, "bluetooth", "forget", device.address) end } }
       else
-        buttons = { { "Pair", function() net_does("Pairing with " .. device.name .. "…", "bluetooth", "pair", device.address) end, "outline" } }
+        buttons = { { "Pair", function() net_does("Pairing with " .. device.name .. "…", "bluetooth", "pair", device.address) end, "outline" },
+          { "With a code", function() net_asking, net_password = "bt:" .. device.address, ""; render() end } }
       end
       right[#right + 1] = net_line("bt-" .. device.address, device.name, state, device.state == "connected", buttons)
+      if net_asking == "bt:" .. device.address then
+        local pair = function()
+          local code = net_password
+          if code == "" then
+            return
+          end
+          net_asking, net_password = "", ""
+          net_does("Pairing with " .. device.name .. "…", "bluetooth", "pair", device.address, code)
+        end
+        right[#right + 1] = ui.row({ key = "bt-code", gap = 8, align = "center" }, {
+          ui.input({ key = "bt-code-" .. device.address, placeholder = "Code, often 0000", focus = true, controlSize = "sm", flexGrow = 1,
+            onChange = function(text) net_password = text end, onSubmit = pair }),
+          ui.button({ text = "Pair", variant = "primary", controlSize = "sm", onClick = pair }),
+          ui.button({ text = "Cancel", variant = "ghost", controlSize = "sm", onClick = function() net_asking = ""; render() end }),
+        })
+      end
     end
     if net.bluetooth == "on" then
       right[#right + 1] = ui.row({ gap = 8 }, { ui.button({ text = "Pair a device", variant = "primary", controlSize = "sm", enabled = not busy,
         onClick = function() net_does("Looking for devices nearby for ten seconds…", "bluetooth", "scan") end }) })
-      right[#right + 1] = note("Put the device in pairing mode first. The ones found show in the list with a Pair button.")
+      right[#right + 1] = note("Put the device in pairing mode first. The ones found show in the list with a Pair button. A device that shows a code has it said in a notice; one that asks for a code is paired with With a code.")
     end
   end
   if net_working ~= "" then
@@ -1701,7 +1862,7 @@ local WIDGETS = {
   { "launcher", "Launcher" }, { "workspaces", "Workspaces" }, { "active_window", "Window title" }, { "taskbar", "Open windows" },
   { "clock", "Clock and date" }, { "kavat/modes:mode", "Mode switcher" }, { "kavat/notes:due", "Notes due" }, { "media", "What is playing" },
   { "sysmon", "Processor and memory" }, { "privacy", "Recording indicator" }, { "tray", "Tray" }, { "notifications", "Notifications" },
-  { "clipboard", "Clipboard" }, { "keyboard_layout", "Keyboard in use" }, { "network", "Network" }, { "bluetooth", "Bluetooth" },
+  { "clipboard", "Clipboard" }, { "keyboard_layout", "Keyboard in use" }, { "kavat/settings:network", "Network" }, { "network", "Network, the shell's own" }, { "bluetooth", "Bluetooth" },
   { "volume", "Volume" }, { "brightness", "Brightness" }, { "battery", "Battery" }, { "session", "Power" },
   { "control-center", "Control center" }, { "wallpaper", "Background picker" }, { "weather", "Weather" }, { "nightlight", "Night light" },
   { "caffeine", "Keep awake" }, { "power_profile", "Power profile" }, { "screenshot", "Screenshot" }, { "theme_mode", "Light or dark" },
@@ -1892,15 +2053,21 @@ local function language()
 end
 
 local displays_read = 0
+local night = { state = "off", warmth = "4000", from = "20:00", to = "07:00" }  -- the night light, as kavat-displays says it
 
 local function read_displays()
-  noctalia.runAsync("kavat-displays; for name in $(kavat-displays | cut -f1); do echo \"== $name\"; kavat-displays modes $name; done", function(result)
+  noctalia.runAsync("kavat-displays; for name in $(kavat-displays | cut -f1); do echo \"== $name\"; kavat-displays modes $name; done; echo '== night light'; kavat-displays night", function(result)
     local found, part = {}, nil
     for line in result.stdout:gmatch("[^\n]+") do
       local heading = line:match("^== (.+)$")
       local name, what, mode, position, scale, turn, spaces = line:match("^([^\t]+)\t([^\t]*)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)\t([^\t]+)$")
       if heading then
         part = heading
+      elseif part == "night light" then
+        local state, warmth, from, to = line:match("^(%a+)\t(%d+)\t([%d:]+)\t([%d:]+)$")
+        if state then
+          night = { state = state, warmth = warmth, from = from, to = to }
+        end
       elseif part == nil and name then
         local width, height, rate = mode:match("^(%d+)x(%d+)@([%d.]+)")
         local x, y = position:match("^(-?%d+)x(-?%d+)")
@@ -1967,6 +2134,58 @@ local function display_does(...)
     end
     read_displays()
   end)
+end
+
+-- The night light is not tried as a display's settings are: it leaves nothing black
+local function night_does(...)
+  busy = true
+  said = ""
+  render()
+  noctalia.runAsync({ "kavat-displays", "night", ... }, function(result)
+    busy = false
+    if result.exitCode ~= 0 then
+      said = trim(result.stderr ~= "" and result.stderr or result.stdout):gsub("^kavat%-displays: ", "")
+    end
+    read_displays()
+  end)
+end
+
+local function night_rows()
+  local from, to = {}, {}
+  for hour = 16, 23 do
+    from[#from + 1] = string.format("%02d:00", hour)
+    from[#from + 1] = string.format("%02d:30", hour)
+  end
+  for hour = 4, 10 do
+    to[#to + 1] = string.format("%02d:00", hour)
+    to[#to + 1] = string.format("%02d:30", hour)
+  end
+  local function at(list, value)
+    for index, one in ipairs(list) do
+      if one == value then
+        return index
+      end
+    end
+    -- an hour written in the file that the list does not have is shown as it is
+    list[#list + 1] = value
+    return #list
+  end
+  local from_at, to_at = at(from, night.from), at(to, night.to)
+  return {
+    section("Night light · Auto has it on between the two hours"),
+    row("Warmer colours", segmented({
+      { text = "Off", on = night.state == "off", pick = function() night_does("off") end },
+      { text = "On", on = night.state == "on", pick = function() night_does("on") end },
+      { text = "Auto", on = night.state == "auto", pick = function() night_does("auto") end },
+    })),
+    row("Warmth", segmented({
+      { text = "Mild", on = night.warmth == "5000", pick = function() night_does("warmth", "5000") end },
+      { text = "Warm", on = night.warmth == "4000", pick = function() night_does("warmth", "4000") end },
+      { text = "Warmer", on = night.warmth == "3000", pick = function() night_does("warmth", "3000") end },
+    })),
+    row("From", select(from, from_at, function(index) night_does("hours", from[index], night.to) end)),
+    row("Until", select(to, to_at, function(index) night_does("hours", night.from, to[index]) end)),
+  }
 end
 
 local function pages_displays()
@@ -2090,6 +2309,7 @@ local function pages_displays()
     row("Refresh rate", #rates > 0 and select(rate_names, rate_at, function(index) display_does("set", chosen.name, "mode=" .. chosen.size .. "@" .. rates[index]) end) or note(chosen.rate .. " Hz")),
     row("Scale", choices({ "1", "1.25", "1.5", "2" }, chosen.scale, "scale", { "100%", "125%", "150%", "200%" })),
     row("Rotation", choices({ "0", "90", "180", "270" }, chosen.turn, "rotate", { "0°", "90°", "180°", "270°" })),
+    table.unpack(night_rows()),
   }, right = {
     section("Place"),
     #names > 0 and row("Put it", select(places, 1, function(index)
@@ -2100,8 +2320,6 @@ local function pages_displays()
     ui.row({ gap = 4 }, spaces),
     note(#displays > 1 and "The workspaces that open on this display: press a number to give it to this display, or to let it go. A workspace is on one display, so what this one takes the others give up; the first of them is the one the display starts on. One nobody has opens on the display in use."
       or "With one display every workspace is on it. With a second one, each display can have its own."),
-    section("Not built yet"),
-    note("Night light."),
   } }
 end
 
@@ -2140,22 +2358,61 @@ end
 
 -- The panel ---------------------------------------------------------------------------
 
+-- What each page has, by its settings' names: made while something is searched for, by
+-- drawing every page out of sight, and forgotten when the search is emptied
+local inside = nil
+
+local function gather()
+  inside = {}
+  for id, draw in pairs(BUILT) do
+    gathering = {}
+    pcall(draw)
+    inside[id] = gathering
+  end
+  gathering = nil
+end
+
+-- The first setting of a page that has what is searched for, or nil
+local function found_inside(id)
+  for _, name in ipairs(inside and inside[id] or {}) do
+    if name:lower():find(search, 1, true) then
+      return name
+    end
+  end
+  return nil
+end
+
 function render()
+  if search == "" then
+    inside = nil
+  else
+    -- each time, since what a page has can depend on what was read since
+    gather()
+  end
   local nav = {
     ui.input({ key = "search", placeholder = "Search settings…", controlSize = "sm", value = search,
-      onChange = function(text) search = text:lower() render() end }),
+      onChange = function(text)
+        -- the Displays page has no settings to name until the displays are read
+        if search == "" and text ~= "" and #displays == 0 then
+          read_displays()
+        end
+        search = text:lower()
+        render()
+      end }),
   }
   local shown
   for _, entry in ipairs(PAGES) do
     if entry.id == page then
       shown = entry
     end
-    if search == "" or (entry.name .. " " .. (entry.about or "")):lower():find(search, 1, true) then
+    local by_name = search == "" or (entry.name .. " " .. (entry.about or "")):lower():find(search, 1, true)
+    local setting = not by_name and found_inside(entry.id) or nil
+    if by_name or setting then
       nav[#nav + 1] = ui.row({ key = "nav-" .. entry.id, align = "center", paddingH = 12, minHeight = 26, radius = 6,
         fill = entry.id == page and "surface_container_highest" or "surface_container_low", onClick = function() open_page(entry.id) end }, {
         ui.label({ text = entry.name, flexGrow = 1, fontWeight = entry.id == page and "medium" or "normal",
           color = BUILT[entry.id] and "on_surface" or "on_surface_variant" }),
-        ui.label({ text = entry.about or "", fontSize = 11, color = "on_surface_variant" }),
+        ui.label({ text = setting or entry.about or "", fontSize = 11, color = setting and "primary" or "on_surface_variant", maxWidth = 110 }),
       })
     end
   end

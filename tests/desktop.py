@@ -172,6 +172,49 @@ def main():
                                      'kavat-boot-settings set timeout=7 2>&1 | grep -c "not a setting"', 240)
         checks.report(output.split('\n') == ['timeout=3 recovery=no ', '0', 'some', '1', '1'],
                       'the boot menu waits as long as it is set to and leaves out an entry that is turned off, and gets it back', output)
+        print('the second round: night light, a background each, the login, what starts, Qt', flush=True)
+        status, output = user('kavat-displays night warmth 3500; kavat-displays night on; sleep 2; hyprctl --instance 0 hyprsunset temperature; kavat-displays night | cut -f1,2; '
+                              'kavat-displays night auto; grep -c "^profile" ~/.config/hypr/hyprsunset.conf; kavat-displays night off; systemctl --user is-active hyprsunset; '
+                              'kavat-displays night warmth 900 2>&1 | grep -c usage')
+        checks.report(output.split('\n') == ['3500', 'on\t3500', '2', 'inactive', '1'],
+                      'the night light warms the colours when on, is two profiles by the hour, and stops when off', output)
+        status, output = user('mkdir -p ~/Pictures/Wallpapers/images; cd ~/Pictures/Wallpapers/images; for colour in navy teal; do '
+                              'ffmpeg -loglevel error -y -f lavfi -i color=c=$colour:s=320x180 -frames:v 1 0-$colour.png; done; '
+                              'hyprctl --instance 0 output create headless > /dev/null; sleep 2; second=$(kavat-wallpaper displays | grep HEADLESS | cut -f1 | head -n 1); '
+                              'kavat-wallpaper set $PWD/0-teal.png $second; kavat-wallpaper displays | grep -c "HEADLESS.*0-teal.png"; kavat-shell msg wallpaper-get $second | grep -c 0-teal; '
+                              'kavat-shell msg wallpaper-get Virtual-1 | grep -c "kavat/theme/"; kavat-wallpaper same $second; kavat-wallpaper displays | grep -c "0-teal"; '
+                              'hyprctl --instance 0 output remove $second > /dev/null; '
+                              'kavat-wallpaper option slideshow 5; systemctl --user list-timers --no-legend | grep -c kavat-wallpaper-slideshow; '
+                              'kavat-wallpaper set $PWD/0-navy.png; kavat-wallpaper next; kavat-wallpaper | grep -c 0-teal.png; '
+                              'kavat-wallpaper option slideshow off; systemctl --user list-timers --no-legend | grep -c kavat-wallpaper-slideshow; kavat-wallpaper theme; rm 0-navy.png 0-teal.png', 60)
+        checks.report(output.split() == ['1', '1', '1', '0', '1', '1', '0'],
+                      'a display takes an image of its own and gives it up, and the slideshow shows the next image of the library by a timer', output)
+        status, output = machine.run('printf "client\\ndev tun\\nproto udp\\nremote 192.0.2.20 1194\\nauth-user-pass\\n<ca>\\n-----BEGIN CERTIFICATE-----\\nMIIB\\n-----END CERTIFICATE-----\\n</ca>\\n" '
+                                     '> /tmp/kavat-test-corp.ovpn; kavat-network vpn add /tmp/kavat-test-corp.ovpn > /dev/null; kavat-network | grep ^vpn | cut -f2,3,6; '
+                                     'kavat-network vpn up kavat-test-corp 2>&1 | grep -c "asks for a name and a password"; kavat-network vpn login kavat-test-corp will "pa,ss word" > /dev/null; '
+                                     'kavat-network | grep ^vpn | cut -f6; nmcli -g vpn.data connection show kavat-test-corp | grep -c "username = will"; '
+                                     'kavat-network vpn remove kavat-test-corp; kavat-network bluetooth pair 00:11:22:33:44:55 2>&1 | grep -c "no Bluetooth adapter"', 90)
+        checks.report(output.split('\n') == ['kavat-test-corp\topenvpn\tlogin', '1', '-', '1', '1'],
+                      'a VPN that asks for a name and a password says so, does not come up without them, and keeps them once given', output)
+        status, output = machine.run('kavat-boot-settings set default=other > /dev/null; grep -c "set default=.kavat-other-systems>0" /boot/grub/grub.cfg; '
+                                     'kavat-boot-settings set default=kavat follow=yes > /dev/null; grep -c "kavat-other-systems>0" /boot/grub/grub.cfg; '
+                                     'runuser -l tester -c "kavat-theme set accent teal"; /usr/lib/kavat/boot-follow > /dev/null 2>&1; grep -c "accent = .teal" /var/lib/kavat/theme/settings.toml; '
+                                     'systemctl is-active kavat-boot-follow.service; runuser -l tester -c "kavat-theme set accent amber"; /usr/lib/kavat/boot-follow > /dev/null 2>&1; '
+                                     'grep -c "accent = .amber" /var/lib/kavat/theme/settings.toml; kavat-boot-settings set follow=no > /dev/null', 400)
+        checks.report(output.split() == ['1', '0', '1', 'active', '1'],
+                      "the other system can be what starts by itself, and the boot follows the desktop's theme when asked to, as the machine is turned off", output)
+        status, output = machine.run('kavat-login-settings set clock=12 users=no auto=tester > /dev/null; kavat-login-settings | tr "\\t\\n" "= "; echo; '
+                                     'grep -c -E "^\\[initial_session\\]|^user = .tester" /etc/kavat/greetd.toml; grep -c greetd-start /usr/lib/systemd/system/greetd.service.d/kavat-greeter.conf; '
+                                     'cat /home/tester/.local/share/keyrings/default; echo; stat -c %U:%a /home/tester/.local/share/keyrings/Kavat.keyring; '
+                                     'kavat-login-settings set auto=nobody-at-all 2>&1 | grep -c "not a setting"; kavat-login-settings set clock=24 users=yes auto=none > /dev/null; '
+                                     'ls /etc/kavat/greetd.toml 2> /dev/null | wc -l; cat /home/tester/.local/share/keyrings/default; echo')
+        checks.report(output.split('\n') == ['clock=12 users=no auto=tester ', '2', '1', 'Kavat', 'tester:600', '1', '0', 'login'],
+                      "the login's clock, whether it shows who can log in, and who logs in by itself are kept, greetd is told who, and that person's keyring asks for no password", output)
+        status, output = user('readlink ~/.config/qt6ct/colors/kavat.conf | grep -c "kavat/theme/current/qt/kavat.conf"; grep -c "^color_scheme_path=$HOME/.config/qt6ct/colors/kavat.conf" ~/.config/qt6ct/qt6ct.conf; '
+                              'grep -c "^active_colors=#ff[0-9a-f]\\{6\\}, " ~/.config/qt6ct/colors/kavat.conf; tr "\\0" "\\n" < /proc/$(pgrep -u tester -x kavat-shell | head -n 1)/environ | grep -c "^QT_QPA_PLATFORMTHEME=qt6ct"; '
+                              'nmcli -t -f TYPE connection show --active | grep -c -E "^(vpn|wireguard)"; grep -c "VPN · " /usr/share/kavat/shell-plugins/modes/widget.luau; '
+                              'kavat-shell msg config-get bar.default.end | grep -c "kavat/settings:network"; kavat-network | grep -c "^proton.-.-$"; kavat-mode vpn proton 2>&1 | grep -c "is not installed"')
+        checks.report(output.split() == ['1', '1', '1', '1', '0', '1', '1', '1', '1'], "Qt apps are handed the theme's colours through qt6ct, which the session names; the bar has the system's network widget; Proton VPN is offered and said not to be installed", output)
         status, output = machine.run('kavat-dns; kavat-dns on > /dev/null; kavat-dns; readlink /etc/resolv.conf; resolvectl status | grep -c "+DNSOverTLS"; '
                                      'kavat-dns on nobody 2>&1 | grep -c "is not one of"; kavat-dns off > /dev/null; kavat-dns; systemctl is-active systemd-resolved; '
                                      'test -L /etc/resolv.conf || echo a-file', 90)

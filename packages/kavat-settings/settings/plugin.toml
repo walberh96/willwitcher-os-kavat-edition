@@ -16,3 +16,8 @@ height         = 810
 placement      = "floating"
 position       = "center"
 keyboard_focus = "on_demand"
+
+# the network on the bar: a press opens the Network page
+[[widget]]
+id    = "network"
+entry = "network.luau"

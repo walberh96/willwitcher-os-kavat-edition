@@ -5,7 +5,9 @@ usage: kavat-network                              what there is, one thing to a 
                                                     wired <device> <state> <speed>
                                                     wifi <on|off|none> <startup: on|off>
                                                     network <name> <signal> <open|locked> <saved|-> <connected|->
-                                                    vpn <name> <wireguard|openvpn|...> <up|-> <incognito|->
+                                                    vpn <name> <wireguard|openvpn|...> <up|-> <incognito|-> <login|->
+                                                      (login: it asks for a name and a password, and has none yet)
+                                                    proton <installed|-> <incognito|->   Proton VPN's own app
                                                     bluetooth <on|off|none> <startup: on|off>
                                                     device <address> <name> <connected|paired|near> <battery|->
        kavat-network wifi on|off                  the Wi-Fi radio
@@ -15,12 +17,18 @@ usage: kavat-network                              what there is, one thing to a 
        kavat-network wifi forget <name>
        kavat-network vpn add [file]               add a VPN from a provider's file: WireGuard (.conf) or OpenVPN (.ovpn);
                                                   with no file, in a terminal, the file is picked in Yazi
+       kavat-network vpn login <name> <user> [password]
+                                                  the name and the password a VPN asks for, as some OpenVPN ones do;
+                                                  with no password given, it is read from the input
        kavat-network vpn up|down|remove <name>
        kavat-network vpn use <name>|none          the VPN Incognito uses
        kavat-network bluetooth on|off
        kavat-network bluetooth startup on|off     whether Bluetooth is on when a session starts
        kavat-network bluetooth scan               look for devices nearby for ten seconds
-       kavat-network bluetooth pair|connect|disconnect|forget <address>
+       kavat-network bluetooth pair <address> [code]
+                                                  a device that asks for a code gets the one given; one that shows
+                                                  a code of its own has it said in a notice
+       kavat-network bluetooth connect|disconnect|forget <address>
        kavat-network startup                      at the start of a session: turn off what is not to be on
 
 It is NetworkManager and BlueZ that do the work, through nmcli and bluetoothctl: this puts
@@ -104,6 +112,20 @@ def kind_of(name, kind):
     return service.rsplit('.', 1)[-1] or 'vpn'
 
 
+def vpn_data(name):
+    """What a VPN's plugin keeps about it, as a dictionary."""
+    data = out('nmcli', '-g', 'vpn.data', 'connection', 'show', 'id', name) or ''
+    return dict(part.strip().split(' = ', 1) for part in data.replace('\\,', '\0').split(',') if ' = ' in part)
+
+
+def wants_login(name, kind):
+    """Whether a VPN asks for a name and a password and has not been given them."""
+    if kind != 'vpn':
+        return False
+    data = vpn_data(name)
+    return data.get('connection-type') in ('password', 'password-tls') and not (data.get('username') and data.get('password-flags') == '0')
+
+
 def has_bluetooth():
     """Whether there is a Bluetooth adapter: with none BlueZ is not running, and bluetoothctl would wait for it."""
     try:
@@ -159,7 +181,9 @@ def show():
     incognito = (out('kavat-mode', 'vpn') or '').strip()
     for name, kind, active in kept:
         if kind in ('vpn', 'wireguard'):
-            lines.append(('vpn', name, kind_of(name, kind), 'up' if active == 'yes' else '-', 'incognito' if name == incognito else '-'))
+            lines.append(('vpn', name, kind_of(name, kind), 'up' if active == 'yes' else '-', 'incognito' if name == incognito else '-',
+                          'login' if wants_login(name, kind) else '-'))
+    lines.append(('proton', 'installed' if shutil.which('protonvpn') else '-', 'incognito' if incognito == 'proton' else '-'))
     controller = out('bluetoothctl', '--timeout', '5', 'show', timeout=8) if has_bluetooth() else None
     lines.append(('bluetooth', 'none' if not controller else 'on' if 'Powered: yes' in controller else 'off',
                   'on' if at_startup('bluetooth_at_startup') else 'off'))
@@ -217,7 +241,94 @@ def vpn_add(path):
     said = f'{name} is added.'
     if not (out('kavat-mode', 'vpn') or '').strip() and out('kavat-mode', 'vpn', name) is not None:
         said += ' Incognito uses it.'
+    if wants_login(name, 'vpn' if kind == 'openvpn' else kind):
+        said += ' It asks for a name and a password: give them on the Network page, or with kavat-network vpn login.'
     print(said)
+
+
+def vpn_login(name, user, password):
+    """The name and the password of a VPN, kept by NetworkManager where only root reads them:
+    Incognito brings the VPN up with nobody there to be asked."""
+    if not any(known == name and kind == 'vpn' for known, kind, _ in connections()):
+        sys.exit(f'kavat-network: there is no VPN called {name} that asks for a name and a password')
+    if not user or not password:
+        sys.exit('kavat-network: a name and a password are both needed')
+    does('nmcli', 'connection', 'modify', 'id', name, '+vpn.data', f'username={user}', '+vpn.data', 'password-flags=0',
+         'vpn.secrets', 'password=' + password.replace('\\', '\\\\').replace(',', '\\,'))
+    print(f'{name} has its name and its password.')
+
+
+# ---- Bluetooth
+
+def pair(address, code):
+    """Pair a device, answering what it asks: bluetoothctl is spoken to as a person at its prompt would."""
+    import pty
+    import select
+    import time
+    pid, master = pty.fork()
+    if pid == 0:
+        os.execvp('bluetoothctl', ['bluetoothctl', '--agent', 'KeyboardDisplay'])
+    heard, said, asked, state = '', False, set(), None
+    until = time.monotonic() + 90
+
+    def say(line):
+        os.write(master, (line + '\n').encode())
+
+    try:
+        while time.monotonic() < until and state is None:
+            ready, _, _ = select.select([master], [], [], 1)
+            if not ready:
+                continue
+            try:
+                heard += os.read(master, 4096).decode('utf-8', 'replace')
+            except OSError:
+                break
+            if not said and ('Agent registered' in heard or '#' in heard):
+                say(f'pair {address}')
+                said = True
+            plain = re.sub(r'\x1b\[[0-9;?]*[A-Za-z]|\r', '', heard)
+            # the device shows a code and asks whether it is the same one: it is said, and taken as right,
+            # since the pairing was asked for from this machine a moment ago
+            shown = re.search(r'Confirm passkey (\d+)', plain)
+            if shown and 'confirm' not in asked:
+                asked.add('confirm')
+                subprocess.run(['notify-send', '-a', 'Bluetooth', 'Pairing', f'The device should show {shown.group(1)}.'], check=False)
+                say('yes')
+            typed = re.search(r'(?:Passkey|PIN code): (\d+)', plain)
+            if typed and 'typed' not in asked:
+                asked.add('typed')
+                subprocess.run(['notify-send', '-a', 'Bluetooth', 'Pairing', f'Type {typed.group(1)} on the device, then Enter.'], check=False)
+            if re.search(r'Enter (PIN code|passkey)', plain) and 'code' not in asked:
+                asked.add('code')
+                if not code:
+                    state = 'This device asks for a code: write it in the box beside it and pair again.'
+                else:
+                    say(code)
+            if re.search(r'(Authorize service|Accept pairing|Request authorization)', plain) and 'yes' not in asked:
+                asked.add('yes')
+                say('yes')
+            if 'Pairing successful' in plain or 'AlreadyExists' in plain:
+                state = ''
+            failed = re.search(r'Failed to pair: (\S+)', plain)
+            if failed:
+                state = 'The pairing failed: ' + failed.group(1).rsplit('.', 1)[-1]
+            elif re.search(rf'Device {address} not available', plain):
+                state = 'That device is not near: look for devices again.'
+        if state is None:
+            state = 'The device did not answer in time.'
+    finally:
+        try:
+            say('quit')
+            os.close(master)
+        except OSError:
+            pass
+        try:
+            os.kill(pid, 15)
+            os.waitpid(pid, 0)
+        except OSError:
+            pass
+    if state:
+        sys.exit('kavat-network: ' + state)
 
 
 def main():
@@ -245,6 +356,8 @@ def main():
         does('nmcli', 'connection', 'delete', 'id', arguments[2])
     elif arguments[:2] == ['vpn', 'add'] and len(arguments) in (2, 3):
         vpn_add(arguments[2] if len(arguments) == 3 else pick_file())
+    elif arguments[:2] == ['vpn', 'login'] and len(arguments) in (4, 5):
+        vpn_login(arguments[2], arguments[3], arguments[4] if len(arguments) == 5 else sys.stdin.readline().rstrip('\n'))
     elif arguments[0] == 'vpn' and arguments[1:2] in (['up'], ['down'], ['remove']) and len(arguments) == 3:
         if not any(name == arguments[2] and kind in ('vpn', 'wireguard') for name, kind, _ in connections()):
             sys.exit(f'kavat-network: there is no VPN called {arguments[2]}')
@@ -253,6 +366,8 @@ def main():
                 out('kavat-mode', 'vpn', 'none')
             does('nmcli', 'connection', 'delete', 'id', arguments[2])
         else:
+            if arguments[1] == 'up' and wants_login(arguments[2], 'vpn'):
+                sys.exit(f'kavat-network: {arguments[2]} asks for a name and a password, and has none yet')
             does('nmcli', 'connection', arguments[1], 'id', arguments[2], timeout=45)
     elif arguments[:2] == ['vpn', 'use'] and len(arguments) == 3:
         does('kavat-mode', 'vpn', arguments[2])
@@ -264,11 +379,12 @@ def main():
         set_startup('bluetooth_at_startup', arguments[2] == 'on')
     elif arguments == ['bluetooth', 'scan']:
         out('bluetoothctl', '--timeout', '10', 'scan', 'on', timeout=20)
-    elif arguments[0] == 'bluetooth' and arguments[1:2] in (['pair'], ['connect'], ['disconnect'], ['forget']) and len(arguments) == 3 \
-            and re.fullmatch(ADDRESS, arguments[2]):
+    elif arguments[0] == 'bluetooth' and arguments[1:2] in (['pair'], ['connect'], ['disconnect'], ['forget']) \
+            and len(arguments) in ((3, 4) if arguments[1] == 'pair' else (3,)) and re.fullmatch(ADDRESS, arguments[2]) \
+            and re.fullmatch(r'[0-9A-Za-z]{1,16}', arguments[3] if len(arguments) == 4 else '0'):
         address = arguments[2]
         if arguments[1] == 'pair':
-            does('bluetoothctl', '--timeout', '30', 'pair', address, timeout=40)
+            pair(address, arguments[3] if len(arguments) == 4 else '')
             # a device that is trusted connects by itself the next time it is turned on
             out('bluetoothctl', 'trust', address)
             out('bluetoothctl', '--timeout', '15', 'connect', address, timeout=25)

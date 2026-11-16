@@ -6,7 +6,7 @@ plugin_api  = 43
 author      = "kavat"
 license     = "LicenseRef-AllRightsReserved"
 icon        = "command"
-description = "Settings pages, files, projects, modes, packages and notes in the launcher: /s, /f, /pr, /m, /k and /n."
+description = "Settings pages, files, projects, modes, packages, notes and the browser's tabs in the launcher: /s, /f, /pr, /m, /k, /n and /t."
 
 [[launcher_provider]]
 id     = "settings"
@@ -43,3 +43,9 @@ id     = "notes"
 entry  = "notes.luau"
 prefix = "n"
 glyph  = "notes"
+
+[[launcher_provider]]
+id     = "tabs"
+entry  = "tabs.luau"
+prefix = "t"
+glyph  = "world"
