@@ -5,6 +5,10 @@
 # and under one name.
 set -e
 
+# the Boot page of the settings can leave this entry off the menu
+[ ! -r /etc/kavat/boot.conf ] || . /etc/kavat/boot.conf
+[ "${KAVAT_BOOT_OTHER}" != no ] || exit 0
+
 [ -f /etc/grub.d/30_os-prober ] || exit 0
 found="$(sh /etc/grub.d/30_os-prober)"
 [ -n "${found}" ] || exit 0

@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- Part of kavat-boot. What the password dialog says when kavat-boot-settings asks to change
+     the boot menu, and who may say yes: an administrator, whose password is good for a few minutes. -->
+<policyconfig>
+  <vendor>Willwitcher-OS Kavat Edition</vendor>
+  <vendor_url>https://github.com/walberh96/willwitcher-os-kavat-edition</vendor_url>
+  <action id="org.kavat.boot.settings">
+    <description>Change what the boot menu shows and how the system starts</description>
+    <message>The boot menu is a file of the system. Your password lets its settings change.</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/kavat-boot-settings</annotate>
+  </action>
+</policyconfig>

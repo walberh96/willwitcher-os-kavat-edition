@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+"""kavat-boot-settings: what the boot menu shows and how the system starts.
+
+usage: kavat-boot-settings                     the settings, a name and its value to a line
+       kavat-boot-settings set <name>=<value>...
+                                               timeout=0|1|3|5|10|30   the seconds the menu waits; with 0 it is not
+                                                                       shown unless Shift or Esc is held as the machine starts
+                                               quiet=yes|no            no messages of the kernel while it starts
+                                               splash=yes|no           the loading screen, instead of the messages
+                                               fallback=yes|no         the Fallback kernel entry
+                                               snapshots=yes|no        the Snapshots entry
+                                               recovery=yes|no         the Recovery entry
+                                               firmware=yes|no         the Firmware settings entry
+                                               other=yes|no            the Other systems entry
+
+The settings are in /etc/kavat/boot.conf, which the scripts that write the menu read. A
+change asks for an administrator's password and writes the menu again; it shows at the
+next start. Safe mode is always on the menu.
+"""
+import os
+import re
+import subprocess
+import sys
+
+FILE = '/etc/kavat/boot.conf'
+SNAPSHOTS = '/etc/default/grub-btrfs/config'
+SETTINGS = {'timeout': (['0', '1', '3', '5', '10', '30'], '5'), 'quiet': (['yes', 'no'], 'yes'), 'splash': (['yes', 'no'], 'yes'),
+            'fallback': (['yes', 'no'], 'yes'), 'snapshots': (['yes', 'no'], 'yes'), 'recovery': (['yes', 'no'], 'yes'),
+            'firmware': (['yes', 'no'], 'yes'), 'other': (['yes', 'no'], 'yes')}
+
+
+def read():
+    kept = {name: default for name, (_, default) in SETTINGS.items()}
+    try:
+        text = open(FILE, encoding='utf-8').read()
+    except OSError:
+        text = ''
+    for name, value in re.findall(r'^KAVAT_BOOT_(\w+)=(\w+)$', text, re.M):
+        if name.lower() in SETTINGS and value in SETTINGS[name.lower()][0]:
+            kept[name.lower()] = value
+    return kept
+
+
+def main():
+    arguments = sys.argv[1:]
+    if not arguments:
+        for name, value in read().items():
+            print(f'{name}\t{value}')
+        return
+    if arguments[0] != 'set' or len(arguments) < 2:
+        sys.exit(__doc__)
+    kept = read()
+    for pair in arguments[1:]:
+        name, _, value = pair.partition('=')
+        if name not in SETTINGS or value not in SETTINGS[name][0]:
+            sys.exit(f'kavat-boot-settings: {pair} is not a setting of the boot, or not a value it takes\n\n' + __doc__)
+        kept[name] = value
+    if os.geteuid() != 0:
+        # the menu is a file of the system: the same command again, as an administrator
+        os.execvp('pkexec', ['pkexec', '/usr/bin/kavat-boot-settings', *arguments])
+    os.makedirs(os.path.dirname(FILE), exist_ok=True)
+    with open(FILE + '.new', 'w', encoding='utf-8') as file:
+        file.write('# Written by kavat-boot-settings: what the boot menu shows and how the system starts.\n'
+                   '# The Boot page of the settings changes it. After a change by hand:\n'
+                   '#   grub-mkconfig -o /boot/grub/grub.cfg\n')
+        for name, value in kept.items():
+            file.write(f'KAVAT_BOOT_{name.upper()}={value}\n')
+    os.replace(FILE + '.new', FILE)
+    # the snapshots' entry is written by grub-btrfs, which has a switch of its own
+    try:
+        text = open(SNAPSHOTS, encoding='utf-8').read()
+        line = 'GRUB_BTRFS_DISABLE="true"' if kept['snapshots'] == 'no' else '#GRUB_BTRFS_DISABLE="true"'
+        changed = re.sub(r'^#?GRUB_BTRFS_DISABLE=.*$', line, text, count=1, flags=re.M)
+        if changed != text:
+            with open(SNAPSHOTS, 'w', encoding='utf-8') as file:
+                file.write(changed)
+    except OSError:
+        pass
+    done = subprocess.run(['grub-mkconfig', '-o', '/boot/grub/grub.cfg'], capture_output=True, text=True, check=False)
+    if done.returncode != 0:
+        sys.exit('kavat-boot-settings: the menu could not be written again: ' + (done.stderr.strip().splitlines() or ['grub-mkconfig failed'])[-1])
+    print('The boot menu is written again: the change shows at the next start.')
+
+
+if __name__ == '__main__':
+    main()

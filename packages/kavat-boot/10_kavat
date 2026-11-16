@@ -30,4 +30,6 @@ EOF2
 # The kernel keeps the screen as the menu left it, so the loading screen follows without a cut.
 echo 'set gfxpayload=keep'
 entry 'Willwitcher-OS Kavat Edition' kavat linux-zen
-entry 'Fallback kernel' kavat-fallback linux-lts
+# the Boot page of the settings can leave the fallback kernel off the menu
+[ ! -r /etc/kavat/boot.conf ] || . /etc/kavat/boot.conf
+[ "${KAVAT_BOOT_FALLBACK}" = no ] || entry 'Fallback kernel' kavat-fallback linux-lts

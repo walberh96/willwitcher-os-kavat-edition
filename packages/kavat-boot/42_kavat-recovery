@@ -9,6 +9,10 @@ exec_prefix="/usr"
 datarootdir="/usr/share"
 . "$pkgdatadir/grub-mkconfig_lib"
 
+# the Boot page of the settings can leave this entry off the menu
+[ ! -r /etc/kavat/boot.conf ] || . /etc/kavat/boot.conf
+[ "${KAVAT_BOOT_RECOVERY}" != no ] || exit 0
+
 kernel=linux-lts
 [ -f "/boot/vmlinuz-${kernel}" ] || kernel=linux-zen
 [ -f "/boot/vmlinuz-${kernel}" ] || exit 0

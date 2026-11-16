@@ -1,19 +1,20 @@
 pkgname=kavat-boot
 pkgver=0.1.0
-pkgrel=8
+pkgrel=9
 pkgdesc="Willwitcher-OS Kavat Edition: the boot menu's entries, safe mode, the recovery console, the boot that remembers whether the last one failed, and GRUB opening an encrypted disk"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
-depends=('grub' 'hyprland' 'systemd')
+depends=('grub' 'hyprland' 'systemd' 'python' 'polkit')
 install=kavat-boot.install
 source=('00_kavat-unlock' '02_kavat-boot-check' '03_kavat-background' '10_kavat' '11_kavat-safe-mode' '42_kavat-recovery'
         '43_kavat-firmware' '44_kavat-other-systems' 'grub-defaults.cfg' 'kavat-boot.hook'
         'boot-state' 'kavat-session' 'kavat.desktop' 'kavat-boot-state@.service'
         'kavat-boot-greeter.service' 'kavat-boot-session.path' 'kavat-boot-desktop.path'
-        'kavat-rescue' 'kavat-rescue.service' 'kavat-rescue.target' 'tmpfiles.conf')
+        'kavat-rescue' 'kavat-rescue.service' 'kavat-rescue.target' 'tmpfiles.conf'
+        'kavat-boot-settings' 'org.kavat.boot.policy')
 sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
-            'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+            'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 package() {
   install -Dm755 -t "$pkgdir/etc/grub.d" 00_kavat-unlock 02_kavat-boot-check 03_kavat-background 10_kavat \
@@ -29,4 +30,6 @@ package() {
     kavat-boot-greeter.service kavat-boot-session.path kavat-boot-desktop.path \
     kavat-rescue.service kavat-rescue.target
   install -Dm644 tmpfiles.conf "$pkgdir/usr/lib/tmpfiles.d/kavat-boot.conf"
+  install -Dm755 kavat-boot-settings "$pkgdir/usr/bin/kavat-boot-settings"
+  install -Dm644 org.kavat.boot.policy "$pkgdir/usr/share/polkit-1/actions/org.kavat.boot.policy"
 }

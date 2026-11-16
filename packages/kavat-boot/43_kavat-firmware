@@ -4,6 +4,10 @@
 # 30_uefi-firmware, which kavat-boot switches off: this one comes after the snapshots.
 set -e
 
+# the Boot page of the settings can leave this entry off the menu
+[ ! -r /etc/kavat/boot.conf ] || . /etc/kavat/boot.conf
+[ "${KAVAT_BOOT_FIRMWARE}" != no ] || exit 0
+
 cat << 'EOF2'
 if [ "${grub_platform}" = efi ]; then
   fwsetup --is-supported
