@@ -1,5 +1,6 @@
 <!doctype html>
-<!-- The command console: type to find a command, Enter runs it. -->
+<!-- The command console: type to find a command, Enter runs it. Saving the page to the notes
+     asks first for a comment, tags and which picture to keep. -->
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -9,6 +10,20 @@
 <body class="console">
   <input id="find" type="text" placeholder="Type a command…" autofocus spellcheck="false" autocomplete="off">
   <ul id="list"></ul>
+  <!-- what "save to notes" asks before it saves -->
+  <form id="clip" hidden>
+    <b>Save to the notes</b>
+    <input id="comment" type="text" placeholder="A comment of yours" spellcheck="false" autocomplete="off">
+    <input id="tags" type="text" placeholder="Tags: reading rust" spellcheck="false" autocomplete="off">
+    <div class="row">
+      <span class="muted">Picture</span>
+      <label><input type="radio" name="picture" value="view" checked> In view</label>
+      <label><input type="radio" name="picture" value="region"> A region</label>
+      <label><input type="radio" name="picture" value="whole"> Whole page</label>
+      <span class="grow"></span>
+      <button type="submit">Save</button>
+    </div>
+  </form>
   <div id="said" class="said muted"></div>
   <script type="module" src="popup.js"></script>
 </body>

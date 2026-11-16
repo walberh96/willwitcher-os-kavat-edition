@@ -5,7 +5,8 @@ The browser starts it when the extension asks for it, and they speak in messages
 bytes with the length, then that much JSON. The extension asks for the system theme's
 colours, the mode in force, your own commands of the console, a clipping to be saved to
 the notes, the albums of sites and the notes there are about a site, or a folder to be
-opened in Yazi. The other way, this tells the extension when
+opened in Yazi, and tells which tabs are open, which this keeps for the launcher of the
+desktop. The other way, this tells the extension when
 the system's mode changes, and passes on a command the system asks the browser for:
 `kavat-browser command "<name>"` leaves it in a folder this watches.
 
@@ -20,6 +21,7 @@ import struct
 import subprocess
 import sys
 import tempfile
+import time
 import tomllib
 
 HOME = os.path.expanduser('~')
@@ -31,6 +33,7 @@ SETTINGS = f'{CONFIG}/kavat/browser/browser.toml'
 NOTES = os.path.realpath(f'{HOME}/Notes')
 MODE = f'{STATE}/kavat/mode.json'
 ASKED = f'{RUNTIME}/kavat-browser'  # commands the system asks for, one file each
+TABS = f'{ASKED}/tabs'  # the tabs that are open, one file for each host: a profile has its own
 TOKENS = {'bg': 'bg', 'surface': 'surface', 'surface2': 'surface2', 'text': 'text', 'muted': 'muted',
           'border': 'border', 'accent': 'accent', 'on_accent': 'on_accent'}
 
@@ -40,7 +43,7 @@ def read_message():
     if len(head) < 4:
         return None
     length = struct.unpack('=I', head)[0]
-    if length > 8 << 20:  # a clipping carries a picture of the page
+    if length > 8 << 20:  # a clipping carries a picture of the page, of the whole of it at most
         return None
     try:
         return json.loads(sys.stdin.buffer.read(length))
@@ -236,12 +239,16 @@ def with_picture(message, *command, given=None):
 
 
 def clip(message):
-    """A page as a note: its title, its address, what was selected as a quote, and a picture of it."""
+    """A page as a note: its title, its address, what was selected as a quote, a picture of
+    it, and the comment and the tags written when it was saved."""
     title, address, problem = page(message)
     if problem:
         return problem
     quote = str(message.get('quote') or '').strip()[:20000]
-    saved = with_picture(message, 'kavat-notes', 'clip', title, address, given=quote)
+    comment = re.sub(r'\s+', ' ', str(message.get('comment') or '')).strip()[:2000]
+    # tags as they were typed: with or without their #, parted by spaces or commas
+    tags = ' '.join(re.findall(r'[\w-]+', str(message.get('tags') or ''))[:20])
+    saved = with_picture(message, 'kavat-notes', 'clip', '--comment', comment, '--tags', tags, title, address, given=quote)
     return {'said': 'Saved to the notes'} if saved is not None else {'failed': 'the notes did not take it'}
 
 
@@ -310,8 +317,97 @@ def open_note(message):
     return {}
 
 
+# ---- the tabs that are open, for the launcher of the desktop
+
+mine = set()  # the tabs of the browser this host is the line of, by their number
+
+
+def keep_tabs(message):
+    """The open tabs, as the extension tells them at each change, kept in this host's file."""
+    told = [tab for tab in message.get('tabs') or [] if isinstance(tab, dict) and isinstance(tab.get('id'), int)]
+    kept = [{'id': tab['id'], 'window': tab.get('window'), 'active': bool(tab.get('active')),
+             'title': str(tab.get('title') or '')[:300], 'url': str(tab.get('url') or '')[:2000]} for tab in told]
+    mine.clear()
+    mine.update(tab['id'] for tab in kept)
+    path = f'{TABS}/{os.getpid()}.json'
+    os.makedirs(TABS, mode=0o700, exist_ok=True)
+    with open(path + '.new', 'w', encoding='utf-8') as file:
+        json.dump(kept, file)
+    os.replace(path + '.new', path)
+    return {}
+
+
+def forget_tabs():
+    try:
+        os.remove(f'{TABS}/{os.getpid()}.json')
+    except OSError:
+        pass
+
+
+def hyprctl(*arguments):
+    for instance in ([], ['--instance', '0']):
+        said = out('hyprctl', *instance, *arguments, timeout=10)
+        if said is not None and 'HYPRLAND_INSTANCE_SIGNATURE' not in said:
+            return said
+    return ''
+
+
+def browser_windows():
+    """The browser's windows, as Hyprland has them."""
+    try:
+        return [window for window in json.loads(hyprctl('clients', '-j') or '[]') if window.get('class') == 'kavat-browser']
+    except ValueError:
+        return []
+
+
+def open_tabs():
+    """The tabs of every profile that is open. None while a mode keeps the browser out of
+    sight, and none of a browser that is gone."""
+    try:
+        names = [name for name in os.listdir(TABS) if name.endswith('.json')]
+    except OSError:
+        return []
+    if not out('pgrep', '-u', str(os.getuid()), '-f', f'user-data-dir={CONFIG}/kavat-browser'):
+        for name in names:
+            os.remove(f'{TABS}/{name}')
+        return []
+    if any(window.get('workspace', {}).get('name') == 'special:kavat-hidden' for window in browser_windows()):
+        return []
+    tabs = []
+    for name in sorted(names):
+        try:
+            with open(f'{TABS}/{name}', encoding='utf-8') as file:
+                tabs += json.load(file)
+        except (OSError, ValueError):
+            continue
+    return tabs
+
+
+def go_to_tab(wanted):
+    """Bring a tab to the front, and its window with it. The tab is asked of the browser, as
+    a command; the window is asked of Hyprland, which knows it by its title, and a window of
+    the browser is called as the tab in view in it."""
+    tabs = open_tabs()
+    tab = next((tab for tab in tabs if str(tab['id']) == wanted), None)
+    if tab is None:
+        sys.exit('kavat-browser: there is no such tab open')
+    path = f'{ASKED}/{time.time_ns()}'
+    with open(path, 'w', encoding='utf-8') as file:
+        json.dump({'name': 'go to tab', 'given': tab['id']}, file)
+    os.replace(path, path + '.json')
+    windows = browser_windows()
+    shown = next((other['title'] for other in tabs if other['window'] == tab['window'] and other['active']), '')
+    found = [window for window in windows if shown and str(window.get('title', '')).startswith(shown)]
+    if not found and len(windows) == 1:
+        found = windows
+    if found:
+        hyprctl('dispatch', f'hl.dsp.focus({{ window = "address:{found[0]["address"]}" }})')
+
+
 def answer(message):
     ask = message.get('ask')
+    if ask == 'tabs':
+        return keep_tabs(message)
     if ask == 'mode':
         return {'mode': mode()}
     if ask == 'theme':
@@ -353,7 +449,25 @@ def main():
             sys.exit(f'kavat-browser: {done["failed"]}')
         print(done['settings']['start_background'])
         return
+    if sys.argv[1:] == ['tabs']:
+        # for the launcher: a tab to a line, its number, its title and its address
+        for tab in open_tabs():
+            title, address = (re.sub(r'\s+', ' ', tab[key]).strip() for key in ('title', 'url'))
+            print(f'{tab["id"]}\t{title or address}\t{address}')
+        return
+    if sys.argv[1:2] == ['tab']:
+        if len(sys.argv) != 3:
+            sys.exit('usage: kavat-browser tab <number>, one of those `kavat-browser tabs` lists')
+        go_to_tab(sys.argv[2])
+        return
     os.makedirs(ASKED, mode=0o700, exist_ok=True)
+    try:
+        listen()
+    finally:
+        forget_tabs()
+
+
+def listen():
     last_mode = mode()
     while True:
         ready, _, _ = select.select([sys.stdin.buffer], [], [], 1.0)
@@ -371,9 +485,16 @@ def main():
             write_message({'event': 'mode', 'mode': now})
         for name in sorted(os.listdir(ASKED)):
             path = f'{ASKED}/{name}'
+            if not name.endswith('.json'):
+                continue  # the folder of the tabs, or a command still being written
             try:
                 with open(path, encoding='utf-8') as file:
                     asked = json.load(file)
+                if asked.get('name') == 'go to tab' and asked.get('given') not in mine:
+                    # a tab of another profile, whose own host takes it; one nobody takes goes
+                    if time.time() - os.path.getmtime(path) > 5:
+                        os.remove(path)
+                    continue
                 os.remove(path)
             except (OSError, ValueError):
                 continue

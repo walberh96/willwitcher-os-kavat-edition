@@ -3,13 +3,13 @@
 // through the host. A command of your own, from ~/.config/kavat/browser/commands.toml, is
 // one of these by its name with something to give it, or an address to open.
 
-async function current() {
+export async function current() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   return tab;
 }
 
 // what is selected in the page, when the page lets itself be read
-async function selection(tab) {
+export async function selection(tab) {
   try {
     const [found] = await chrome.scripting.executeScript({ target: { tabId: tab.id }, func: () => String(getSelection()) });
     return (found && found.result) || '';
@@ -19,7 +19,7 @@ async function selection(tab) {
 }
 
 // a picture of what the tab shows; nothing when the browser will not give one
-async function shot(tab) {
+export async function shot(tab) {
   try {
     return await chrome.tabs.captureVisibleTab(tab.windowId, { format: 'jpeg', quality: 70 });
   } catch (error) {
@@ -81,7 +81,7 @@ export const COMMANDS = {
     },
   },
   'save to notes': {
-    about: 'This page in the notes, with what is selected as a quote',
+    about: 'This page in the notes, with what is selected as a quote; here, with a comment, tags and the picture you choose',
     run: async (send) => {
       const tab = await current();
       return send({ ask: 'clip', title: tab.title, url: tab.url, quote: await selection(tab), picture: await shot(tab) });
@@ -139,6 +139,15 @@ export const COMMANDS = {
   'history': { about: 'Where you have been', run: () => chrome.tabs.create({ url: 'chrome://history' }) },
   'extensions': { about: 'The extensions', run: () => chrome.tabs.create({ url: 'chrome://extensions' }) },
   'settings': { about: "The browser's settings", run: () => chrome.tabs.create({ url: 'chrome://settings' }) },
+  'go to tab': {
+    about: 'Bring a tab to the front, by its number',
+    hidden: true,
+    // the system asks for it: the launcher of the desktop lists the tabs
+    run: async (send, id) => {
+      const tab = await chrome.tabs.update(Number(id), { active: true });
+      await chrome.windows.update(tab.windowId, { focused: true });
+    },
+  },
   'open': { about: 'Open an address', hidden: true, run: (send, address) => chrome.tabs.create({ url: address }) },
 };
 

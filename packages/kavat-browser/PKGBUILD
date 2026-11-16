@@ -3,7 +3,7 @@
 # inside; the Kavat extension is this package's own.
 pkgname=kavat-browser
 pkgver=0.1.0
-pkgrel=6
+pkgrel=8
 _ubol=2026.1110.1816
 pkgdesc="Willwitcher-OS Kavat Edition: the browser, with the blocker, the command console and the system's modes"
 arch=('any')

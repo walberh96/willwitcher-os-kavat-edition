@@ -48,8 +48,9 @@ print(ask({"ask": "mode", "number": 1})["mode"])
 theme = ask({"ask": "theme", "number": 2})["theme"]
 print(theme["accent"], theme["mode"])
 print(ask({"ask": "commands", "number": 3})["commands"])
-print(ask({"ask": "clip", "number": 4, "title": "A page  worth keeping", "url": "https://example.org/x", "quote": "first line\nsecond line"}))
+print(ask({"ask": "clip", "number": 4, "title": "A page  worth keeping", "url": "https://example.org/x", "quote": "first line\nsecond line", "tags": "reading"}))
 print(ask({"ask": "clip", "number": 5, "title": "Not a page", "url": "file:///etc/passwd"}))
+print(ask({"ask": "clip", "number": 6, "title": "A page worth keeping", "url": "https://example.org/x", "comment": "worth a\nsecond look", "tags": "#reading, rust"})["said"])
 host.stdin.close()
 '''
 # The albums, asked of the host the same way: a site is added twice and is there once, with
@@ -145,8 +146,10 @@ def main():
                               'cat "$(grep -l "example.org/x" ~/Notes/inbox/*.md | head -n 1)" | tr "\\n" "|"', 60)
         lines = output.split('\n')
         checks.report(lines[:2] == ['coder', '#f2a93b dark'] and "'name': 'docs'" in lines[2] and 'Saved to the notes' in lines[3] and 'failed' in lines[4]
-                      and lines[5] == '1' and '# A page worth keeping' in lines[6] and '> first line|> second line' in lines[6] and '#clip' in lines[6],
-                      "the system's side answers with the mode, the theme and your commands, and keeps a clipping as a note with its quote", output)
+                      and lines[5] == 'Saved to the notes' and lines[6] == '1' and '# A page worth keeping' in lines[7] and '> first line|> second line' in lines[7]
+                      and '|#clip #reading #rust|' in lines[7] and '|worth a second look|' in lines[7],
+                      "the system's side answers with the mode, the theme and your commands, and keeps a clipping as a note with its quote, "
+                      'and a second one of the page adds its comment and its tags to it, each tag once', output)
         before = user(OPEN + ' | grep -c "^page "')[1]
         # the host looks for what was asked once a second, and the tab takes a moment to be there
         status, output = user('kavat-browser command "new tab"; for n in 1 2 3 4 5 6 7 8 9 10; do sleep 1.5; [ "$(' + OPEN + ' | grep -c "^page ")" != "' + before + '" ] && break; done; '
@@ -156,6 +159,12 @@ def main():
                       'a command asked for from outside reaches the open browser, and a new tab is the start page of the system', f'{before} before\n{output}')
         time.sleep(2)
         machine.screen.picture(f'{pictures}/browser-tab.png')
+        status, output = user('sleep 2; kavat-browser tabs | grep -c "^[0-9][0-9]*\t"; ls $XDG_RUNTIME_DIR/kavat-browser/tabs | grep -c "json$"; '
+                              'kavat-browser tab 999999 2>&1 | grep -c "no such tab"; kavat-shell msg plugins list | grep -c "kavat/palette.*enabled"; '
+                              'grep -c "^prefix *= *.t.$" /usr/share/kavat/shell-plugins/palette/plugin.toml')
+        lines = output.split()
+        checks.report(len(lines) == 5 and lines[0].isdigit() and int(lines[0]) >= 2 and lines[1:] == ['1', '1', '1', '1'],
+                      "the browser tells the system its tabs, which the launcher lists behind /t, and a tab that is not there is said", output)
 
         print('albums, its colours, a profile for a mode, the sandbox', flush=True)
         status, output = user('ffmpeg -v error -y -f lavfi -i color=c=red:s=800x500 -frames:v 1 /tmp/album.png; cat > /tmp/albums.py << "END"\n' + ALBUMS + 'END\npython3 /tmp/albums.py; '

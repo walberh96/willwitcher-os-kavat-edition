@@ -1,11 +1,13 @@
 // The command console's window: the browser's own commands and yours, filtered as you
-// type; the arrows move, Enter runs the one that is lit, Esc closes.
+// type; the arrows move, Enter runs the one that is lit, Esc closes. "save to notes" turns
+// the window into a form: a comment, tags and which picture, and Enter again saves.
 import { COMMANDS } from './commands.js';
 import { theme } from './theme.js';
 
 const find = document.getElementById('find');
 const list = document.getElementById('list');
 const said = document.getElementById('said');
+const form = document.getElementById('clip');
 let all = [];    // each: name, about, run (the name of a built-in), given
 let shown = [];
 let lit = 0;
@@ -52,7 +54,18 @@ async function go() {
     window.close();
     return;
   }
-  const result = await chrome.runtime.sendMessage({ run: command.run, given: command.given });
+  if (command.run === 'save to notes') {
+    find.hidden = true;
+    list.hidden = true;
+    form.hidden = false;
+    document.getElementById('comment').focus();
+    return;
+  }
+  tell(await chrome.runtime.sendMessage({ run: command.run, given: command.given }));
+}
+
+// What came of a command: why it failed, or what it says, and the window closes.
+function tell(result) {
   if (result && result.failed) {
     said.className = 'said failed';
     said.textContent = result.failed;
@@ -65,11 +78,30 @@ async function go() {
   }
 }
 
+// The form of a clipping. A region is dragged over the page, which this window covers and
+// would keep the mouse from: it closes first, and the toolbar's button says how it went.
+form.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const how = { comment: document.getElementById('comment').value, tags: document.getElementById('tags').value, picture: new FormData(form).get('picture') };
+  if (how.picture === 'region') {
+    chrome.runtime.sendMessage({ clip: how });
+    window.close();
+    return;
+  }
+  form.hidden = true;
+  said.className = 'said muted';
+  said.textContent = how.picture === 'whole' ? 'Taking the whole page…' : 'Saving…';
+  tell(await chrome.runtime.sendMessage({ clip: how }));
+});
+form.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') { window.close(); }
+});
+
 find.addEventListener('input', () => { lit = 0; draw(); });
 find.addEventListener('keydown', (event) => {
   if (event.key === 'ArrowDown') { lit = Math.min(lit + 1, shown.length - 1); draw(); event.preventDefault(); }
   else if (event.key === 'ArrowUp') { lit = Math.max(lit - 1, 0); draw(); event.preventDefault(); }
-  else if (event.key === 'Enter') { go(); }
+  else if (event.key === 'Enter') { event.preventDefault(); go(); }  // or the same press would send the form it opens
   else if (event.key === 'Escape') { window.close(); }
 });
 

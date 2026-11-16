@@ -8,6 +8,8 @@
 #                                               desktop's background, or a picture of yours
 #        kavat-browser command "<name>" [what]  ask the open browser for a command of its console:
 #                                               "sleep other tabs", "zen mode", "new tab"…
+#        kavat-browser tabs                     the tabs that are open: a number, a title and an address each
+#        kavat-browser tab <number>             bring one of them to the front, and its window with it
 #
 # It is Chromium, as Arch builds it, made a piece of the system from the outside: its own
 # settings folder, the system's policies, the blocker and the Kavat extension loaded from
@@ -16,7 +18,7 @@
 # every window it opens is a private one, and a mode can have a profile of its own, named in
 # ~/.config/kavat/browser/browser.toml: a window opened in that mode is that profile's.
 set -u
-if [[ ${1:-} == background ]]; then
+if [[ ${1:-} == background || ${1:-} == tabs || ${1:-} == tab ]]; then
   exec /usr/lib/kavat/browser-host "$@"
 fi
 data="${XDG_CONFIG_HOME:-$HOME/.config}/kavat-browser"

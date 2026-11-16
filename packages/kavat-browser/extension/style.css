@@ -28,6 +28,13 @@ body.console { width: 460px; padding: 10px; background: var(--surface); }
 .console li span { font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .console .said { margin: 8px 2px 0; font-size: 12px; min-height: 1.4em; }
 .console .said.failed { color: #e5534b; }
+.console form { display: grid; gap: 8px; }
+.console form[hidden] { display: none; }
+.console form .row { display: flex; gap: 0.9em; align-items: center; font-size: 13px; }
+.console form label { display: flex; gap: 0.35em; align-items: center; cursor: pointer; white-space: nowrap; }
+.console form input[type=radio] { width: auto; margin: 0; padding: 0; accent-color: var(--accent); }
+.console form .grow { flex: 1; }
+.console form button { background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-weight: 600; }
 
 /* the start page */
 body.start { min-height: 100vh; display: grid; place-items: center; }

@@ -3,6 +3,7 @@
 // come the commands of your own, the system's mode and what the system asks the browser to
 // do; through it go the clippings for the notes and the folders to open in Yazi.
 import { COMMANDS, run } from './commands.js';
+import { clip } from './clip.js';
 
 const HOST = 'dev.kavat.browser';
 let port = null;
@@ -128,7 +129,14 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
 
 // The console's window and the start page ask through here.
 chrome.runtime.onMessage.addListener((message, sender, answer) => {
-  if (message.run) {
+  if (message.clip) {
+    // the console's form: its window may be gone by the time this is done, when a region
+    // is dragged over the page, so the toolbar's button says how it went too
+    clip(send, message.clip).catch((error) => ({ failed: String(error.message || error) })).then((result) => {
+      tell(result);
+      answer(result);
+    });
+  } else if (message.run) {
     run(message.run, send, message.given).then(answer);
   } else if (message.ask) {
     send(message).then(answer);
@@ -156,6 +164,31 @@ chrome.storage.session.get('claimed').then((kept) => {
     setTimeout(claim, 300);
   }
 });
+
+// The tabs that are open are told to the host at each change of them, a moment after the
+// last one: the launcher of the desktop lists them from what the host keeps. The private
+// ones are not told.
+let telling = null;
+function tabs() {
+  clearTimeout(telling);
+  telling = setTimeout(async () => {
+    const open = (await chrome.tabs.query({})).filter((tab) => !tab.incognito);
+    send({
+      ask: 'tabs',
+      tabs: open.map((tab) => ({ id: tab.id, window: tab.windowId, active: tab.active, title: tab.title || '', url: tab.url || tab.pendingUrl || '' })),
+    });
+  }, 300);
+}
+for (const change of [chrome.tabs.onCreated, chrome.tabs.onRemoved, chrome.tabs.onActivated, chrome.tabs.onAttached, chrome.tabs.onDetached, chrome.tabs.onReplaced]) {
+  change.addListener(tabs);
+}
+// a page that loads says many things about itself: only its title and its address matter here
+chrome.tabs.onUpdated.addListener((id, change) => {
+  if (change.title !== undefined || change.url !== undefined) {
+    tabs();
+  }
+});
+tabs();
 
 // The host is started with the browser, so that the system can reach it from then on.
 chrome.runtime.onStartup.addListener(() => send({ ask: 'mode' }).then((answer) => answer.mode && mode(answer.mode)));
