@@ -250,6 +250,41 @@ Each of these is something found on the PC on 15 November 2026 and corrected. On
 - [ ] **The look of the boot, said plainly.** Change the desktop to Light on Appearance, open Boot: "They wear" and "Your desktop" differ, and the button "Make them look like my desktop" is there. Press it, restart: the boot menu, the loading screen and the login are light.
 - [ ] **A new tab's background.** In a new tab, the **Background** button at its foot: "The desktop's background" puts the wallpaper behind the clock, "A picture of yours…" opens the file window and puts that one, "The theme's colour" takes it away. The Browser page of the settings shows the same choice.
 
+## 19. What was built on the night of 16 November
+
+None of this was seen on the PC yet. The virtual machine tried what it could; what it could not is said in each line.
+
+- [ ] **Night light.** Displays, "Night light": On warms the colours of every display at once, Warmer more so, Off takes it away. Auto with From and Until set around the hour it is now turns it on and off by itself. After logging out and in, it is as it was left.
+- [ ] **A background for each display.** With the two displays on, the Wallpaper page has "Background of": choose the second display and press an image: only that display changes, and its name gets a dot. Pressing the image the others show takes it back. Change the theme to Light: the display with its own image keeps it. *Tried with a made-up second display only.*
+- [ ] **The slideshow.** With three or more images in `~/Pictures/Wallpapers/images`, set "Next image" to 5 min on the Wallpaper page: the background changes every five minutes, in the order of the names. Off stops it.
+- [ ] **Proton VPN's own app.** Check Proton VPN on the installer's Software page, or press "Install Proton VPN" on the Network page. Open it from the Network page and sign in. Press "Use for Incognito", then Incognito on the bar: Proton connects by itself and the mode is entered; leaving the mode disconnects it. *Never tried with a real account: say what it says if the mode is not entered.*
+- [ ] **A VPN with a name and a password.** Add an OpenVPN file that asks for them (Proton's OpenVPN files do): its line says "asks for your name and password" and has **Sign in**; type them, Keep, and Connect brings it up. *The virtual machine has no network: it was never really connected.*
+- [ ] **A Bluetooth device with a code.** Pair a keyboard: a notice says the code to type on it. Pair something old that asks for a code, with **With a code** and `0000`. *Never tried: the virtual machine has no Bluetooth. If Pair now fails where it worked before, say so: the pairing was rewritten.*
+- [ ] **The VPN on the bar.** With a VPN connected, "VPN · its name" stands beside the modes; a press opens the Network page. It goes within five seconds of disconnecting.
+- [ ] **What starts by itself.** Boot, "Starts by itself": The other system. Restart and touch nothing: Windows starts. Choose Kavat on the menu, set it back to This system. *The virtual machine has no other system: only the menu's file was read.*
+- [ ] **The boot follows the desktop.** Boot, "Follow my desktop" on. Change the palette or the accent, turn the machine off: it takes some seconds longer, and at the next start the menu, the loading screen and the login wear the new look. Turn off again without changing anything: it is as quick as always.
+- [ ] **The login's clock and names.** Login & lock: 12 hours, and "Show who can log in" off. Log out: the clock says AM or PM, nobody is named, and typing your name and your password logs in; a wrong name says the password is not right. Set them back.
+- [ ] **Logging in by itself.** In the installer, check "Log in automatically" on the Users page: the installed system opens the desktop with no password asked, and nothing asks for one afterwards: save a password in the browser and restart. Log out: the login asks as always. On Login & lock, "Logs in by itself" changes who, or sets it back to Nobody. *The passwords saved by who logs in by itself are not encrypted, unless the disk is.*
+- [ ] **Qt apps in the theme.** Install a Qt app, `kav install qbittorrent` or `vlc`: it wears the palette, and changes with it when the theme changes while it is open.
+- [ ] **Repeating the installation.** After installing, `cat /etc/kavat/kavat-install.toml`: it has your answers and no password. Copy it to the top folder of a USB stick, boot the installer with that stick plugged in and open it: the side bar says it was filled in from the file, and every page comes up as you answered it, in your language, with the passwords empty. The disk is still chosen and confirmed by you. *Next to the ISO on a Ventoy stick the file may not be found: say whether it is. `kavat-installer --answers <file>` in a terminal always works.*
+- [ ] **A clipping with a comment, tags and its picture.** On a long page, select a paragraph, `Ctrl+Shift+K`, `save to notes`, Enter: the console asks for a comment, tags and the picture. Write both and press Enter: the note has your tags beside `#clip`, the comment and the quote. Again with **Whole page**: the page scrolls by itself and comes back, and the note gains a tall picture with the site's top bar in it once. Again with **A region**: the page dims, drag a rectangle, and the toolbar's button shows a tick; the picture is that rectangle. Esc while it is dimmed saves nothing. *Note any real site whose whole page comes out wrong: bars repeated, blank screens where pictures load late.*
+- [ ] **A copy out of sight.** In Yazi, copy something large to another disk, and press `Esc` while the window is up. The right of the status bar says `Copying 42% · 1 of 3` and moves; `Ctrl+V` meanwhile says a copy is still working; a notice says when it is done.
+- [ ] **The calendar's marks.** `Super+N`, "dentist friday 10:00". Open the control center, Calendar: Friday has a dot, and pressing it lists "dentist" at 10:00. Mark the note done in the notes: the dot goes. *If nothing shows the first time, log out and in. Say also if the shell itself notifies about a reminder: only the notes should.*
+- [ ] **A picture in Albums.** Keep a page in an album from the browser, then `Super+Shift+N`, `6`, down to the album: the picture of the site under the cursor shows on the right, changes with the arrows, and goes away under Help (`?`) and when leaving the tab.
+- [ ] **The mirrors.** `kav set mirror es`, then `kav set`: the mirror in use is a Spanish one, and `kav update` downloads from it. `kav set mirror worldwide` puts the first ones back. In `kav`, Settings tab, Enter on the mirror asks for the country in the terminal.
+- [ ] **The room a snapshot takes.** `kav snapshots size`: every snapshot has a size; note how long it takes with the PC's real snapshots. In `kav`, Snapshots tab, `s` on one shows it in its row.
+- [ ] **The signature of the reviewed list**, when the first package goes into it. Make the key once, on a USB stick: `export GNUPGHOME=/run/media/$USER/<stick>/kavat-key; mkdir -m 700 -p "$GNUPGHOME"; gpg --quick-generate-key "Willwitcher-OS Kavat Edition" ed25519 sign never`. After each change of `kav/allowlist.toml`, `tools/sign-allowlist.sh` with the stick in. A list changed after it was signed is refused by `kav`.
+
+- [ ] **Booting a snapshot from `kav`.** In `kav`, Snapshots tab, `b` on a snapshot from before a change, Enter, the password: it says the next boot starts from it, once, and nothing restarts. Restart: the system is the snapshot (`cat /proc/cmdline` has `@snapshots/<n>/snapshot`). Restart again: it is the system as it was.
+- [ ] **Ready to paste.** In Yazi, `Ctrl+C` on a file: the right of the status bar says `1 item ready to paste · as a copy`. Select three with Space and press `Ctrl+X`: `3 items ready to paste · as a move`. Paste them: the line goes. Copy again and press `Y`: it goes too.
+- [ ] **Tabs in the launcher.** With the browser open on two or three tabs, `Super+D`, `/t` and a word of a tab's title: Enter brings the browser to the front on that tab, from another workspace too. `/win` does the same for windows. In Incognito, `/t` lists no tab.
+- [ ] **Appearance, Auto and From wallpaper**, in the installer. Choose "From wallpaper" and Auto: the small desktop is light by day and dark by night. After installing, the boot menu and the login wear Kavat's palette in the side of that hour; at the first login the colours are taken from the background, and the mode follows the hour. Set another image as the background: the colours change with it. *The palette is made as the first session starts: say if the desktop comes up in Kavat's colours and stays so.*
+- [ ] **The network, in the installer.** The bar of the live session says "No network · offline install" with the cable out and no Wi-Fi, and "Online" within five seconds of connecting. A press on it opens the Network page: join a Wi-Fi network there. On the installed system the same widget is the network's icon on the bar, and a press opens the Network page. *Never seen with a real network: the test machine has none.*
+- [ ] **No empty password.** On the installer's Users page, Next stays off until a password is typed twice.
+- [ ] **A display plugged in.** With the arrangement of the two displays kept, unplug the second one and plug it back in during a session: it comes back where it was, with its mode and its workspaces.
+- [ ] **Searching for a setting.** `Super+T`, type `warmth` in the search: Displays is listed, with "Warmth" beside it. `password` or `clock` find theirs.
+- [ ] **Incognito and recent files.** In Incognito, open a file from a GTK app's file window: after leaving the mode, it is not among that app's recent files.
+
 ## What to send back
 
 For each line that failed: its number, what you did, what you saw. A photo of the screen is enough for anything before the login. After the login, `journalctl -b > ~/log.txt` right after it happens.
@@ -292,16 +327,13 @@ Seen on the way: the keyboard's indicator was not on the bar, its name misspelt 
 These are not failures: they are listed in the design document as left for later.
 
 - The settings panel has twenty-four pages of twenty-six; the other two wait for the agent.
-- The boot following the desktop's theme by itself, and the theme for Qt apps.
-- In the modes: all that waits for the agent and the browser, and the VPN's state on the bar.
-- Displays: night light, and a background for each display.
-- Login & lock: logging in without a password, a clock of twelve hours and the list of users.
-- Network: a VPN that needs a name and a password typed, as some OpenVPN ones do, and a Bluetooth device that asks for a code.
-- In the browser: the palette on the pages Chromium draws itself, hiding its native panels, and the agent's panel.
+- In the modes: all that waits for the agent and the browser.
+- Wallpaper: a video of its own for each display, and the login and the lock showing a video's still frame.
+- In the browser: the palette on the pages Chromium draws itself and hiding its native panels, which are to be built with a Chromium compiled here (D46); and the agent's panel.
 - Your aliases and functions from Endgame: they wait for you to go over them.
-- In the installer: the programs that are only in the AUR, and repeating an installation from its answer file.
-- In Yazi: the wallpaper action, and the indicator of a copy that works out of sight.
+- In the installer: the programs that are only in the AUR, which wait for their review (D44); and choosing the disk from the answer file.
 - `kavat-fetch` and `kavat-top` are fastfetch and btop with the theme, not the forks of the design yet.
-- In the notes: the permanent index, the calendar's marks, and a picture's preview in the Albums tab.
-- Neovim's marketplace, the side panels with Claude, and the Editor page.
-- In `kav`: the signing of the reviewed list, choosing the mirrors, and how much room each snapshot takes.
+- In the notes: the agent's tools.
+- Neovim's side panels with Claude.
+- In `kav`: really building a package of the AUR was never tried, for want of a network in the test machine.
+- In the settings: changing a shortcut from the panel. In Incognito: notifications without their content.
