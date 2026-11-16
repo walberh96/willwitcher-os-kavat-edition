@@ -6,7 +6,8 @@ with pacman, working on the new system as pacstrap does, from the repositories t
 are the same versions the system was built with. It needs a network. It never stops the
 installation: with no network, or with a name pacman does not know, the system is installed
 as it comes and what was left out is written down, in /etc/kavat/kavat-install.toml, for
-`kav install` later. That file also keeps what was chosen, to repeat it.
+`kav install` later. That file is the one the kavat-answers step began, with the rest of
+the answers: what was chosen here is added to it, to repeat it.
 """
 import os
 import re
@@ -64,8 +65,8 @@ def run():
     folder = os.path.join(root, 'etc/kavat')
     os.makedirs(folder, mode=0o755, exist_ok=True)
     quoted = lambda names: '[' + ', '.join(f'"{name}"' for name in names) + ']'
-    with open(os.path.join(folder, 'kavat-install.toml'), 'w', encoding='utf-8') as file:
-        file.write('# What was chosen when the system was installed.\n\n[software]\n'
+    with open(os.path.join(folder, 'kavat-install.toml'), 'a', encoding='utf-8') as file:
+        file.write('\n[software]\n'
                    f'asked     = {quoted(wanted)}\ninstalled = {quoted(installed)}\n'
                    f'# `kav install` followed by these names brings them in\nleft_out  = {quoted(left_out)}\n'
                    + (f'why       = "{why}"\n' if left_out else ''))

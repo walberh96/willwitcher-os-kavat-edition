@@ -219,6 +219,11 @@ def check_installed(machine, checks):
     status, output = machine.run("tr -d ' \\042' < /etc/kavat/kavat-install.toml | grep -c -E '^(asked|left_out)=\\[firefox\\]$|^installed=\\[\\]$|nonetwork'; "
                                  'pacman -Qq firefox 2>&1 | grep -c "was not found"')
     checks.report(output.split() == ['4', '1'], 'what was checked on the Software page could not be downloaded, and is written down for later', output)
+    # the answers of the other pages, to repeat the installation; \042 is a double quote
+    status, output = machine.run("tr '\\042' = < /etc/kavat/kavat-install.toml | grep -c -x -E "
+                                 f"'timezone = =America/New_York=|keyboard = =us=|login = ={USER}=|method = =erase=|encrypt = (true|false)|palette = =kavat='; "
+                                 f"grep -c -e '{PASSWORD}' -e '{DISK_PASSWORD}' /etc/kavat/kavat-install.toml")
+    checks.report(output.split() == ['6', '0'], 'the answers of the installation are kept, with no password among them', output)
 
 
 def boot_with_password(disk, firmware, checks, pictures):

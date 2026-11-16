@@ -1,12 +1,18 @@
 // The Appearance page of the installer: the palette, the mode and the accent the new
 // system starts with. What is chosen is left in Calamares' global storage, where the
 // kavat-look step takes it from; the picture on the right is drawn with the same colours.
+//
+// Two choices are not a palette or a mode of their own. "From wallpaper" is the colours
+// taken from the background: the palette is made at the first login, from the picture
+// shown then, so here it is drawn with the system's own, which that picture is made of.
+// "Auto" is light by day and dark by night: it is drawn as the hour of now asks for.
 import io.calamares.core 1.0
 import io.calamares.ui 1.0
 
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
+import "answers.js" as Earlier
 import "palettes.js" as Data
 
 Item {
@@ -20,20 +26,35 @@ Item {
     readonly property color soft: "#8b90a0"
     readonly property color mark: "#f2a93b"
 
+    // the palette's place among the cards; the one after the last is "From wallpaper"
     property int palette: 0
-    property string mode: "dark"
+    property string mode: "dark"  // dark, light or auto
     property int accent: 0
 
-    readonly property var chosen: Data.palettes[palette]
-    readonly property var side: chosen[mode]
+    readonly property bool fromWallpaper: palette === Data.palettes.length
+    readonly property var chosen: Data.palettes[fromWallpaper ? 0 : palette]
+    // the side that is drawn: in Auto, the one of this hour, by the hours the theme starts with
+    readonly property string lit: mode !== "auto" ? mode : (new Date().getHours() >= 7 && new Date().getHours() < 19) ? "light" : "dark"
+    readonly property var side: chosen[lit]
     readonly property color tint: chosen.accents[accent].colour
 
     function keep() {
-        Global.insert("kavatPalette", chosen.id)
+        Global.insert("kavatPalette", fromWallpaper ? "wallpaper" : chosen.id)
         Global.insert("kavatMode", mode)
-        Global.insert("kavatAccent", chosen.accents[accent].name)
+        // the accents of the background's palette are not known until it is made
+        Global.insert("kavatAccent", fromWallpaper ? "default" : chosen.accents[accent].name)
     }
-    Component.onCompleted: keep()
+    // the look of an earlier installation, when the installer was started with its answers
+    function repeat() {
+        var answers = Earlier.answers
+        for (var i = 0; i < Data.palettes.length; i++) if (Data.palettes[i].id === answers.palette) palette = i
+        if (answers.palette === "wallpaper") palette = Data.palettes.length
+        if (answers.mode === "dark" || answers.mode === "light" || answers.mode === "auto") mode = answers.mode
+        // an accent is one of its palette's: it is only looked for when the palette is the one answered
+        if (!fromWallpaper && chosen.id === answers.palette)
+            for (var j = 0; j < chosen.accents.length; j++) if (chosen.accents[j].name === answers.accent) accent = j
+    }
+    Component.onCompleted: { repeat(); keep() }
     onPaletteChanged: { accent = 0; keep() }
     onModeChanged: keep()
     onAccentChanged: keep()
@@ -81,7 +102,7 @@ Item {
                         Rectangle {
                             required property int index
                             required property var modelData
-                            readonly property var shown: modelData[page.mode]
+                            readonly property var shown: modelData[page.lit]
                             width: 105; height: 84; radius: 10
                             color: index === page.palette ? page.raised : "transparent"
                             border.width: index === page.palette ? 2 : 1
@@ -99,6 +120,31 @@ Item {
                             MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.palette = index }
                         }
                     }
+                    // the colours of the background, whatever it comes to be
+                    Rectangle {
+                        width: 105; height: 84; radius: 10
+                        color: page.fromWallpaper ? page.raised : "transparent"
+                        border.width: page.fromWallpaper ? 2 : 1
+                        border.color: page.fromWallpaper ? page.mark : page.line
+                        Rectangle {
+                            x: 10; y: 10; width: 82; height: 40; radius: 6
+                            gradient: Gradient {
+                                orientation: Gradient.Horizontal
+                                GradientStop { position: 0.0; color: "#f2a93b" }
+                                GradientStop { position: 0.35; color: "#ff6b8a" }
+                                GradientStop { position: 0.7; color: "#9d7bff" }
+                                GradientStop { position: 1.0; color: "#3ecfb2" }
+                            }
+                        }
+                        Text { x: 10; y: 60; text: "From wallpaper"; color: page.ink; font.pixelSize: 12; font.weight: Font.Medium }
+                        MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.palette = Data.palettes.length }
+                    }
+                }
+                Text {
+                    visible: page.fromWallpaper
+                    text: "The colours are taken from the background: the system's own picture at first, and every one you set after it."
+                    color: page.soft; font.pixelSize: 12; wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
                 }
 
                 Heading { text: "Mode"; Layout.topMargin: 8 }
@@ -108,10 +154,10 @@ Item {
                     Row {
                         anchors.fill: parent; anchors.margins: 3
                         Repeater {
-                            model: [ { name: "Light", value: "light" }, { name: "Dark", value: "dark" } ]
+                            model: [ { name: "Light", value: "light" }, { name: "Dark", value: "dark" }, { name: "Auto", value: "auto" } ]
                             Rectangle {
                                 required property var modelData
-                                width: parent.width / 2; height: parent.height; radius: 6
+                                width: parent.width / 3; height: parent.height; radius: 6
                                 color: page.mode === modelData.value ? page.bg : "transparent"
                                 Text { anchors.centerIn: parent; text: modelData.name; color: page.mode === modelData.value ? page.ink : page.soft; font.pixelSize: 13 }
                                 MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: page.mode = modelData.value }
@@ -119,9 +165,21 @@ Item {
                         }
                     }
                 }
+                Text {
+                    visible: page.mode === "auto"
+                    text: "Light from 7:00 to 19:00, dark the rest of the day."
+                    color: page.soft; font.pixelSize: 12; wrapMode: Text.WordWrap
+                    Layout.fillWidth: true
+                }
 
                 Heading { text: "Accent"; Layout.topMargin: 8 }
+                Text {
+                    visible: page.fromWallpaper
+                    text: "The accents are the colours that stand out in the picture."
+                    color: page.soft; font.pixelSize: 12
+                }
                 Row {
+                    visible: !page.fromWallpaper
                     spacing: 10
                     Repeater {
                         model: page.chosen.accents
@@ -187,14 +245,14 @@ Item {
                         color: page.side.surface
                         border.width: 1; border.color: page.side.border
                         Text { x: 14; y: 12; text: "Aa"; color: page.side.text; font.pixelSize: 22; font.weight: Font.Bold }
-                        Text { x: 14; y: 44; text: page.chosen.name + " · " + page.mode; color: page.side.muted; font.pixelSize: 12 }
+                        Text { x: 14; y: 44; text: (page.fromWallpaper ? "From wallpaper" : page.chosen.name) + " · " + page.mode; color: page.side.muted; font.pixelSize: 12 }
                     }
                     Rectangle {
                         x: 30 + (parent.width - 48) * 0.58; y: 74 + (parent.height - 92) / 2; width: (parent.width - 48) * 0.42; height: (parent.height - 92) / 2; radius: 10
                         color: page.side.surface2
                         border.width: 1; border.color: page.side.border
                         Rectangle { x: 14; y: 14; width: 84; height: 26; radius: 7; color: page.tint
-                            Text { anchors.centerIn: parent; text: "Button"; color: page.mode === "dark" ? "#14110a" : "#ffffff"; font.pixelSize: 12; font.weight: Font.Medium } }
+                            Text { anchors.centerIn: parent; text: "Button"; color: page.lit === "dark" ? "#14110a" : "#ffffff"; font.pixelSize: 12; font.weight: Font.Medium } }
                     }
                 }
             }

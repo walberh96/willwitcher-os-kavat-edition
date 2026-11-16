@@ -1,4 +1,20 @@
 #!/bin/sh
 # Start the installer from the live session. It needs root to touch the disks, and the
 # session's Wayland socket to draw; the live user's sudo asks for no password.
+#
+# usage: kavat-installer [--answers <file>] [Calamares' own options]
+#
+# With the answers of an earlier installation, the /etc/kavat/kavat-install.toml of an
+# installed system, the pages come up already answered: only the passwords and the disk are
+# asked for. Without --answers, a kavat-install.toml at the top of a USB stick is used.
+answers=
+if [ "${1:-}" = --answers ]; then
+  [ -n "${2:-}" ] || { echo 'usage: kavat-installer [--answers <file>]' >&2; exit 2; }
+  answers=$(realpath -- "$2")
+  shift 2
+fi
+# the installer opens in the language of the answers
+# a file that was named has to be read; one that was only found does not stop the installer
+locale=$(sudo /usr/lib/kavat-installer/answers "$answers") || [ -z "$answers" ] || exit 1
+[ -z "$locale" ] || export LANG="$locale"
 exec sudo -E calamares "$@"

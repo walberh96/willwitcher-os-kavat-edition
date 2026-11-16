@@ -1,6 +1,6 @@
 pkgname=kavat-installer
 pkgver=0.1.0
-pkgrel=15
+pkgrel=19
 pkgdesc="Willwitcher-OS Kavat Edition: the installer's configuration and looks"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -8,8 +8,8 @@ license=('LicenseRef-AllRightsReserved')
 # Calamares, and what its steps run on the new system's disk
 depends=('kavat-calamares' 'kavat-theme' 'btrfs-progs' 'cryptsetup' 'dosfstools' 'efibootmgr' 'grub' 'python' 'qt6-wayland' 'rsync'
          'squashfs-tools' 'sudo')
-source=('settings.conf' 'kavat-installer' 'kavat-installer.desktop' 'finish-system' 'install-bootloader')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+source=('settings.conf' 'kavat-installer' 'kavat-installer.desktop' 'finish-system' 'install-bootloader' 'answers')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 
 # The Appearance page offers the palettes the theme system has: they are read from its
 # package, which is why it is needed to build this one.
@@ -50,7 +50,9 @@ package() {
   install -Dm644 -t "$pkgdir/usr/lib/calamares/modules/luks-keys" "$startdir"/luks-keys/*
   install -Dm644 -t "$pkgdir/usr/lib/calamares/modules/kavat-look" "$startdir"/kavat-look/*
   install -Dm644 -t "$pkgdir/usr/lib/calamares/modules/kavat-software" "$startdir"/kavat-software/*
+  install -Dm644 -t "$pkgdir/usr/lib/calamares/modules/kavat-answers" "$startdir"/kavat-answers/*
   install -Dm755 kavat-installer "$pkgdir/usr/bin/kavat-installer"
+  install -Dm755 answers "$pkgdir/usr/lib/kavat-installer/answers"
   install -Dm755 finish-system "$pkgdir/usr/lib/kavat-installer/finish-system"
   install -Dm755 install-bootloader "$pkgdir/usr/lib/kavat-installer/install-bootloader"
   install -Dm644 kavat-installer.desktop "$pkgdir/usr/share/applications/kavat-installer.desktop"

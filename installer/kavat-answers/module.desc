@@ -1,0 +1,6 @@
+# The installer's own step: the answers given, kept on the new system. See main.py.
+---
+type: "job"
+name: "kavat-answers"
+interface: "python"
+script: "main.py"

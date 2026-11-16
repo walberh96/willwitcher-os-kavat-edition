@@ -8,6 +8,8 @@ import io.calamares.core 1.0
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
+import "answers.js" as Earlier
+
 Rectangle {
     id: sideBar
     color: "#1b1f2b"
@@ -68,6 +70,14 @@ Rectangle {
         }
 
         Item { Layout.fillHeight: true }
+
+        // when the installer was started with the answers of an earlier installation
+        Text {
+            visible: Earlier.answers.from !== undefined
+            text: "Filled in from " + Earlier.answers.from + ". The passwords and the disk are asked for again."
+            color: "#f2a93b"; font.pixelSize: 12; wrapMode: Text.WordWrap
+            Layout.fillWidth: true; Layout.bottomMargin: 8
+        }
 
         Text {
             text: "Step " + (ViewManager.currentStepIndex + 1) + " of " + ViewManager.rowCount()

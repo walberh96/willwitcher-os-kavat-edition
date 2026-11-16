@@ -8,6 +8,7 @@ import io.calamares.ui 1.0
 import QtQuick 2.15
 import QtQuick.Layouts 1.15
 
+import "answers.js" as Earlier
 import "software.js" as Data
 
 Item {
@@ -48,7 +49,28 @@ Item {
         count = names.length + typed.length
         Global.insert("kavatSoftware", names.concat(typed).join(" "))
     }
-    Component.onCompleted: keep()
+    // the programs of an earlier installation, when the installer was started with its answers:
+    // a box is checked when every package of its line was asked for, and the names that are
+    // in no box go to the line for any other package
+    function repeat() {
+        var asked = Earlier.answers.software || []
+        var now = {}
+        var boxed = {}
+        for (var c = 0; c < Data.categories.length; c++) {
+            var programs = Data.categories[c].programs
+            for (var p = 0; p < programs.length; p++) {
+                var names = programs[p].pkg.split(" ")
+                if (names.every(function (name) { return asked.indexOf(name) >= 0 })) {
+                    now[programs[p].pkg] = true
+                    names.forEach(function (name) { boxed[name] = true })
+                }
+            }
+        }
+        checked = now
+        // the line keeps what it is given, and that brings the count up to date
+        field.text = asked.filter(function (name) { return !boxed[name] }).join(" ")
+    }
+    Component.onCompleted: { repeat(); keep() }
 
     Rectangle { anchors.fill: parent; color: page.bg }
 

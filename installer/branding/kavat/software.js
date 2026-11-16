@@ -47,6 +47,7 @@ var categories = [
     { name: "System", programs: [
         { pkg: "flatpak", name: "Flatpak", what: "programs kept apart from the base system" },
         { pkg: "opensnitch", name: "OpenSnitch", what: "asks the first time a program reaches the network" },
+        { pkg: "proton-vpn-gtk-app proton-vpn-cli", name: "Proton VPN", what: "Proton's own app, with its login; Incognito mode can use it" },
     ] },
     { name: "Office", programs: [
         { pkg: "libreoffice-fresh", name: "LibreOffice", what: "documents, sheets and slides" },
