@@ -1,13 +1,14 @@
 pkgname=kav
 pkgver=0.1.0
-pkgrel=8
+pkgrel=10
 pkgdesc="Willwitcher-OS Kavat Edition: one command over pacman, with the AUR behind a reviewed list"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # git and curl reach the AUR; snapper and kavat-snapshots are what kav undo goes back with;
-# libnotify tells the desktop that updates wait, and bash runs the migrations
-depends=('gcc-libs' 'pacman' 'sudo' 'git' 'curl' 'snapper' 'kavat-snapshots' 'systemd' 'libnotify' 'bash')
+# libnotify tells the desktop that updates wait, and bash runs the migrations; gpgv, of
+# gnupg, checks the signature of the reviewed list, and btrfs measures a snapshot
+depends=('gcc-libs' 'pacman' 'sudo' 'git' 'curl' 'snapper' 'kavat-snapshots' 'systemd' 'libnotify' 'bash' 'gnupg' 'btrfs-progs')
 # kav installs devtools itself the first time a package of the AUR is built
 optdepends=('devtools: builds the packages of the AUR in a clean system'
             'pacman-contrib: paccache cleans the cache of packages; without it kav does it itself'
@@ -26,11 +27,20 @@ build() {
 check() {
   cd "$startdir"
   CARGO_HOME="$srcdir/cargo" CARGO_TARGET_DIR="$srcdir/target" cargo test --release --locked
+  # a signature that is not of the list as it is would leave kav refusing the whole list
+  if [[ -e allowlist.toml.sig ]]; then
+    gpgv --quiet --keyring "$startdir/allowlist.gpg" allowlist.toml.sig allowlist.toml
+  fi
 }
 
 package() {
   install -Dm755 "$srcdir/target/release/kav" "$pkgdir/usr/bin/kav"
   install -Dm644 "$startdir/allowlist.toml" "$pkgdir/usr/share/kav/allowlist.toml"
+  # its signature and the key it is checked against, once the list holds packages:
+  # tools/sign-allowlist.sh makes them
+  if [[ -e $startdir/allowlist.toml.sig ]]; then
+    install -Dm644 -t "$pkgdir/usr/share/kav" "$startdir/allowlist.toml.sig" "$startdir/allowlist.gpg"
+  fi
   # the look for updates, every week unless `kav set check` says otherwise
   install -Dm644 -t "$pkgdir/usr/lib/systemd/system" "$startdir/kav-check.service" "$startdir/kav-check.timer"
   install -d "$pkgdir/usr/lib/systemd/system/timers.target.wants"

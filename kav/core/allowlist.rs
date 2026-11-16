@@ -1,8 +1,14 @@
 //! The reviewed list: the packages of the AUR that may be installed, each fixed to the
 //! commit that a person read and approved.
+//!
+//! The list that comes with the system is signed: allowlist.toml.sig beside it is its
+//! signature, and allowlist.gpg the public key it is checked against, with gpgv. The key
+//! that signs is kept by the person who reviews, away from the machine that builds. The
+//! list of this machine is not signed: root writes it here, and nothing is above root.
 
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
 use toml_edit::{DocumentMut, Item};
 
 /// One approved package.
@@ -92,12 +98,25 @@ impl Allowlist {
     }
 
     /// The list in force: the files in order, a later one having the last word on a package.
-    /// A file that is not there holds nothing.
+    /// A file that is not there holds nothing. The first file is the one that comes with the
+    /// system, and its packages count only when its signature is good.
     pub fn load(files: &[PathBuf]) -> Result<Allowlist, String> {
+        Allowlist::load_checked(files, &signed)
+    }
+
+    /// The same, with what checks the signature of the first file given: an empty list
+    /// allows nothing, and needs no signature.
+    fn load_checked(files: &[PathBuf], signed: &dyn Fn(&Path) -> Result<(), String>) -> Result<Allowlist, String> {
         let mut list = Allowlist::default();
-        for file in files {
+        for (place, file) in files.iter().enumerate() {
             match std::fs::read_to_string(file) {
-                Ok(text) => list.0.extend(Allowlist::parse(&file.display().to_string(), &text)?.0),
+                Ok(text) => {
+                    let entries = Allowlist::parse(&file.display().to_string(), &text)?.0;
+                    if place == 0 && !entries.is_empty() {
+                        signed(file)?;
+                    }
+                    list.0.extend(entries);
+                }
                 Err(error) if error.kind() == std::io::ErrorKind::NotFound => {}
                 Err(error) => return Err(format!("{}: {error}", file.display())),
             }
@@ -111,6 +130,30 @@ impl Allowlist {
 
     pub fn entries(&self) -> impl Iterator<Item = &Entry> {
         self.0.values()
+    }
+}
+
+/// The signature of a list, and the public key it is checked against: both beside it.
+fn signature_of(file: &Path) -> (PathBuf, PathBuf) {
+    let mut signature = file.as_os_str().to_owned();
+    signature.push(".sig");
+    (signature.into(), file.with_extension("gpg"))
+}
+
+/// Whether the signature beside a list is of that list as it is now, by the key beside it.
+fn signed(file: &Path) -> Result<(), String> {
+    let (signature, key) = signature_of(file);
+    let refusal = |why: &str| format!("{}: it holds packages and {why}. Nothing is installed from the AUR until the list is signed as it is.", file.display());
+    if !signature.is_file() || !key.is_file() {
+        return Err(refusal(&format!("is not signed: its signature is {} and its key {}", signature.display(), key.display())));
+    }
+    // gpgv takes a keyring by its path only when the path is a whole one
+    let key = std::path::absolute(&key).unwrap_or(key);
+    let checked = Command::new("gpgv").arg("--quiet").arg("--keyring").arg(&key).arg(&signature).arg(file).stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null()).status();
+    match checked {
+        Ok(status) if status.success() => Ok(()),
+        Ok(_) => Err(refusal(&format!("{} is not its signature by the key in {}: it was changed after it was signed, or signed with another key", signature.display(), key.display()))),
+        Err(error) => Err(format!("{}: its signature could not be checked: gpgv: {error}", file.display())),
     }
 }
 
@@ -177,6 +220,37 @@ mod tests {
         for entry in list.entries() {
             assert!(is_commit(&entry.commit));
         }
+        // with packages in it, it goes with its signature and its key: tools/sign-allowlist.sh
+        let (signature, key) = signature_of(&Path::new(env!("CARGO_MANIFEST_DIR")).join("allowlist.toml"));
+        assert!(list.entries().count() == 0 || (signature.is_file() && key.is_file()), "the list holds packages and is not signed");
+    }
+
+    #[test]
+    fn the_list_of_the_system_counts_only_when_it_is_signed() {
+        let folder = std::env::temp_dir().join(format!("kav-test-{}-signed", std::process::id()));
+        let _ = std::fs::remove_dir_all(&folder);
+        std::fs::create_dir_all(&folder).unwrap();
+        let (system, machine) = (folder.join("allowlist.toml"), folder.join("machine.toml"));
+        assert_eq!(signature_of(&system), (folder.join("allowlist.toml.sig"), folder.join("allowlist.gpg")));
+        let files = [system.clone(), machine.clone()];
+        let asked = std::cell::Cell::new(0);
+        let good = |_: &Path| {
+            asked.set(asked.get() + 1);
+            Ok(())
+        };
+        let bad = |file: &Path| Err(format!("{}: not signed", file.display()));
+        // an empty list allows nothing and needs no signature, and the machine's list has none
+        std::fs::write(&system, "# nothing yet\n[packages]\n").unwrap();
+        std::fs::write(&machine, entry("another")).unwrap();
+        assert_eq!(Allowlist::load_checked(&files, &bad).unwrap().entries().count(), 1);
+        // with a package in it, the system's list is taken with a good signature and not without
+        std::fs::write(&system, entry("some-package")).unwrap();
+        assert!(Allowlist::load_checked(&files, &bad).err().unwrap().ends_with("allowlist.toml: not signed"));
+        assert_eq!(Allowlist::load_checked(&files, &good).unwrap().entries().count(), 2);
+        assert_eq!(asked.get(), 1);
+        // and the real check refuses it: there is no signature beside it
+        let problem = Allowlist::load(&files).err().unwrap();
+        assert!(problem.contains("it holds packages and is not signed"), "{problem}");
     }
 
     #[test]
@@ -209,7 +283,7 @@ mod tests {
         let mut other = approved.clone();
         other.name = "another".to_string();
         approve(&machine, &other).unwrap();
-        let list = Allowlist::load(&[system, machine.clone(), folder.join("not-there.toml")]).unwrap();
+        let list = Allowlist::load_checked(&[system, machine.clone(), folder.join("not-there.toml")], &|_| Ok(())).unwrap();
         assert_eq!(list.get("some-package").unwrap().commit, newer);
         assert_eq!(list.entries().count(), 2);
         let text = std::fs::read_to_string(&machine).unwrap();

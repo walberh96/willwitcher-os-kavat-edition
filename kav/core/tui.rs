@@ -34,12 +34,16 @@ h                Updates: hold a package of the AUR back, or let it go
 r                AUR: read the package, and approve it or not
 Enter            Snapshots: read the list, which asks for your password;
                  then, what the change of the snapshot did, package by package
+s                Snapshots: measure the room the snapshot takes, which takes a moment
 c                Snapshots: compare the snapshot with the system now
+b                Snapshots: start from the snapshot the next time the machine starts,
+                 once; nothing restarts by itself
 p                Snapshots: pin the snapshot, so it is not cleaned away, or unpin it
 d                Snapshots: delete the snapshot
 z                Snapshots: go back to before the last change of packages
 f                Doctor: mend what the line under the cursor found
-Enter            Settings: change the setting to its next value
+Enter            Settings: change the setting to its next value; the mirror, to the
+                 mirrors of a country
 F5               read everything again
 q, Esc           leave";
 
@@ -73,6 +77,8 @@ struct App {
     /// what an update would bring, and the snapshots, behind their lines
     pending: Vec<Update>,
     snapshots: Vec<Snapshot>,
+    /// the room the snapshots that were measured take, by their numbers
+    measured: std::collections::BTreeMap<u32, u64>,
     /// where things were drawn last, for the mouse: each tab's columns, the list, and the
     /// dashboard's cards
     tab_spots: Vec<(u16, u16)>,
@@ -183,6 +189,7 @@ impl App {
             filter: Filter::All,
             pending: Vec::new(),
             snapshots: Vec::new(),
+            measured: Default::default(),
             tab_spots: Vec::new(),
             body: Rect::default(),
             cards: [Rect::default(); 4],
@@ -230,7 +237,7 @@ impl App {
                 }
             })
             .collect();
-        rows.push(fixed("The mirror in use", mirror().unwrap_or_else(|| "none is set".into())));
+        rows.push(Row { name: "mirror".into(), text: Line::from(vec![wide("The mirror in use"), self.bold(mirror().unwrap_or_else(|| "none is set".into()))]) });
         rows.push(empty());
         rows.extend(LOCKED.iter().map(|(what, value)| fixed(what, format!("{value} · locked"))));
         rows.push(empty());
@@ -242,7 +249,7 @@ impl App {
             fixed("Where AUR packages are built", self.paths.chroot.display().to_string()),
         ]);
         rows.push(empty());
-        rows.push(Row { name: String::new(), text: Line::from(dim("Enter on one of the first five changes it to its next value. What is locked protects the system.")) });
+        rows.push(Row { name: String::new(), text: Line::from(dim("Enter on one of the first five changes it to its next value; on the mirror, it asks for a country. What is locked protects the system.")) });
         self.rows[6] = rows;
     }
 
@@ -336,6 +343,9 @@ impl App {
         // the newest first
         self.snapshots = snapshots::list().unwrap_or_default();
         self.snapshots.reverse();
+        for snapshot in &mut self.snapshots {
+            snapshot.takes = self.measured.get(&snapshot.number).copied();
+        }
         let mut rows: Vec<Row> = self.snapshots.iter().map(|snapshot| Row { name: snapshot.number.to_string(), text: Line::from(snapshots::line(snapshot)) }).collect();
         if rows.is_empty() {
             rows.push(Row { name: String::new(), text: Line::from("There are no snapshots to list.") });
@@ -533,7 +543,7 @@ impl App {
             1 => vec![("f", "filter"), ("↵", "record"), ("i", "install"), ("x", "remove")],
             2 => vec![("u", "update all"), ("h", "hold an AUR package back")],
             3 => vec![("r", "review")],
-            4 if self.snapshots_read => vec![("↵", "its packages"), ("c", "compare"), ("p", "pin"), ("d", "delete"), ("z", "undo the last change")],
+            4 if self.snapshots_read => vec![("↵", "its packages"), ("s", "size"), ("c", "compare"), ("b", "boot it next"), ("p", "pin"), ("d", "delete"), ("z", "undo the last change")],
             4 => vec![("↵", "read the list"), ("z", "undo the last change")],
             5 => vec![("f", "mend the line under the cursor")],
             6 => vec![("↵", "change to the next value")],
@@ -596,6 +606,10 @@ impl App {
             Ok(status) if status.success() => format!("kav {} is done", arguments.join(" ")),
             _ => format!("kav {} did not finish", arguments.join(" ")),
         };
+        // what changed the system may have changed what each snapshot alone holds
+        if arguments.get(1) != Some(&"compare") {
+            self.measured.clear();
+        }
         println!("\nEnter goes back to kav.");
         let _ = std::io::stdin().read_line(&mut String::new());
         *terminal = screen_on();
@@ -733,6 +747,9 @@ impl App {
                     self.asked = Some((format!("Mend: {words}"), arguments));
                 }
             }
+            KeyCode::Enter if self.tab == 6 && self.selected() == Some("mirror") => {
+                self.asked = Some(("The mirrors of a country, or the worldwide ones: it asks which in the terminal".into(), vec!["set".into(), "mirror".into()]));
+            }
             KeyCode::Enter if self.tab == 6 => {
                 // the row's name is the setting and the value it would take
                 if let Some((name, value)) = self.selected().and_then(|row| row.split_once(' ')) {
@@ -751,9 +768,31 @@ impl App {
                     self.sheet = Some((format!("Snapshot {}{}", snapshot.number, if snapshot.pinned() { " · pinned" } else { "" }), text));
                 }
             }
+            KeyCode::Char('s') if self.tab == 4 && self.snapshots_read => {
+                if let Some(number) = self.selected().and_then(|number| number.parse().ok()) {
+                    // sudo may ask for the password again: it needs the terminal as it is
+                    screen_off();
+                    println!("\n  Measuring snapshot {number}: btrfs reads it whole, which takes a moment.");
+                    let measured = snapshots::sizes(&[number]);
+                    *terminal = screen_on();
+                    match measured.as_ref().and_then(|measured| measured.get(&number)) {
+                        Some(bytes) => {
+                            self.measured.insert(number, *bytes);
+                            self.said = format!("Snapshot {number} alone takes {}: what deleting it gives back", size(*bytes));
+                            self.read_snapshots();
+                        }
+                        None => self.said = format!("Snapshot {number} could not be measured"),
+                    }
+                }
+            }
             KeyCode::Char('c') if self.tab == 4 => {
                 if let Some(number) = self.selected().map(str::to_string) {
                     self.hand_over(terminal, &["snapshots", "compare", &number]);
+                }
+            }
+            KeyCode::Char('b') if self.tab == 4 => {
+                if let Some(number) = self.selected().map(str::to_string) {
+                    self.asked = Some((format!("Start from snapshot {number} the next time, once: nothing restarts by itself"), vec!["snapshots".into(), "boot".into(), number]));
                 }
             }
             KeyCode::Char('d') if self.tab == 4 => {

@@ -50,8 +50,10 @@ usage: kav             in a terminal: everything below on one screen
                        with the lines worth a second look marked; then approve it or not
   request <package>    ask for an AUR package to be reviewed
   undo [--yes]         take the system back to before the last change of packages
-  snapshots            the snapshots, with what each change did; then compare <number> with
-                       the system now, delete <number>, pin <number> or unpin <number>
+  snapshots            the snapshots, with what each change did; then size [<number>] for
+                       the room each takes, compare <number> with the system now,
+                       boot <number> to start from it the next time, once,
+                       delete <number>, pin <number> or unpin <number>
   migrate [--list]     run the migrations that wait: what a new version changes that
                        pacman does not manage
   news                 Arch's news since the last time: an update waits for it to be read
@@ -60,7 +62,8 @@ usage: kav             in a terminal: everything below on one screen
   fix <what>           mend what doctor found: orphans, lock, cache, service <unit>,
                        merge <file ending in .pacnew>
   set [<what> <value>] what kav can change, and changing it: downloads at once, snapshots
-                       kept, check for updates, cache versions kept, jobs of a build
+                       kept, check for updates, cache versions kept, jobs of a build,
+                       mirror <country> for the mirrors of a country, or worldwide
 
 The reviewed list is /usr/share/kav/allowlist.toml, and /etc/kav/allowlist.toml for what
 was approved on this machine.";

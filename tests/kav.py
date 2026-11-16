@@ -13,11 +13,13 @@ which marks its dangerous line; once it is approved, kav builds only the commit 
 approved, and refuses when the AUR does not have it. Then a package is removed with kav and
 brought back with kav undo. This is the other half of the gate of phase 3.
 
-Around those: the settings kav changes, each in the file of the tool that uses it; the
+Around those: the settings kav changes, each in the file of the tool that uses it, the
+mirrors among them; the signature of the reviewed list that comes with the system; the
 filters of the lists; a package of the AUR that is held back; migrations, with made-up
 scripts, one of which fails; a file that no package owns in the way of a made-up package,
 which is moved aside; an item of the news gone through with a person, who is a terminal
-that is not there; and the snapshots of a change, compared, pinned and deleted.
+that is not there; and the snapshots of a change, compared, pinned, asked
+for at the next start and deleted.
 
 A system that was just installed has not fetched pacman's lists of packages, and kav has
 to say so. The test then gives the machine the lists of the day the system was built from,
@@ -27,6 +29,7 @@ Needs qemu-desktop and edk2-ovmf, and tools/build-repo.sh and tests/install.py r
 runs as a normal user and takes about two minutes.
 """
 import os
+import re
 import sys
 
 from machine import BOOT_TIMEOUT, ROOT, Checks, Machine, over_installed, print_journal
@@ -278,6 +281,31 @@ def main():
         checks.report(len(lines) == 7 and lines[0] == 'made-up-1.0-10-any.pkg.tar.zst' and lines[1:4] == ['1', '1', '4'] and lines[4] != '' and lines[5:] == ['all', '4'],
                       "kav set cache keeps only the newest versions in pacman's cache, kav set jobs is in kav's own file, and what protects the system is shown locked", output)
 
+        # the mirrors are pacman's list of them: those of a country, as Arch lists them, with a
+        # file standing in for Arch's answer, or the worldwide ones the system came with
+        status, output = machine.run('printf "## Spain\\n#Server = https://one.example.es/archlinux/\\$repo/os/\\$arch\\n#Server = https://two.example.es/\\$repo/os/\\$arch\\n" > /tmp/mirrors; '
+                                     'export KAV_MIRRORS=/tmp/mirrors; kav set mirror es > /dev/null && grep -c "^Server = " /etc/pacman.d/mirrorlist; '
+                                     'kav set | grep "^mirror" | sed "s/.* //"; kav set mirror spain 2>&1 | head -n 1; : > /tmp/mirrors; kav set mirror fr 2>&1 | head -n 1; '
+                                     'kav set | grep "^mirror" | sed "s/.* //"; kav set mirror worldwide > /dev/null && grep -c "^Server = " /etc/pacman.d/mirrorlist; '
+                                     'kav set | grep "^mirror" | sed "s/.* //"; pacman-conf --repo-list | grep -c "^core$"')
+        lines = output.splitlines()
+        checks.report(len(lines) == 8 and lines[:2] == ['4', 'one.example.es'] and 'kav set mirror takes' in lines[2] and 'Arch lists no mirrors in FR' in lines[3]
+                      and lines[4:] == ['one.example.es', '2', 'geo.mirror.pkgbuild.com', '1'],
+                      "kav set mirror writes pacman's list of mirrors with those of a country or the worldwide ones, and leaves it alone when it gets none", output)
+
+        # the list that comes with the system counts only with its signature: the machine's own
+        # list stands in for it, in another folder, signed with a key made here
+        status, output = machine.run('export GNUPGHOME=/tmp/key KAV_DATA=/tmp/data; mkdir -m 700 -p /tmp/key /tmp/data; cp /etc/kav/allowlist.toml /tmp/data/; '
+                                     'kav list --aur 2>&1 | head -n 1; '
+                                     'gpg --batch --quiet --pinentry-mode loopback --passphrase "" --quick-generate-key "made up for the test" ed25519 sign never 2> /dev/null; '
+                                     'gpg --batch --yes --output /tmp/data/allowlist.toml.sig --detach-sign /tmp/data/allowlist.toml 2> /dev/null; '
+                                     'gpg --batch --yes --output /tmp/data/allowlist.gpg --export 2> /dev/null; '
+                                     f'kav list --aur 2>&1 | grep -c "^{FAKE} "; echo "# changed" >> /tmp/data/allowlist.toml; kav list --aur 2>&1 | head -n 1; '
+                                     'gpgconf --kill all 2> /dev/null', 60)
+        lines = output.splitlines()
+        checks.report(len(lines) == 3 and 'it holds packages and is not signed' in lines[0] and lines[1] == '1' and 'is not its signature' in lines[2],
+                      'the reviewed list that comes with the system is taken with its signature, and not without it or changed after it', output)
+
         # migrations: the record starts with what is there, and each new script runs once, in order
         there = '/usr/share/kavat/migrations'
         status, output = machine.run(f'kav migrate && {AS_USER} kav migrate && ls -d /var/lib/kavat/migrations /home/{USER}/.local/state/kavat/migrations | wc -l')
@@ -345,11 +373,26 @@ def main():
             status, output = machine.run(f'kav snapshots compare {before}; kav snapshots compare {after} | tail -n 1')
             checks.report('installed' not in output and f'removed     {PACKAGE}' in output and '1 package differs' in output and 'no package differs' in output,
                           'kav snapshots compare shows the packages that differ from the system now', output)
+            # the room a snapshot takes is measured only when asked for
+            status, output = machine.run(f'kav snapshots size {before} | grep "^ *{before} "; kav snapshots size 2> /dev/null | grep -c "· takes [0-9.]* [KMG]*i*B"; '
+                                         'kav snapshots | wc -l; kav snapshots | grep -c "· takes "', 120)
+            lines = output.splitlines()
+            checks.report(len(lines) == 4 and lines[0].split()[0] == before and re.search(r'· takes [0-9.]+ (B|KiB|MiB|GiB)$', lines[0]) is not None
+                          and lines[1] == lines[2] and lines[3] == '0',
+                          'kav snapshots size says how much room each snapshot alone takes, and the plain list does not measure', output)
             status, output = machine.run(f'kav snapshots pin {before} > /dev/null && kav snapshots | grep "^ *{before} "; '
                                          f'kav snapshots unpin {before} > /dev/null && kav snapshots | grep "^ *{before} "')
             lines = output.splitlines()
             checks.report(len(lines) == 2 and lines[0].endswith('pinned') and not lines[1].endswith('pinned'),
                           'a snapshot is pinned, so it is not cleaned away, and unpinned', output)
+            # asking for the next start to be from a snapshot leaves its number for GRUB; it is taken back, so the machine starts as ever
+            status, output = machine.run(f'kav snapshots boot {before} && grub-editenv /boot/grub/grubenv list | grep "^kavat_once_snapshot="; '
+                                         'grub-editenv /boot/grub/grubenv unset kavat_once_snapshot; kav snapshots boot 999999 2>&1 | tail -n 1; '
+                                         'grub-editenv /boot/grub/grubenv list | grep -c "^kavat_once_snapshot="')
+            lines = output.splitlines()
+            checks.report(f'kavat_once_snapshot={before}' in lines and 'nothing restarts by itself' in output
+                          and 'kavat-boot-once ended with status 1' in output and lines[-1] == '0',
+                          'kav snapshots boot asks for the next start to be from a snapshot, once, and restarts nothing', output)
             status, output = machine.run(f'kav snapshots delete {after} < /dev/null 2>&1 | tail -n 1; kav snapshots delete {after} --yes && kav snapshots | grep -c "^ *{after} "; '
                                          'kav snapshots delete 0 2>&1')
             checks.report('--yes' in output.splitlines()[0] and f'snapshot {after} is deleted' in output and output.splitlines()[-2] == '0'

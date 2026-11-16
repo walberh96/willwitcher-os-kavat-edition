@@ -1,9 +1,11 @@
 //! The snapshots of the system: which packages each one changed, how one differs from the
 //! system as it is now, deleting one and keeping one from being cleaned away. They are
-//! snapper's, and root's to read; pacman's log says what each change did.
+//! snapper's, and root's to read; pacman's log says what each change did. How much room one
+//! takes is what btrfs says it alone holds, which is what deleting it gives back; btrfs
+//! reads the whole snapshot for it, so it is measured only when asked for.
 
 use crate::log::Transaction;
-use crate::system::{as_root, read, run, someone_there, yes};
+use crate::system::{as_root, read, run, size, someone_there, yes};
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::process::Command;
@@ -24,6 +26,8 @@ pub struct Snapshot {
     pub changed: String,
     /// the same, package by package
     pub packages: Vec<String>,
+    /// the room it alone takes, in bytes, once it was measured
+    pub takes: Option<u64>,
 }
 
 impl Snapshot {
@@ -46,7 +50,7 @@ pub fn parse(listed: &str) -> Vec<Snapshot> {
                 None => description.to_string(),
             };
             let number = number.trim().parse().ok().filter(|number| *number != 0)?;
-            Some(Snapshot { number, kind: kind.to_string(), pre: pre.parse().ok(), date: date.to_string(), cleanup: cleanup.to_string(), description, changed: String::new(), packages: Vec::new() })
+            Some(Snapshot { number, kind: kind.to_string(), pre: pre.parse().ok(), date: date.to_string(), cleanup: cleanup.to_string(), description, changed: String::new(), packages: Vec::new(), takes: None })
         })
         .collect()
 }
@@ -80,7 +84,32 @@ pub fn line(snapshot: &Snapshot) -> String {
         ("post", false) => format!("after: {}", snapshot.changed),
         _ => snapshot.description.clone(),
     };
-    format!("{:>4}  {:<6} {}  {what}{}", snapshot.number, snapshot.kind, snapshot.date.chars().take(16).collect::<String>(), if snapshot.pinned() { "  · pinned" } else { "" })
+    let takes = snapshot.takes.map_or(String::new(), |bytes| format!("  · takes {}", size(bytes)));
+    format!("{:>4}  {:<6} {}  {what}{takes}{}", snapshot.number, snapshot.kind, snapshot.date.chars().take(16).collect::<String>(), if snapshot.pinned() { "  · pinned" } else { "" })
+}
+
+/// What each snapshot alone holds, in what `btrfs filesystem du -s --raw` says of their
+/// folders: a line for each, as total, exclusive, shared and the folder.
+pub fn sizes_in(answer: &str) -> BTreeMap<u32, u64> {
+    answer
+        .lines()
+        .filter_map(|line| {
+            let mut fields = line.split_whitespace();
+            let (_total, alone, _shared, folder) = (fields.next()?, fields.next()?, fields.next()?, fields.next()?);
+            let number = folder.strip_prefix("/.snapshots/")?.strip_suffix("/snapshot")?;
+            Some((number.parse().ok()?, alone.parse().ok()?))
+        })
+        .collect()
+}
+
+/// Measures snapshots, by their numbers. It takes a while: btrfs reads each one whole.
+/// None when btrfs could not be asked.
+pub fn sizes(numbers: &[u32]) -> Option<BTreeMap<u32, u64>> {
+    if numbers.is_empty() {
+        return Some(BTreeMap::new());
+    }
+    let folders = numbers.iter().map(|number| format!("/.snapshots/{number}/snapshot"));
+    Some(sizes_in(&read(as_root("btrfs").args(["filesystem", "du", "--summarize", "--raw"]).args(folders))?))
 }
 
 /// How a package differs between a snapshot and the system now.
@@ -115,6 +144,11 @@ pub fn differences(then: &str, now: &str) -> Vec<Difference> {
     all
 }
 
+/// What is said once the next start was asked to be from a snapshot.
+fn booting(number: u32) -> String {
+    format!("kav: nothing restarts by itself. The start after that one is the system as it is now again; from the snapshot, kavat-rollback {number} keeps it.")
+}
+
 fn number_of(text: &str) -> Result<u32, String> {
     text.parse().ok().filter(|number| *number != 0).ok_or_else(|| format!("{text} is not the number of a snapshot: kav snapshots lists them"))
 }
@@ -134,6 +168,25 @@ pub fn command(arguments: &[String]) -> Result<(), String> {
             }
             for snapshot in &all {
                 println!("{}", line(snapshot));
+            }
+            Ok(())
+        }
+        ["size"] | ["size", _] => {
+            let mut all = match arguments.get(1) {
+                Some(number) => vec![find(number_of(number)?)?],
+                None => list().ok_or("the snapshots could not be listed")?,
+            };
+            if all.len() > 1 {
+                eprintln!("kav: measuring {} snapshots; it takes a while.", all.len());
+            }
+            let measured = sizes(&all.iter().map(|snapshot| snapshot.number).collect::<Vec<_>>()).ok_or("the snapshots could not be measured")?;
+            for snapshot in &mut all {
+                snapshot.takes = measured.get(&snapshot.number).copied();
+                println!("{}", line(snapshot));
+            }
+            match all.is_empty() {
+                true => println!("There are no snapshots yet: each change of packages takes one before and one after."),
+                false => println!("What a snapshot takes is what it alone holds: what deleting it gives back."),
             }
             Ok(())
         }
@@ -181,7 +234,14 @@ pub fn command(arguments: &[String]) -> Result<(), String> {
             }
             Ok(())
         }
-        _ => Err("kav snapshots takes nothing, or: compare <number>, delete <number> [--yes], pin <number>, unpin <number>".into()),
+        ["boot", number] => {
+            let number = number_of(number)?;
+            // kavat-boot-once leaves the number where GRUB reads it, and GRUB clears it as it boots
+            run(as_root("kavat-boot-once").arg(number.to_string()))?;
+            println!("{}", booting(number));
+            Ok(())
+        }
+        _ => Err("kav snapshots takes nothing, or: size [<number>], compare <number>, boot <number>, delete <number> [--yes], pin <number>, unpin <number>".into()),
     }
 }
 
@@ -220,6 +280,29 @@ mod tests {
         assert_eq!(all[3].packages.len(), 5);
         assert_eq!(line(&all[1]), "   2  pre    2026-11-13 10:15  before: installed os-prober");
         assert_eq!(line(&all[0]), "   1  single 2026-11-12 20:00  the system as it was installed  · pinned");
+    }
+
+    #[test]
+    fn what_a_snapshot_takes_is_what_it_alone_holds() {
+        let answer = "     Total   Exclusive  Set shared  Filename\n 9123456789     3145728  9120311061  /.snapshots/2/snapshot\n 9123460000        4096  9123455904  /.snapshots/3/snapshot\n";
+        let measured = sizes_in(answer);
+        assert_eq!(measured, BTreeMap::from([(2, 3_145_728), (3, 4096)]));
+        assert!(sizes_in("ERROR: cannot access '/.snapshots/9/snapshot'\n").is_empty());
+        let mut all = parse(LISTED);
+        all[0].takes = Some(5 * 1024 * 1024 * 1024);
+        all[1].takes = measured.get(&2).copied();
+        assert_eq!(line(&all[0]), "   1  single 2026-11-12 20:00  the system as it was installed  · takes 5.0 GiB  · pinned");
+        assert_eq!(line(&all[1]), "   2  pre    2026-11-13 10:15  pacman -S --needed -- os-prober  · takes 3.0 MiB");
+        assert_eq!(line(&all[2]), "   3  post   2026-11-13 10:15  os-prober");
+    }
+
+    #[test]
+    fn booting_a_snapshot_takes_its_number_and_restarts_nothing() {
+        // what is not the number of a snapshot is refused before anything is run
+        assert_eq!(command(&["boot".to_string(), "0".to_string()]), Err("0 is not the number of a snapshot: kav snapshots lists them".to_string()));
+        assert!(command(&["boot".to_string(), "last".to_string()]).is_err_and(|problem| problem.starts_with("last is not the number")));
+        assert!(command(&["boot".to_string()]).is_err_and(|problem| problem.contains("boot <number>")));
+        assert!(booting(12).contains("nothing restarts by itself") && booting(12).contains("kavat-rollback 12"));
     }
 
     #[test]
