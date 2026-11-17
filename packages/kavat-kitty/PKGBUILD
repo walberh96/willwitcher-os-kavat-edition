@@ -1,14 +1,15 @@
 pkgname=kavat-kitty
 pkgver=0.1.0
-pkgrel=1
+pkgrel=2
 pkgdesc="Willwitcher-OS Kavat Edition: the system's Kitty configuration"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
-depends=('kitty' 'kavat-theme')
-source=('kitty.conf')
-sha256sums=('SKIP')
+depends=('kitty' 'kavat-theme' 'bash' 'coreutils')
+source=('kitty.conf' 'remote-control')
+sha256sums=('SKIP' 'SKIP')
 
 package() {
   install -Dm644 kitty.conf "$pkgdir/etc/xdg/kitty/kitty.conf"
+  install -Dm755 remote-control "$pkgdir/usr/lib/kavat/kitty-remote-control"
 }

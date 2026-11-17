@@ -1,0 +1,20 @@
+#!/bin/bash
+# Part of kavat-kitty: the password of Kitty's remote control, and what it allows.
+#
+# Kitty runs this as it reads its configuration and takes what it prints as one more line
+# of it. The password is the user's own: it is made the first time Kitty starts, from the
+# kernel's random numbers, and kept in ~/.config/kitty/rc-pass, which only the user can
+# read. That is the file `kitty @` looks for by itself. With it a program can open, focus,
+# resize, close and list windows, which is what the editor's panels need, and nothing
+# else: not read a window, nor type into one.
+file=${XDG_CONFIG_HOME:-$HOME/.config}/kitty/rc-pass
+
+if [[ ! -s $file ]]; then
+  umask 077
+  mkdir -p "${file%/*}"
+  head -c 24 /dev/urandom | base64 | tr '+/' '__' >"$file.new" && mv "$file.new" "$file"
+fi
+password=$(<"$file") || exit 0
+[[ $password ]] || exit 0
+
+printf 'remote_control_password "%s" launch focus-window resize-window close-window ls\n' "$password"

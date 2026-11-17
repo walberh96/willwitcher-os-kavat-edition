@@ -221,6 +221,30 @@ local function specs(dir)
             },
         }),
 
+        -- Claude Code, connected to the editor: it sees the file and the selection, and what
+        -- it proposes opens as a diff. It runs in a panel beside the editor, a window of
+        -- Kitty's; out of Kitty, as over SSH, in a split of Neovim's own. The plugin listens
+        -- on this machine only, and from the first time one of its commands is used.
+        plugin("claudecode.nvim", {
+            cmd = {
+                "ClaudeCode", "ClaudeCodeFocus", "ClaudeCodeOpen", "ClaudeCodeClose", "ClaudeCodeSend", "ClaudeCodeAdd",
+                "ClaudeCodeTreeAdd", "ClaudeCodeSelectModel", "ClaudeCodeStart", "ClaudeCodeStop", "ClaudeCodeStatus",
+                "ClaudeCodeDiffAccept", "ClaudeCodeDiffDeny", "ClaudeCodeCloseAllDiffs",
+            },
+            config = function()
+                local panels = require("kavat.panels")
+                require("claudecode").setup({
+                    -- it says what goes wrong, and not each time it starts and stops
+                    log_level = "warn",
+                    terminal = {
+                        provider = panels.in_kitty() and panels.claude() or "native",
+                        split_side = "right",
+                        split_width_percentage = panels.panels.claude.size / 100,
+                    },
+                })
+            end,
+        }),
+
         -- What the keys do, shown when one is held
         plugin("which-key.nvim", {
             event = "VeryLazy",
@@ -230,6 +254,7 @@ local function specs(dir)
                     { "<leader>f", group = "find" },
                     { "<leader>w", group = "windows" },
                     { "<leader>g", group = "git" },
+                    { "<leader>a", group = "Claude" },
                 },
             },
         }),

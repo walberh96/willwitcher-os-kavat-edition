@@ -89,6 +89,16 @@ map(everywhere, "<C-S-x>", "<Cmd>Store<CR>", { desc = "The marketplace of plugin
 map(everywhere, "<C-b>", "<Cmd>NvimTreeToggle<CR>", { desc = "Explorer" })
 map({ "n", "i", "x", "s", "t" }, "<C-`>", "<Cmd>ToggleTerm<CR>", { desc = "Terminal" })
 
+-- The panels. Claude's opens and closes like the secondary side bar of VS Code.
+local function panels(what)
+    return function()
+        require("kavat.panels")[what]()
+    end
+end
+map(everywhere, "<C-M-b>", panels("toggle_claude"), { desc = "Claude" })
+map("x", "<C-M-k>", panels("send_selection"), { desc = "Send the selection to Claude" })
+map("s", "<C-M-k>", "<C-g><C-M-k>", { desc = "Send the selection to Claude", remap = true })
+
 -- Moving
 map(everywhere, "<C-g>", go_to_line, { desc = "Go to a line" })
 map({ "n", "i" }, "<M-Left>", "<Cmd>normal! <C-o><CR>", { desc = "Go back" })
@@ -160,6 +170,12 @@ end
 -- What Ctrl+W and Ctrl+V used to be
 map("n", "<leader>w", "<C-w>", { desc = "windows", remap = false })
 map("n", "<C-q>", "<C-v>", { desc = "Select a block" })
+-- From the window at the right edge, the same keys go on to the panel beside the editor
+map("n", "<leader>wl", function()
+    if vim.fn.winnr("l") ~= vim.fn.winnr() or not require("kavat.panels").focus_side("vsplit") then
+        vim.cmd.wincmd("l")
+    end
+end, { desc = "The window, or the panel, to the right" })
 
 -- The <leader> shortcuts, in normal mode
 map("n", "<leader>ff", picker("files"), { desc = "Files" })
@@ -171,6 +187,8 @@ map("n", "<leader>fk", picker("keymaps"), { desc = "Shortcuts" })
 map("n", "<leader>e", "<Cmd>NvimTreeFindFile<CR>", { desc = "Show the file in the explorer" })
 map("n", "<leader>gb", "<Cmd>Gitsigns blame_line<CR>", { desc = "Who wrote the line" })
 map("n", "<leader>gp", "<Cmd>Gitsigns preview_hunk<CR>", { desc = "What changed here" })
+map("n", "<leader>aa", "<Cmd>ClaudeCodeDiffAccept<CR>", { desc = "Accept what Claude proposes" })
+map("n", "<leader>ad", "<Cmd>ClaudeCodeDiffDeny<CR>", { desc = "Reject what Claude proposes" })
 
 -- In the terminal, Esc twice goes back to the editor's keys
 map("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Leave the terminal's keys" })
