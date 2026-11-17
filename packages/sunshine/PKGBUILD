@@ -1,0 +1,148 @@
+# Sunshine is not in Arch's repositories, so the system builds it here: the program as its
+# project tagged it, with its own build file for Arch as the start,
+# packaging/linux/Arch/PKGBUILD, which is also the AUR's. Left out of that file: CUDA, the
+# unit tests and the checks of the files for app stores. Kept from it: two fixes that are
+# already in the project, for the OpenSSL and the CMake that Arch has. It shows the desktop
+# to Moonlight; kavat-remote starts it, and nothing here does.
+pkgname=sunshine
+pkgver=2026.914.233613
+pkgrel=1
+pkgdesc="Self-hosted game stream host for Moonlight"
+arch=('x86_64')
+url='https://app.lizardbyte.dev/Sunshine'
+license=('GPL-3.0-only')
+install=sunshine.install
+depends=('avahi' 'curl' 'gcc-libs' 'gtk3' 'hicolor-icon-theme' 'libayatana-appindicator' 'libcap' 'libdrm'
+         'libevdev' 'libmfx' 'libpipewire' 'libpulse' 'libva' 'libx11' 'libxcb' 'libxfixes' 'libxrandr'
+         'libxtst' 'miniupnpc' 'numactl' 'openssl' 'opus' 'qt6-base' 'qt6-svg' 'systemd-libs'
+         'vulkan-icd-loader' 'which')
+# systemd: its build asks it where the session's units, the udev rules and the modules to load go
+makedepends=('cmake' 'make' 'nodejs' 'npm' 'python-jinja' 'shaderc' 'systemd')
+# the commit of the tag v$pkgver. Sunshine keeps eighteen other projects inside it, some with
+# more inside them: each is fetched as an archive of the exact commit Sunshine names, which
+# takes under a minute and is kept beside this file, where fetching them with git, one
+# connection after another, took most of an hour. What its build does not use is left out:
+# the sources of FFmpeg and of its encoders, the documents' styles and the tests' library.
+# `_parts` is where each goes, from whom, and at which commit.
+_commit=63d35f702ee9e362e43263742981836ec0710384
+_boost=1.89.0
+# the release of build-deps that commit names: FFmpeg, built for Sunshine by its own project
+_ffmpeg=v2026.910.121303
+_parts=(
+  'third-party/build-deps LizardByte/build-deps a1fe2841cbc0d8c4501a1006d2d1cb88f219cc8c'
+  'third-party/build-deps/third-party/FFmpeg/Vulkan-Headers KhronosGroup/Vulkan-Headers ee2ec5fd83dafce291024683b50dc89219333076'
+  'third-party/glad Dav1dde/glad 73db193f853e2ee079bf3ca8a64aa2eaf6459043'
+  'third-party/libdisplaydevice LizardByte/libdisplaydevice 6e9722f89103320c948dc1199066c9e17a69e88a'
+  'third-party/libdisplaydevice/third-party/lizardbyte-common LizardByte/lizardbyte-common 06cd442b808f02f1674f3192a84d25b9a503c482'
+  'third-party/libvirtualhid LizardByte/libvirtualhid 53e1a949fc0784af716b782ddfa6c647cafd1f05'
+  'third-party/libvirtualhid/third-party/lizardbyte-common LizardByte/lizardbyte-common f9d91e1d29b7473f58e43acde4579da4e56c4abe'
+  'third-party/lizardbyte-common LizardByte/lizardbyte-common f9d91e1d29b7473f58e43acde4579da4e56c4abe'
+  'third-party/moonlight-common-c moonlight-stream/moonlight-common-c 62e066388f1a1b133e0bee947b9a374311a3354b'
+  'third-party/moonlight-common-c/enet cgutman/enet aca87840b57f045a1f7f9299e4b1b9b8e2a5e2f1'
+  'third-party/moonlight-common-c/nanors sleepybishop/nanors b1e3c22ca0cdc0bb83e3cd6ed1a2fc77869ed99a'
+  'third-party/nvapi NVIDIA/nvapi cd6918f60b3c9a0476fdfe7e89bb32330602049d'
+  'third-party/plasma-wayland-protocols KDE/plasma-wayland-protocols 382dfabda886d3f2f5c067b22e5a22376685ba78'
+  'third-party/Simple-Web-Server LizardByte-infrastructure/Simple-Web-Server 546895a93a29062bb178367b46c7afb72da9881e'
+  'third-party/TPCircularBuffer michaeltyson/TPCircularBuffer cc520397504bb72bc6df79ff03eb72988a6dc50d'
+  'third-party/tray LizardByte/tray c329d9fd0d39dfb47f0f2fb5467e1db2e8a1d623'
+  'third-party/tray/third-party/lizardbyte-common LizardByte/lizardbyte-common f9d91e1d29b7473f58e43acde4579da4e56c4abe'
+  'third-party/ViGEmClient LizardByte/Virtual-Gamepad-Emulation-Client 8d71f6740ffff4671cdadbca255ce528e3cd3fef'
+  'third-party/wayland-protocols LizardByte-infrastructure/wayland-protocols ee78491a237eaff9389a0ccf8680521d074407d3'
+  'third-party/wlr-protocols LizardByte-infrastructure/wlr-protocols bf4fc79abc359eea5a0edec0ac6d4a2b2955f82a'
+)
+source=("sunshine-$_commit.tar.gz::https://github.com/LizardByte/Sunshine/archive/$_commit.tar.gz"
+        "https://github.com/boostorg/boost/releases/download/boost-$_boost/boost-$_boost-cmake.tar.xz"
+        'openssl-4.1-signature-length.patch'
+        'boost-1.89.0-locale-cmake-4.5.patch'
+        "sunshine-ffmpeg-$_ffmpeg.tar.gz::https://github.com/LizardByte/build-deps/releases/download/$_ffmpeg/Linux-x86_64-ffmpeg.tar.gz"
+        "sunshine-build-deps-a1fe2841cbc0d8c4501a1006d2d1cb88f219cc8c.tar.gz::https://github.com/LizardByte/build-deps/archive/a1fe2841cbc0d8c4501a1006d2d1cb88f219cc8c.tar.gz"
+        "sunshine-Vulkan-Headers-ee2ec5fd83dafce291024683b50dc89219333076.tar.gz::https://github.com/KhronosGroup/Vulkan-Headers/archive/ee2ec5fd83dafce291024683b50dc89219333076.tar.gz"
+        "sunshine-glad-73db193f853e2ee079bf3ca8a64aa2eaf6459043.tar.gz::https://github.com/Dav1dde/glad/archive/73db193f853e2ee079bf3ca8a64aa2eaf6459043.tar.gz"
+        "sunshine-libdisplaydevice-6e9722f89103320c948dc1199066c9e17a69e88a.tar.gz::https://github.com/LizardByte/libdisplaydevice/archive/6e9722f89103320c948dc1199066c9e17a69e88a.tar.gz"
+        "sunshine-lizardbyte-common-06cd442b808f02f1674f3192a84d25b9a503c482.tar.gz::https://github.com/LizardByte/lizardbyte-common/archive/06cd442b808f02f1674f3192a84d25b9a503c482.tar.gz"
+        "sunshine-libvirtualhid-53e1a949fc0784af716b782ddfa6c647cafd1f05.tar.gz::https://github.com/LizardByte/libvirtualhid/archive/53e1a949fc0784af716b782ddfa6c647cafd1f05.tar.gz"
+        "sunshine-lizardbyte-common-f9d91e1d29b7473f58e43acde4579da4e56c4abe.tar.gz::https://github.com/LizardByte/lizardbyte-common/archive/f9d91e1d29b7473f58e43acde4579da4e56c4abe.tar.gz"
+        "sunshine-moonlight-common-c-62e066388f1a1b133e0bee947b9a374311a3354b.tar.gz::https://github.com/moonlight-stream/moonlight-common-c/archive/62e066388f1a1b133e0bee947b9a374311a3354b.tar.gz"
+        "sunshine-enet-aca87840b57f045a1f7f9299e4b1b9b8e2a5e2f1.tar.gz::https://github.com/cgutman/enet/archive/aca87840b57f045a1f7f9299e4b1b9b8e2a5e2f1.tar.gz"
+        "sunshine-nanors-b1e3c22ca0cdc0bb83e3cd6ed1a2fc77869ed99a.tar.gz::https://github.com/sleepybishop/nanors/archive/b1e3c22ca0cdc0bb83e3cd6ed1a2fc77869ed99a.tar.gz"
+        "sunshine-nvapi-cd6918f60b3c9a0476fdfe7e89bb32330602049d.tar.gz::https://github.com/NVIDIA/nvapi/archive/cd6918f60b3c9a0476fdfe7e89bb32330602049d.tar.gz"
+        "sunshine-plasma-wayland-protocols-382dfabda886d3f2f5c067b22e5a22376685ba78.tar.gz::https://github.com/KDE/plasma-wayland-protocols/archive/382dfabda886d3f2f5c067b22e5a22376685ba78.tar.gz"
+        "sunshine-Simple-Web-Server-546895a93a29062bb178367b46c7afb72da9881e.tar.gz::https://github.com/LizardByte-infrastructure/Simple-Web-Server/archive/546895a93a29062bb178367b46c7afb72da9881e.tar.gz"
+        "sunshine-TPCircularBuffer-cc520397504bb72bc6df79ff03eb72988a6dc50d.tar.gz::https://github.com/michaeltyson/TPCircularBuffer/archive/cc520397504bb72bc6df79ff03eb72988a6dc50d.tar.gz"
+        "sunshine-tray-c329d9fd0d39dfb47f0f2fb5467e1db2e8a1d623.tar.gz::https://github.com/LizardByte/tray/archive/c329d9fd0d39dfb47f0f2fb5467e1db2e8a1d623.tar.gz"
+        "sunshine-Virtual-Gamepad-Emulation-Client-8d71f6740ffff4671cdadbca255ce528e3cd3fef.tar.gz::https://github.com/LizardByte/Virtual-Gamepad-Emulation-Client/archive/8d71f6740ffff4671cdadbca255ce528e3cd3fef.tar.gz"
+        "sunshine-wayland-protocols-ee78491a237eaff9389a0ccf8680521d074407d3.tar.gz::https://github.com/LizardByte-infrastructure/wayland-protocols/archive/ee78491a237eaff9389a0ccf8680521d074407d3.tar.gz"
+        "sunshine-wlr-protocols-bf4fc79abc359eea5a0edec0ac6d4a2b2955f82a.tar.gz::https://github.com/LizardByte-infrastructure/wlr-protocols/archive/bf4fc79abc359eea5a0edec0ac6d4a2b2955f82a.tar.gz")
+sha256sums=('2564df7ee9c1ac1d617e30b406ec0ed7d358cbba485cfb013956bdab528dae5f'
+            '67acec02d0d118b5de9eb441f5fb707b3a1cdd884be00ca24b9a73c995511f74'
+            '0a31ccdf628f13fcdc30dac2283f565b3ab6df295b3c21c7a7514f2925549eb8'
+            '16657a0edcf998137ce7afb532c451dc90fce5811478a0878639bdd1c207d85e'
+            '496d2bbb674d01e6033e31b9dfc15cbc9dc1494e882a4505f6ab1e03f75b385c'
+            '7193665168eb8becf94ba1386d6aa72692512db34f88415b93be8af0270a6ca5'
+            'df7a152381a7fdaf98e36de7716b8d6d6ead776764bc76d1a1aef9049d1bca89'
+            '33dbeae44d8315ece57e14eba4b1b4a02ac5406d1c4f49cd20048c91522a6b9a'
+            '7c9255ef40e9ac3c316f54e3c027fdc660c30e6d994167007788cb57eb337d87'
+            'e7b493e8f8641bc9bf628d600f52524401f7f04e2efd2e515ed5c183f6c59198'
+            'a06ebe8aafa1fbcec9753d6df56598f1461cab63a5ac3fadb51426a3783a0390'
+            'b85d29c3df62d2297863ab506dffc631ecc60620f12435a3112f20cb9770028c'
+            '2486d3dfac30ae6bc68d362dac916fdb91294a12f82be649ebc00fba932cb8ed'
+            '6bb1a151e6d21e1756baeff5a95eaf85a5b6731aeda6d0bc255651192ba4a32d'
+            '41edc0309b255b0eeb5e8eb1ad79f7c7e9e6c31db1bd79a16d73271c62867003'
+            '867337168e3b7604df45766d038c379b65fdf21eb5503435a65586bbf126a176'
+            'd95c7d025346fef28eba67bedb0347e49a7230410ec29fd19b0090b075681c19'
+            'de46eeceb87f6d8ff30a494ed9d3b915844a179b32067f8347ee854a07fd3c8c'
+            'fa5538697e2dde0262cdab273baf9e1bc6568226e9cb2c24c89ce8edd0b64fe3'
+            '74779ce6ed963dc6d7baa4992929f79ed5ec1dace093f4646a33dd5c9390cf12'
+            '27907cba8c017de220b66e036ed04a39f5eacb9182846700047420aef2f5cd0e'
+            'cc78a5bc9ec73ed286fa43d31ee2bd4dafed498e67833c2bef9650eff3de2363'
+            '9e0fd2be5ba7c84b81acdd086f84c2da2c2b5e4946a17bda3e9850c62e14057f')
+
+prepare() {
+  mv "Sunshine-$_commit" sunshine
+  cd sunshine
+  # each part into its place, the ones outside before the ones inside them
+  local part where repo commit
+  for part in "${_parts[@]}"; do
+    read -r where repo commit <<< "$part"
+    rmdir "$where" 2> /dev/null || rm -rf "$where"
+    mkdir -p "$(dirname "$where")"
+    cp -a "$srcdir/${repo#*/}-$commit" "$where"
+  done
+  # Sunshine's own commit dac66dfd: the length of a certificate's signature, with OpenSSL 4.1
+  patch -Np1 -i "$srcdir/openssl-4.1-signature-length.patch"
+  # Boost.Locale's own commits 1d070743 and f51b58cd: its list of sources, with a newer CMake
+  patch -Np1 -d "$srcdir/boost-$_boost" -i "$srcdir/boost-1.89.0-locale-cmake-4.5.patch"
+}
+
+build() {
+  # what the program says its version is
+  export BRANCH=master BUILD_VERSION="$pkgver" COMMIT="$_commit"
+  export CFLAGS="${CFLAGS/-Werror=format-security/}"
+  export CXXFLAGS="${CXXFLAGS/-Werror=format-security/}"
+  # Boost is the copy patched above, not one more download; a warning of a newer compiler
+  # does not stop the build
+  cmake -S sunshine -B build -Wno-dev \
+    -D BUILD_DOCS=OFF \
+    -D BUILD_TESTS=OFF \
+    -D BUILD_WERROR=OFF \
+    -D CMAKE_INSTALL_PREFIX=/usr \
+    -D FETCHCONTENT_SOURCE_DIR_BOOST="$srcdir/boost-$_boost" \
+    -D FFMPEG_PREPARED_BINARIES="$srcdir/ffmpeg" \
+    -D SUNSHINE_EXECUTABLE_PATH=/usr/bin/sunshine \
+    -D SUNSHINE_ASSETS_DIR=share/sunshine \
+    -D SUNSHINE_PUBLISHER_NAME=LizardByte \
+    -D SUNSHINE_PUBLISHER_WEBSITE=https://app.lizardbyte.dev \
+    -D SUNSHINE_PUBLISHER_ISSUE_URL=https://app.lizardbyte.dev/support \
+    -D SUNSHINE_ENABLE_CUDA=OFF \
+    -D CUDA_FAIL_ON_MISSING=OFF
+  cmake --build build
+}
+
+check() {
+  cd build
+  ./sunshine --version
+}
+
+package() {
+  DESTDIR="$pkgdir" cmake --install build
+}

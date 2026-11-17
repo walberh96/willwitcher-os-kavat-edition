@@ -24,3 +24,7 @@ __pycache__/
 themes/target/
 kav/target/
 packages/kavat-notes/tui/target/
+packages/sunshine/sunshine/
+agent/kavatd/target/
+packages/sunshine/*.tar.gz
+packages/sunshine/*.tar.xz

@@ -1,0 +1,13 @@
+# Part of kavat-shell: remote access, on the bar while it is on.
+id          = "kavat/remote"
+name        = "Kavat remote access"
+version     = "0.1.0"
+plugin_api  = 43
+author      = "kavat"
+license     = "LicenseRef-AllRightsReserved"
+icon        = "device-desktop-share"
+description = "A mark on the bar for as long as this computer can be reached from your other devices, with how many are connected."
+
+[[widget]]
+id    = "mark"
+entry = "widget.luau"

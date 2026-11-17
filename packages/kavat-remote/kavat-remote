@@ -1,0 +1,722 @@
+#!/usr/bin/env python3
+"""kavat-remote: this computer, reached from your other devices.
+
+usage: kavat-remote                        how it is, one thing to a line, its parts between tabs:
+                                             state <on|off|paused>
+                                               (paused: on, and put down while in Incognito)
+                                             terminal <yes|no> <up|down>     its switch, and whether the SSH server runs
+                                             desktop <yes|no> <up|down>      its switch, and whether Sunshine runs
+                                             awake <yes|no> <up|down>        its switch, and whether suspending is held back
+                                             server <default|address>        who coordinates the private network
+                                             network <up|login|down> <address|->
+                                               (login: not signed in to Tailscale yet; the address is where to
+                                               sign in, once there is one)
+                                             self <name> <address> <full name>
+                                               (this computer on the private network, while it is in it)
+                                             connected <device> <address> <terminal|desktop>
+                                               (who is in now; a desktop being watched has - for both,
+                                               as Sunshine does not say who watches)
+                                             key <n> <type> <comment|-> <the end of the key>
+                                             paired <n> <name>               a device Moonlight was paired on
+       kavat-remote status                 the same, said in a few sentences
+       kavat-remote on                     join the private network, open the terminal and the desktop to it
+                                           only, keep the computer awake and mark the bar
+       kavat-remote off                    undo the four
+       kavat-remote set <name>=<value>...
+                                           terminal=yes|no   the SSH server, for a terminal
+                                           desktop=yes|no    Sunshine, for the desktop, seen from Moonlight
+                                           awake=yes|no      the computer does not suspend while this is on
+                                           server=<address>|default
+                                                             a coordination server of your own, Headscale, written
+                                                             https://name; default is Tailscale's
+       kavat-remote login                  the address to sign in to Tailscale with
+       kavat-remote login qr [file]        that address as a QR code, in the terminal or as a PNG file
+       kavat-remote key list               the SSH keys that may come in, numbered
+       kavat-remote key add <public key>   let a key in: the line of a .pub file
+       kavat-remote key remove <n>
+       kavat-remote pair <pin>             pair the device whose Moonlight shows that PIN
+       kavat-remote unpair <n>             forget a paired device
+       kavat-remote disconnect <device>    end the terminals a device has open here; `disconnect desktop`
+                                           ends the desktop being watched
+       kavat-remote pause | resume         put it down and bring it back, as Incognito does
+       kavat-remote session                at the start of a session: Sunshine, when it is on
+       kavat-remote bar                    for the bar: the state, then who is connected, one to a line
+
+Remote access is off as the system comes. Turned on, the computer joins your Tailscale
+network, WireGuard between your own devices; the firewall opens SSH and Sunshine on
+Tailscale's interface and nowhere else, with two files in /etc/kavat/firewall.d; and the
+computer does not suspend. The SSH server takes keys only, no passwords and no root, and
+the keys are yours: ~/.ssh/authorized_keys. Tailscale's own SSH is not used, and Tailscale
+does not set the system's DNS.
+
+The settings are in /etc/kavat/remote.conf. Turning it on or off and changing a setting
+ask for an administrator's password; the keys and the pairing are your own and do not.
+"""
+import base64
+import fcntl
+import json
+import os
+import re
+import secrets
+import shutil
+import signal
+import ssl
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+
+SELF = '/usr/bin/kavat-remote'
+PAUSE = '/usr/lib/kavat/remote-pause'
+FILE = '/etc/kavat/remote.conf'
+DOORS = '/etc/kavat/firewall.d'
+FIREWALL = '/usr/share/kavat/firewall.nft'
+INTERFACE = 'tailscale0'
+AWAKE = 'kavat-remote-awake.service'
+# Sunshine runs as a unit of the session, under this name
+DESKTOP = 'kavat-remote-desktop.service'
+SETTINGS = {'on': 'no', 'paused': 'no', 'terminal': 'yes', 'desktop': 'yes', 'awake': 'yes', 'server': 'default',
+            # the server the computer signed in to last, so that a change of server signs in again
+            'joined': 'default'}
+SERVER = r'https?://[A-Za-z0-9.-]{1,200}(:\d{1,5})?(/[\w./-]{0,200})?'
+# what each door lets in, on Tailscale's interface: SSH, and the ports Moonlight speaks to Sunshine on
+PORTS = {'terminal': ['tcp dport 22'],
+         'desktop': ['tcp dport { 47984, 47989, 48010 }', 'udp dport { 47998, 47999, 48000 }']}
+KEY = r'(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/=]{40,}( [^\n]*)?'
+
+HOME = os.path.expanduser('~')
+CONFIG = os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config'
+RUNTIME = os.environ.get('XDG_RUNTIME_DIR') or f'/run/user/{os.getuid()}'
+KEYS = f'{HOME}/.ssh/authorized_keys'
+# the name and the password this command speaks to Sunshine with, which it gave Sunshine itself
+SUNSHINE = f'{CONFIG}/kavat/remote-sunshine'
+SUNSHINE_LOG = f'{CONFIG}/sunshine/sunshine.log'
+SUNSHINE_API = 'https://127.0.0.1:47990'
+
+
+def out(*command, timeout=30):
+    """What a command prints, or None when it fails."""
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=timeout, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout if done.returncode == 0 else None
+
+
+def does(*command, timeout=60):
+    return out(*command, timeout=timeout) is not None
+
+
+def read():
+    kept = dict(SETTINGS)
+    try:
+        with open(FILE, encoding='utf-8') as file:
+            text = file.read()
+    except OSError:
+        text = ''
+    for name, value in re.findall(r'^(\w+)=(\S+)$', text, re.M):
+        if name in ('server', 'joined'):
+            if value == 'default' or re.fullmatch(SERVER, value):
+                kept[name] = value
+        elif name in kept and value in ('yes', 'no'):
+            kept[name] = value
+    return kept
+
+
+def write(kept):
+    os.makedirs(os.path.dirname(FILE), exist_ok=True)
+    with open(FILE + '.new', 'w', encoding='utf-8') as file:
+        file.write('# Written by kavat-remote: whether this computer is reached from your other devices.\n'
+                   '# The Remote access page of the settings changes it. After a change by hand:\n'
+                   '#   kavat-remote on, or kavat-remote off\n')
+        for name in SETTINGS:
+            file.write(f'{name}={kept[name]}\n')
+    os.chmod(FILE + '.new', 0o644)
+    os.replace(FILE + '.new', FILE)
+
+
+def running(kept):
+    return kept['on'] == 'yes' and kept['paused'] == 'no'
+
+
+# ---- the private network
+
+def tailscale():
+    """What Tailscale says of itself, or nothing when its service does not run."""
+    try:
+        return json.loads(out('tailscale', 'status', '--json', timeout=10) or '{}')
+    except ValueError:
+        return {}
+
+
+def network(said):
+    """up, login or down, and the address to sign in at when there is one."""
+    state = said.get('BackendState')
+    if state == 'Running':
+        return 'up', '-'
+    if state in ('NeedsLogin', 'NeedsMachineAuth'):
+        return 'login', said.get('AuthURL') or '-'
+    return 'down', '-'
+
+
+def devices(said):
+    """Every address of the private network, with the name of the device that has it."""
+    names = {}
+    for device in (said.get('Peer') or {}).values():
+        for address in device.get('TailscaleIPs') or []:
+            names[address] = device.get('HostName') or (device.get('DNSName') or address).split('.')[0]
+    return names
+
+
+def join(kept):
+    """Bring Tailscale up as the settings say; the address to sign in at, when it asks for one."""
+    for _ in range(20):
+        if tailscale().get('BackendState'):
+            break
+        time.sleep(0.5)
+    else:
+        return None
+    # Tailscale does not set the system's names' server, and its own SSH is never on;
+    # --reset puts every other setting of its own back to how it comes
+    command = ['tailscale', 'up', '--reset', '--accept-dns=false', '--ssh=false', '--timeout=10s']
+    if kept['server'] != 'default':
+        command.append(f'--login-server={kept["server"]}')
+    if kept['server'] != kept['joined']:
+        command.append('--force-reauth')
+    try:
+        done = subprocess.run(command, capture_output=True, text=True, timeout=30, check=False)
+        said = done.stdout + done.stderr
+    except (OSError, subprocess.TimeoutExpired) as error:
+        said = str(getattr(error, 'stdout', '') or '') + str(getattr(error, 'stderr', '') or '')
+    state, address = network(tailscale())
+    if state == 'up' and kept['joined'] != kept['server']:
+        kept['joined'] = kept['server']
+        write(kept)
+    if state == 'login' and address == '-':
+        found = re.search(r'https?://\S+', said)
+        address = found.group(0) if found else '-'
+    return state, address
+
+
+# ---- what root does
+
+def doors(kept):
+    """The files that open the firewall, there only for the parts that are on."""
+    changed = False
+    for part, rules in PORTS.items():
+        path = f'{DOORS}/kavat-remote-{part}.nft'
+        text = (f'# Written by kavat-remote: the {part} of remote access, open to Tailscale\'s network only.\n'
+                '# It is taken away when remote access is turned off.\n'
+                + ''.join(f'add rule inet kavat_firewall in iifname "{INTERFACE}" {rule} accept\n' for rule in rules))
+        wanted = running(kept) and kept[part] == 'yes'
+        try:
+            with open(path, encoding='utf-8') as file:
+                there = file.read()
+        except OSError:
+            there = None
+        if wanted and there != text:
+            os.makedirs(DOORS, exist_ok=True)
+            with open(path, 'w', encoding='utf-8') as file:
+                file.write(text)
+            changed = True
+        elif not wanted and there is not None:
+            os.remove(path)
+            changed = True
+    # the rules are put up again in one go: the firewall is never down in between
+    if changed and (out('systemctl', 'is-active', 'kavat-firewall.service') or '').strip() == 'active':
+        if not does('nft', '-f', FIREWALL):
+            print('kavat-remote: the firewall did not take its rules again: systemctl status kavat-firewall', file=sys.stderr)
+
+
+def unit(name, wanted):
+    if wanted:
+        return does('systemctl', '-q', 'enable', '--now', name)
+    return does('systemctl', '-q', 'disable', '--now', name)
+
+
+def apply(kept):
+    """Make the machine as the settings say. What Tailscale answered when it was brought up."""
+    go = running(kept)
+    doors(kept)
+    unit('sshd.service', go and kept['terminal'] == 'yes')
+    unit(AWAKE, go and kept['awake'] == 'yes')
+    if go:
+        if not unit('tailscaled.service', True):
+            return None
+        return join(kept)
+    if (out('systemctl', 'is-active', 'tailscaled.service') or '').strip() == 'active':
+        does('tailscale', 'down', timeout=15)
+    unit('tailscaled.service', False)
+    return 'down', '-'
+
+
+def sign_in(address):
+    return ('This computer is not signed in to Tailscale yet. Sign in at:\n'
+            f'  {address}\n'
+            'or see that address as a QR code: kavat-remote login qr' if address != '-' else
+            'This computer is not signed in to Tailscale yet: kavat-remote login gives the address to sign in at.')
+
+
+def root_on(kept):
+    kept['on'], kept['paused'] = 'yes', 'no'
+    write(kept)
+    answer = apply(kept)
+    if answer is None:
+        kept['on'] = 'no'
+        write(kept)
+        apply(kept)
+        sys.exit('kavat-remote: Tailscale did not start, so remote access stays off: systemctl status tailscaled')
+    print('Remote access is on.')
+    if answer[0] == 'login':
+        print(sign_in(answer[1]))
+    elif answer[0] != 'up':
+        print('Tailscale is not connected yet: kavat-remote status says how it is.')
+
+
+def root_set(kept, pairs):
+    kept.update(pairs)
+    write(kept)
+    if running(kept):
+        answer = apply(kept)
+        if answer and answer[0] == 'login':
+            print(sign_in(answer[1]))
+
+
+def root_disconnect(kept, device):
+    """End the terminals a device has open: the SSH server's processes that hold its connections."""
+    said = tailscale()
+    theirs = {address for address, name in devices(said).items() if device in (name, address)} or {device}
+    ended = 0
+    for address, pid in terminals(with_pids=True):
+        if address in theirs and pid:
+            try:
+                os.kill(pid, signal.SIGTERM)
+                ended += 1
+            except OSError:
+                pass
+    if not ended:
+        sys.exit(f'kavat-remote: {device} has no terminal open here')
+    print(f'{device} is disconnected. Its key still lets it in: kavat-remote key remove takes that away.')
+
+
+def as_root(arguments):
+    """The same command again, as an administrator; then what is the session's own to do."""
+    kept = read()
+    command = arguments[0]
+    if command == 'on':
+        root_on(kept)
+    elif command == 'off':
+        kept['on'], kept['paused'] = 'no', 'no'
+        write(kept)
+        apply(kept)
+        print('Remote access is off.')
+    elif command == 'pause':
+        if not running(kept):
+            print('off')
+            return
+        kept['paused'] = 'yes'
+        write(kept)
+        apply(kept)
+        print('paused')
+    elif command == 'resume':
+        if kept['paused'] == 'yes':
+            kept['paused'] = 'no'
+            write(kept)
+            apply(kept)
+    elif command == 'set':
+        root_set(kept, dict(pair.split('=', 1) for pair in arguments[1:]))
+    elif command == 'login':
+        if not running(kept):
+            sys.exit('kavat-remote: remote access is off: kavat-remote on')
+        state, address = join(kept) or ('down', '-')
+        if state == 'up':
+            print('This computer is signed in to Tailscale already.')
+        elif address == '-':
+            sys.exit('kavat-remote: Tailscale gave no address to sign in at: systemctl status tailscaled')
+        else:
+            print(address)
+    elif command == 'disconnect':
+        root_disconnect(kept, arguments[1])
+
+
+# ---- who is connected
+
+def terminals(with_pids=False):
+    """The connections to the SSH server that are open: the address each comes from."""
+    found = []
+    lines = out('ss', '-Htnp' if with_pids else '-Htn', 'state', 'established', 'sport = :22') or ''
+    for line in lines.splitlines():
+        parts = line.split()
+        if len(parts) < 4:
+            continue
+        address = parts[3].rsplit(':', 1)[0].strip('[]')
+        if with_pids:
+            pid = re.search(r'"sshd[^"]*",pid=(\d+)', line)
+            found.append((address, int(pid.group(1)) if pid else None))
+        else:
+            found.append(address)
+    return found
+
+
+def desktop_up():
+    return (out('systemctl', '--user', 'is-active', DESKTOP) or '').strip() == 'active'
+
+
+def watched():
+    """How many devices watch the desktop: Sunshine writes each one that comes and goes in its log."""
+    if not desktop_up():
+        return 0
+    try:
+        with open(SUNSHINE_LOG, encoding='utf-8', errors='replace') as file:
+            text = file.read()
+    except OSError:
+        return 0
+    return max(0, text.count('CLIENT CONNECTED') - text.count('CLIENT DISCONNECTED'))
+
+
+def connected(said):
+    """Each: the device, its address, and what it has open."""
+    names = devices(said)
+    found = []
+    for address in dict.fromkeys(terminals()):
+        found.append((names.get(address, address), address, 'terminal'))
+    found += [('-', '-', 'desktop')] * watched()
+    return found
+
+
+# ---- the keys
+
+def keys():
+    """The file's lines, and which of them are keys."""
+    try:
+        with open(KEYS, encoding='utf-8') as file:
+            lines = file.read().splitlines()
+    except OSError:
+        lines = []
+    return lines, [index for index, line in enumerate(lines) if line.strip() and not line.lstrip().startswith('#')]
+
+
+def save_keys(lines):
+    os.makedirs(os.path.dirname(KEYS), mode=0o700, exist_ok=True)
+    with open(KEYS + '.new', 'w', encoding='utf-8') as file:
+        file.write(''.join(line + '\n' for line in lines))
+    os.chmod(KEYS + '.new', 0o600)
+    os.replace(KEYS + '.new', KEYS)
+
+
+def key_lines():
+    lines, which = keys()
+    listed = []
+    for number, index in enumerate(which, 1):
+        parts = lines[index].split()
+        # a line may begin with options, before the kind of key
+        start = next((place for place, part in enumerate(parts) if re.fullmatch(r'(ssh|ecdsa|sk)-[\w@.-]+', part)), 0)
+        kind = parts[start]
+        body = parts[start + 1] if len(parts) > start + 1 else ''
+        comment = ' '.join(parts[start + 2:]) or '-'
+        listed.append(f'{number}\t{kind}\t{comment}\t{body[-12:]}')
+    return listed
+
+
+def key(arguments):
+    lines, which = keys()
+    if arguments == ['list']:
+        print('\n'.join(key_lines()))
+    elif arguments[:1] == ['add'] and len(arguments) > 1:
+        line = ' '.join(' '.join(arguments[1:]).split())
+        if not re.fullmatch(KEY, line):
+            sys.exit('kavat-remote: that is not a public key. It is the one line of a .pub file, as: ssh-ed25519 AAAA... name')
+        try:
+            checked = subprocess.run(['ssh-keygen', '-l', '-f', '-'], input=line + '\n', capture_output=True, text=True, timeout=10, check=False)
+        except (OSError, subprocess.TimeoutExpired):
+            checked = None
+        if checked is not None and checked.returncode != 0:
+            sys.exit('kavat-remote: that key is not whole: copy the line of the .pub file again')
+        if any(lines[index].split()[:2] == line.split()[:2] for index in which):
+            print('That key may come in already.')
+            return
+        save_keys(lines + [line])
+        print('The key may come in.')
+    elif arguments[:1] == ['remove'] and len(arguments) == 2 and arguments[1].isdigit() and 1 <= int(arguments[1]) <= len(which):
+        del lines[which[int(arguments[1]) - 1]]
+        save_keys(lines)
+        print('The key is taken away. A terminal it has open stays until it is disconnected.')
+    else:
+        sys.exit('kavat-remote: key takes list, add <public key> or remove <n>, where n is a number of the list')
+
+
+# ---- the desktop
+
+def sunshine_password():
+    try:
+        with open(SUNSHINE, encoding='utf-8') as file:
+            return file.read().strip() or None
+    except OSError:
+        return None
+
+
+def sunshine(path, body=None):
+    """What Sunshine answers on its own address of this machine, or None."""
+    password = sunshine_password()
+    if not password:
+        return None
+    request = urllib.request.Request(SUNSHINE_API + path, method='POST' if body is not None else 'GET',
+                                     data=json.dumps(body).encode() if body is not None else None)
+    request.add_header('Authorization', 'Basic ' + base64.b64encode(f'kavat:{password}'.encode()).decode())
+    if body is not None:
+        request.add_header('Content-Type', 'application/json')
+    # its certificate is one it made for itself, and it is asked on this machine's own address
+    context = ssl.create_default_context()
+    context.check_hostname = False
+    context.verify_mode = ssl.CERT_NONE
+    try:
+        with urllib.request.urlopen(request, timeout=5, context=context) as answer:
+            return json.loads(answer.read().decode() or '{}')
+    except (OSError, ValueError, urllib.error.URLError):
+        return None
+
+
+def paired():
+    answer = sunshine('/api/clients/list') if desktop_up() else None
+    return [device for device in (answer or {}).get('named_certs', []) if isinstance(device, dict)]
+
+
+def need_desktop():
+    if not desktop_up():
+        sys.exit('kavat-remote: Sunshine is not running: remote access has to be on, with its desktop, in a session of yours')
+    if sunshine('/api/clients/list') is None:
+        sys.exit('kavat-remote: Sunshine does not answer this command. It was given a name and a password of its own '
+                 f'the first time; if they were changed on its page, delete {SUNSHINE} and {CONFIG}/sunshine/sunshine_state.json, '
+                 'and run: kavat-remote session')
+
+
+def pair(pin):
+    if not re.fullmatch(r'\d{4}', pin):
+        sys.exit('kavat-remote: the PIN is the four digits Moonlight shows')
+    need_desktop()
+    waiting = (sunshine('/api/pin') or {}).get('pairings') or []
+    if not waiting:
+        sys.exit('kavat-remote: no device is asking to be paired. In Moonlight, add this computer by its name or '
+                 'address on the private network; it shows a PIN: run this again with it while it waits.')
+    names = devices(tailscale())
+    for one in waiting:
+        name = names.get(str(one.get('address', '')), one.get('name') or 'device')[:120]
+        if (sunshine('/api/pin', {'pairing_id': one.get('id', ''), 'pin': pin, 'name': name}) or {}).get('status') is True:
+            print(f'{name} is paired: its Moonlight can see this desktop.')
+            return
+    sys.exit('kavat-remote: that PIN was not taken: start the pairing again in Moonlight')
+
+
+def session():
+    """Sunshine runs while remote access is on with its desktop, and only then."""
+    kept = read()
+    wanted = running(kept) and kept['desktop'] == 'yes'
+    if not wanted:
+        if desktop_up():
+            does('systemctl', '--user', 'stop', DESKTOP)
+        return
+    if desktop_up() or not shutil.which('sunshine') or not os.environ.get('WAYLAND_DISPLAY'):
+        return
+    if not sunshine_password():
+        # Sunshine is spoken to with a name and a password: it is given ones only this user can read
+        password = secrets.token_urlsafe(24)
+        os.makedirs(os.path.dirname(SUNSHINE), exist_ok=True)
+        with open(os.open(SUNSHINE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600), 'w', encoding='utf-8') as file:
+            file.write(password + '\n')
+        if not does('sunshine', '--creds', 'kavat', password, timeout=30):
+            os.remove(SUNSHINE)
+    does('systemctl', '--user', 'reset-failed', DESKTOP)
+    does('systemd-run', '--user', '--quiet', '--collect', f'--unit={DESKTOP}',
+         '--description=Remote access: the desktop, seen from Moonlight',
+         '--property=Restart=on-failure', '--property=RestartSec=5',
+         *(f'--setenv={name}={os.environ[name]}' for name in
+           ('WAYLAND_DISPLAY', 'DISPLAY', 'XDG_CURRENT_DESKTOP', 'XDG_SESSION_TYPE', 'HYPRLAND_INSTANCE_SIGNATURE') if os.environ.get(name)),
+         'sunshine')
+
+
+# ---- what is shown
+
+def state_word(kept):
+    return 'off' if kept['on'] == 'no' else 'paused' if kept['paused'] == 'yes' else 'on'
+
+
+def active(name):
+    return 'up' if (out('systemctl', 'is-active', name) or '').strip() == 'active' else 'down'
+
+
+def state():
+    kept = read()
+    print(f'state\t{state_word(kept)}')
+    print(f'terminal\t{kept["terminal"]}\t{active("sshd.service")}')
+    print(f'desktop\t{kept["desktop"]}\t{"up" if desktop_up() else "down"}')
+    print(f'awake\t{kept["awake"]}\t{active(AWAKE)}')
+    print(f'server\t{kept["server"]}')
+    said = tailscale() if running(kept) else {}
+    print('network\t' + '\t'.join(network(said)))
+    me = said.get('Self') or {}
+    if network(said)[0] == 'up' and me:
+        print(f'self\t{me.get("HostName", "-")}\t{(me.get("TailscaleIPs") or ["-"])[0]}\t{(me.get("DNSName") or "-").rstrip(".") or "-"}')
+    for device, address, what in connected(said) if running(kept) else []:
+        print(f'connected\t{device}\t{address}\t{what}')
+    for line in key_lines():
+        print('key\t' + line)
+    for number, device in enumerate(paired(), 1):
+        print(f'paired\t{number}\t{device.get("name", "-")}')
+
+
+def status():
+    kept = read()
+    word = state_word(kept)
+    if word == 'off':
+        print('Remote access is off: nothing of it runs, and the firewall has no door for it.')
+        return
+    if word == 'paused':
+        print('Remote access is paused while in Incognito: it comes back on leaving the mode.')
+        return
+    said = tailscale()
+    how, address = network(said)
+    me = said.get('Self') or {}
+    if how == 'up':
+        print(f'Remote access is on: this computer is {me.get("HostName", "?")}, {(me.get("TailscaleIPs") or ["?"])[0]}, on your private network.')
+    elif how == 'login':
+        print('Remote access is on. ' + sign_in(address))
+    else:
+        print('Remote access is on, and Tailscale is not connected: systemctl status tailscaled')
+    parts = [name for name, on in (('the terminal', kept['terminal']), ('the desktop', kept['desktop'])) if on == 'yes']
+    print(('Open to that network: ' + ' and '.join(parts) + '.') if parts else 'Neither the terminal nor the desktop is open.')
+    if kept['desktop'] == 'yes' and not desktop_up():
+        print('The desktop can be seen once someone has logged in at this computer.')
+    print('The computer does not suspend.' if kept['awake'] == 'yes' else 'The computer may suspend, and cannot be reached while it does.')
+    who = connected(said)
+    if who:
+        print('Connected now: ' + ', '.join('a device watching the desktop' if what == 'desktop' else f'{device} ({what})' for device, _, what in who) + '.')
+    else:
+        print('No device is connected now.')
+
+
+def bar():
+    """The state, and who is connected; a device that was not there the last time is told of."""
+    kept = read()
+    word = state_word(kept)
+    said = tailscale() if word == 'on' else {}
+    if word == 'on' and network(said)[0] == 'login':
+        word = 'login'
+    who = connected(said) if word == 'on' else []
+    print(word)
+    for device, _, what in who:
+        print(f'{device}\t{what}')
+    now = sorted({f'{device}\t{what}' for device, _, what in who})
+    try:
+        # every display's bar asks: the list is kept under a lock, so that one of them tells
+        with open(f'{RUNTIME}/kavat-remote-connected', 'a+', encoding='utf-8') as file:
+            fcntl.flock(file, fcntl.LOCK_EX)
+            file.seek(0)
+            before = file.read().splitlines()
+            file.seek(0)
+            file.truncate()
+            file.write(''.join(line + '\n' for line in now))
+    except OSError:
+        return
+    for line in now:
+        if line not in before:
+            device, what = line.split('\t')
+            text = 'A device is watching the desktop' if what == 'desktop' else f'{device} opened a terminal on this computer'
+            try:
+                subprocess.run(['notify-send', '--app-name', 'Remote access', '--icon', 'network-server', 'Remote access', text],
+                               capture_output=True, timeout=5, check=False)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
+
+
+def login(arguments):
+    kept = read()
+    if not running(kept):
+        sys.exit('kavat-remote: remote access is off: kavat-remote on')
+    how, address = network(tailscale())
+    if how == 'up':
+        print('This computer is signed in to Tailscale already.')
+        return
+    if address == '-':
+        # Tailscale is asked for a new address, which is root's to do
+        asked = out('pkexec', SELF, 'login', timeout=120) if os.geteuid() != 0 else None
+        address = (asked or '').strip().splitlines()[-1] if asked else '-'
+        if not re.fullmatch(r'https?://\S+', address):
+            sys.exit('kavat-remote: Tailscale gave no address to sign in at: systemctl status tailscaled')
+    if not arguments:
+        print(address)
+    elif len(arguments) == 2:
+        if not does('qrencode', '-t', 'PNG', '-s', '8', '-o', arguments[1], address):
+            sys.exit(f'kavat-remote: the QR code could not be written to {arguments[1]}')
+    else:
+        print(address)
+        subprocess.run(['qrencode', '-t', 'ANSIUTF8', address], check=False)
+
+
+def checked_set(pairs):
+    for pair in pairs:
+        name, _, value = pair.partition('=')
+        good = value in ('yes', 'no') if name in ('terminal', 'desktop', 'awake') else \
+            name == 'server' and (value == 'default' or re.fullmatch(SERVER, value))
+        if not good:
+            sys.exit(f'kavat-remote: {pair} is not a setting of remote access, or not a value it takes\n\n' + __doc__)
+
+
+def main():
+    arguments = sys.argv[1:]
+    command = arguments[0] if arguments else ''
+    rooted = (len(arguments) == 1 and command in ('on', 'off', 'pause', 'resume')) \
+        or (command == 'set' and len(arguments) > 1) \
+        or (command == 'disconnect' and len(arguments) == 2 and arguments[1] != 'desktop')
+    if command == 'set':
+        checked_set(arguments[1:])
+    if rooted or (os.geteuid() == 0 and arguments == ['login']):
+        if command == 'disconnect' and not re.fullmatch(r'[\w.:-]{1,80}', arguments[1]):
+            sys.exit('kavat-remote: that is not the name of a device')
+        if os.geteuid() == 0:
+            as_root(arguments)
+            return
+        # Incognito pauses it without a password, through a door of its own that does only that
+        if command == 'pause' and not running(read()):
+            print('off')
+            return
+        if command == 'resume' and read()['paused'] == 'no':
+            return
+        door =[PAUSE, command] if command in ('pause', 'resume') else [SELF, *arguments]
+        code = subprocess.run(['pkexec', *door], check=False).returncode
+        session()
+        sys.exit(code)
+    if not arguments:
+        state()
+    elif arguments == ['status']:
+        status()
+    elif arguments == ['bar']:
+        bar()
+    elif arguments == ['session']:
+        session()
+    elif command == 'login' and arguments[1:] in ([], ['qr']) or (len(arguments) == 3 and arguments[:2] == ['login', 'qr']):
+        login(arguments[1:])
+    elif command == 'key':
+        key(arguments[1:])
+    elif command == 'pair' and len(arguments) == 2:
+        pair(arguments[1])
+    elif command == 'unpair' and len(arguments) == 2 and arguments[1].isdigit():
+        need_desktop()
+        known = paired()
+        if not 1 <= int(arguments[1]) <= len(known):
+            sys.exit('kavat-remote: unpair takes a number of the list of paired devices')
+        device = known[int(arguments[1]) - 1]
+        if (sunshine('/api/clients/unpair', {'uuid': device.get('uuid', '')}) or {}).get('status') is not True:
+            sys.exit(f'kavat-remote: Sunshine did not forget {device.get("name", "the device")}')
+        print(f'{device.get("name", "The device")} is forgotten: it has to be paired again to see this desktop.')
+    elif arguments == ['disconnect', 'desktop']:
+        if not desktop_up():
+            sys.exit('kavat-remote: nobody watches the desktop: Sunshine is not running')
+        does('systemctl', '--user', 'restart', DESKTOP)
+        print('The desktop is not watched any more. A paired device can come back: kavat-remote unpair takes that away.')
+    else:
+        sys.exit(__doc__)
+
+
+if __name__ == '__main__':
+    main()

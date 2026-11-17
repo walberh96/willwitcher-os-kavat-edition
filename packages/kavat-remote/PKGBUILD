@@ -1,0 +1,24 @@
+# Remote access: the computer reached from your other devices, off as the system comes.
+pkgname=kavat-remote
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: remote access, with Tailscale, the SSH server and Sunshine, and its mark on the bar"
+arch=('any')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+depends=('tailscale' 'openssh' 'sunshine' 'qrencode' 'polkit' 'python' 'kavat-base' 'kavat-shell'
+         'nftables' 'iproute2' 'libnotify' 'systemd')
+source=('kavat-remote' 'remote-pause' 'org.kavat.remote.policy' 'sshd.conf' 'kavat-remote-awake.service')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+
+# Nothing here starts anything: Tailscale's, the SSH server's and this package's own units
+# stay disabled until `kavat-remote on`, and the firewall's doors are files it writes then.
+package() {
+  install -Dm755 kavat-remote "$pkgdir/usr/bin/kavat-remote"
+  install -Dm755 remote-pause "$pkgdir/usr/lib/kavat/remote-pause"
+  install -Dm644 org.kavat.remote.policy "$pkgdir/usr/share/polkit-1/actions/org.kavat.remote.policy"
+  # read before the SSH server's own settings, so that these have the say
+  install -Dm644 sshd.conf "$pkgdir/etc/ssh/sshd_config.d/10-kavat-remote.conf"
+  install -Dm644 kavat-remote-awake.service "$pkgdir/usr/lib/systemd/system/kavat-remote-awake.service"
+  install -Dm644 -t "$pkgdir/usr/share/kavat/shell-plugins/remote" "$startdir"/shell/*
+}

@@ -1,0 +1,15 @@
+#!/usr/bin/env python3
+"""The part of kavat-remote that a mode may do without a password: put remote access down
+while in Incognito, and bring back what was put down on leaving it.
+
+usage: remote-pause pause | resume
+
+It is run through pkexec by kavat-remote. It opens nothing that an administrator did not
+turn on: resume only undoes a pause, and a pause only closes.
+"""
+import os
+import sys
+
+if sys.argv[1:] not in (['pause'], ['resume']):
+    sys.exit(__doc__)
+os.execv('/usr/bin/kavat-remote', ['/usr/bin/kavat-remote', sys.argv[1]])

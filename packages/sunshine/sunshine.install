@@ -1,0 +1,17 @@
+# Sunshine reads the screen through the kernel's own interface, which asks for this
+# capability, and makes its keyboard, mouse and gamepads through uinput and uhid. Nothing
+# is started here: kavat-remote starts Sunshine with the session, when remote access is on.
+_ready() {
+  setcap cap_sys_admin,cap_sys_nice+p "$(readlink -f usr/bin/sunshine)"
+  udevadm control --reload-rules || true
+  udevadm trigger --property-match=DEVNAME=/dev/uinput || true
+  udevadm trigger --property-match=DEVNAME=/dev/uhid || true
+}
+
+post_install() {
+  _ready
+}
+
+post_upgrade() {
+  _ready
+}

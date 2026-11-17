@@ -1,0 +1,12 @@
+# Part of kavat-remote: a suspended computer cannot be reached, so it does not suspend while
+# remote access is on with its Awake switch. kavat-remote enables and disables this unit;
+# the screen still locks and turns off.
+[Unit]
+Description=Remote access: the computer does not suspend while it can be reached
+
+[Service]
+ExecStart=/usr/bin/systemd-inhibit --what=sleep --mode=block --who="Remote access" --why="This computer is reached from your other devices" sleep infinity
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target

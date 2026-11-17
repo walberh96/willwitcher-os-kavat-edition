@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE policyconfig PUBLIC "-//freedesktop//DTD PolicyKit Policy Configuration 1.0//EN"
+  "http://www.freedesktop.org/standards/PolicyKit/1/policyconfig.dtd">
+<!-- Part of kavat-remote. What the password dialog says when kavat-remote asks to turn remote
+     access on or off or to change it, and who may say yes: an administrator, whose password
+     is good for a few minutes. Pausing it, as Incognito does, only closes what is open, so
+     the person at the machine may do that without a password. -->
+<policyconfig>
+  <vendor>Willwitcher-OS Kavat Edition</vendor>
+  <vendor_url>https://github.com/walberh96/willwitcher-os-kavat-edition</vendor_url>
+  <action id="org.kavat.remote.change">
+    <description>Change whether this computer is reached from your other devices</description>
+    <message>Remote access opens this computer to your own devices. Your password lets it change.</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>auth_admin_keep</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/bin/kavat-remote</annotate>
+  </action>
+  <action id="org.kavat.remote.pause">
+    <description>Pause remote access while in a mode, and bring it back</description>
+    <message>Pausing remote access</message>
+    <defaults>
+      <allow_any>auth_admin</allow_any>
+      <allow_inactive>auth_admin</allow_inactive>
+      <allow_active>yes</allow_active>
+    </defaults>
+    <annotate key="org.freedesktop.policykit.exec.path">/usr/lib/kavat/remote-pause</annotate>
+  </action>
+</policyconfig>
