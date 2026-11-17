@@ -313,6 +313,18 @@ None of this was seen on the PC. What the virtual machine could not try is said 
   - Turn it off: the mark goes, the phone reaches nothing, and `systemctl is-enabled tailscaled sshd` says disabled.
   - *None of the lines above was ever tried: only that it is off as the system comes, and what the firewall is told.*
 
+## 21. Kavat Chromium, built on 17 November
+
+The browser is now a Chromium compiled here, with three patches of the system's. The virtual machine checks that it is installed and that zen mode changes the window; the rest only shows on the PC.
+
+- [ ] **It is the browser you know.** `Super+B`: it opens as before, with your tabs, your logins, the start page and the console. `chrome://version` says 156 and Kavat Chromium's path, `/usr/lib/chromium/`. Netflix or Spotify web plays (Widevine).
+- [ ] **The two extensions cannot be turned off.** `chrome://extensions`: uBlock Origin Lite and Kavat have no switch and no Remove, and "Allow in Incognito" is on and cannot be changed.
+- [ ] **Blocking in private windows.** `Ctrl+Shift+N`, a page full of ads: none; the blocker's icon and the console's are on the toolbar; `Ctrl+Shift+K` opens the console there. The new tab of a private window is Chromium's own, which is expected.
+- [ ] **Enhanced Safe Browsing.** Settings, Privacy, Security, "Enhanced protection", close and open the browser: both extensions are still there. Put it back as it was.
+- [ ] **The palette on its own pages.** `chrome://settings`, history, downloads, extensions, bookmarks, the side panel and the ⋮ menu: the background is the theme's surface, switches and focus wear the accent, links the accent's text colour. Change the palette, the accent and Light/Dark with the browser open: those pages follow without restarting. A private window over Light stays dark.
+- [ ] **Hiding its parts.** `kavat-browser parts tabs`: the tab strip goes; `toolbar`: the address bar goes; `bookmarks`, `sidepanel`; `none` gives everything back, live, in every window. The console's "hide tabs" and the rest do the same.
+- [ ] **Zen mode.** `Ctrl+Shift+Z`: the page alone, the window keeps its size and place among the others (it is not fullscreen); `Ctrl+L` brings the address bar back to type in; `Ctrl+T` opens a tab; `Ctrl+Shift+Z` again gives everything back. *Look at the window's corners with the tabs hidden: Chromium's close and maximise buttons may sit over the page.* A web app, a pop-up and `F11` are not touched by it. Closing and opening the browser starts with everything in view.
+
 ## What to send back
 
 For each line that failed: its number, what you did, what you saw. A photo of the screen is enough for anything before the login. After the login, `journalctl -b > ~/log.txt` right after it happens.
@@ -357,7 +369,7 @@ These are not failures: they are listed in the design document as left for later
 - The settings panel has twenty-five pages of twenty-seven; the other two wait for the agent.
 - In the modes: what waits for the agent. 
 - Wallpaper: the login showing a video's still frame, and the lock showing each display's own background.
-- In the browser: the palette on the pages Chromium draws itself and hiding its native panels, which are to be built with a Chromium compiled here (D46); and the agent's panel.
+- In the browser: the agent's panel.
 - More of your aliases and functions from Endgame, when you go over them: `port-kill` and `y` are in.
 - In the installer: the programs that are only in the AUR, which wait for their review (D44).
 - `kavat-top` is btop with the theme, not the fork of the design, which is phase 4; `kavat-fetch` has no line for the agent.

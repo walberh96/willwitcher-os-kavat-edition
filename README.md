@@ -228,7 +228,7 @@ Notes are part of the system, built on a fork of [`nb`](https://github.com/xwmx/
 
 A Chromium of its own, with ten changes.
 
-- **It follows the modes.** In Incognito it opens private windows; in Gamer it suspends tabs.
+- **It follows the modes.** In Incognito it is a browser apart that keeps nothing, with its blocker as always; in Gamer it suspends tabs.
 - **It follows the theme.** It changes colour with the rest of the system, internal pages included.
 - **It blocks out of the box.** Ads and trackers, from the first start.
 - **No YouTube Shorts.** They are hidden from the first start, and a switch brings them back.
