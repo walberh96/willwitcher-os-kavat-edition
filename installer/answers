@@ -11,8 +11,11 @@ put back as the package brought them.
 
 What is filled in: the language, the time zone, the keyboard, the names of the user and of
 the machine, how the disk is used and whether it is encrypted, the look, and the programs.
-What is not: the passwords, which no file holds, and which disk it is. An answer that is
-not what its page could have given is left out, and its page comes up as it always does.
+What is not: the passwords, which no file holds. The file says what the disk was, its
+model, its serial number and its size, and not its name: when exactly one disk of this
+machine is that one, the disk page comes up with it chosen, and is shown all the same. An
+answer that is not what its page could have given is left out, and its page comes up as it
+always does.
 
 It prints the locale the installer is to be opened in, when the file names one.
 """
@@ -44,6 +47,8 @@ ALLOWED = {
     ('user', 'name'): r'[^\x00-\x1f\x7f:]{1,100}',
     ('user', 'login'): r'[a-z_][a-z0-9_-]{0,30}',
     ('disk', 'method'): r'erase|replace|alongside|manual',
+    ('disk', 'model'): r'[^\x00-\x1f\x7f]{1,100}',
+    ('disk', 'serial'): r'[^\x00-\x1f\x7f]{1,100}',
     ('appearance', 'palette'): r'[a-z][a-z0-9-]*',
     ('appearance', 'mode'): r'dark|light|auto',
     ('appearance', 'accent'): r'[a-z][a-z0-9-]*',
@@ -133,6 +138,8 @@ def read(text):
     disk, software = file.get('disk'), file.get('software')
     if isinstance(disk, dict) and isinstance(disk.get('encrypt'), bool):
         answers['disk', 'encrypt'] = disk['encrypt']
+    if isinstance(disk, dict) and type(disk.get('size')) is int and disk['size'] > 0:
+        answers['disk', 'size'] = disk['size']
     user = file.get('user')
     if isinstance(user, dict) and isinstance(user.get('autologin'), bool):
         answers['user', 'autologin'] = user['autologin']
@@ -140,6 +147,32 @@ def read(text):
         answers['software', 'asked'] = [name for name in software['asked']
                                         if isinstance(name, str) and re.fullmatch(PACKAGE, name)]
     return answers
+
+
+def the_disk(answers):
+    """The disk of this machine that is the one of the answers: its path, or None unless exactly one is.
+
+    It is the same disk when the serial numbers are the same, if both have one, and otherwise
+    when the model and the size are. None too when the answers do not say what the disk was.
+    """
+    model, serial, size = (answers.get(('disk', name)) for name in ('model', 'serial', 'size'))
+    try:
+        listed = subprocess.run(['lsblk', '--json', '-b', '-d', '-o', 'PATH,TYPE,MODEL,SERIAL,SIZE'],
+                                capture_output=True, text=True, check=True, timeout=30)
+        disks = json.loads(listed.stdout)['blockdevices']
+    except (OSError, ValueError, KeyError, subprocess.SubprocessError):
+        return None
+    same = []
+    for disk in disks:
+        if disk.get('type') != 'disk' or not isinstance(disk.get('path'), str):
+            continue
+        its_model, its_serial = ((disk.get(name) or '').strip() or None for name in ('model', 'serial'))
+        if serial and its_serial:
+            if serial == its_serial:
+                same.append(disk['path'])
+        elif size and size == disk.get('size') and model == its_model:
+            same.append(disk['path'])
+    return same[0] if len(same) == 1 else None
 
 
 def change(name, settings):
@@ -187,6 +220,14 @@ def fill_in(answers, where):
         disk['preCheckEncryption'] = 'true' if answers['disk', 'encrypt'] else 'false'
     if disk:
         change('modules/partition.conf', disk)
+    # the disk page comes up with the disk of the answers chosen, when this machine has it
+    described = any(('disk', name) in answers for name in ('serial', 'size'))
+    device = the_disk(answers) if described else None
+    if device:
+        with open(os.path.join(CONFIG, 'modules/partition.conf'), 'a', encoding='utf-8') as file:
+            file.write(f'# from the answers file; the page is shown and another disk can be chosen\ninitialDevice: {quoted(device)}\n')
+    elif described:
+        say('the disk of the answers is not in this machine, or more than one could be it: none is chosen')
 
     # the name of the machine is made from a template when the user's name is filled in
     if ('system', 'hostname') in answers:
@@ -203,6 +244,9 @@ def fill_in(answers, where):
 
     # what the installer's own pages start from, and what the side bar says
     pages = {'from': os.path.basename(where)}
+    if described:
+        # the disk that comes up chosen, or false when it was not found
+        pages['disk'] = device or False
     for name in ('palette', 'mode', 'accent'):
         if ('appearance', name) in answers:
             pages[name] = answers['appearance', name]

@@ -1,0 +1,90 @@
+diff --git a/src/modules/partition/Config.cpp b/src/modules/partition/Config.cpp
+--- a/src/modules/partition/Config.cpp
++++ b/src/modules/partition/Config.cpp
+@@ -445,6 +445,7 @@
+ 
+     m_allowManualPartitioning = Calamares::getBool( configurationMap, "allowManualPartitioning", true );
+     m_preCheckEncryption = Calamares::getBool( configurationMap, "preCheckEncryption", false );
++    m_initialDevice = Calamares::getString( configurationMap, "initialDevice" );
+     m_showNotEncryptedBootMessage = Calamares::getBool( configurationMap, "showNotEncryptedBootMessage", true );
+     m_requiredPartitionTableType = Calamares::getStringList( configurationMap, "requiredPartitionTableType" );
+ 
+diff --git a/src/modules/partition/Config.h b/src/modules/partition/Config.h
+--- a/src/modules/partition/Config.h
++++ b/src/modules/partition/Config.h
+@@ -159,6 +159,13 @@
+      */
+     bool preCheckEncryption() const { return m_preCheckEncryption; }
+ 
++    /** @brief Device (e.g. /dev/sda) the device chooser starts on.
++     *
++     * Empty, which is the default, or naming a device that is not offered,
++     * leaves the chooser on its first device.
++     */
++    QString initialDevice() const { return m_initialDevice; }
++
+     /// @brief Show "Boot partition not encrypted" warning (not explicitly disabled in the config file)?
+     bool showNotEncryptedBootMessage() const { return m_showNotEncryptedBootMessage; }
+ 
+@@ -221,6 +228,7 @@
+     bool m_allowZfsEncryption = true;
+     bool m_allowManualPartitioning = true;
+     bool m_preCheckEncryption = false;
++    QString m_initialDevice;
+     bool m_showNotEncryptedBootMessage = true;
+     bool m_isLVMEnabled = true;
+     QStringList m_essentialMounts;
+diff --git a/src/modules/partition/gui/ChoicePage.cpp b/src/modules/partition/gui/ChoicePage.cpp
+--- a/src/modules/partition/gui/ChoicePage.cpp
++++ b/src/modules/partition/gui/ChoicePage.cpp
+@@ -187,6 +187,22 @@
+              } );
+     setModelToComboBox( m_drivesCombo, core->deviceModel() );
+ 
++    // *initialDevice*: the chooser starts on that device, when it is one of those offered.
++    // Nothing else changes: the page is shown and the device can still be changed.
++    if ( !m_config->initialDevice().isEmpty() )
++    {
++        DeviceModel* devices = core->deviceModel();
++        for ( int row = 0; row < devices->rowCount(); ++row )
++        {
++            const Device* device = devices->deviceForIndex( devices->index( row ) );
++            if ( device && device->deviceNode() == m_config->initialDevice() )
++            {
++                m_drivesCombo->setCurrentIndex( row );
++                break;
++            }
++        }
++    }
++
+     connect( m_drivesCombo, qOverload< int >( &QComboBox::currentIndexChanged ), this, &ChoicePage::applyDeviceChoice );
+     connect( m_encryptWidget, &EncryptWidget::stateChanged, this, &ChoicePage::onEncryptWidgetStateChanged );
+     connect(
+diff --git a/src/modules/partition/partition.conf b/src/modules/partition/partition.conf
+--- a/src/modules/partition/partition.conf
++++ b/src/modules/partition/partition.conf
+@@ -156,6 +156,13 @@
+ # one of the items from the options.
+ initialSwapChoice: none
+ 
++# The device (e.g. /dev/sda) that the device chooser of the page starts on. When it is
++# not set, or it names a device that the page does not offer, the chooser starts on
++# its first device. The page is shown all the same and the user can pick another.
++#
++# The default is empty.
++# initialDevice: /dev/sda
++
+ # armInstall
+ #
+ # Leaves 16MB empty at the start of a drive when partitioning
+diff --git a/src/modules/partition/partition.schema.yaml b/src/modules/partition/partition.schema.yaml
+--- a/src/modules/partition/partition.schema.yaml
++++ b/src/modules/partition/partition.schema.yaml
+@@ -49,6 +49,7 @@
+     partitionLayout: { type: array }  # TODO: specify items
+     initialPartitioningChoice: { type: string, enum: [ none, erase, replace, alongside, manual ] }
+     initialSwapChoice: { type: string, enum: [ none, small, suspend, reuse, file ] }
++    initialDevice: { type: string }
+ 
+     requiredStorage: { type: number }
+ required:

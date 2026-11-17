@@ -10,9 +10,11 @@ var categories = [
     ] },
     { name: "Development", programs: [
         { pkg: "git github-cli", name: "git · github-cli", what: "version control, gh" },
+        { pkg: "lazygit", name: "lazygit", what: "git on one screen; Neovim opens it too" },
         { pkg: "mise", name: "mise", what: "Node and other tools, a version per project" },
         { pkg: "pnpm", name: "pnpm", what: "package manager" },
         { pkg: "docker docker-compose docker-buildx", name: "docker · compose", what: "containers" },
+        { pkg: "lazydocker", name: "lazydocker", what: "the containers on one screen" },
         { pkg: "postgresql", name: "postgresql", what: "the psql client" },
         { pkg: "rustup", name: "rustup", what: "rustc, cargo, clippy, rust-analyzer" },
         { pkg: "lldb gcc pkgconf", name: "lldb · gcc · pkg-config", what: "debugger and build tools" },

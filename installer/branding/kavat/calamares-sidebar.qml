@@ -74,7 +74,9 @@ Rectangle {
         // when the installer was started with the answers of an earlier installation
         Text {
             visible: Earlier.answers.from !== undefined
-            text: "Filled in from " + Earlier.answers.from + ". The passwords and the disk are asked for again."
+            text: "Filled in from " + Earlier.answers.from + ". " + (Earlier.answers.disk === undefined ? "The passwords and the disk are asked for again."
+                : Earlier.answers.disk ? "The disk is chosen, " + Earlier.answers.disk + ": check it. The passwords are asked for again."
+                : "The disk of that installation was not found: choose one. The passwords are asked for again.")
             color: "#f2a93b"; font.pixelSize: 12; wrapMode: Text.WordWrap
             Layout.fillWidth: true; Layout.bottomMargin: 8
         }
