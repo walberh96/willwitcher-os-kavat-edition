@@ -1,24 +1,40 @@
 pkgname=kavat-shell-config
 pkgver=0.1.0
-pkgrel=8
+pkgrel=10
 pkgdesc="Willwitcher-OS Kavat Edition: zsh as the terminal's shell, with its prompt and the terminal's everyday tools"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
-# zsh, its prompt and its three plugins; the file search, whose picker Tab opens; and the
-# tools the settings below make room for
-depends=('zsh' 'starship' 'zsh-autosuggestions' 'zsh-syntax-highlighting' 'fzf-tab'
-         'kavat-find' 'zoxide' 'lsd' 'ripgrep' 'fd' 'fzf' 'bat' 'jq' 'fastfetch' 'btop')
-source=('zshrc' 'starship.toml' 'starship-full.toml' 'skel-zshrc' 'kavat-fetch' 'kavat-top' 'kavat' 'kavat-project' '_kavat')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+# zsh, its prompt and its plugins; the file search, whose picker Tab opens; the tools the
+# settings below make room for; ss, which port-kill asks, and what makes kavat-fetch's
+# picture from the theme's drawing
+depends=('zsh' 'starship' 'zsh-autosuggestions' 'zsh-syntax-highlighting' 'fzf-tab' 'zsh-completions'
+         'kavat-find' 'zoxide' 'lsd' 'ripgrep' 'fd' 'fzf' 'bat' 'jq' 'fastfetch' 'btop'
+         'iproute2' 'librsvg')
+# The fifth plugin is oh-my-zsh's sudo: only its one file, as it was at this commit, the
+# last one that changed it, and the licence it comes under.
+_ohmyzsh=f8bf8f0029a475831ebfba0799975ede20e08742
+source=('zshrc' 'starship.toml' 'starship-full.toml' 'skel-zshrc' 'aliases.zsh' 'kavat-fetch' 'fetch-health'
+        'kavat-top' 'kavat' 'kavat-project' '_kavat'
+        "sudo.plugin-$_ohmyzsh.zsh::https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/$_ohmyzsh/plugins/sudo/sudo.plugin.zsh"
+        "ohmyzsh-LICENSE-$_ohmyzsh.txt::https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/$_ohmyzsh/LICENSE.txt")
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+            'SKIP' 'SKIP' 'SKIP' 'SKIP'
+            'a57ca50dd7607af2651db558151cfb2fea0139bf2141b1968b87bb67d95c2c59'
+            '5b6e033667dba169de6213440dea2d7f2286e679c1f56a3fcb01103d2bcb306d')
 
 package() {
   install -Dm644 zshrc "$pkgdir/etc/zsh/zshrc"
   install -Dm644 starship.toml "$pkgdir/usr/share/kavat/starship.toml"
   install -Dm644 starship-full.toml "$pkgdir/usr/share/kavat/starship-full.toml"
   install -Dm644 skel-zshrc "$pkgdir/etc/skel/.zshrc"
+  # the aliases file every new user starts with, with port-kill and y in it
+  install -Dm644 aliases.zsh "$pkgdir/etc/skel/.config/kavat/aliases.zsh"
+  install -Dm644 "sudo.plugin-$_ohmyzsh.zsh" "$pkgdir/usr/share/kavat/zsh/sudo.plugin.zsh"
+  install -Dm644 "ohmyzsh-LICENSE-$_ohmyzsh.txt" "$pkgdir/usr/share/licenses/$pkgname/ohmyzsh-LICENSE.txt"
   # what machine this is and what is running, in the theme's colours
   install -Dm755 kavat-fetch "$pkgdir/usr/bin/kavat-fetch"
+  install -Dm755 fetch-health "$pkgdir/usr/lib/kavat/fetch-health"
   install -Dm755 kavat-top "$pkgdir/usr/bin/kavat-top"
   # one command for the whole system, the projects, and what Tab offers after them
   install -Dm755 kavat "$pkgdir/usr/bin/kavat"

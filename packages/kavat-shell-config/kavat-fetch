@@ -3,11 +3,28 @@
 #
 # It is fastfetch with the lines and colours kavat-theme writes. A file of your own,
 # ~/.config/fastfetch/config.jsonc, is used in their place when it is there.
+#
+# In Kitty the cat is a picture, shown with Kitty's own way of drawing; anywhere else it
+# is the one in characters. The picture is made from the theme's drawing the first time,
+# and again when the theme has changed. kavat-fetch --logo none leaves the cat out.
 own="${XDG_CONFIG_HOME:-$HOME/.config}/fastfetch/config.jsonc"
 theme="${XDG_STATE_HOME:-$HOME/.local/state}/kavat/theme/current/fastfetch/config.jsonc"
 if [ -e "$own" ]; then
   exec fastfetch "$@"
 elif [ -e "$theme" ]; then
+  drawing="${theme%/*}/logo.svg"
+  picture="${XDG_CACHE_HOME:-$HOME/.cache}/kavat/fetch-logo.png"
+  # Kitty reads the picture's file itself, so it has to be this machine's Kitty, with
+  # nothing in between
+  if [ -n "$KITTY_WINDOW_ID" ] && [ -z "$TMUX" ] && [ -z "$SSH_CONNECTION" ] && [ -t 1 ] && [ -e "$drawing" ]; then
+    if [ ! -e "$picture" ] || [ "$drawing" -nt "$picture" ]; then
+      mkdir -p "${picture%/*}"
+      rsvg-convert --width 512 --output "$picture.new" "$drawing" 2> /dev/null && mv "$picture.new" "$picture"
+    fi
+    # as wide as the cat in characters: a square, in cells twice as tall as they are wide
+    [ -e "$picture" ] && exec fastfetch --config "$theme" --logo-type kitty-direct --logo "$picture" \
+      --logo-width 22 --logo-height 11 "$@"
+  fi
   exec fastfetch --config "$theme" "$@"
 fi
 exec fastfetch "$@"

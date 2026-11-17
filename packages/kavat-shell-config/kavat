@@ -15,6 +15,9 @@
 #   notes       notes, tasks and reminders                       (kavat-notes)
 #   find        the file search                                  (kavat-find)
 #   browser     the browser, and its console's commands          (kavat-browser)
+#   webapp      a page installed as an app: kavat webapp install (kavat-webapp)
+#   remote      reaching this computer from your devices         (kavat-remote)
+#   keys        the desktop's shortcuts, and other keys for them (kavat-keys)
 #   packages    install, remove, update: kavat packages update   (kav)
 #   doctor      the health of the system                         (kav doctor)
 #   backup      copies off the computer                          (kavat-backup)
@@ -27,7 +30,7 @@ declare -A programs=(
   [theme]=kavat-theme [mode]=kavat-mode [wallpaper]=kavat-wallpaper [displays]=kavat-displays [project]=kavat-project
   [notes]=kavat-notes [find]=kavat-find [browser]=kavat-browser [packages]=kav [backup]=kavat-backup
   [history]=kavat-history [set]=kavat-conf [fetch]=kavat-fetch [top]=kavat-top
-  [game]=kavat-game [dns]=kavat-dns [sandbox]=kavat-sandbox
+  [game]=kavat-game [dns]=kavat-dns [sandbox]=kavat-sandbox [webapp]=kavat-webapp [remote]=kavat-remote [keys]=kavat-keys
 )
 what=${1:-}
 case "$what" in

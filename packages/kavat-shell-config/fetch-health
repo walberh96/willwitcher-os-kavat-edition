@@ -1,0 +1,37 @@
+#!/bin/sh
+# fetch-health: the Health line of kavat-fetch, in a few words: what kav doctor would warn
+# of, and how many updates wait. kav doctor says the rest.
+#
+# It only reads what is quick to read. Counting the updates is pacman's work and takes a
+# moment, so the count is kept, and made again only when the packages, or the lists the
+# look for updates fetches, have changed since. Packages of the AUR are not counted.
+warnings=
+
+failed=$(systemctl --failed --no-legend --plain 2> /dev/null | grep -c .)
+[ "$failed" -eq 1 ] && warnings="1 service failed"
+[ "$failed" -gt 1 ] && warnings="$failed services failed"
+
+full=$(df --output=pcent / 2> /dev/null | tail -n 1 | tr -dc 0-9)
+[ "${full:-0}" -ge 90 ] && warnings="${warnings:+$warnings · }disk $full% full"
+
+merge=$(find /etc \( -name '*.pacnew' -o -name '*.pacsave' \) 2> /dev/null | grep -c .)
+[ "$merge" -eq 1 ] && warnings="${warnings:+$warnings · }1 settings file to merge"
+[ "$merge" -gt 1 ] && warnings="${warnings:+$warnings · }$merge settings files to merge"
+
+# the newer lists, as kav reads them: the system's own, or the ones kav check fetched since
+kept="${XDG_CACHE_HOME:-$HOME/.cache}/kavat/fetch-updates"
+newest=$(ls -t /var/lib/kav/check/sync/*.db /var/lib/pacman/sync/*.db 2> /dev/null | head -n 1)
+if [ ! -e "$kept" ] || [ "$newest" -nt "$kept" ] || [ /var/lib/pacman/local -nt "$kept" ]; then
+  mkdir -p "${kept%/*}"
+  pacman -Qu --dbpath "${newest%/sync/*}" 2> /dev/null | grep -c . > "$kept"
+fi
+updates=$(cat "$kept" 2> /dev/null)
+
+if [ -n "$warnings" ]; then
+  line="! $warnings"
+else
+  line="✓ ok"
+fi
+[ "${updates:-0}" -eq 1 ] && line="$line · 1 update"
+[ "${updates:-0}" -gt 1 ] && line="$line · $updates updates"
+echo "$line"

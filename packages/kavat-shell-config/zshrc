@@ -7,8 +7,8 @@
 # The settings of the Shell page of the settings panel: a name and its value to a line, in
 # ~/.config/kavat/shell.conf. They are read here without starting a program; a terminal
 # opened after a change has it.
-typeset -A _kavat_shell=(suggestions yes highlighting yes completion_picker yes history_lines 50000
-                         shared_history yes prompt short listing lsd)
+typeset -A _kavat_shell=(suggestions yes highlighting yes completion_picker yes more_completions yes
+                         esc_sudo yes history_lines 50000 shared_history yes prompt short listing lsd)
 () {
   local name value file="${XDG_CONFIG_HOME:-$HOME/.config}/kavat/shell.conf"
   [[ -r $file ]] || return
@@ -51,15 +51,31 @@ bindkey '^[[1;5D' backward-word
 
 # Completion. What can be completed is worked out once a day and kept; in between, the
 # kept list is used as it is.
+#
+# zsh-completions brings completions for many more commands. Its files are in the folder
+# every other program's are in, so there is no folder to leave out when the Shell page
+# turns it off: its commands are taken out of the list instead, as the list is made, and
+# that list is kept under a name of its own. pacman's record of the package says which
+# files are its.
 autoload -Uz compinit
 () {
   local kept="${XDG_CACHE_HOME:-$HOME/.cache}/zsh/zcompdump"
+  [[ ${_kavat_shell[more_completions]} == yes ]] || kept+=-fewer
   [[ -d ${kept:h} ]] || mkdir -p "${kept:h}"
   local -a fresh=( ${kept}(N.mh-24) )
   if (( $#fresh )); then
     compinit -C -d "$kept"
   else
     compinit -d "$kept"
+    if [[ $kept == *-fewer ]]; then
+      local -a record=( /var/lib/pacman/local/zsh-completions-*/files(N) ) theirs
+      (( $#record )) && theirs=( ${${(M)${(f)"$(< $record[1])"}:#usr/share/zsh/site-functions/_*}:t} )
+      local command
+      for command in ${(k)_comps}; do
+        (( ${theirs[(Ie)${_comps[$command]}]} )) && unset "_comps[$command]"
+      done
+      (( $#theirs )) && compdump
+    fi
   fi
   zstyle ':completion:*' cache-path "${kept:h}/completions"
 }
@@ -103,6 +119,10 @@ fi
 
 # Suggestions from the history as you type; the right arrow takes one
 [[ ${_kavat_shell[suggestions]} == yes ]] && source /usr/share/zsh/plugins/zsh-autosuggestions/zsh-autosuggestions.zsh
+
+# Esc twice puts sudo in front of the line, or of the last command when the line is empty,
+# and takes it away again. It is oh-my-zsh's plugin: only its one file, with no framework.
+[[ ${_kavat_shell[esc_sudo]} == yes ]] && source /usr/share/kavat/zsh/sudo.plugin.zsh
 
 # Ctrl+G looks for text inside the files of this folder
 kavat-find-text() {
