@@ -35,6 +35,7 @@ local PAGES = {
   { id = "packages", name = "Packages", about = "kav" },
   { id = "backup", name = "Backup & sync" },
   { id = "privacy", name = "Privacy & network" },
+  { id = "remote", name = "Remote access" },
   { id = "boot", name = "Boot", about = "GRUB" },
   { id = "login", name = "Login & lock" },
   { id = "language", name = "Language & region" },
@@ -52,7 +53,7 @@ local projects = {}  -- each: name, folder, workspace, open
 local project_name = ""
 local privacy = { firewall = "", doors = {}, opensnitch = "", vpn = "", dns = "off", sandbox = {} }
 local games = {}  -- the game profiles, as kavat-game lists them
-local browser = { default = "", widevine = "", commands = "0" }  -- what the browser page shows
+local browser = { default = "", widevine = "", commands = "0", shorts = "off", apps = {} }  -- what the browser page shows
 local panel_open = false  -- what reads again and again stops when the panel closes
 local gpu = {}  -- what the graphics card says of itself, by name
 local profiles = {}      -- the looks saved under a name
@@ -64,6 +65,9 @@ local display_tried = 0    -- above zero while a change of the displays waits to
 local walls = { list = {}, displays = {}, kind = "theme", file = "", sound = "off", fit = "fill", gpu = "on" }  -- the background, as kavat-wallpaper says it
 local wall_display = ""  -- the display a background is being chosen for; none is all of them
 local wall_filter = "all"
+local wall_words = ""      -- what is searched for online
+local wall_found = {}      -- what the sources answered: each a small picture, the full one's address and its size
+local wall_searching = false
 local modes = { list = {}, vpn = "", vpns = {}, auto = true }  -- the system's modes, as kavat-mode says them
 local boot_said = ""
 local conf = {}        -- what kavat-conf says each page's settings are, by page and name
@@ -340,11 +344,15 @@ local function read_browser()
   noctalia.runAsync("echo \"default $(xdg-settings get default-web-browser 2>/dev/null)\"; "
     .. "echo \"widevine $(sed -n 's/.*\"version\": *\"\\([^\"]*\\)\".*/\\1/p' /usr/lib/chromium/WidevineCdm/manifest.json 2>/dev/null | head -n 1)\"; "
     .. "echo \"commands $(grep -c '^\\[\\[command\\]\\]' ~/.config/kavat/browser/commands.toml 2>/dev/null)\"; "
-    .. "echo \"background $(sed -n 's/^start_background *= *\"\\(.*\\)\"/\\1/p' ~/.config/kavat/browser/browser.toml 2>/dev/null | head -n 1)\"", function(result)
-    local found = { default = "", widevine = "", commands = "0", background = "" }
+    .. "echo \"background $(sed -n 's/^start_background *= *\"\\(.*\\)\"/\\1/p' ~/.config/kavat/browser/browser.toml 2>/dev/null | head -n 1)\"; "
+    .. "echo \"shorts $(kavat-browser shorts 2>/dev/null)\"; kavat-webapp list 2>/dev/null | sed 's/^/app\t/'", function(result)
+    local found = { default = "", widevine = "", commands = "0", background = "", shorts = "off", apps = {} }
     for line in result.stdout:gmatch("[^\n]+") do
+      local app, address = line:match("^app\t([^\t]+)\t([^\t]*)")
       local name, value = line:match("^(%S+) ?(.*)$")
-      if name then
+      if app then
+        found.apps[#found.apps + 1] = { name = app, address = address }
+      elseif name then
         found[name] = value
       end
     end
@@ -428,15 +436,39 @@ local function set_conf(name, key, value)
   end)
 end
 
+local key_changing = ""  -- the shortcut being given other keys, by the keys it comes with
+local key_typed = ""
+
+-- The shortcuts as kavat-keys lists them: the keys now, what they do, the group, and the
+-- keys a changed one comes with. The list itself is read when kavat-keys is not there.
 local function read_shortcuts()
-  shortcuts = {}
-  local text = noctalia.readFile("/usr/share/kavat/hypr/shortcuts.tsv") or ""
-  for line in text:gmatch("[^\n]+") do
-    local keys, what, group = line:match("^([^#\t][^\t]*)\t([^\t]*)\t(.*)$")
-    if keys then
-      shortcuts[#shortcuts + 1] = { keys = keys, what = what, group = group }
+  noctalia.runAsync({ "kavat-keys" }, function(result)
+    local text, found = result.exitCode == 0 and result.stdout or (noctalia.readFile("/usr/share/kavat/hypr/shortcuts.tsv") or ""), {}
+    for line in text:gmatch("[^\n]+") do
+      local keys, what, group, first = line:match("^([^#\t][^\t]*)\t([^\t]*)\t([^\t]*)\t?(.*)$")
+      if keys then
+        local changed = first ~= "" and first ~= "-"
+        found[#found + 1] = { keys = keys, what = what, group = group, first = changed and first or keys, changed = changed }
+      end
     end
-  end
+    shortcuts = found
+    render()
+  end)
+end
+
+local function key_does(...)
+  busy = true
+  said = ""
+  render()
+  noctalia.runAsync({ "kavat-keys", ... }, function(result)
+    busy = false
+    if result.exitCode ~= 0 then
+      said = trim(result.stderr ~= "" and result.stderr or result.stdout):gsub("^kavat%-keys: ", "")
+    else
+      key_changing = ""
+    end
+    read_shortcuts()
+  end)
 end
 
 -- The pieces every page is made of ------------------------------------------------------
@@ -1069,7 +1101,7 @@ local function pages_browser()
       panel.close()
     end
   end
-  return { title = "Browser", sub = "Kavat Browser · Chromium, made the system's own", file = "~/.config/kavat/browser/commands.toml", left = {
+  local content = { title = "Browser", sub = "Kavat Browser · Chromium, made the system's own", file = "~/.config/kavat/browser/commands.toml", left = {
     section("The browser"),
     row("Opens links", ui.row({ gap = 8, align = "center", flexGrow = 1 }, {
       ui.label({ text = ours and "Kavat Browser" or (browser.default ~= "" and browser.default or "nothing chosen"), fontFamily = "JetBrains Mono", fontSize = 12, flexGrow = 1 }),
@@ -1109,6 +1141,30 @@ local function pages_browser()
     row("Widevine", ui.label({ text = browser.widevine ~= "" and browser.widevine or "not installed", fontFamily = "JetBrains Mono", fontSize = 12 })),
     note("Netflix, Prime Video, Disney+ and Spotify play through it, at 720p at most, as in any browser on Linux."),
   } }
+  local right = content.right
+  right[#right + 1] = section("YouTube")
+  right[#right + 1] = row("Hide Shorts", ui.row({ justify = "end", flexGrow = 1 }, {
+    ui.toggle({ checked = browser.shorts ~= "on", enabled = not busy, onChange = function(now)
+      noctalia.runAsync({ "kavat-browser", "shorts", now == "true" and "off" or "on" }, function() read_browser() end)
+    end }) }))
+  right[#right + 1] = section("Pages installed as apps")
+  for _, app in ipairs(browser.apps) do
+    right[#right + 1] = ui.row({ key = "app-" .. app.name, align = "center", gap = 8, paddingH = 10, paddingV = 4, minHeight = 36, radius = 8, fill = "surface_container" }, {
+      ui.column({ gap = 1, flexGrow = 1 }, {
+        ui.label({ text = app.name, maxWidth = 300 }),
+        ui.label({ text = app.address, fontSize = 11, color = "on_surface_variant", maxWidth = 300 }),
+      }),
+      ui.button({ text = "Remove", variant = "ghost", controlSize = "sm", onClick = function()
+        noctalia.runAsync({ "kavat-webapp", "remove", app.name }, function() read_browser() end)
+      end }),
+    })
+  end
+  right[#right + 1] = ui.row({ gap = 8 }, { ui.button({ text = "+ Install a page as an app", variant = "outline", controlSize = "sm", onClick = function()
+    noctalia.runInTerminal("kavat-webapp install; echo; read -r -p 'Enter closes this window. ' _")
+    panel.close()
+  end }) })
+  right[#right + 1] = note("An app is a page in a window of its own, with no tabs and no address bar, found in the launcher. In the browser, Ctrl+Shift+K and \"install app\" installs the page in view.")
+  return content
 end
 
 local function pages_projects()
@@ -1343,6 +1399,8 @@ local function shell()
     row("Suggestions from the history", conf_toggle("shell", "suggestions", "yes", "no")),
     row("Colours for what is typed", conf_toggle("shell", "highlighting", "yes", "no")),
     row("Tab opens the picker", conf_toggle("shell", "completion_picker", "yes", "no")),
+    row("More completions", conf_toggle("shell", "more_completions", "yes", "no")),
+    row("Esc twice puts sudo", conf_toggle("shell", "esc_sudo", "yes", "no")),
     section("History"),
     row("Commands kept", conf_select("shell", "history_lines", { { "10000", "10,000" }, { "50000", "50,000" }, { "200000", "200,000" } })),
     row("Shared between terminals", conf_toggle("shell", "shared_history", "yes", "no")),
@@ -1408,8 +1466,7 @@ local function wallpaper()
     end
   end
   for _, item in ipairs(walls.list) do
-    -- a video plays on every display: one display takes an image, or what the others show
-    if (wall_filter == "all" or item.kind == wall_filter or item.kind == "theme") and (wall_display == "" or item.kind ~= "video") then
+    if wall_filter == "all" or item.kind == wall_filter or item.kind == "theme" then
       local on = (item.kind == "theme" and walls.kind == "theme") or item.file == walls.file
       if wall_display ~= "" then
         on = own ~= nil and item.file == own or own == nil and on
@@ -1453,6 +1510,56 @@ local function wallpaper()
     }),
     ui.column({ gap = 12 }, rows),
   })
+  -- Online: the words go to the sources that are on, and what they answer is drawn; a press
+  -- downloads the picture to the library and sets it. Nothing is asked until Search is pressed.
+  local search = function()
+    if wall_words == "" or wall_searching then
+      return
+    end
+    wall_searching, wall_found, said = true, {}, ""
+    render()
+    noctalia.runAsync({ "kavat-wallpaper", "search", wall_words }, function(result)
+      wall_searching = false
+      for line in result.stdout:gmatch("[^\n]+") do
+        local source, id, small, full, size, file = line:match("^([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)$")
+        if file and file ~= "-" and full ~= "-" then
+          wall_found[#wall_found + 1] = { source = source, full = full, size = size, file = file }
+        end
+      end
+      if result.exitCode ~= 0 then
+        said = trim(result.stderr):gsub("^kavat%-wallpaper: ", "")
+      elseif #wall_found == 0 then
+        said = "Nothing was found for those words."
+      end
+      render()
+    end)
+  end
+  local online = {
+    ui.row({ gap = 8, align = "center" }, {
+      section("Online"),
+      ui.input({ key = "wall-words", placeholder = "Search wallpapers on the network: mountains, city at night…", controlSize = "sm", flexGrow = 1, value = wall_words,
+        onChange = function(text) wall_words = text end, onSubmit = search }),
+      ui.button({ text = wall_searching and "Searching…" or "Search", variant = "outline", controlSize = "sm", enabled = not wall_searching, onClick = search }),
+      #wall_found > 0 and ui.button({ text = "✕", variant = "ghost", controlSize = "sm", onClick = function() wall_found = {}; render() end }) or nil,
+    }),
+  }
+  for at = 1, #wall_found, 5 do
+    local line = {}
+    for index = at, math.min(at + 4, #wall_found) do
+      local picture = wall_found[index]
+      line[#line + 1] = ui.column({ key = "online-" .. picture.file, gap = 4, width = 178 }, {
+        ui.image({ path = picture.file, width = 178, height = 100, radius = 8, fit = "cover", border = "outline_variant", borderWidth = 1,
+          onClick = function() wall_does("fetch", picture.full) end }),
+        ui.row({ gap = 6 }, {
+          ui.label({ text = picture.size ~= "-" and picture.size or "", fontSize = 11, color = "on_surface_variant" }),
+          ui.spacer({ flexGrow = 1 }),
+          ui.label({ text = picture.source, fontSize = 11, color = "on_surface_variant" }),
+        }),
+      })
+    end
+    online[#online + 1] = ui.row({ gap = 12 }, line)
+  end
+  top = ui.column({ gap = 12 }, { top, ui.column({ gap = 10 }, online) })
   if #walls.displays > 1 then
     local choices = { { text = "All displays", on = wall_display == "", pick = function() wall_display = ""; render() end } }
     for _, display in ipairs(walls.displays) do
@@ -1478,6 +1585,9 @@ local function wallpaper()
     }),
     note("A file put in one of the two folders shows here. In Yazi, W sets the file under the cursor as the background."),
     section("Also"),
+    row("The lock shows it", ui.row({ justify = "end", flexGrow = 1 }, {
+      ui.toggle({ checked = (walls.lock or "background") ~= "theme", enabled = not busy, onChange = function(now) wall_does("option", "lock", now == "true" and "background" or "theme") end }),
+    })),
     row("Colours from it", ui.row({ justify = "end", flexGrow = 1 }, {
       ui.toggle({ checked = theme.palette == "wallpaper", enabled = not busy, onChange = function(now)
         if now == "true" then wall_does("palette") else set("palette", "kavat") end
@@ -1506,7 +1616,7 @@ local function wallpaper()
       { text = "30", on = walls.slideshow == "30", pick = function() wall_does("option", "slideshow", "30") end },
       { text = "1 h", on = walls.slideshow == "60", pick = function() wall_does("option", "slideshow", "60") end },
     })),
-    note("The images of the library are shown one after another, in the order of their names, on every display. With more than one display, each can have an image of its own, chosen above; a video plays on them all."),
+    note("The images of the library are shown one after another, in the order of their names, on every display. With more than one display, each can have an image or a video of its own, chosen above."),
   } }
 end
 
@@ -1849,6 +1959,158 @@ local function network()
   end
   right[#right + 1] = note("The firewall and who uses the network are in Privacy & network.")
   return { title = "Network", sub = "connections and Bluetooth devices", file = "~/.config/kavat/network.toml", left = left, right = right }
+end
+
+-- Remote access: whether this computer is reached from your other devices, as kavat-remote
+-- says it. Turning it on or off, and its parts, ask for an administrator's password.
+local remote = { state = "off", parts = {}, server = "default", network = "down", address = "-", connected = {}, keys = {}, paired = {} }
+local remote_typed = { key = "", pin = "", server = "" }
+local remote_qr = ""  -- the picture of the address to sign in at, while there is one
+
+local function read_remote()
+  noctalia.runAsync("command -v kavat-remote > /dev/null || { echo missing; exit 0; }; kavat-remote", function(result)
+    local found = { state = "off", missing = trim(result.stdout) == "missing", parts = {}, server = "default", network = "down", address = "-", connected = {}, keys = {}, paired = {} }
+    for line in result.stdout:gmatch("[^\n]+") do
+      local parts = {}
+      for part in (line .. "\t"):gmatch("([^\t]*)\t") do
+        parts[#parts + 1] = part
+      end
+      local what = parts[1]
+      if what == "state" then
+        found.state = parts[2]
+      elseif what == "terminal" or what == "desktop" or what == "awake" then
+        found.parts[what] = { on = parts[2] == "yes", up = parts[3] == "up" }
+      elseif what == "server" then
+        found.server = parts[2]
+      elseif what == "network" then
+        found.network, found.address = parts[2], parts[3] or "-"
+      elseif what == "self" then
+        found.name, found.own = parts[2], parts[3]
+      elseif what == "connected" then
+        found.connected[#found.connected + 1] = { device = parts[2], address = parts[3], through = parts[4] }
+      elseif what == "key" then
+        found.keys[#found.keys + 1] = { number = parts[2], kind = parts[3], comment = parts[4], tail = parts[5] }
+      elseif what == "paired" then
+        found.paired[#found.paired + 1] = { number = parts[2], name = parts[3] }
+      end
+    end
+    remote = found
+    if found.network == "login" and found.address ~= "-" then
+      -- the address to sign in at, as a picture a phone can read
+      local file = (os.getenv("XDG_RUNTIME_DIR") or "/tmp") .. "/kavat-remote-qr.png"
+      noctalia.runAsync({ "kavat-remote", "login", "qr", file }, function(made)
+        remote_qr = made.exitCode == 0 and file or ""
+        render()
+      end)
+    else
+      remote_qr = ""
+    end
+    render()
+  end)
+end
+
+local function remote_does(working, ...)
+  busy = true
+  said = ""
+  news = working or ""
+  render()
+  noctalia.runAsync({ "kavat-remote", ... }, function(result)
+    busy = false
+    news = ""
+    if result.exitCode ~= 0 then
+      said = trim(result.stderr ~= "" and result.stderr or result.stdout):gsub("^kavat%-remote: ", "")
+      if said == "" then said = "The password was not given, so nothing changed." end
+    elseif trim(result.stdout) ~= "" then
+      news = trim(result.stdout)
+    end
+    read_remote()
+  end)
+end
+
+local function pages_remote()
+  if remote.missing then
+    return { title = "Remote access", sub = "not installed", left = {
+      note("Remote access is not part of this system yet. It is kavat-remote, over Tailscale, the SSH server and Sunshine, and it comes with an update once Sunshine is built for the system."),
+    }, right = {} }
+  end
+  local on = remote.state ~= "off"
+  local part = function(name, label)
+    local this = remote.parts[name] or { on = false, up = false }
+    return row(label, ui.row({ justify = "end", align = "center", gap = 8, flexGrow = 1 }, {
+      ui.label({ text = on and (this.up and "running" or this.on and "not running" or "") or "", fontSize = 11, color = this.up and "primary" or "on_surface_variant" }),
+      ui.toggle({ checked = this.on, enabled = not busy, onChange = function(now) remote_does("Waiting for your password…", "set", name .. "=" .. (now == "true" and "yes" or "no")) end }),
+    }))
+  end
+  local left = {
+    section("Remote access"),
+    row("Enabled", switch(on, function(now) remote_does("Waiting for your password…", now and "on" or "off") end)),
+    note(remote.state == "paused" and "It is paused while Incognito is on, and comes back on leaving."
+      or on and "This computer is reached from your own devices, through your private network and from nowhere else."
+      or "Off: nothing of it runs, and the firewall has no door for it. Turning it on joins your Tailscale network, opens the terminal and the desktop to that network only, and keeps the computer awake."),
+    section("What is open"),
+    part("terminal", "Terminal · SSH"),
+    part("desktop", "Desktop · Sunshine"),
+    part("awake", "Stay awake"),
+    note("The terminal takes keys only: no passwords and no root. The desktop is seen from Moonlight, once someone has logged in at this computer. Awake keeps it from suspending; the screen still locks."),
+    section("Private network · Tailscale"),
+  }
+  if not on then
+    left[#left + 1] = note("Joined when remote access is turned on.")
+  elseif remote.network == "up" then
+    left[#left + 1] = row("This computer", ui.label({ text = (remote.name or "?") .. " · " .. (remote.own or ""), fontFamily = "JetBrains Mono", fontSize = 12 }))
+  elseif remote.network == "login" then
+    left[#left + 1] = note("Sign in to join it, at this address or with the picture, from any device:")
+    left[#left + 1] = ui.label({ text = remote.address, fontFamily = "JetBrains Mono", fontSize = 12, color = "primary", maxWidth = 440 })
+    if remote_qr ~= "" then
+      left[#left + 1] = ui.image({ path = remote_qr, width = 170, height = 170, radius = 6 })
+    end
+    left[#left + 1] = ui.row({ gap = 8 }, { ui.button({ text = "I have signed in", variant = "outline", controlSize = "sm", onClick = function() read_remote() end }) })
+  else
+    left[#left + 1] = note("The private network is not up.")
+  end
+  left[#left + 1] = ui.row({ gap = 8, align = "center" }, {
+    ui.input({ key = "remote-server", placeholder = remote.server == "default" and "A server of your own, Headscale: https://…" or remote.server, controlSize = "sm", flexGrow = 1,
+      onChange = function(text) remote_typed.server = text end }),
+    ui.button({ text = "Use it", variant = "ghost", controlSize = "sm", enabled = not busy, onClick = function()
+      if remote_typed.server ~= "" then remote_does("Waiting for your password…", "set", "server=" .. remote_typed.server) end
+    end }),
+    remote.server ~= "default" and ui.button({ text = "Tailscale's", variant = "ghost", controlSize = "sm", enabled = not busy,
+      onClick = function() remote_does("Waiting for your password…", "set", "server=default") end }) or nil,
+  })
+
+  local right = { section("Connected now") }
+  if #remote.connected == 0 then
+    right[#right + 1] = note(on and "Nobody." or "Remote access is off.")
+  end
+  for index, device in ipairs(remote.connected) do
+    local desktop = device.through == "desktop"
+    right[#right + 1] = net_line("remote-in-" .. index, desktop and "A device is watching the desktop" or device.device, desktop and "desktop" or ("terminal · " .. device.address), true,
+      { { "Disconnect", function() remote_does(nil, "disconnect", desktop and "desktop" or device.device) end } })
+  end
+  right[#right + 1] = section("Keys that may come in to the terminal")
+  for _, key in ipairs(remote.keys) do
+    right[#right + 1] = net_line("remote-key-" .. key.number, key.comment ~= "-" and key.comment or key.kind, key.kind .. " · …" .. key.tail, false,
+      { { "Remove", function() remote_does(nil, "key", "remove", key.number) end } })
+  end
+  right[#right + 1] = ui.row({ gap = 8, align = "center" }, {
+    ui.input({ key = "remote-key", placeholder = "Paste a public key: ssh-ed25519 AAAA… name", controlSize = "sm", flexGrow = 1, onChange = function(text) remote_typed.key = text end }),
+    ui.button({ text = "Add", variant = "outline", controlSize = "sm", enabled = not busy, onClick = function()
+      if remote_typed.key ~= "" then remote_does(nil, "key", "add", remote_typed.key) end
+    end }),
+  })
+  right[#right + 1] = section("Devices paired for the desktop")
+  for _, device in ipairs(remote.paired) do
+    right[#right + 1] = net_line("remote-paired-" .. device.number, device.name, "Moonlight", false,
+      { { "Forget", function() remote_does(nil, "unpair", device.number) end } })
+  end
+  right[#right + 1] = ui.row({ gap = 8, align = "center" }, {
+    ui.input({ key = "remote-pin", placeholder = "The PIN Moonlight shows", controlSize = "sm", width = 200, onChange = function(text) remote_typed.pin = text end }),
+    ui.button({ text = "Pair", variant = "outline", controlSize = "sm", enabled = not busy and on, onClick = function()
+      if remote_typed.pin ~= "" then remote_does("Pairing…", "pair", remote_typed.pin) end
+    end }),
+  })
+  right[#right + 1] = note("In Moonlight, add this computer by its name on the private network: it shows a PIN to type here.")
+  return { title = "Remote access", sub = on and (remote.state == "paused" and "paused" or "on · your own devices only") or "off", file = "/etc/kavat/remote.conf", left = left, right = right }
 end
 
 -- The bar and the notifications are the shell's: what it says of them is read, and changed,
@@ -2336,19 +2598,39 @@ local function keys()
       column[#column + 1] = ui.column({ key = "group-" .. shortcut.group, gap = 2 }, rows)
       last = shortcut.group
     end
-    rows[#rows + 1] = ui.row({ key = "key-" .. shortcut.keys, align = "center", gap = 12, minHeight = 24 }, {
-      ui.column({ width = 180, minWidth = 180 }, { ui.label({ text = shortcut.keys, fontFamily = "JetBrains Mono", fontSize = 12, color = "primary" }) }),
-      ui.label({ text = shortcut.what, fontSize = 13 }),
-    })
+    -- the ones that are several shortcuts at once, or the mouse's, keep their keys
+    local fixed = shortcut.first:find("Arrows", 1, true) or shortcut.first:find("…", 1, true) or shortcut.first:lower():find("mouse", 1, true)
+    if key_changing == shortcut.first then
+      local keep = function()
+        if key_typed ~= "" then
+          key_does("set", shortcut.first, key_typed)
+        end
+      end
+      rows[#rows + 1] = ui.row({ key = "key-change", align = "center", gap = 6, minHeight = 30 }, {
+        ui.input({ key = "key-input-" .. shortcut.first, placeholder = "Keys for " .. shortcut.what, focus = true, controlSize = "sm", width = 190,
+          onChange = function(text) key_typed = text end, onSubmit = keep }),
+        ui.button({ text = "Keep", variant = "primary", controlSize = "sm", onClick = keep }),
+        ui.button({ text = "No keys", variant = "ghost", controlSize = "sm", onClick = function() key_does("off", shortcut.first) end }),
+        ui.button({ text = "As it comes", variant = "ghost", controlSize = "sm", onClick = function() key_does("reset", shortcut.first) end }),
+        ui.button({ text = "✕", variant = "ghost", controlSize = "sm", onClick = function() key_changing = ""; render() end }),
+      })
+    else
+      rows[#rows + 1] = ui.row({ key = "key-" .. shortcut.first, align = "center", gap = 12, minHeight = 24, radius = 6,
+        onClick = not fixed and function() key_changing, key_typed = shortcut.first, ""; said = ""; render() end or nil }, {
+        ui.column({ width = 180, minWidth = 180 }, { ui.label({ text = shortcut.keys, fontFamily = "JetBrains Mono", fontSize = 12,
+          color = shortcut.keys == "none" and "on_surface_variant" or "primary", fontWeight = shortcut.changed and "bold" or "normal" }) }),
+        ui.label({ text = shortcut.what .. (shortcut.changed and "  · was " .. shortcut.first or ""), fontSize = 13 }),
+      })
+    end
     half = index
   end
-  return { title = "Keybindings", sub = "the desktop's shortcuts · Super+/ opens this list", file = "/usr/share/kavat/hypr/hyprland.lua",
+  return { title = "Keybindings", sub = "the desktop's shortcuts · press one to give it other keys", file = "~/.config/hypr/keys.lua",
     left = columns[1], right = columns[2] }
 end
 
 local BUILT = { appearance = appearance, wallpaper = wallpaper, accessibility = accessibility, windows = windows, keys = keys,
   displays = pages_displays, sound = sound, network = network, terminal = terminal, shell = shell, editor = editor, files = files, notes = notes,
-  bar = bar, modes = pages_modes, backup = pages_backup, gpu = pages_gpu, browser = pages_browser, projects = pages_projects, privacy = pages_privacy, packages = pages_packages, boot = boot, login = login, language = language }
+  bar = bar, modes = pages_modes, backup = pages_backup, gpu = pages_gpu, browser = pages_browser, projects = pages_projects, privacy = pages_privacy, remote = pages_remote, packages = pages_packages, boot = boot, login = login, language = language }
 
 local function waiting(entry)
   return { title = entry.name, sub = entry.about or "", left = {
@@ -2503,6 +2785,8 @@ function open_page(id)
     read_privacy()
   elseif id == "modes" then
     read_modes()
+  elseif id == "remote" then
+    read_remote()
   elseif id == "network" then
     read_net()
   elseif id == "bar" then
@@ -2531,7 +2815,6 @@ function open_page(id)
     read_boot()
   elseif id == "keys" then
     read_shortcuts()
-    render()
   end
 end
 

@@ -215,6 +215,44 @@ def main():
                               'nmcli -t -f TYPE connection show --active | grep -c -E "^(vpn|wireguard)"; grep -c "VPN · " /usr/share/kavat/shell-plugins/modes/widget.luau; '
                               'kavat-shell msg config-get bar.default.end | grep -c "kavat/settings:network"; kavat-network | grep -c "^proton.-.-$"; kavat-mode vpn proton 2>&1 | grep -c "is not installed"')
         checks.report(output.split() == ['1', '1', '1', '1', '0', '1', '1', '1', '1'], "Qt apps are handed the theme's colours through qt6ct, which the session names; the bar has the system's network widget; Proton VPN is offered and said not to be installed", output)
+        print('the third round: shortcuts, the shell, web apps, Shorts, wallpapers online, remote access', flush=True)
+        status, output = user('kavat-keys set Super+E Super+Shift+E; kavat-keys | grep -c "^Super+Shift+E.Files.Apps.Super+E$"; kavat-keys set Super+U Super+B 2>&1 | grep -c "is already"; '
+                              'kavat-keys off Super+U; hyprctl --instance 0 binds | grep -c "^bind"; kavat-keys reset all; hyprctl --instance 0 binds | grep -c "^bind"; '
+                              'hyprctl --instance 0 configerrors; kavat-keys set Super+Arrows Super+K 2>&1 | grep -c "several shortcuts"')
+        lines = output.split()
+        checks.report(len(lines) == 5 and lines[:2] == ['1', '1'] and lines[2].isdigit() and lines[3].isdigit() and int(lines[3]) == int(lines[2]) + 1 and lines[4] == '1',
+                      'a shortcut is given other keys, or none, and gets its own back; keys another has are refused', output)
+        status, output = user('zsh -i -c "whence -w port-kill y" 2> /dev/null | tr "\\n" " "; echo; (python3 -m http.server 58123 > /dev/null 2>&1 &); sleep 1.5; '
+                              'zsh -i -c "port-kill | grep -c 58123/tcp; port-kill 58123" 2> /dev/null | tr "\\n" " "; echo; zsh -i -c "bindkey \\"\\e\\e\\"" 2> /dev/null | grep -c sudo-command-line; '
+                              'kavat-conf show shell | grep -c -E "more_completions|esc_sudo"; pacman -Q zsh-completions > /dev/null 2>&1 && echo there; '
+                              'kavat-fetch --pipe 2> /dev/null | grep -c -E "Health +(✓ ok|!)"', 60)
+        lines = output.split('\n')
+        checks.report(len(lines) == 6 and 'port-kill: function' in lines[0] and 'y: function' in lines[0] and lines[1].startswith('1 ') and 'stopped python' in lines[1]
+                      and lines[2:] == ['1', '2', 'there', '1'],
+                      "port-kill and y come written for the user, Esc twice puts sudo, the extra completions are there, and kavat-fetch says the system's health", output)
+        status, output = user('kavat-webapp install Test https://example.invalid/ < /dev/null > /dev/null 2>&1; kavat-webapp list | tr "\\t" "|"; '
+                              'grep -c -x "Exec=kavat-browser --app=\\"https://example.invalid/\\"" ~/.local/share/applications/kavat-webapp-test.desktop; '
+                              'kavat-webapp install Bad "javascript:alert(1)" > /dev/null 2>&1; echo $?; kavat-webapp remove test > /dev/null; kavat-webapp list | wc -l; '
+                              'kavat-browser shorts; kavat-browser shorts on; kavat-browser shorts off; test -s /usr/share/kavat-browser/extensions/kavat/shorts-rules.js && echo rules; '
+                              'kavat-wallpaper sources | cut -f1,2 | tr "\\t" "|"; kavat-wallpaper search sea 2>&1 | grep -c "no network"; kavat-wallpaper option | grep -c "^lock background"; '
+                              'readlink ~/.cache/kavat/lock/background.png | grep -c "kavat/lock/kavat-"', 60)
+        checks.report(output.split('\n') == ['Test|https://example.invalid/|kavat-browser', '1', '2', '0', 'off', 'on', 'off', 'rules', 'wallhaven|on', '1', '1', '1'],
+                      'a page is installed as an app and removed, only from a web address; Shorts are hidden unless asked for; the online search of wallpapers has its source and says there is no network; the lock is given its picture', output)
+        # remote access comes in when Sunshine, which it needs, is built: until then there is nothing to check
+        if machine.run('test -x /usr/bin/kavat-remote')[0] == 0:
+            status, output = machine.run('systemctl is-enabled tailscaled sshd kavat-remote-awake 2>&1 | sort -u | tr "\\n" " "; echo; ss -Hltn | grep -c -E ":(22|47984|47989|47990|48010)\\b"; '
+                                         'ls /etc/kavat/firewall.d/ | grep -c kavat-remote; runuser -u tester -- kavat-remote | head -n 1 | tr "\\t" "="; '
+                                         'sshd -T 2> /dev/null | grep -E "^(passwordauthentication|permitrootlogin) " | tr "\\n" " "; echo; '
+                                         'kavat-remote on > /tmp/remote-on 2>&1; echo $?; runuser -u tester -- kavat-remote | sed -n 1p | tr "\\t" "="; '
+                                         'grep -L "iifname \\"tailscale0\\"" /etc/kavat/firewall.d/kavat-remote-*.nft | wc -l; nft list table inet kavat_firewall | grep -c tailscale0; '
+                                         'systemctl is-active tailscaled sshd kavat-remote-awake | tr "\\n" " "; echo; '
+                                         'kavat-remote off > /dev/null 2>&1; ls /etc/kavat/firewall.d/ | grep -c kavat-remote; nft list table inet kavat_firewall | grep -c tailscale0; '
+                                         'systemctl is-active tailscaled sshd | sort -u | tr "\\n" " "', 120)
+            lines = output.split('\n')
+            checks.report(len(lines) >= 11 and lines[0].strip() == 'disabled' and lines[1:4] == ['0', '0', 'state=off'] and 'passwordauthentication no' in lines[4]
+                          and 'permitrootlogin no' in lines[4] and lines[5:7] == ['0', 'state=on'] and lines[7] == '0' and lines[8].isdigit() and int(lines[8]) >= 3
+                          and lines[9].split() == ['active', 'active', 'active'] and lines[10:12] == ['0', '0'] and lines[12].strip() == 'inactive',
+                          'remote access is off as the system comes, with nothing listening; on, its doors are on the private network only and the terminal takes keys alone; off undoes it', output + '\n' + machine.run('cat /tmp/remote-on')[1])
         status, output = machine.run('kavat-dns; kavat-dns on > /dev/null; kavat-dns; readlink /etc/resolv.conf; resolvectl status | grep -c "+DNSOverTLS"; '
                                      'kavat-dns on nobody 2>&1 | grep -c "is not one of"; kavat-dns off > /dev/null; kavat-dns; systemctl is-active systemd-resolved; '
                                      'test -L /etc/resolv.conf || echo a-file', 90)

@@ -51,6 +51,8 @@ PAGES = {
             'suggestions': (['yes', 'no'], 'yes'),
             'highlighting': (['yes', 'no'], 'yes'),
             'completion_picker': (['yes', 'no'], 'yes'),
+            'more_completions': (['yes', 'no'], 'yes'),
+            'esc_sudo': (['yes', 'no'], 'yes'),
             'history_lines': (['10000', '50000', '200000'], '50000'),
             'shared_history': (['yes', 'no'], 'yes'),
             'listing': (['lsd', 'ls'], 'lsd'),
