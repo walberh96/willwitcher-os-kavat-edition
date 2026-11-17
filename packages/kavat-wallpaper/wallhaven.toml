@@ -1,0 +1,13 @@
+# A source of the wallpaper search: Wallhaven, which answers a search with data and asks for no key.
+#
+# kavat-wallpaper search sends the words to the address below and reads the answer. Only
+# what is safe for work is asked for (purity=100), the nearest to the words first. A file
+# like this one in ~/.config/kavat/wallpaper-sources/ is another source; kavat-wallpaper's
+# own header says what each line is.
+name = "Wallhaven"
+search = "https://wallhaven.cc/api/v1/search?q={words}&purity=100&categories=111&sorting=relevance"
+list = "data"
+id = "id"
+small = "thumbs.small"
+full = "path"
+size = "resolution"

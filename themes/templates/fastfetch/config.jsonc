@@ -26,6 +26,7 @@
     { "type": "memory", "key": "Memory" },
     { "type": "disk", "key": "Disk", "folders": "/" },
     { "type": "uptime", "key": "Up for" },
+    { "type": "command", "key": "Health", "text": "/usr/lib/kavat/fetch-health" },
     "break",
     { "type": "colors", "symbol": "circle" }
   ]

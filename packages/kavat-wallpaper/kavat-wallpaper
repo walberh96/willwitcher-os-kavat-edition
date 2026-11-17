@@ -3,35 +3,67 @@
 
 usage: kavat-wallpaper                  what the background is: theme, image or video, and its file
        kavat-wallpaper set <file>       an image (PNG, JPG, WebP, SVG) or a video (MP4, WebM, MKV, GIF)
-       kavat-wallpaper set <file> <display>   an image on one display only, the others keeping theirs
+       kavat-wallpaper set <file> <display>   an image or a video on one display only, the others keeping theirs
        kavat-wallpaper same <display>   that display shows what the others show again
-       kavat-wallpaper displays         each display and the image of its own, or - when it has none
+       kavat-wallpaper displays         each display and the image or the video of its own, or - when it has none
        kavat-wallpaper theme            back to the theme's own picture
        kavat-wallpaper list             the library: each file of ~/Pictures/Wallpapers, what it is, and a picture of it
        kavat-wallpaper add <file>       copy a file into the library
-       kavat-wallpaper pause|resume     stop the video where it is, and let it go on
+       kavat-wallpaper search <words>   ask the sources that are on for pictures: what they answer, one to a line
+       kavat-wallpaper fetch <address> [name]   download a picture to the library's images, and set it; get is the same
+       kavat-wallpaper sources          each source of the search, whether it is on, and its name
+       kavat-wallpaper source <name> on|off
+       kavat-wallpaper pause|resume     stop the videos where they are, and let them go on
        kavat-wallpaper playing          whether a video is playing, paused, or there is none
-       kavat-wallpaper option [<name> <value>]   the video's settings: sound, fit, gpu; and slideshow: off, or the
-                                        minutes after which the next image of the library is shown
+       kavat-wallpaper option [<name> <value>]   the video's settings: sound, fit, gpu; slideshow: off, or the
+                                        minutes after which the next image of the library is shown; and lock:
+                                        background, the lock screen showing the background, or theme
        kavat-wallpaper next             the next image of the library, in the order of their names
        kavat-wallpaper palette          make a palette from the background and wear it
-       kavat-wallpaper restore          at the start of a session: put the video back, and make the palette
+       kavat-wallpaper restore          at the start of a session: put the videos back, and make the palette
                                         the installer was asked to take from the background
+       kavat-wallpaper lock again       point the lock screen at its picture again; the theme asks after a change
 
 An image is drawn by the shell. A video is played by mpvpaper, over a still frame of it that
 the shell draws: that frame is what shows while the video is stopped, and what the palette
-is made from. The library is two folders, as in Endgame: ~/Pictures/Wallpapers/images and
-~/Pictures/Wallpapers/live.
+is made from. A video for all the displays is one player; a display with a video of its
+own has a player of its own. The library is two folders, as in Endgame:
+~/Pictures/Wallpapers/images and ~/Pictures/Wallpapers/live.
+
+The search asks the network, and nothing else here does. A source is a small TOML file,
+the system's in /usr/share/kavat/wallpaper-sources and yours in
+~/.config/kavat/wallpaper-sources, one of yours replacing the system's of the same name:
+
+    name = "Wallhaven"                      what it is called
+    search = "https://…?q={words}"          the address a search is sent to; {words} is where they go
+    list = "data"                           where in the JSON answer the list of pictures is
+    id = "id"                               and in each picture: a name for it,
+    small = "thumbs.small"                  the small picture's address,
+    full = "path"                           the full one's,
+    size = "resolution"                     and its size as 1920x1080; or width = and height =
+
+A place in the answer is its keys joined by dots; a number is a place in a list. search
+prints one picture to a line, six columns with tabs between them, - for one that is
+missing: the source, the picture's name there, the small picture's address, the full
+one's, its size as WxH, and the file the small picture was downloaded to, under
+~/.cache/kavat/wallpaper/online. Only the first 24 of each source are listed.
 """
 import colorsys
 import hashlib
+import http.client
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
 import sys
 import time
+import tomllib
+import urllib.error
+import urllib.parse
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
 
 HOME = os.path.expanduser('~')
 CONFIG = os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config'
@@ -44,7 +76,13 @@ KINDS = {'image': ('.png', '.jpg', '.jpeg', '.webp', '.svg'), 'video': ('.mp4', 
 SOCKET = f'{RUNTIME}/kavat-wallpaper.sock'
 UNIT = 'kavat-wallpaper-video'
 SLIDES = 'kavat-wallpaper-slideshow'
-OPTIONS = {'sound': ('off', 'on'), 'fit': ('fill', 'fit', 'stretch'), 'gpu': ('on', 'off'), 'slideshow': ('off', '5', '15', '30', '60')}
+OPTIONS = {'sound': ('off', 'on'), 'fit': ('fill', 'fit', 'stretch'), 'gpu': ('on', 'off'), 'slideshow': ('off', '5', '15', '30', '60'),
+           'lock': ('background', 'theme')}
+LOCK = (os.environ.get('XDG_CACHE_HOME') or f'{HOME}/.cache') + '/kavat/lock'
+SOURCES = ('/usr/share/kavat/wallpaper-sources', f'{CONFIG}/kavat/wallpaper-sources')
+ONLINE = f'{CACHE}/online'
+PAGE = 24                              # how many pictures of each source a search lists
+SMALL, FULL = 2 << 20, 60 << 20        # the most a small picture and a wallpaper may weigh
 
 
 def settings():
@@ -98,38 +136,67 @@ def still_of(video):
     return still if os.path.exists(still) else None
 
 
-def shell_shows(picture):
+def shell_shows(picture, display=None):
+    """Tell the shell its picture, for all the displays or for one. It may still be starting."""
     for _ in range(20):
-        if run('kavat-shell', 'msg', 'wallpaper-set', picture, timeout=5) is not None:
+        if run('kavat-shell', 'msg', 'wallpaper-set', *([display] if display else []), picture, timeout=5) is not None:
             return True
         time.sleep(0.5)
     return False
 
 
-def stop_video():
-    run('systemctl', '--user', 'stop', f'{UNIT}.service')
-    run('systemctl', '--user', 'reset-failed', f'{UNIT}.service')
+def unit_of(display=None):
+    """The unit of the session that plays the video: one for all the displays, or one display's own."""
+    return f'{UNIT}-{display}' if display else UNIT
 
 
-def play(video, now):
-    """mpvpaper on every screen, as a unit of the session, so that it is one and can be stopped."""
-    stop_video()
+def socket_of(display=None):
+    return f'{RUNTIME}/kavat-wallpaper-{display}.sock' if display else SOCKET
+
+
+def stop_video(display=None):
+    run('systemctl', '--user', 'stop', f'{unit_of(display)}.service')
+    run('systemctl', '--user', 'reset-failed', f'{unit_of(display)}.service')
+
+
+def stop_videos():
+    """The video for all the displays and those of each display."""
+    for units in (f'{UNIT}.service', f'{UNIT}-*.service'):
+        run('systemctl', '--user', 'stop', units)
+        run('systemctl', '--user', 'reset-failed', units)
+
+
+def play(video, now, display=None):
+    """mpvpaper on every screen, or on one, as a unit of the session, so that it is one and can be stopped."""
+    stop_video(display)
     fit = {'fill': 'panscan=1.0', 'fit': 'panscan=0.0', 'stretch': 'keepaspect=no'}[now.get('fit', 'fill')]
-    options = ['loop-file=inf', fit, f'input-ipc-server={SOCKET}',
+    options = ['loop-file=inf', fit, f'input-ipc-server={socket_of(display)}',
                'hwdec=auto-safe' if now.get('gpu', 'on') == 'on' else 'hwdec=no']
     if now.get('sound', 'off') != 'on':
         options.append('no-audio')
     # --auto-pause: the video stops while a window covers the whole of it
-    return run('systemd-run', '--user', '--quiet', '--collect', '--unit', UNIT, '--description', 'The video on the desktop',
-               'mpvpaper', '--auto-pause', '-o', ' '.join(options), 'ALL', video) is not None
+    return run('systemd-run', '--user', '--quiet', '--collect', '--unit', unit_of(display),
+               '--description', f'The video on {display}' if display else 'The video on the desktop',
+               'mpvpaper', '--auto-pause', '-o', ' '.join(options), display or 'ALL', video) is not None
 
 
-def tell_player(*command):
-    """A word to the running video, through mpv's own socket."""
+def players(now):
+    """Each video that is to play: the display it is on, None for all of them, and its file."""
+    found = []
+    if now.get('kind') == 'video' and os.path.exists(now.get('file', '')):
+        found.append((None, now['file']))
+    for display, path in now.get('displays', {}).items():
+        if kind_of(path) == 'video' and os.path.isfile(path):
+            found.append((display, path))
+    return found
+
+
+def tell_player(display, *command):
+    """A word to a running video, through mpv's own socket."""
     try:
         with socket.socket(socket.AF_UNIX) as player:
             player.settimeout(2)
-            player.connect(SOCKET)
+            player.connect(socket_of(display))
             player.sendall(json.dumps({'command': list(command)}).encode() + b'\n')
             answer = json.loads(player.recv(4096).split(b'\n')[0])
         return answer.get('data', True)
@@ -170,17 +237,30 @@ def display_names():
 
 
 def set_on(path, display):
-    """An image of its own for one display. A video is one for them all, and covers this."""
+    """An image or a video of its own for one display. A video for all of them covers this."""
     path = os.path.abspath(os.path.expanduser(path))
-    if not os.path.isfile(path) or kind_of(path) != 'image':
-        sys.exit(f'kavat-wallpaper: {path} is not an image; a video plays on every display')
+    kind = kind_of(path)
+    if not os.path.isfile(path) or kind is None:
+        sys.exit(f'kavat-wallpaper: {path} is not an image or a video this can show')
     if display not in display_names():
         sys.exit(f'kavat-wallpaper: there is no display called {display}')
     now = settings()
     if now.get('kind') == 'video':
         sys.exit('kavat-wallpaper: a video is playing on every display; set an image or the theme first')
-    if run('kavat-shell', 'msg', 'wallpaper-set', display, path, timeout=5) is None:
+    picture = path
+    if kind == 'video':
+        if not shutil.which('mpvpaper'):
+            sys.exit('kavat-wallpaper: a video needs mpvpaper, which is not installed')
+        picture = still_of(path)
+        if picture is None:
+            sys.exit(f'kavat-wallpaper: no frame could be read from {path}')
+    if run('kavat-shell', 'msg', 'wallpaper-set', display, picture, timeout=5) is None:
         sys.exit('kavat-wallpaper: the shell did not take the image')
+    if kind == 'video':
+        if not play(path, now, display):
+            sys.exit('kavat-wallpaper: the video could not be started')
+    else:
+        stop_video(display)
     now.setdefault('displays', {})[display] = path
     save(now)
 
@@ -190,17 +270,20 @@ def same_on(display):
     if now.get('displays', {}).pop(display, None) is None:
         return
     save(now)
+    stop_video(display)
     picture = now['file'] if now.get('kind') == 'image' and os.path.exists(now.get('file', '')) else theme_picture()
     if picture:
         run('kavat-shell', 'msg', 'wallpaper-set', display, picture, timeout=5)
 
 
 def displays_again():
-    """Put back the images of the displays that have one of their own, after all were given the same."""
+    """Put back the pictures of the displays that have one of their own, after all were given the same."""
     names = display_names()
     for display, path in settings().get('displays', {}).items():
         if display in names and os.path.isfile(path):
-            run('kavat-shell', 'msg', 'wallpaper-set', display, path, timeout=5)
+            picture = still_of(path) if kind_of(path) == 'video' else path
+            if picture:
+                run('kavat-shell', 'msg', 'wallpaper-set', display, picture, timeout=5)
 
 
 def set_to(path):
@@ -216,19 +299,21 @@ def set_to(path):
         if still is None:
             sys.exit(f'kavat-wallpaper: no frame could be read from {path}')
         shell_shows(still)
+        stop_videos()
         if not play(path, now):
             sys.exit('kavat-wallpaper: the video could not be started')
     else:
-        stop_video()
+        stop_videos()
         shell_shows(path)
     now.update(kind=kind, file=path)
     now.pop('displays', None)
     save(now)
+    lock_picture()
     follow()
 
 
 def to_theme():
-    stop_video()
+    stop_videos()
     now = settings()
     now.pop('kind', None)
     now.pop('file', None)
@@ -237,6 +322,231 @@ def to_theme():
     picture = theme_picture()
     if picture:
         shell_shows(picture)
+    lock_picture()
+
+
+def lock_picture():
+    """Point the lock screen at its picture: the background, a video's still frame, or the theme's.
+
+    hyprlock is told one name, background.png, and that is a link to the picture in force.
+    The theme's is the copy /usr/lib/kavat/wallpaper keeps there; it is the one when the
+    background is the theme's, or with `option lock theme`."""
+    now = settings()
+    picture = None
+    if now.get('lock', OPTIONS['lock'][0]) == 'background' and os.path.exists(now.get('file', '')):
+        if now.get('kind') == 'video':
+            picture = still_of(now['file'])
+        elif now.get('kind') == 'image':
+            picture = png_of(now['file'])
+    if picture is None:
+        theme = theme_picture()
+        if theme is None:
+            return
+        picture = f'{LOCK}/{os.path.basename(theme)[:-4]}.png'
+    os.makedirs(LOCK, exist_ok=True)
+    link = f'{LOCK}/background.png'
+    try:
+        if os.path.lexists(link + '.new'):
+            os.remove(link + '.new')
+        os.symlink(picture, link + '.new')
+        os.replace(link + '.new', link)
+    except OSError:
+        pass
+
+
+def png_of(image):
+    """An image as a PNG, which is what the lock screen is sure to read: itself, or a copy kept for it."""
+    if image.lower().endswith('.png'):
+        return image
+    stamp = hashlib.sha1(f'{image}{os.path.getmtime(image)}'.encode()).hexdigest()[:16]
+    copy = f'{LOCK}/own-{stamp}.png'
+    if not os.path.exists(copy):
+        os.makedirs(LOCK, exist_ok=True)
+        for name in os.listdir(LOCK):
+            if name.startswith('own-'):
+                os.remove(f'{LOCK}/{name}')
+        if image.lower().endswith('.svg'):
+            run('rsvg-convert', '-w', '2560', '-o', copy, image)
+        else:
+            run('ffmpeg', '-y', '-loglevel', 'error', '-i', image, '-frames:v', '1', copy, timeout=60)
+    return copy if os.path.exists(copy) else None
+
+
+# ---- pictures from the network
+
+def web(address):
+    """Whether it is an address of the web, and nothing else: no file, no other way in."""
+    return isinstance(address, str) and re.fullmatch(r'https?://[^\s\x00-\x1f\x7f]+', address) is not None
+
+
+def download(address, limit, seconds):
+    """What a web address answers, up to a size and within a time.
+
+    Only http and https are spoken, also where the answer sends on to another address."""
+    if not web(address):
+        raise ValueError('not a web address')
+    opener = urllib.request.OpenerDirector()
+    for handler in (urllib.request.HTTPHandler, urllib.request.HTTPSHandler, urllib.request.HTTPRedirectHandler,
+                    urllib.request.HTTPDefaultErrorHandler, urllib.request.HTTPErrorProcessor, urllib.request.UnknownHandler):
+        opener.add_handler(handler())
+    until = time.monotonic() + seconds
+    data = b''
+    with opener.open(urllib.request.Request(address, headers={'User-Agent': 'kavat-wallpaper'}), timeout=min(seconds, 15)) as answer:
+        while chunk := answer.read(1 << 16):
+            data += chunk
+            if len(data) > limit:
+                raise ValueError('too large')
+            if time.monotonic() > until:
+                raise TimeoutError('too slow')
+    return data
+
+
+def image_ending(data):
+    """The ending for the name of a picture, read from what it is and not from what it is called."""
+    if data.startswith(b'\x89PNG\r\n\x1a\n'):
+        return '.png'
+    if data.startswith(b'\xff\xd8\xff'):
+        return '.jpg'
+    if data[:4] == b'RIFF' and data[8:12] == b'WEBP':
+        return '.webp'
+    return None
+
+
+def sources():
+    """Each source by the name of its file, yours after the system's and in place of one of the same name."""
+    found = {}
+    for folder in SOURCES:
+        try:
+            names = sorted(os.listdir(folder))
+        except OSError:
+            continue
+        for name in names:
+            if not name.endswith('.toml'):
+                continue
+            try:
+                with open(f'{folder}/{name}', 'rb') as file:
+                    source = tomllib.load(file)
+            except (OSError, ValueError):
+                continue
+            if all(isinstance(source.get(key), str) for key in ('search', 'list', 'small', 'full')) and web(source['search']):
+                found[name[:-5]] = source
+    return found
+
+
+def at(answer, place):
+    """What an answer has at a place: its keys joined by dots, a number for a place in a list."""
+    for key in place.split('.') if isinstance(place, str) and place else []:
+        if isinstance(answer, dict):
+            answer = answer.get(key)
+        elif isinstance(answer, list) and key.isdigit() and int(key) < len(answer):
+            answer = answer[int(key)]
+        else:
+            return None
+    return answer
+
+
+def small_picture(address):
+    """A small picture, downloaded once: the file it is kept in, or None."""
+    stem = f'{ONLINE}/{hashlib.sha1(address.encode()).hexdigest()[:16]}'
+    for ending in ('.jpg', '.png', '.webp'):
+        if os.path.exists(stem + ending):
+            return stem + ending
+    try:
+        data = download(address, SMALL, 10)
+    except (OSError, ValueError, http.client.HTTPException):
+        return None
+    ending = image_ending(data)
+    if ending is None:
+        return None
+    with open(stem + '.part', 'wb') as file:
+        file.write(data)
+    os.replace(stem + '.part', stem + ending)
+    return stem + ending
+
+
+def search(words):
+    now = settings()
+    asked = {name: source for name, source in sources().items() if name not in now.get('sources_off', [])}
+    if not asked:
+        sys.exit('kavat-wallpaper: no source is on; kavat-wallpaper sources lists them')
+    found, failed, reached = [], [], False
+    for name, source in asked.items():
+        title = source.get('name', name)
+        try:
+            answer = json.loads(download(source['search'].replace('{words}', urllib.parse.quote_plus(words)), 4 << 20, 20))
+        except urllib.error.HTTPError as error:
+            reached = True
+            failed.append(f'{title} answered with error {error.code}')
+            continue
+        except (OSError, http.client.HTTPException):
+            failed.append(f'{title} could not be reached')
+            continue
+        except ValueError:
+            reached = True
+            failed.append(f'{title} did not answer with data')
+            continue
+        reached = True
+        pictures = at(answer, source['list'])
+        for picture in pictures[:PAGE] if isinstance(pictures, list) else []:
+            small, full = at(picture, source['small']), at(picture, source['full'])
+            if not web(small) or not web(full):
+                continue
+            size = at(picture, source.get('size'))
+            if 'width' in source:
+                size = f'{at(picture, source["width"])}x{at(picture, source.get("height"))}'
+            size = size if isinstance(size, str) and re.fullmatch(r'\d+x\d+', size) else '-'
+            called = re.sub(r'\s+', ' ', str(at(picture, source.get('id')) or '')).strip() or os.path.basename(urllib.parse.urlsplit(full).path)
+            found.append([name, called or '-', small, full, size])
+    if not found and failed:
+        sys.exit('kavat-wallpaper: ' + ('; '.join(failed) if reached else 'there is no network, so nothing could be searched'))
+    for failure in failed:
+        print('kavat-wallpaper: ' + failure, file=sys.stderr)
+    os.makedirs(ONLINE, exist_ok=True)
+    with ThreadPoolExecutor(8) as pool:
+        kept = list(pool.map(small_picture, [picture[2] for picture in found]))
+    for picture, file in zip(found, kept):
+        print('\t'.join(picture + [file or '-']))
+    # the small pictures of earlier searches go after a day
+    for name in os.listdir(ONLINE):
+        file = f'{ONLINE}/{name}'
+        if file not in kept and os.path.getmtime(file) < time.time() - 86400:
+            os.remove(file)
+
+
+def fetch(address, name=None):
+    """Download a picture to the library's images, and set it as the background."""
+    if not web(address):
+        sys.exit(f'kavat-wallpaper: {address} is not an http or https address')
+    try:
+        data = download(address, FULL, 180)
+    except urllib.error.HTTPError as error:
+        sys.exit(f'kavat-wallpaper: the picture was not given: error {error.code}')
+    except ValueError:
+        sys.exit(f'kavat-wallpaper: the picture is larger than {FULL >> 20} MB')
+    except TimeoutError:
+        sys.exit('kavat-wallpaper: the picture took too long to arrive')
+    except (OSError, http.client.HTTPException):
+        sys.exit('kavat-wallpaper: there is no network, so the picture could not be downloaded')
+    ending = image_ending(data)
+    if ending is None:
+        sys.exit('kavat-wallpaper: what that address gives is not a PNG, JPG or WebP image')
+    # the name it is kept under: letters, digits, dots and dashes of the one given, or of the address's
+    stem = os.path.splitext(os.path.basename(name or urllib.parse.urlsplit(address).path))[0]
+    stem = re.sub(r'[^A-Za-z0-9._-]+', '-', stem).strip('.-')[:80] or 'wallpaper'
+    os.makedirs(LIBRARY['image'], exist_ok=True)
+    path, number = f'{LIBRARY["image"]}/{stem}{ending}', 1
+    while os.path.exists(path):
+        with open(path, 'rb') as file:
+            if file.read() == data:
+                break
+        number += 1
+        path = f'{LIBRARY["image"]}/{stem}-{number}{ending}'
+    else:
+        with open(path + '.part', 'wb') as file:
+            file.write(data)
+        os.replace(path + '.part', path)
+    print(path)
+    set_to(path)
 
 
 def shown():
@@ -396,11 +706,28 @@ def main():
             sys.exit(f'kavat-wallpaper: {arguments[1]} is not an image or a video this can show')
         os.makedirs(LIBRARY[kind], exist_ok=True)
         print(shutil.copy2(arguments[1], LIBRARY[kind]))
+    elif arguments[0] == 'search' and len(arguments) > 1:
+        search(' '.join(arguments[1:]))
+    elif arguments[0] in ('fetch', 'get') and len(arguments) in (2, 3):
+        fetch(*arguments[1:])
+    elif arguments == ['sources']:
+        for name, source in sources().items():
+            print(f'{name}\t{"off" if name in now.get("sources_off", []) else "on"}\t{source.get("name", name)}')
+    elif arguments[0] == 'source' and len(arguments) == 3 and arguments[2] in ('on', 'off'):
+        if arguments[1] not in sources():
+            sys.exit(f'kavat-wallpaper: there is no source called {arguments[1]}; kavat-wallpaper sources lists them')
+        off = [name for name in now.get('sources_off', []) if name != arguments[1]] + ([arguments[1]] if arguments[2] == 'off' else [])
+        now['sources_off'] = off
+        if not off:
+            del now['sources_off']
+        save(now)
     elif arguments in (['pause'], ['resume']):
-        tell_player('set_property', 'pause', arguments[0] == 'pause')
+        for display, _ in players(now):
+            tell_player(display, 'set_property', 'pause', arguments[0] == 'pause')
     elif arguments == ['playing']:
-        paused = tell_player('get_property', 'pause')
-        print('none' if paused is None else 'paused' if paused else 'playing')
+        # paused when every video is; one that goes on is a video playing
+        paused = [state for state in (tell_player(display, 'get_property', 'pause') for display, _ in players(now)) if state is not None]
+        print('none' if not paused else 'paused' if all(paused) else 'playing')
     elif arguments[0] == 'option' and len(arguments) == 1:
         for name, values in OPTIONS.items():
             print(name, now.get(name, values[0]))
@@ -412,9 +739,13 @@ def main():
         save(now)
         if name == 'slideshow':
             slideshow(now)
-            return
-        if now.get('kind') == 'video' and os.path.exists(now.get('file', '')):
-            play(now['file'], now)
+        elif name == 'lock':
+            lock_picture()
+        else:
+            for display, video in players(now):
+                play(video, now, display)
+    elif arguments == ['lock', 'again']:
+        lock_picture()
     elif arguments == ['palette']:
         sys.exit(wear_palette())
     elif arguments == ['next']:
@@ -422,11 +753,14 @@ def main():
     elif arguments == ['restore']:
         first_palette(now)
         slideshow(now)
-        if now.get('kind') == 'video' and os.path.exists(now.get('file', '')):
-            still = still_of(now['file'])
-            if still:
-                shell_shows(still)
-            play(now['file'], now)
+        lock_picture()
+        names = display_names()
+        for display, video in players(now):
+            if display is None or display in names:
+                still = still_of(video)
+                if still:
+                    shell_shows(still, display)
+                play(video, now, display)
     else:
         sys.exit(__doc__)
 

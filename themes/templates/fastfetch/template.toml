@@ -1,8 +1,12 @@
 # fastfetch, which says what machine this is: its logo, its lines and its colours.
-# kavat-fetch points fastfetch at these files.
+# kavat-fetch points fastfetch at these files. The logo is there twice: in characters, and
+# as a drawing, which kavat-fetch makes a picture from for Kitty to show.
 
 [[file]]
 from = "config.jsonc"
 
 [[file]]
 from = "logo.txt"
+
+[[file]]
+from = "logo.svg"

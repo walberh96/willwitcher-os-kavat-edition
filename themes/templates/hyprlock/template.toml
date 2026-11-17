@@ -1,8 +1,9 @@
 # The lock screen, hyprlock: the same picture, clock and place for the password as the login.
 #
 # hyprlock reads its file from the user's folder each time the screen is locked, so there
-# is nothing to reload. Its picture is made by /usr/lib/kavat/wallpaper, from the desktop's
-# background, since hyprlock cannot read that drawing as it is.
+# is nothing to reload. Its picture is a link: to the copy /usr/lib/kavat/wallpaper makes of
+# the theme's background, since hyprlock cannot read that drawing as it is, or to the
+# background you chose, which kavat-wallpaper points it at.
 
 [[file]]
 from = "hyprlock.conf"

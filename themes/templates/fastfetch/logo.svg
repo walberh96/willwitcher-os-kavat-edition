@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="1 0 98 98">
+  <!-- the cat, in the accent; its eyes and its nose are holes, which show the terminal -->
+  <path fill="{{ accent }}" fill-rule="evenodd"
+        d="M18 34 L30 8 L46 30 H54 L70 8 L82 34 Q84 70 50 90 Q16 70 18 34Z M30 50 L42 56 L30 60Z M70 50 L58 56 L70 60Z M46 70 L50 74 L54 70Z"/>
+</svg>

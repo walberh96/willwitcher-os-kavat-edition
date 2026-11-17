@@ -9,14 +9,17 @@ picture="$(ls "${XDG_STATE_HOME:-$HOME/.local/state}"/kavat/theme/current/wallpa
 [ -n "$picture" ] || exit 0
 
 # The lock screen shows the same picture, but cannot read the drawing as it is: a copy it
-# can read is kept, one for the look in force.
+# can read is kept, one for the look in force. Other pictures there are kavat-wallpaper's.
 lock="${XDG_CACHE_HOME:-$HOME/.cache}/kavat/lock"
 copy="$lock/$(basename "$picture" .svg).png"
 if [ ! -e "$copy" ]; then
   mkdir -p "$lock"
-  rm -f "$lock"/*.png
+  rm -f "$lock"/kavat-*.png
   rsvg-convert -w 2560 -h 1440 -o "$copy" "$picture" 2> /dev/null
 fi
+# hyprlock is told one name, background.png: a link to this copy, or to the background you
+# chose, which kavat-wallpaper knows about when it is there
+kavat-wallpaper lock again 2> /dev/null || ln -sfn "$copy" "$lock/background.png"
 
 tries=0
 until now="$(kavat-shell msg wallpaper-get 2> /dev/null)"; do
