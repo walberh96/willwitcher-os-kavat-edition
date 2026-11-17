@@ -171,6 +171,10 @@ def enter(word, mode):
                 run('protonvpn', 'disconnect', timeout=30) if proton else run('nmcli', 'connection', 'down', 'id', name)
             sys.exit('kavat-mode: the guard that lets nothing out but through the VPN could not be put up, so the mode is not entered.')
         undo['vpn'] = {'name': name, 'bring_down': not was_up, 'proton': proton}
+    if mode.get('remote') == 'pause':
+        # remote access is put down for as long as the mode lasts; it says whether it was on
+        if run('kavat-remote', 'pause', timeout=60) == 'paused':
+            undo['remote'] = True
     if mode.get('power'):
         before = run('powerprofilesctl', 'get')
         if before and before != mode['power'] and run('powerprofilesctl', 'set', mode['power']) is not None:
@@ -194,7 +198,8 @@ def enter(word, mode):
     if mode.get('hide_browser'):
         hidden = []
         for window in windows():
-            if window.get('class') == 'kavat-browser' and not str(window.get('workspace', {}).get('name', '')).startswith('special'):
+            # the browser's own windows, and those of the pages installed as apps, which Chromium names chrome-…
+            if (window.get('class') == 'kavat-browser' or str(window.get('class', '')).startswith('chrome-')) and not str(window.get('workspace', {}).get('name', '')).startswith('special'):
                 hyprctl('dispatch', f'hl.dsp.window.move({{ workspace = "special:kavat-hidden", window = "address:{window["address"]}", follow = false }})')
                 hidden.append([window['address'], window['workspace']['name']])
         if hidden:
@@ -206,10 +211,24 @@ def enter(word, mode):
         recent = run('gsettings', 'get', 'org.gnome.desktop.privacy', 'remember-recent-files')
         if recent == 'true' and run('gsettings', 'set', 'org.gnome.desktop.privacy', 'remember-recent-files', 'false') is not None:
             undo['recent'] = True
+        # notifications say who sent them and not what they say, on the screen and in the history
+        if run('kavat-shell', 'msg', 'config-set', 'notification.hide_content', 'true') is not None:
+            undo['notifications_hidden'] = True
     return undo
 
 
 def leave(undo):
+    # the browser of Incognito, a browser apart whose settings are in memory: closed, and its folder deleted
+    private = f'{RUNTIME}/kavat-browser-incognito'
+    if os.path.isdir(private):
+        run('pkill', '-u', str(os.getuid()), '-f', f'user-data-dir={private}')
+        for _ in range(20):
+            if run('pgrep', '-u', str(os.getuid()), '-f', f'user-data-dir={private}') is None:
+                break
+            time.sleep(0.25)
+        shutil.rmtree(private, ignore_errors=True)
+    if undo.get('notifications_hidden'):
+        run('kavat-shell', 'msg', 'config-set', 'notification.hide_content', 'false')
     if undo.get('recent'):
         run('gsettings', 'set', 'org.gnome.desktop.privacy', 'remember-recent-files', 'true')
     if undo.get('history'):
@@ -242,6 +261,8 @@ def leave(undo):
                 run('protonvpn', 'disconnect', timeout=30)
             else:
                 run('nmcli', 'connection', 'down', 'id', undo['vpn']['name'])
+    if undo.get('remote'):
+        run('kavat-remote', 'resume', timeout=60)
 
 
 def change(word, quiet=False):
@@ -286,8 +307,10 @@ def describe(word, mode):
         lines.append('A video background is paused')
     if mode.get('hide_browser'):
         lines.append('The browser opens private windows; the ones that were open are hidden until you leave')
+    if mode.get('remote') == 'pause':
+        lines.append('Remote access is paused, and comes back on leaving')
     if mode.get('history') is False:
-        lines.append('The terminal keeps no history and apps no list of recent files; the clipboard is emptied on leaving')
+        lines.append('The terminal keeps no history and apps no list of recent files; notifications do not show what they say; the clipboard is emptied on leaving')
     if len(lines) == 1 and word == 'coder':
         lines.append('Everything running')
     return lines

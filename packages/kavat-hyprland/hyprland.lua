@@ -51,6 +51,8 @@ hl.on("hyprland.start", function()
     hl.exec_cmd("kavat-displays restore")
     -- the night light, when it is on or comes on by the hour
     hl.exec_cmd("kavat-displays night restore")
+    -- the desktop is seen from your other devices, when remote access is on and says so
+    hl.exec_cmd("kavat-remote session")
     -- Wi-Fi and Bluetooth are turned off for who set them not to be on at startup
     hl.exec_cmd("kavat-network startup")
     -- light by day and dark by night, for who asked for it
@@ -154,55 +156,74 @@ hl.config({
     },
 })
 
+-- A shortcut can be given other keys, or none: `kavat-keys`, the Keybindings page of the
+-- settings, keeps them in ~/.config/hypr/keys.lua, each under the keys it comes with.
+local other_keys = {}
+do
+    local home = os.getenv("XDG_CONFIG_HOME") or (os.getenv("HOME") .. "/.config")
+    local read, kept = pcall(dofile, home .. "/hypr/keys.lua")
+    if read and type(kept) == "table" then
+        other_keys = kept
+    end
+end
+
+local function bind(keys, ...)
+    local now = other_keys[(keys:gsub("%s", "")):lower()]
+    if now == "" then
+        return
+    end
+    return hl.bind(type(now) == "string" and now or keys, ...)
+end
+
 -- Shortcuts inherited from Endgame
 
-hl.bind(mod .. " + Return", hl.dsp.exec_cmd(terminal))
-hl.bind(mod .. " + Q", hl.dsp.window.close())
-hl.bind(mod .. " + D", hl.dsp.exec_cmd("kavat-shell msg panel-toggle launcher"))
-hl.bind(mod .. " + E", hl.dsp.exec_cmd(files))
-hl.bind(mod .. " + B", hl.dsp.exec_cmd("kavat-browser"))
-hl.bind(mod .. " + V", hl.dsp.window.float({ action = "toggle" }))
-hl.bind(mod .. " + P", hl.dsp.window.pseudo())
-hl.bind(mod .. " + J", hl.dsp.layout("togglesplit"))
+bind(mod .. " + Return", hl.dsp.exec_cmd(terminal))
+bind(mod .. " + Q", hl.dsp.window.close())
+bind(mod .. " + D", hl.dsp.exec_cmd("kavat-shell msg panel-toggle launcher"))
+bind(mod .. " + E", hl.dsp.exec_cmd(files))
+bind(mod .. " + B", hl.dsp.exec_cmd("kavat-browser"))
+bind(mod .. " + V", hl.dsp.window.float({ action = "toggle" }))
+bind(mod .. " + P", hl.dsp.window.pseudo())
+bind(mod .. " + J", hl.dsp.layout("togglesplit"))
 
 for _, direction in ipairs({ "left", "right", "up", "down" }) do
-    hl.bind(mod .. " + " .. direction, hl.dsp.focus({ direction = direction }))
+    bind(mod .. " + " .. direction, hl.dsp.focus({ direction = direction }))
 end
 
 for i = 1, 10 do
     local key = i % 10 -- workspace 10 is on the 0 key
-    hl.bind(mod .. " + " .. key, hl.dsp.focus({ workspace = i }))
-    hl.bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
+    bind(mod .. " + " .. key, hl.dsp.focus({ workspace = i }))
+    bind(mod .. " + SHIFT + " .. key, hl.dsp.window.move({ workspace = i }))
 end
 
-hl.bind(mod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
-hl.bind(mod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
+bind(mod .. " + mouse_down", hl.dsp.focus({ workspace = "e+1" }))
+bind(mod .. " + mouse_up", hl.dsp.focus({ workspace = "e-1" }))
 
-hl.bind(mod .. " + S", hl.dsp.workspace.toggle_special("scratchpad"))
-hl.bind(mod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:scratchpad" }))
+bind(mod .. " + S", hl.dsp.workspace.toggle_special("scratchpad"))
+bind(mod .. " + SHIFT + S", hl.dsp.window.move({ workspace = "special:scratchpad" }))
 
-hl.bind("ALT + Tab", hl.dsp.window.cycle_next())
-hl.bind(mod .. " + SHIFT + M", hl.dsp.exec_cmd("kavat-mode next"))
-hl.bind(mod .. " + SHIFT + V", hl.dsp.exec_cmd("kavat-shell msg panel-toggle clipboard"))
-hl.bind(mod .. " + SHIFT + P", hl.dsp.exec_cmd("hyprpicker -a"))
+bind("ALT + Tab", hl.dsp.window.cycle_next())
+bind(mod .. " + SHIFT + M", hl.dsp.exec_cmd("kavat-mode next"))
+bind(mod .. " + SHIFT + V", hl.dsp.exec_cmd("kavat-shell msg panel-toggle clipboard"))
+bind(mod .. " + SHIFT + P", hl.dsp.exec_cmd("hyprpicker -a"))
 -- a region of the screen, read: its text goes to the clipboard
-hl.bind("SHIFT + Print", hl.dsp.exec_cmd("/usr/lib/kavat/screen-text"))
-hl.bind("Print", hl.dsp.exec_cmd('grim -g "$(slurp)" - | wl-copy'))
-hl.bind(mod .. " + SHIFT + L", hl.dsp.exec_cmd("hyprlock"))
-hl.bind(mod .. " + M", hl.dsp.exit())
+bind("SHIFT + Print", hl.dsp.exec_cmd("/usr/lib/kavat/screen-text"))
+bind("Print", hl.dsp.exec_cmd('grim -g "$(slurp)" - | wl-copy'))
+bind(mod .. " + SHIFT + L", hl.dsp.exec_cmd("hyprlock"))
+bind(mod .. " + M", hl.dsp.exit())
 
-hl.bind(mod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
-hl.bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
+bind(mod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
+bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })
 
 -- New shortcuts
 
-hl.bind(mod .. " + F", hl.dsp.window.fullscreen({ action = "toggle", mode = "fullscreen" }))
+bind(mod .. " + F", hl.dsp.window.fullscreen({ action = "toggle", mode = "fullscreen" }))
 
-hl.bind(mod .. " + Escape", hl.dsp.exec_cmd("kavat-shell msg panel-toggle session"))
+bind(mod .. " + Escape", hl.dsp.exec_cmd("kavat-shell msg panel-toggle session"))
 
 -- The file search, in a window of its own over whatever is open. Kitty asks for the size
 -- its last window had, which here was a tiled one: it is told not to.
-hl.bind(mod .. " + SHIFT + F",
+bind(mod .. " + SHIFT + F",
     hl.dsp.exec_cmd("kitty --class kavat-find -o remember_window_size=no kavat-find --window"))
 hl.window_rule({
     name   = "file-search",
@@ -213,10 +234,10 @@ hl.window_rule({
 })
 
 -- The system's settings, on the page of the look; and kav, on its full screen
-hl.bind(mod .. " + T", hl.dsp.exec_cmd("kavat-shell msg panel-toggle kavat/settings:panel"))
-hl.bind(mod .. " + U", hl.dsp.exec_cmd("kitty --class kavat-kav -o remember_window_size=no kav"))
+bind(mod .. " + T", hl.dsp.exec_cmd("kavat-shell msg panel-toggle kavat/settings:panel"))
+bind(mod .. " + U", hl.dsp.exec_cmd("kitty --class kavat-kav -o remember_window_size=no kav"))
 -- The cheat sheet: every shortcut of this file, on the Keybindings page of the settings
-hl.bind(mod .. " + slash", hl.dsp.exec_cmd("kavat-shell msg panel-open kavat/settings:panel keys"))
+bind(mod .. " + slash", hl.dsp.exec_cmd("kavat-shell msg panel-open kavat/settings:panel keys"))
 hl.window_rule({
     name   = "kav",
     match  = { class = "^kavat-kav$" },
@@ -226,9 +247,9 @@ hl.window_rule({
 })
 
 -- Notes: a line to type one in, over whatever is open, and the notes themselves
-hl.bind(mod .. " + N",
+bind(mod .. " + N",
     hl.dsp.exec_cmd("kitty --class kavat-note -o remember_window_size=no kavat-notes quick"))
-hl.bind(mod .. " + SHIFT + N",
+bind(mod .. " + SHIFT + N",
     hl.dsp.exec_cmd("kitty --class kavat-notes -o remember_window_size=no kavat-notes"))
 hl.window_rule({
     name   = "quick-note",
@@ -265,7 +286,7 @@ hl.window_rule({
 
 local step = 40 -- pixels a window grows or shrinks with each press
 for direction, by in pairs({ left = { -step, 0 }, right = { step, 0 }, up = { 0, -step }, down = { 0, step } }) do
-    hl.bind(mod .. " + SHIFT + " .. direction, hl.dsp.window.move({ direction = direction }))
-    hl.bind(mod .. " + CTRL + " .. direction, hl.dsp.window.resize({ x = by[1], y = by[2], relative = true }),
+    bind(mod .. " + SHIFT + " .. direction, hl.dsp.window.move({ direction = direction }))
+    bind(mod .. " + CTRL + " .. direction, hl.dsp.window.resize({ x = by[1], y = by[2], relative = true }),
         { repeating = true })
 end

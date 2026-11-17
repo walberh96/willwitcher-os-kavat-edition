@@ -1,0 +1,145 @@
+#!/usr/bin/env python3
+"""kavat-keys: the desktop's shortcuts, and other keys for the ones you change.
+
+usage: kavat-keys                        every shortcut: its keys now, what it does, its group, and the
+                                         keys it comes with when they were changed, or -; between tabs
+       kavat-keys set <keys> <new keys>  give a shortcut other keys: kavat-keys set Super+E Super+Shift+E
+       kavat-keys off <keys>             leave a shortcut with no keys
+       kavat-keys reset <keys>           the keys it comes with again; `kavat-keys reset all` for every one
+
+A shortcut is named by the keys it comes with, as the Keybindings page and Super+/ list
+them. Keys are written with + between them: Super, Shift, Ctrl and Alt, then the key, as
+Hyprland names it: a letter, a digit, Return, Escape, Tab, Print, slash, F1. The shortcuts
+that are many at once, the arrows and the numbers of the workspaces, cannot be changed
+here. What is changed is kept in ~/.config/hypr/keys.lua, which Hyprland's configuration
+reads; it is read again at once.
+"""
+import os
+import re
+import subprocess
+import sys
+
+HOME = os.path.expanduser('~')
+CONFIG = os.environ.get('XDG_CONFIG_HOME') or f'{HOME}/.config'
+FILE = f'{CONFIG}/hypr/keys.lua'
+LIST = '/usr/share/kavat/hypr/shortcuts.tsv'
+MODS = {'super': 'SUPER', 'shift': 'SHIFT', 'ctrl': 'CTRL', 'control': 'CTRL', 'alt': 'ALT'}
+# the keys the list writes as people say them, and Hyprland's names for them
+NAMES = {'/': 'slash', 'enter': 'Return', 'esc': 'Escape'}
+# what cannot be one shortcut's keys: they stand for several, or for the mouse
+MANY = ('Arrows', '…', 'mouse', 'Mouse')
+
+
+def shortcuts():
+    found = []
+    try:
+        text = open(LIST, encoding='utf-8').read()
+    except OSError:
+        sys.exit(f'kavat-keys: {LIST} is missing')
+    for line in text.splitlines():
+        parts = line.split('\t')
+        if len(parts) == 3 and not line.startswith('#'):
+            found.append(parts)
+    return found
+
+
+def plain(keys):
+    """Keys as the configuration compares them: no spaces, small letters, Hyprland's names."""
+    parts = [NAMES.get(part.strip().lower(), part.strip()) for part in keys.split('+') if part.strip()] or ['']
+    if keys.strip().endswith('+') or keys.strip() == '/':
+        parts = parts[:-1] + ['slash'] if keys.strip() != '/' else ['slash']
+    return '+'.join(part.lower() for part in parts)
+
+
+def for_hyprland(keys):
+    """Keys as Hyprland binds them: SUPER + SHIFT + E. None when they are not keys it can bind."""
+    parts = [NAMES.get(part.strip().lower(), part.strip()) for part in keys.split('+')]
+    if not parts or any(not part for part in parts):
+        return None
+    *mods, key = parts
+    if any(mod.lower() not in MODS for mod in mods) or key.lower() in MODS or not re.fullmatch(r'[A-Za-z0-9_]+', key):
+        return None
+    mods = [MODS[mod.lower()] for mod in mods]
+    if len(set(mods)) != len(mods):
+        return None
+    return ' + '.join(mods + [key.upper() if len(key) == 1 else key])
+
+
+def shown(bound):
+    """Keys of Hyprland's as the list writes them: Super+Shift+E."""
+    parts = bound.split(' + ')
+    return '+'.join([part.capitalize() if part in MODS.values() else ('/' if part == 'slash' else part) for part in parts])
+
+
+def read():
+    """What was changed: {the plain keys a shortcut comes with: its keys now, or '' for none}."""
+    try:
+        text = open(FILE, encoding='utf-8').read()
+    except OSError:
+        return {}
+    return dict(re.findall(r'^\s*\["([^"]+)"\]\s*=\s*"([^"]*)",?\s*$', text, re.M))
+
+
+def write(changed):
+    os.makedirs(os.path.dirname(FILE), exist_ok=True)
+    with open(FILE + '.new', 'w', encoding='utf-8') as file:
+        file.write('-- Written by kavat-keys: the shortcuts of the desktop that have other keys than the ones\n'
+                   '-- they come with, each by its own keys; "" leaves one with no keys. The Keybindings page\n'
+                   '-- of the settings changes it.\nreturn {\n')
+        for old, new in sorted(changed.items()):
+            file.write(f'  ["{old}"] = "{new}",\n')
+        file.write('}\n')
+    os.replace(FILE + '.new', FILE)
+    for instance in ([], ['--instance', '0']):
+        try:
+            if subprocess.run(['hyprctl', *instance, 'reload'], capture_output=True, timeout=10, check=False).returncode == 0:
+                break
+        except (OSError, subprocess.TimeoutExpired):
+            break
+
+
+def main():
+    arguments = sys.argv[1:]
+    listed, changed = shortcuts(), read()
+    by_plain = {plain(keys): keys for keys, _, _ in listed}
+    if not arguments:
+        for keys, what, group in listed:
+            now = changed.get(plain(keys))
+            print('\t'.join(((shown(now) if now else 'none') if now is not None else keys, what, group, keys if now is not None else '-')))
+        return
+    if arguments[0] == 'reset' and arguments[1:] == ['all']:
+        write({})
+        return
+    if arguments[0] not in ('set', 'off', 'reset') or len(arguments) != (3 if arguments[0] == 'set' else 2):
+        sys.exit(__doc__)
+    old = plain(arguments[1])
+    if old not in by_plain:
+        sys.exit(f'kavat-keys: {arguments[1]} is not a shortcut of the desktop: kavat-keys lists them')
+    if any(word in by_plain[old] for word in MANY):
+        sys.exit(f'kavat-keys: {by_plain[old]} is several shortcuts at once, and cannot be changed here')
+    if arguments[0] == 'reset':
+        changed.pop(old, None)
+    elif arguments[0] == 'off':
+        changed[old] = ''
+    else:
+        new = for_hyprland(arguments[2])
+        if new is None:
+            sys.exit(f'kavat-keys: {arguments[2]} is not keys Hyprland can bind: write them as Super+Shift+E')
+        if plain(new.replace(' ', '')) == old:
+            changed.pop(old, None)
+        else:
+            # the keys nobody else has now: neither as it comes, nor as it was changed to
+            for keys, what, _ in listed:
+                other = plain(keys)
+                if other == old:
+                    continue
+                theirs = changed.get(other)
+                now = plain(theirs.replace(' ', '')) if theirs else (None if theirs == '' else other)
+                if now == plain(new.replace(' ', '')):
+                    sys.exit(f'kavat-keys: {shown(new)} is already "{what}": change that one first, or pick other keys')
+            changed[old] = new
+    write(changed)
+
+
+if __name__ == '__main__':
+    main()

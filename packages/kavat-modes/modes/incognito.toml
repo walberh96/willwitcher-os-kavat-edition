@@ -5,7 +5,10 @@ about = "Private session"
 
 vpn = true
 # true: the browser's windows that are open are put out of sight until the mode is left;
-# the windows it opens while in the mode are private ones, which is the browser's own doing
+# while in the mode the browser is one apart, with the blocker as always, whose settings are
+# kept in memory and deleted on leaving: that is the browser's own doing
 hide_browser = true
 # false: the terminal keeps no history, apps keep no list of recent files, and the clipboard is emptied on leaving
 history = false
+# "pause": remote access is put down while in the mode, and comes back on leaving it
+remote = "pause"

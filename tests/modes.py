@@ -141,9 +141,20 @@ def main():
         checks.report(output.split() == ['1', '3', '1'], 'the VPN is up, and nothing goes out but through it and to its server', output)
         status, output = user(HISTORY + '; (echo secret | wl-copy) > /dev/null 2>&1 < /dev/null')
         checks.report(output == 'history:none', 'the terminal writes no history while in it', output)
+        status, output = user('kavat-shell msg config-get notification.hide_content; gsettings get org.gnome.desktop.privacy remember-recent-files; '
+                              'kavat-remote 2> /dev/null | head -n 1 | cut -f2')
+        checks.report(output.split()[:2] == ['true', 'false'], 'notifications do not show what they say, and apps keep no recent files', output)
+        # the browser of the mode is a browser apart, with the blocker loaded, whose settings are in memory
+        status, output = user('hyprctl --instance 0 dispatch "hl.dsp.exec_cmd(\\"kavat-browser about:blank\\")" > /dev/null; sleep 8; '
+                              'pgrep -u $(id -u) -a -f "user-data-dir=$XDG_RUNTIME_DIR/kavat-browser-incognito" | grep -c -- "--load-extension=.*ublock"; '
+                              'pgrep -u $(id -u) -a -x chromium | grep -c -- "--incognito"; ls -d $XDG_RUNTIME_DIR/kavat-browser-incognito | wc -l', 40)
+        lines = output.split()
+        checks.report(len(lines) == 3 and lines[0] != '0' and lines[1:] == ['0', '1'], 'in the mode the browser is one apart, with its blocker, and not a private window without it', output)
         machine.screen.picture(f'{pictures}/modes-incognito.png')
         machine.screen.click(*CODER)
         until('pressing Coder leaves it', 'kavat-mode', 'coder')
+        status, output = user('sleep 2; pgrep -u $(id -u) -c -f "user-data-dir=$XDG_RUNTIME_DIR/kavat-browser-incognito"; ls -d $XDG_RUNTIME_DIR/kavat-browser-incognito 2> /dev/null | wc -l')
+        checks.report(output.split() == ['0', '0'], 'and leaving the mode closes that browser and deletes all it kept', output)
         status, output = machine.run(f'nmcli -t -f NAME connection show --active | grep -c "^nowhere$"; nft list tables | grep -c kavat_incognito')
         checks.report(output.split() == ['0', '0'], 'the VPN comes down and the guard with it', output)
         status, output = user(HISTORY + '; timeout 3 wl-paste 2>&1 | grep -c secret')
