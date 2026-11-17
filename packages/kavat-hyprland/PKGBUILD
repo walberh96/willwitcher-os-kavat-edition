@@ -1,14 +1,13 @@
 pkgname=kavat-hyprland
 pkgver=0.1.0
-pkgrel=23
+pkgrel=24
 pkgdesc="Willwitcher-OS Kavat Edition: the system's Hyprland configuration"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # Hyprland, the shell it starts, the theme its look comes from, and every program its
 # shortcuts open
-# kavat-remote is not among them yet: Sunshine, which it needs, has still to be built once
-depends=('hyprland' 'kavat-shell' 'kavat-theme' 'kavat-icons' 'kavat-cursor' 'kavat-kitty' 'kavat-find' 'kavat-files' 'kavat-notes' 'kavat-settings' 'kavat-modes' 'kavat-wallpaper' 'kavat-backup' 'kavat-browser' 'kav' 'tesseract' 'tesseract-data-eng' 'tesseract-data-spa' 'hyprlock' 'hypridle' 'hyprsunset' 'hyprpicker' 'grim' 'slurp' 'wl-clipboard')
+depends=('hyprland' 'kavat-shell' 'kavat-theme' 'kavat-icons' 'kavat-cursor' 'kavat-kitty' 'kavat-find' 'kavat-files' 'kavat-notes' 'kavat-settings' 'kavat-modes' 'kavat-wallpaper' 'kavat-backup' 'kavat-browser' 'kavat-remote' 'kav' 'tesseract' 'tesseract-data-eng' 'tesseract-data-spa' 'hyprlock' 'hypridle' 'hyprsunset' 'hyprpicker' 'grim' 'slurp' 'wl-clipboard')
 source=('hyprland.lua' 'hypridle.conf' 'shortcuts.tsv' 'kavat-displays' 'screen-text' 'kavat-keys')
 sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 

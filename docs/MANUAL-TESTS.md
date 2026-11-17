@@ -302,7 +302,7 @@ None of this was seen on the PC. What the virtual machine could not try is said 
 - [ ] **Incognito hides what notifications say.** With the mode on, a message from a chat app shows the app's name and "Notification", in the toast and in the history; its button still opens the app; after leaving the mode, new ones show in full.
 - [ ] **The installer finds the disk again.** Started with the answers of the earlier installation, the disk page comes up with the same disk chosen although its nvme name changed, and the side bar says which; with a file from another machine, none is chosen and the side bar says so. *Check the disk it names before pressing Install: this was never tried with two real disks.*
 - [ ] **Claude beside the editor.** `kav install claude-code` once it is on the reviewed list, `claude` once in a terminal to log in. In Neovim, `Ctrl+Alt+B` opens Claude in a Kitty window to the right, and `/ide` there says it is connected; select lines, `Ctrl+Alt+K`: Claude has them; ask for a change: it opens as a diff, `<leader>aa` applies it and `<leader>ad` drops it; `Ctrl+Alt+B` again closes it. *Never tried with a real Kitty or a real Claude Code.*
-- [ ] **Remote access**, once it is in the system: it is written, but Sunshine has still to be built, and until then the page says it is not installed. It needs a Tailscale account and a second device with Tailscale and Moonlight; a phone will do.
+- [ ] **Remote access.** It needs a Tailscale account and a second device with Tailscale and Moonlight; a phone will do.
   - Before turning it on: the page says off, the bar has no mark, and `ssh` to this computer from the local network is refused.
   - Turn it on: the password is asked for, the page shows an address and a picture to sign in with, and after signing in it shows this computer's name on the private network. The bar carries the mark.
   - Paste the phone's public key on the page, `ssh` from the phone to that name: it comes in, a notification says so, and the mark counts it. With a password, or as root, it does not.
@@ -355,7 +355,6 @@ Seen on the way: the keyboard's indicator was not on the bar, its name misspelt 
 These are not failures: they are listed in the design document as left for later.
 
 - The settings panel has twenty-five pages of twenty-seven; the other two wait for the agent.
-- Remote access is written and not installed: Sunshine, which it needs, has still to be built once for the system.
 - In the modes: what waits for the agent. 
 - Wallpaper: the login showing a video's still frame, and the lock showing each display's own background.
 - In the browser: the palette on the pages Chromium draws itself and hiding its native panels, which are to be built with a Chromium compiled here (D46); and the agent's panel.

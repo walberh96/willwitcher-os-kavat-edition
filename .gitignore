@@ -28,3 +28,5 @@ packages/sunshine/sunshine/
 agent/kavatd/target/
 packages/sunshine/*.tar.gz
 packages/sunshine/*.tar.xz
+packages/kavat-chromium/*.tar.xz
+packages/kavat-chromium/*.tar.gz

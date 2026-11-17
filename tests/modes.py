@@ -143,7 +143,7 @@ def main():
         checks.report(output == 'history:none', 'the terminal writes no history while in it', output)
         status, output = user('kavat-shell msg config-get notification.hide_content; gsettings get org.gnome.desktop.privacy remember-recent-files; '
                               'kavat-remote 2> /dev/null | head -n 1 | cut -f2')
-        checks.report(output.split()[:2] == ['true', 'false'], 'notifications do not show what they say, and apps keep no recent files', output)
+        checks.report(output.split() == ['true', 'false', 'off'], 'notifications do not show what they say, apps keep no recent files, and remote access, which was off, stays so', output)
         # the browser of the mode is a browser apart, with the blocker loaded, whose settings are in memory
         status, output = user('hyprctl --instance 0 dispatch "hl.dsp.exec_cmd(\\"kavat-browser about:blank\\")" > /dev/null; sleep 8; '
                               'pgrep -u $(id -u) -a -f "user-data-dir=$XDG_RUNTIME_DIR/kavat-browser-incognito" | grep -c -- "--load-extension=.*ublock"; '

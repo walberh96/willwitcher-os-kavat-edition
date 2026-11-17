@@ -242,15 +242,15 @@ def main():
         if machine.run('test -x /usr/bin/kavat-remote')[0] == 0:
             status, output = machine.run('systemctl is-enabled tailscaled sshd kavat-remote-awake 2>&1 | sort -u | tr "\\n" " "; echo; ss -Hltn | grep -c -E ":(22|47984|47989|47990|48010)\\b"; '
                                          'ls /etc/kavat/firewall.d/ | grep -c kavat-remote; runuser -u tester -- kavat-remote | head -n 1 | tr "\\t" "="; '
-                                         'sshd -T 2> /dev/null | grep -E "^(passwordauthentication|permitrootlogin) " | tr "\\n" " "; echo; '
                                          'kavat-remote on > /tmp/remote-on 2>&1; echo $?; runuser -u tester -- kavat-remote | sed -n 1p | tr "\\t" "="; '
+                                         'sshd -T 2> /dev/null | grep -i -E "^(passwordauthentication|permitrootlogin) " | tr "A-Z\\n" "a-z "; echo; '
                                          'grep -L "iifname \\"tailscale0\\"" /etc/kavat/firewall.d/kavat-remote-*.nft | wc -l; nft list table inet kavat_firewall | grep -c tailscale0; '
                                          'systemctl is-active tailscaled sshd kavat-remote-awake | tr "\\n" " "; echo; '
                                          'kavat-remote off > /dev/null 2>&1; ls /etc/kavat/firewall.d/ | grep -c kavat-remote; nft list table inet kavat_firewall | grep -c tailscale0; '
                                          'systemctl is-active tailscaled sshd | sort -u | tr "\\n" " "', 120)
             lines = output.split('\n')
-            checks.report(len(lines) >= 11 and lines[0].strip() == 'disabled' and lines[1:4] == ['0', '0', 'state=off'] and 'passwordauthentication no' in lines[4]
-                          and 'permitrootlogin no' in lines[4] and lines[5:7] == ['0', 'state=on'] and lines[7] == '0' and lines[8].isdigit() and int(lines[8]) >= 3
+            checks.report(len(lines) >= 11 and lines[0].strip() == 'disabled' and lines[1:4] == ['0', '0', 'state=off'] and lines[4:6] == ['0', 'state=on'] and 'passwordauthentication no' in lines[6]
+                          and 'permitrootlogin no' in lines[6] and lines[7] == '0' and lines[8].isdigit() and int(lines[8]) >= 3
                           and lines[9].split() == ['active', 'active', 'active'] and lines[10:12] == ['0', '0'] and lines[12].strip() == 'inactive',
                           'remote access is off as the system comes, with nothing listening; on, its doors are on the private network only and the terminal takes keys alone; off undoes it', output + '\n' + machine.run('cat /tmp/remote-on')[1])
         status, output = machine.run('kavat-dns; kavat-dns on > /dev/null; kavat-dns; readlink /etc/resolv.conf; resolvectl status | grep -c "+DNSOverTLS"; '

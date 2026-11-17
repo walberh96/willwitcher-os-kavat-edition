@@ -24,7 +24,7 @@ polkit_agent = true
 # Noctalia's two lists of plugins on the network are named here, off, so that they can be
 # turned on in the shell's settings: a list that is on is fetched on every start.
 [plugins]
-enabled     = ["kavat/settings", "kavat/modes", "kavat/palette", "kavat/notes"]
+enabled     = ["kavat/settings", "kavat/modes", "kavat/palette", "kavat/notes", "kavat/remote"]
 auto_update = "none"
 
 [[plugins.source]]
@@ -78,4 +78,4 @@ start = ["launcher", "workspaces", "kavat/modes:mode"]
 # installer's medium it says in words whether there is a network.
 # with the shell's own widgets: a mark when an app uses the microphone, the camera or the
 # screen, which of the two keyboards is in use, and how many notes are due
-end   = ["media", "privacy", "tray", "kavat/notes:due", "notifications", "clipboard", "keyboard_layout", "kavat/settings:network", "bluetooth", "volume", "brightness", "battery", "session"]
+end   = ["media", "privacy", "kavat/remote:mark", "tray", "kavat/notes:due", "notifications", "clipboard", "keyboard_layout", "kavat/settings:network", "bluetooth", "volume", "brightness", "battery", "session"]
