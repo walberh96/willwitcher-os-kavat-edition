@@ -1,6 +1,6 @@
 pkgname=kavat-base
 pkgver=0.1.0
-pkgrel=4
+pkgrel=5
 pkgdesc="Willwitcher-OS Kavat Edition: settings of the base system"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

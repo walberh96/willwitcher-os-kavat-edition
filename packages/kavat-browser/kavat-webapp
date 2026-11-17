@@ -1,0 +1,255 @@
+#!/usr/bin/env python3
+"""kavat-webapp: a page of the web as an app of the desktop.
+
+usage: kavat-webapp install [name address [icon]]   make the app; what is not given is asked for
+       kavat-webapp list                            the apps: a name, an address and an icon each
+       kavat-webapp remove <name>                   take one away, and its icon
+
+An app is an entry in ~/.local/share/applications/ that runs `kavat-browser --app=<address>`:
+the page in a window of its own, with no tabs and no address bar, found in the launcher like
+any program. It is the browser's own profile, so it is logged in where the browser is.
+
+The address has to be http or https. The icon is the site's own, fetched from it when the
+app is made and kept in ~/.local/share/kavat/webapps/; a picture of yours can be given
+instead, and with no network, or a site that has none, the app wears the browser's.
+"""
+import html.parser
+import json
+import os
+import re
+import subprocess
+import sys
+import tempfile
+import time
+import urllib.parse
+
+DATA = os.environ.get('XDG_DATA_HOME') or os.path.expanduser('~/.local/share')
+ENTRIES = f'{DATA}/applications'
+ICONS = f'{DATA}/kavat/webapps'
+GENERIC = 'kavat-browser'  # the browser's own icon, by its name
+PATIENCE = 9  # seconds for the whole of an icon's fetching: an app is made without one after that
+
+
+def fail(message, code=1):
+    print(f'kavat-webapp: {message}', file=sys.stderr)
+    sys.exit(code)
+
+
+def slug(name):
+    return re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-') or 'app'
+
+
+def entry(name):
+    return f'{ENTRIES}/kavat-webapp-{slug(name)}.desktop'
+
+
+def clean_address(address):
+    """The address as the entry keeps it, or None when it is not one of the web's. What a
+    command line or an entry would read as something else is written as the web writes it."""
+    address = address.strip()
+    found = urllib.parse.urlsplit(address)
+    if found.scheme not in ('http', 'https') or not found.hostname or re.search(r'[\x00-\x20\x7f]', address):
+        return None
+    return re.sub(r'''["'`$\\<>|]''', lambda letter: f'%{ord(letter.group()):02X}', address)
+
+
+def window_class(address, profile='Default'):
+    """The name Chromium gives the window of an app, which window rules can use: chrome-,
+    the host, an underscore, the path with its slashes as underscores, and the profile."""
+    found = urllib.parse.urlsplit(address)
+    return 'chrome-' + re.sub(r'[/\\:*?"<>| ]', '_', f'{found.hostname}_{found.path or "/"}-{profile}')
+
+
+# ---- the icon
+
+class Links(html.parser.HTMLParser):
+    """The icons a page names, and its manifest."""
+
+    def __init__(self):
+        super().__init__()
+        self.icons = []  # each: how many pixels wide it says it is, its address
+        self.manifest = None
+
+    def handle_starttag(self, tag, attrs):
+        if tag != 'link':
+            return
+        given = {key: value or '' for key, value in attrs}
+        kinds, address = given.get('rel', '').lower().split(), given.get('href', '')
+        if not address:
+            return
+        if 'manifest' in kinds:
+            self.manifest = address
+        elif 'apple-touch-icon' in kinds or 'apple-touch-icon-precomposed' in kinds:
+            self.icons.append((width(given.get('sizes')) or 180, address))
+        elif 'icon' in kinds:
+            self.icons.append((width(given.get('sizes')) or (512 if address.endswith('.svg') else 32), address))
+
+
+def width(sizes):
+    found = re.findall(r'(\d+)x\d+', str(sizes or ''))
+    return max(map(int, found)) if found else (512 if str(sizes or '').strip() == 'any' else 0)
+
+
+def fetch(address, until, limit='5M'):
+    """What an address of the web gives, as bytes; None when it gives nothing in time."""
+    left = until - time.monotonic()
+    if left < 1 or not re.match(r'https?://', address):
+        return None
+    try:
+        done = subprocess.run(['curl', '--silent', '--fail', '--location', '--proto', '=http,https', '--max-time', str(int(min(left, 5))),
+                               '--max-filesize', limit, '--user-agent', 'Mozilla/5.0 (X11; Linux x86_64)', '--', address],
+                              capture_output=True, timeout=left + 1, check=False, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return done.stdout if done.returncode == 0 and done.stdout else None
+
+
+def as_png(data, made):
+    """A picture of any kind as the PNG an entry can name; whether it could be made."""
+    with tempfile.TemporaryDirectory(prefix='kavat-webapp-') as folder:
+        given = f'{folder}/icon'
+        with open(given, 'wb') as file:
+            file.write(data)
+        if b'<svg' in data[:4096]:
+            command = ['rsvg-convert', '-w', '256', '-h', '256', '-o', f'{folder}/icon.png', given]
+        else:
+            command = ['ffmpeg', '-y', '-loglevel', 'error', '-i', given, '-frames:v', '1', f'{folder}/icon.png']
+        try:
+            subprocess.run(command, capture_output=True, timeout=20, check=False, stdin=subprocess.DEVNULL)
+        except (OSError, subprocess.TimeoutExpired):
+            return False
+        if not os.path.exists(f'{folder}/icon.png') or not os.path.getsize(f'{folder}/icon.png'):
+            return False
+        os.makedirs(ICONS, exist_ok=True)
+        os.replace(f'{folder}/icon.png', made)
+    return True
+
+
+def site_icon(address, made):
+    """The site's own icon: the largest of those its page and its manifest name, or its
+    favicon.ico. Asked of the site itself and of nobody else."""
+    until = time.monotonic() + PATIENCE
+    icons = []
+    page = fetch(address, until, '3M')
+    if page:
+        links = Links()
+        try:
+            links.feed(page.decode('utf-8', 'replace'))
+        except Exception:  # a page that is not well made: what was read until then is kept
+            pass
+        icons = [(size, urllib.parse.urljoin(address, link)) for size, link in links.icons]
+        if links.manifest:
+            where = urllib.parse.urljoin(address, links.manifest)
+            try:
+                listed = json.loads(fetch(where, until, '1M') or b'{}').get('icons', [])
+                icons += [(width(icon.get('sizes')), urllib.parse.urljoin(where, str(icon.get('src') or '')))
+                          for icon in listed if isinstance(icon, dict) and icon.get('src')]
+            except (ValueError, AttributeError):
+                pass
+    icons.sort(key=lambda icon: -icon[0])
+    for _, link in [*icons, (0, urllib.parse.urljoin(address, '/favicon.ico'))]:
+        data = fetch(link, until)
+        if data and as_png(data, made):
+            return True
+    return False
+
+
+# ---- the three commands
+
+def read(path):
+    """An entry of ours: its name, its address and its icon."""
+    found = {}
+    try:
+        with open(path, encoding='utf-8') as file:
+            for line in file:
+                key, mark, value = line.rstrip('\n').partition('=')
+                if mark:
+                    found.setdefault(key, value)
+    except OSError:
+        return None
+    if 'X-Kavat-WebApp' not in found:
+        return None
+    return found.get('Name', ''), found['X-Kavat-WebApp'], found.get('Icon', GENERIC)
+
+
+def apps():
+    try:
+        names = sorted(name for name in os.listdir(ENTRIES) if name.startswith('kavat-webapp-') and name.endswith('.desktop'))
+    except OSError:
+        return []
+    return [(f'{ENTRIES}/{name}', *app) for name in names if (app := read(f'{ENTRIES}/{name}'))]
+
+
+def ask(question):
+    try:
+        return input(question).strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        sys.exit(1)
+
+
+def install(given):
+    if len(given) > 3 or (len(given) < 2 and not sys.stdin.isatty()):
+        fail('usage: kavat-webapp install [name address [icon]]', 2)
+    asked = len(given) < 2
+    name = given[0] if given else ask('Name: ')
+    address = given[1] if len(given) > 1 else ask('Address: ')
+    picture = given[2] if len(given) > 2 else (ask("Icon (a picture's path, or nothing for the site's own): ") if asked else '')
+    # a name is plain words: no line of its own in it, and nothing an entry reads as a mark
+    name = re.sub(r'\s+', ' ', re.sub(r'[\x00-\x1f\x7f\\]', ' ', name)).strip()[:80]
+    if not name:
+        fail('an app needs a name', 2)
+    kept = clean_address(address)
+    if not kept:
+        fail(f'{address or "that"} is not an address of the web: it has to begin with http:// or https:// and have no spaces in it', 2)
+    icon = f'{ICONS}/{slug(name)}.png'
+    if picture:
+        try:
+            with open(os.path.expanduser(picture), 'rb') as file:
+                data = file.read()
+        except OSError:
+            fail(f'there is no picture {picture}')
+        if not as_png(data, icon):
+            fail(f'{picture} is not a picture')
+    elif not site_icon(kept, icon):
+        if os.path.exists(icon):
+            os.remove(icon)  # of an app of this name that was here before
+        icon = GENERIC
+    os.makedirs(ENTRIES, exist_ok=True)
+    # an entry reads a % as its own, so each of the address is written twice
+    run = kept.replace('%', '%%')
+    with open(entry(name) + '.new', 'w', encoding='utf-8') as file:
+        file.write('[Desktop Entry]\nType=Application\n'
+                   f'Name={name}\n'
+                   f'Comment={kept}\n'
+                   f'Exec=kavat-browser --app="{run}"\n'
+                   f'Icon={icon}\n'
+                   'Terminal=false\nCategories=Network;\n'
+                   f'StartupWMClass={window_class(kept)}\n'
+                   f'X-Kavat-WebApp={kept}\n')
+    os.replace(entry(name) + '.new', entry(name))
+    print(entry(name))
+
+
+def main():
+    command, given = (sys.argv[1] if len(sys.argv) > 1 else ''), sys.argv[2:]
+    if command == 'install':
+        install(given)
+    elif command == 'list' and not given:
+        for _, name, address, icon in apps():
+            print(f'{name}\t{address}\t{icon}')
+    elif command == 'remove' and len(given) == 1:
+        found = [app for app in apps() if app[0] == entry(given[0]) or app[1].lower() == given[0].lower()]
+        if not found:
+            fail(f'there is no app called {given[0]}')
+        for path, _, _, icon in found:
+            os.remove(path)
+            if icon.startswith(ICONS + '/') and os.path.exists(icon):
+                os.remove(icon)
+    else:
+        print(__doc__.strip(), file=sys.stderr)
+        sys.exit(0 if command in ('help', '--help', '-h') else 2)
+
+
+if __name__ == '__main__':
+    main()

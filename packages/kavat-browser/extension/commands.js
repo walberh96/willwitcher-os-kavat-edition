@@ -135,6 +135,14 @@ export const COMMANDS = {
     // button it opens; asked for from outside the browser, it is refused, and that is said
     run: async () => chrome.sidePanel.open({ windowId: (await chrome.windows.getLastFocused()).id }),
   },
+  'install app': {
+    about: 'This page as an app, with a window of its own and an entry in the launcher: type its name after the command, or it is the page\'s title',
+    takes: 'name',
+    run: async (send, name) => {
+      const tab = await current();
+      return send({ ask: 'webapp-install', name: name || tab.title, url: tab.url });
+    },
+  },
   'downloads': { about: 'The downloads folder, in Yazi', run: (send) => send({ ask: 'folder', which: 'downloads' }) },
   'history': { about: 'Where you have been', run: () => chrome.tabs.create({ url: 'chrome://history' }) },
   'extensions': { about: 'The extensions', run: () => chrome.tabs.create({ url: 'chrome://extensions' }) },
@@ -153,7 +161,8 @@ export const COMMANDS = {
 
 // Run a command by its name; `given` is what a command of your own gives it.
 export async function run(name, send, given) {
-  const command = COMMANDS[name];
+  // `install-app` is `install app`: a name may be said with hyphens
+  const command = COMMANDS[name] || COMMANDS[String(name).replace(/-/g, ' ')];
   if (!command) {
     return { failed: `there is no command called ${name}` };
   }

@@ -1,30 +1,40 @@
 # The system's browser: Chromium as Arch builds it, made a piece of the system from the
 # outside. The blocker is uBlock Origin Lite, as its authors released it, with its lists
-# inside; the Kavat extension is this package's own.
+# inside; the Kavat extension is this package's own, and hides YouTube's Shorts with the
+# rules of gijsdev/ublock-hide-yt-shorts, fetched here and made its own when this is built.
 pkgname=kavat-browser
 pkgver=0.1.0
-pkgrel=8
+pkgrel=9
 _ubol=2026.1110.1816
+# the list that hides YouTube's Shorts, as it was at this commit
+_shorts=62f0cb7c9c87dec07439c9c697aac6a61bf349a8
 pkgdesc="Willwitcher-OS Kavat Edition: the browser, with the blocker, the command console and the system's modes"
 arch=('any')
 url="https://github.com/walberh96/willwitcher-os-kavat-edition"
 license=('LicenseRef-AllRightsReserved' 'GPL-3.0-or-later')
 depends=('chromium' 'kavat-widevine' 'kavat-theme' 'kavat-modes' 'kavat-notes' 'kavat-files' 'kavat-wallpaper' 'python' 'xdg-user-dirs' 'xdg-desktop-portal'
-         'ffmpeg' 'librsvg')
+         'ffmpeg' 'librsvg' 'curl')
 makedepends=('librsvg' 'python')
 source=(kavat-browser browser-host dev.kavat.browser.json policies.json kavat-browser.desktop mimeapps.list commands.toml browser.toml icon.svg
+        kavat-webapp shorts-rules.py
+        "hide-yt-shorts-$_shorts.txt::https://raw.githubusercontent.com/gijsdev/ublock-hide-yt-shorts/$_shorts/list.txt"
         "uBOLite_$_ubol.chromium.zip::https://github.com/uBlockOrigin/uBOL-home/releases/download/$_ubol/uBOLite_$_ubol.chromium.zip")
 noextract=("uBOLite_$_ubol.chromium.zip")
 sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+            'SKIP' 'SKIP'
+            'f8398dc26b1027f7435855bf979d4d7a23dd3191392c1a607ce4e92f5eede6bb'
             '85fe5909366e8ada66c5b331bbdbf69cf5100245ed6161b1e4e2f1f848ec7d03')
 
 build() {
   rsvg-convert -w 128 -h 128 -o icon.png icon.svg
+  # the list's rules, as the extension applies them; a rule it cannot apply is named here
+  python3 shorts-rules.py "hide-yt-shorts-$_shorts.txt" > shorts-rules.js
 }
 
 package() {
   install -Dm755 kavat-browser "$pkgdir/usr/bin/kavat-browser"
   install -Dm755 browser-host "$pkgdir/usr/lib/kavat/browser-host"
+  install -Dm755 kavat-webapp "$pkgdir/usr/bin/kavat-webapp"
   # only the Kavat extension may start the host
   install -Dm644 dev.kavat.browser.json "$pkgdir/etc/chromium/native-messaging-hosts/dev.kavat.browser.json"
   install -Dm644 policies.json "$pkgdir/etc/chromium/policies/managed/kavat.json"
@@ -39,6 +49,7 @@ package() {
   bsdtar -xf "uBOLite_$_ubol.chromium.zip" -C "$pkgdir/usr/share/kavat-browser/extensions/ublock"
   cp -r "$startdir"/extension/. "$pkgdir/usr/share/kavat-browser/extensions/kavat/"
   install -Dm644 icon.png "$pkgdir/usr/share/kavat-browser/extensions/kavat/icon.png"
+  install -Dm644 shorts-rules.js "$pkgdir/usr/share/kavat-browser/extensions/kavat/shorts-rules.js"
   # The extension's version is the package's: Chromium keeps the script of an extension it
   # has loaded before, and only reads it again when the version is another.
   sed -i "s/\"version\": \"[0-9.]*\"/\"version\": \"$pkgver.$pkgrel\"/" "$pkgdir/usr/share/kavat-browser/extensions/kavat/manifest.json"

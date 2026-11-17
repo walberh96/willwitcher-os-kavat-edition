@@ -10,6 +10,9 @@
   "action": { "default_title": "Kavat: the command console", "default_popup": "popup.html" },
   "chrome_url_overrides": { "newtab": "start.html" },
   "side_panel": { "default_path": "panel.html" },
+  "content_scripts": [
+    { "matches": ["*://www.youtube.com/*", "*://m.youtube.com/*"], "js": ["shorts-rules.js", "shorts.js"], "run_at": "document_start" }
+  ],
   "commands": {
     "_execute_action": {
       "suggested_key": { "default": "Ctrl+Shift+K" },

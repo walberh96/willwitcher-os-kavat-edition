@@ -8,6 +8,10 @@
 # the settings set it too.
 # start_background = "theme"
 
+# YouTube's Shorts: false, they are hidden wherever YouTube shows them; true brings them
+# back. `kavat-browser shorts on|off` and the Browser page of the settings set it too.
+# shorts = false
+
 # A profile of the browser for a mode: a window opened while that mode is in force is that
 # profile's, with its own history, its own sessions and its own passwords. A mode with no
 # line here uses the browser's first profile.

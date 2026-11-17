@@ -3,6 +3,10 @@
 #
 # usage: kavat-browser [address ...]            open the browser, or a tab in the one that is open
 #        kavat-browser --private [address ...]  a window that keeps nothing
+#        kavat-browser --app=<address>          a page as an app: a window of its own, with no tabs
+#                                               and no address bar; kavat-webapp makes its entry
+#        kavat-browser shorts [on|off]          YouTube's Shorts: off, hidden, as the system comes;
+#                                               on brings them back; alone, says which it is
 #        kavat-browser background theme|wallpaper|<file>
 #                                               what a new tab shows behind it: the theme's colour, the
 #                                               desktop's background, or a picture of yours
@@ -15,13 +19,23 @@
 # settings folder, the system's policies, the blocker and the Kavat extension loaded from
 # the system's own files, and Widevine for protected video. Its bars wear the system theme:
 # it is set to take its colours from GTK, whose theme is the system's. In Incognito mode
-# every window it opens is a private one, and a mode can have a profile of its own, named in
-# ~/.config/kavat/browser/browser.toml: a window opened in that mode is that profile's.
+# it is a browser apart, with settings of its own that are kept in memory and deleted on
+# leaving the mode: the blocker and the system's extension work in it as always, which they
+# would not in Chromium's private windows, and nothing of it is kept. A mode can have a
+# profile of its own, named in ~/.config/kavat/browser/browser.toml: a window opened in
+# that mode is that profile's.
 set -u
-if [[ ${1:-} == background || ${1:-} == tabs || ${1:-} == tab ]]; then
+if [[ ${1:-} == background || ${1:-} == shorts || ${1:-} == tabs || ${1:-} == tab ]]; then
   exec /usr/lib/kavat/browser-host "$@"
 fi
 data="${XDG_CONFIG_HOME:-$HOME/.config}/kavat-browser"
+mode=$(kavat-mode 2> /dev/null)
+# In Incognito the browser's settings folder is one of the session's, in memory: a browser
+# that begins with nothing and leaves nothing. kavat-mode closes it and deletes the folder.
+if [[ $mode == incognito && ${1:-} != --private ]]; then
+  data="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}/kavat-browser-incognito"
+  mkdir -p -m 700 "$data"
+fi
 # The two extensions come with the system, but Chromium writes beside an extension it loads
 # from a folder, so they are loaded from a copy in your own, made again when the system's change.
 system=/usr/share/kavat-browser
@@ -56,12 +70,9 @@ flags=(
   # loading an extension from a folder is being taken out of Chromium's own builds: kept on
   --disable-features=DisableLoadExtensionCommandLineSwitch
 )
-mode=$(kavat-mode 2> /dev/null)
 if [[ ${1:-} == --private ]]; then
   flags+=(--incognito)
   shift
-elif [[ $mode == incognito ]]; then
-  flags+=(--incognito)
 fi
 # The profile: the one asked for, as a project does, or the one the settings give the mode
 # in force; with neither, the browser's first.

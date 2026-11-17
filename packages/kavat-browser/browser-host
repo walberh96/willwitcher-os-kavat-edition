@@ -5,7 +5,8 @@ The browser starts it when the extension asks for it, and they speak in messages
 bytes with the length, then that much JSON. The extension asks for the system theme's
 colours, the mode in force, your own commands of the console, a clipping to be saved to
 the notes, the albums of sites and the notes there are about a site, or a folder to be
-opened in Yazi, and tells which tabs are open, which this keeps for the launcher of the
+opened in Yazi, whether YouTube's Shorts are wanted, or the page in view to be installed as
+an app, and tells which tabs are open, which this keeps for the launcher of the
 desktop. The other way, this tells the extension when
 the system's mode changes, and passes on a command the system asks the browser for:
 `kavat-browser command "<name>"` leaves it in a folder this watches.
@@ -105,7 +106,8 @@ def settings():
             found = tomllib.load(file)
     except (OSError, tomllib.TOMLDecodeError):
         found = {}
-    kept = {'start_album': str(found.get('start_album') or ''), 'start_background': str(found.get('start_background') or 'theme')}
+    kept = {'start_album': str(found.get('start_album') or ''), 'start_background': str(found.get('start_background') or 'theme'),
+            'shorts': found.get('shorts') is True}
     source = background_source(kept['start_background'])
     kept['start_background_stamp'] = f'{source}:{os.path.getmtime(source)}' if source else ''
     return kept
@@ -127,6 +129,28 @@ def set_line(key, value):
     with open(SETTINGS, 'w', encoding='utf-8') as file:
         file.write(text)
     return {'settings': settings()}
+
+
+def shorts():
+    """Whether YouTube's Shorts are shown: they are hidden unless the settings file says so."""
+    try:
+        with open(SETTINGS, 'rb') as file:
+            return tomllib.load(file).get('shorts') is True
+    except (OSError, tomllib.TOMLDecodeError):
+        return False
+
+
+def install_app(message):
+    """The page in view as an app of the desktop, which kavat-webapp makes."""
+    name = re.sub(r'\s+', ' ', str(message.get('name') or '')).strip()[:60]
+    try:
+        done = subprocess.run(['kavat-webapp', 'install', name or 'App', str(message.get('url') or '')], capture_output=True,
+                              text=True, timeout=14, check=False, stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired):
+        return {'failed': 'the app could not be installed'}
+    if done.returncode != 0:
+        return {'failed': done.stderr.strip().removeprefix('kavat-webapp: ') or 'the app could not be installed'}
+    return {'said': f'{name or "App"} is installed as an app'}
 
 
 def set_start_album(message):
@@ -430,6 +454,10 @@ def answer(message):
         return about(message)
     if ask == 'note':
         return open_note(message)
+    if ask == 'shorts':
+        return {'shorts': shorts()}
+    if ask == 'webapp-install':
+        return install_app(message)
     if ask == 'folder':
         folder = out('xdg-user-dir', 'DOWNLOAD') or f'{HOME}/Downloads'
         os.makedirs(folder, exist_ok=True)
@@ -448,6 +476,15 @@ def main():
         if done.get('failed'):
             sys.exit(f'kavat-browser: {done["failed"]}')
         print(done['settings']['start_background'])
+        return
+    if sys.argv[1:2] == ['shorts']:
+        # from a terminal, or the settings: kavat-browser shorts [on|off]
+        if len(sys.argv) > 3 or sys.argv[2:] not in ([], ['on'], ['off']):
+            print('usage: kavat-browser shorts [on|off]', file=sys.stderr)
+            sys.exit(2)
+        if sys.argv[2:]:
+            set_line('shorts', sys.argv[2] == 'on')
+        print('on' if shorts() else 'off')
         return
     if sys.argv[1:] == ['tabs']:
         # for the launcher: a tab to a line, its number, its title and its address

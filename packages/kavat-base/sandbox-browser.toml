@@ -14,6 +14,9 @@ write = [
   "Notes",
   # the line of the start page's album
   ".config/kavat/browser",
+  # a page installed as an app from the browser's console: its entry and its icon
+  ".local/share/applications",
+  ".local/share/kavat/webapps",
 ]
 # folders it may only read: the theme, the mode in force, the fonts
 read = [
