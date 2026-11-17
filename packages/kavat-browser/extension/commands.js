@@ -52,12 +52,17 @@ export const COMMANDS = {
     },
   },
   'zen mode': {
-    about: 'The page and nothing else; again to come back',
-    run: async () => {
-      const window = await chrome.windows.getLastFocused();
-      await chrome.windows.update(window.id, { state: window.state === 'fullscreen' ? 'normal' : 'fullscreen' });
-    },
+    about: 'The page and nothing else, in a window that stays a window; again to come back',
+    run: (send) => send({ ask: 'parts', toggle: 'zen' }),
   },
+  'hide tabs': { about: 'Hide the tab strip, or show it again', run: (send) => send({ ask: 'parts', toggle: 'tabs' }) },
+  'hide toolbar': {
+    about: 'Hide the toolbar and the address bar, or show them again; Ctrl+L brings them back for a moment',
+    run: (send) => send({ ask: 'parts', toggle: 'toolbar' }),
+  },
+  'hide bookmarks': { about: 'Hide the bookmarks bar, or show it again', run: (send) => send({ ask: 'parts', toggle: 'bookmarks' }) },
+  'hide side panel': { about: 'Close the side panel and keep it closed, or let it open again', run: (send) => send({ ask: 'parts', toggle: 'sidepanel' }) },
+  'show everything': { about: 'Every part of the window back', run: (send) => send({ ask: 'parts', parts: [] }) },
   'sleep other tabs': {
     about: 'Free the memory of the tabs that are not in view',
     run: async () => {

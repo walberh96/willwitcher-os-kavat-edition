@@ -167,6 +167,15 @@ def main():
         lines = output.split()
         checks.report(len(lines) == 5 and lines[0].isdigit() and int(lines[0]) >= 2 and lines[1:] == ['1', '1', '1', '1'],
                       "the browser tells the system its tabs, which the launcher lists behind /t, and a tab that is not there is said", output)
+        # Kavat Chromium hides the parts of its windows when the system asks: the top of the
+        # window is another picture in zen mode, and the window stays a window
+        top = (WINDOW + ' | sed -n "s/^\\s*at: \\([0-9]*\\),\\([0-9]*\\)/\\1 \\2/p;s/^\\s*size: \\([0-9]*\\),.*/\\1/p" | head -n 2 | tr "\\n" " " '
+               '| { read x y w; grim -g "$x,$y ${w}x120" -t ppm - | md5sum | cut -c1-8; }')
+        status, output = user(f'pacman -Qq kavat-chromium; {top}; kavat-browser parts zen; sleep 3; {top}; cat $XDG_RUNTIME_DIR/kavat-browser/parts; '
+                              f'{WINDOW} | grep -c "fullscreen: 0"; kavat-browser parts none; sleep 3; kavat-browser parts', 60)
+        lines = output.split()
+        checks.report(len(lines) == 6 and lines[0] == 'kavat-chromium' and lines[1] != lines[2] and lines[3:] == ['zen', '1', 'none'],
+                      "the browser is Kavat Chromium, and the system hides the parts of its window, zen mode, and shows them again", output)
 
         print('albums, its colours, a profile for a mode, the sandbox', flush=True)
         status, output = user('ffmpeg -v error -y -f lavfi -i color=c=red:s=800x500 -frames:v 1 /tmp/album.png; cat > /tmp/albums.py << "END"\n' + ALBUMS + 'END\npython3 /tmp/albums.py; '

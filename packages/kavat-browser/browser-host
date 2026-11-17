@@ -140,6 +140,51 @@ def shorts():
         return False
 
 
+PARTS = f'{ASKED}/parts'  # the parts of the browser's windows that are hidden, read by Kavat Chromium
+PART_NAMES = ('tabs', 'toolbar', 'bookmarks', 'sidepanel', 'zen')
+
+
+def hidden_parts():
+    try:
+        with open(PARTS) as file:
+            return [word for word in file.read().split() if word in PART_NAMES]
+    except OSError:
+        return []
+
+
+def set_parts(words):
+    """Hide these parts of every window of the browser, and show the rest: written whole,
+    so the browser never reads half a file."""
+    os.makedirs(ASKED, mode=0o700, exist_ok=True)
+    path = f'{PARTS}.{os.getpid()}'
+    with open(path, 'w') as file:
+        file.write(' '.join(words) + '\n' if words else '')
+    os.replace(path, PARTS)
+    return words
+
+
+def parts(message):
+    """{ask:'parts'} says which are hidden; with 'parts', hides those and shows the rest;
+    with 'toggle', hides that one, or shows it again."""
+    if 'parts' in message:
+        words = [word for word in message['parts'] if word in PART_NAMES]
+        return {'parts': set_parts(words)}
+    if 'toggle' in message:
+        word = message['toggle']
+        if word not in PART_NAMES:
+            return {'failed': f'no part called {word}'}
+        four = set(PART_NAMES[:-1])
+        now = set(hidden_parts())
+        if 'zen' in now:
+            now = set(four)  # zen is the four of them
+        if word == 'zen':
+            now = set() if now == four else set(four)
+        else:
+            now ^= {word}
+        return {'parts': set_parts(['zen'] if now == four else [w for w in PART_NAMES if w in now])}
+    return {'parts': hidden_parts()}
+
+
 def install_app(message):
     """The page in view as an app of the desktop, which kavat-webapp makes."""
     name = re.sub(r'\s+', ' ', str(message.get('name') or '')).strip()[:60]
@@ -456,6 +501,8 @@ def answer(message):
         return open_note(message)
     if ask == 'shorts':
         return {'shorts': shorts()}
+    if ask == 'parts':
+        return parts(message)
     if ask == 'webapp-install':
         return install_app(message)
     if ask == 'folder':
@@ -485,6 +532,21 @@ def main():
         if sys.argv[2:]:
             set_line('shorts', sys.argv[2] == 'on')
         print('on' if shorts() else 'off')
+        return
+    if sys.argv[1:2] == ['parts']:
+        # from a terminal, or the settings: kavat-browser parts [tabs|toolbar|bookmarks|sidepanel|zen ...|none]
+        words = sys.argv[2:]
+        if words == ['none']:
+            words = []
+        elif not words:
+            print(' '.join(hidden_parts()) or 'none')
+            return
+        wrong = [word for word in words if word not in PART_NAMES]
+        if wrong:
+            print(f'kavat-browser: no part called {wrong[0]}: tabs, toolbar, bookmarks, sidepanel, zen or none',
+                  file=sys.stderr)
+            sys.exit(2)
+        print(' '.join(set_parts(words)) or 'none')
         return
     if sys.argv[1:] == ['tabs']:
         # for the launcher: a tab to a line, its number, its title and its address

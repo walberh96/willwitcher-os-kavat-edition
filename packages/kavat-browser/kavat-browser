@@ -12,20 +12,25 @@
 #                                               desktop's background, or a picture of yours
 #        kavat-browser command "<name>" [what]  ask the open browser for a command of its console:
 #                                               "sleep other tabs", "zen mode", "new tab"…
+#        kavat-browser parts [tabs|toolbar|bookmarks|sidepanel|zen ...|none]
+#                                               hide these parts of the browser's windows and show
+#                                               the rest; alone, says which are hidden
 #        kavat-browser tabs                     the tabs that are open: a number, a title and an address each
 #        kavat-browser tab <number>             bring one of them to the front, and its window with it
 #
-# It is Chromium, as Arch builds it, made a piece of the system from the outside: its own
-# settings folder, the system's policies, the blocker and the Kavat extension loaded from
-# the system's own files, and Widevine for protected video. Its bars wear the system theme:
-# it is set to take its colours from GTK, whose theme is the system's. In Incognito mode
-# it is a browser apart, with settings of its own that are kept in memory and deleted on
-# leaving the mode: the blocker and the system's extension work in it as always, which they
-# would not in Chromium's private windows, and nothing of it is kept. A mode can have a
+# It is Kavat Chromium: Arch's Chromium built with three patches of the system's. The
+# blocker and the Kavat extension, loaded from the system's own files, are always on, in its
+# private windows too, and cannot be turned off or removed; its own pages wear the system's
+# palette; and the system hides the parts of its windows, the tabs, the toolbar, the
+# bookmarks and the side panel, or all four, which is zen mode. Around it: its own settings
+# folder, the system's policies and Widevine for protected video. Its bars take their
+# colours from GTK, whose theme is the system's. In Incognito mode it is a browser apart,
+# with settings of its own that are kept in memory and deleted on leaving the mode, so that
+# nothing of it is kept and the Kavat start page is still the new tab. A mode can have a
 # profile of its own, named in ~/.config/kavat/browser/browser.toml: a window opened in
 # that mode is that profile's.
 set -u
-if [[ ${1:-} == background || ${1:-} == shorts || ${1:-} == tabs || ${1:-} == tab ]]; then
+if [[ ${1:-} == background || ${1:-} == shorts || ${1:-} == parts || ${1:-} == tabs || ${1:-} == tab ]]; then
   exec /usr/lib/kavat/browser-host "$@"
 fi
 data="${XDG_CONFIG_HOME:-$HOME/.config}/kavat-browser"
@@ -67,8 +72,6 @@ flags=(
   --load-extension="$extensions/ublock,$extensions/kavat"
   # Chromium asks nobody whether it is the default browser, and shows no first-run pages
   --no-default-browser-check --no-first-run
-  # loading an extension from a folder is being taken out of Chromium's own builds: kept on
-  --disable-features=DisableLoadExtensionCommandLineSwitch
 )
 if [[ ${1:-} == --private ]]; then
   flags+=(--incognito)
@@ -97,6 +100,10 @@ fi
 if [[ ! -e $data/${profile:-Default}/Preferences ]]; then
   mkdir -p "$data/${profile:-Default}"
   echo '{"extensions":{"theme":{"system_theme":1}}}' > "$data/${profile:-Default}/Preferences"
+fi
+# A browser that starts begins with every part of its windows in view.
+if ! pgrep -u "$(id -u)" -f -- "--class=kavat-browser" > /dev/null; then
+  rm -f "$runtime/kavat-browser/parts"
 fi
 # the window apps pick files with is the system's, Yazi
 export GTK_USE_PORTAL=1

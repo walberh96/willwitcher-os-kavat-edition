@@ -1,10 +1,10 @@
-# The system's browser: Chromium as Arch builds it, made a piece of the system from the
-# outside. The blocker is uBlock Origin Lite, as its authors released it, with its lists
+# The system's browser: Kavat Chromium, Arch's Chromium built with three patches of the
+# system's, made a piece of the system. The blocker is uBlock Origin Lite, as its authors released it, with its lists
 # inside; the Kavat extension is this package's own, and hides YouTube's Shorts with the
 # rules of gijsdev/ublock-hide-yt-shorts, fetched here and made its own when this is built.
 pkgname=kavat-browser
 pkgver=0.1.0
-pkgrel=9
+pkgrel=10
 _ubol=2026.1110.1816
 # the list that hides YouTube's Shorts, as it was at this commit
 _shorts=62f0cb7c9c87dec07439c9c697aac6a61bf349a8
@@ -12,7 +12,7 @@ pkgdesc="Willwitcher-OS Kavat Edition: the browser, with the blocker, the comman
 arch=('any')
 url="https://github.com/walberh96/willwitcher-os-kavat-edition"
 license=('LicenseRef-AllRightsReserved' 'GPL-3.0-or-later')
-depends=('chromium' 'kavat-widevine' 'kavat-theme' 'kavat-modes' 'kavat-notes' 'kavat-files' 'kavat-wallpaper' 'python' 'xdg-user-dirs' 'xdg-desktop-portal'
+depends=('kavat-chromium' 'kavat-widevine' 'kavat-theme' 'kavat-modes' 'kavat-notes' 'kavat-files' 'kavat-wallpaper' 'python' 'xdg-user-dirs' 'xdg-desktop-portal'
          'ffmpeg' 'librsvg' 'curl')
 makedepends=('librsvg' 'python')
 source=(kavat-browser browser-host dev.kavat.browser.json policies.json kavat-browser.desktop mimeapps.list commands.toml browser.toml icon.svg

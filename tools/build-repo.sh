@@ -18,7 +18,16 @@ chroot="$root/work/chroot"
 
 dirs=()
 if (( $# == 0 )); then
-  for file in "$root"/packages/*/PKGBUILD "$root"/*/PKGBUILD; do dirs+=("$(dirname "$file")"); done
+  for file in "$root"/packages/*/PKGBUILD "$root"/*/PKGBUILD; do
+    dir="$(dirname "$file")"
+    # Kavat Chromium takes hours: with no folders it is built only when its version is not
+    # built yet; named, it is built again
+    if [[ $dir == */packages/kavat-chromium ]]; then
+      version="$(bash -c 'source "$1" > /dev/null 2>&1; echo "$pkgver-$pkgrel"' _ "$file")"
+      compgen -G "$repo/kavat-chromium-$version-*.pkg.tar.zst" > /dev/null && continue
+    fi
+    dirs+=("$dir")
+  done
 else
   for name in "$@"; do
     if [[ -f $root/packages/$name/PKGBUILD ]]; then dirs+=("$root/packages/$name")
