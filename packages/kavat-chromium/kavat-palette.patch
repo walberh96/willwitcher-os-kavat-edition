@@ -1,0 +1,377 @@
+Kavat: the system's palette on the pages and panels the browser draws itself.
+
+Kavat Browser takes the colours of its bars from GTK, whose theme is the system's. The
+pages it draws itself, chrome://settings, history, downloads, extensions, bookmarks, the
+side panel, menus and bubbles, are coloured from Material's "sys" tokens, which come
+from one seed colour, and so wore Chromium's own greys and blue. This adds a mixer, last
+of all so that it wins, that gives those tokens the colours kavat-theme writes for the
+browser in $XDG_STATE_HOME/kavat/theme/current/browser/palette (`name=#rrggbb` lines and
+`mode=dark|light`). Everything the browser derives from the tokens follows.
+
+The file is read on the thread pool, never on the UI thread. Each time the colours are
+built a read is asked for; when it finds a palette other than the one kept, the new one
+is kept and the toolkit's native theme is told, as GTK's own code does when its theme
+changes, so the colours are built again with it. A change of the system's theme switches
+GTK's theme name, which builds the colours again, so the read after it finds the new
+palette and the pages change live, without a restart.
+
+It does nothing when the browser does not take its look from the system (the Classic
+theme), when the file is not there, when colours are forced, or when the file's mode is
+not the one the colours are built for, as in a dark Incognito window over a light system.
+Light or dark itself still follows GTK's colour scheme, as before.
+
+diff -Naur a/chrome/browser/ui/color/BUILD.gn b/chrome/browser/ui/color/BUILD.gn
+--- a/chrome/browser/ui/color/BUILD.gn
++++ b/chrome/browser/ui/color/BUILD.gn
+@@ -70,7 +70,16 @@
+   }
+ 
+   if (is_linux) {
+-    sources += [ "linux/native_chrome_color_mixer_linux.cc" ]
++    sources += [
++      "linux/kavat_palette_color_mixer.cc",
++      "linux/kavat_palette_color_mixer.h",
++      "linux/native_chrome_color_mixer_linux.cc",
++    ]
++    deps += [
++      "//ui/linux:linux_ui",
++      "//ui/linux:linux_ui_factory",
++      "//ui/native_theme",
++    ]
+   }
+ 
+   if (is_mac) {
+diff -Naur a/chrome/browser/ui/color/chrome_color_mixers.cc b/chrome/browser/ui/color/chrome_color_mixers.cc
+--- a/chrome/browser/ui/color/chrome_color_mixers.cc
++++ b/chrome/browser/ui/color/chrome_color_mixers.cc
+@@ -10,6 +10,7 @@
+ #include "base/containers/fixed_flat_map.h"
+ #include "base/functional/bind.h"
+ #include "base/no_destructor.h"
++#include "build/build_config.h"
+ #include "chrome/browser/ui/color/chrome_color_id.h"
+ #include "chrome/browser/ui/color/chrome_color_mixer.h"
+ #include "chrome/browser/ui/color/chrome_color_provider_utils.h"
+@@ -25,6 +26,10 @@
+ #include "chrome/browser/ui/color/tab_strip_color_mixer.h"
+ #include "ui/color/color_provider_utils.h"
+ 
++#if BUILDFLAG(IS_LINUX)
++#include "chrome/browser/ui/color/linux/kavat_palette_color_mixer.h"
++#endif
++
+ namespace {
+ 
+ class ChromeColorProviderUtilsCallbacks
+@@ -95,4 +100,9 @@
+   if (key.app_controller) {
+     key.app_controller->AddColorMixers(provider, key);
+   }
++
++#if BUILDFLAG(IS_LINUX)
++  // Kavat: the system's palette, last, so that it wins over all of the above.
++  AddKavatPaletteColorMixer(provider, key);
++#endif
+ }
+diff -Naur a/chrome/browser/ui/color/linux/kavat_palette_color_mixer.cc b/chrome/browser/ui/color/linux/kavat_palette_color_mixer.cc
+--- a/chrome/browser/ui/color/linux/kavat_palette_color_mixer.cc
++++ b/chrome/browser/ui/color/linux/kavat_palette_color_mixer.cc
+@@ -0,0 +1,272 @@
++// Willwitcher-OS Kavat Edition: the system's palette in the browser's own colours.
++//
++// The pages the browser draws itself, chrome://settings and the rest, the side
++// panel, menus and bubbles are coloured from the Material "sys" tokens, which
++// come from one seed colour. Here those tokens are given the colours of the
++// system's theme instead, read from the file kavat-theme writes for the
++// browser. Everything else the browser derives from them follows.
++//
++// The file is read on the thread pool, never on the UI thread: each time
++// colours are built a read is asked for, and when what it finds differs from
++// what is kept, it is kept and the toolkit's native theme is told it changed,
++// which builds the colours again with it. A change of the system's theme
++// changes GTK's theme name, which builds the colours again, so the read that
++// follows finds the new palette.
++
++#include "chrome/browser/ui/color/linux/kavat_palette_color_mixer.h"
++
++#include <functional>
++#include <map>
++#include <memory>
++#include <optional>
++#include <string>
++#include <string_view>
++#include <utility>
++
++#include "base/environment.h"
++#include "base/files/file_path.h"
++#include "base/files/file_util.h"
++#include "base/functional/bind.h"
++#include "base/location.h"
++#include "base/nix/xdg_util.h"
++#include "base/no_destructor.h"
++#include "base/strings/string_number_conversions.h"
++#include "base/strings/string_split.h"
++#include "base/strings/string_util.h"
++#include "base/task/sequenced_task_runner.h"
++#include "base/task/thread_pool.h"
++#include "base/task/thread_pool/thread_pool_instance.h"
++#include "chrome/browser/ui/color/chrome_color_id.h"
++#include "third_party/skia/include/core/SkColor.h"
++#include "ui/color/color_id.h"
++#include "ui/color/color_mixer.h"
++#include "ui/color/color_provider.h"
++#include "ui/color/color_recipe.h"
++#include "ui/color/color_transform.h"
++#include "ui/color/system_theme.h"
++#include "ui/linux/linux_ui.h"
++#include "ui/linux/linux_ui_factory.h"
++#include "ui/native_theme/native_theme.h"
++
++namespace {
++
++// Where kavat-theme leaves the palette, under $XDG_STATE_HOME: lines of
++// `name=#rrggbb`, and `mode=dark` or `mode=light`; lines that start with `#`
++// are comments.
++constexpr char kPaletteFile[] = "kavat/theme/current/browser/palette";
++
++struct Palette {
++  bool dark = false;
++  std::map<std::string, SkColor, std::less<>> colors;
++
++  bool operator==(const Palette&) const = default;
++};
++
++struct State {
++  std::optional<Palette> palette;
++  bool reading = false;
++  bool read_again = false;
++};
++
++// Only touched on the UI thread, where colours are built and replies land.
++State& GetState() {
++  static base::NoDestructor<State> state;
++  return *state;
++}
++
++// Runs on the thread pool.
++std::optional<Palette> ReadPalette() {
++  std::unique_ptr<base::Environment> env = base::Environment::Create();
++  const base::FilePath path =
++      base::nix::GetXDGDirectory(env.get(), "XDG_STATE_HOME", ".local/state")
++          .Append(kPaletteFile);
++  std::string text;
++  if (!base::ReadFileToStringWithMaxSize(path, &text, 64 * 1024)) {
++    return std::nullopt;
++  }
++
++  Palette palette;
++  for (std::string_view line : base::SplitStringPiece(
++           text, "\n", base::TRIM_WHITESPACE, base::SPLIT_WANT_NONEMPTY)) {
++    const size_t equals = line.find('=');
++    if (line.front() == '#' || equals == std::string_view::npos) {
++      continue;
++    }
++    const std::string_view name =
++        base::TrimWhitespaceASCII(line.substr(0, equals), base::TRIM_ALL);
++    const std::string_view value =
++        base::TrimWhitespaceASCII(line.substr(equals + 1), base::TRIM_ALL);
++    if (name == "mode") {
++      palette.dark = value == "dark";
++      continue;
++    }
++    uint32_t rgb = 0;
++    if (value.size() != 7 || value[0] != '#' ||
++        !base::HexStringToUInt(value.substr(1), &rgb)) {
++      continue;
++    }
++    palette.colors.insert_or_assign(std::string(name),
++                                    SkColorSetA(rgb, SK_AlphaOPAQUE));
++  }
++  if (palette.colors.empty()) {
++    return std::nullopt;
++  }
++  return palette;
++}
++
++void ReadSoon(ui::SystemTheme system_theme);
++
++void OnPaletteRead(ui::SystemTheme system_theme,
++                   std::optional<Palette> palette) {
++  State& state = GetState();
++  state.reading = false;
++  const bool again = std::exchange(state.read_again, false);
++  if (palette != state.palette) {
++    state.palette = std::move(palette);
++    // What GTK does when its theme changes: the colours are built again and
++    // the windows and pages are told.
++    if (ui::LinuxUiTheme* linux_ui_theme =
++            ui::GetLinuxUiTheme(system_theme)) {
++      if (ui::NativeTheme* native_theme = linux_ui_theme->GetNativeTheme()) {
++        native_theme->NotifyOnNativeThemeUpdated();
++      }
++    }
++  }
++  if (again) {
++    ReadSoon(system_theme);
++  }
++}
++
++// Asks for a read, one at a time; one asked for while another is under way is
++// made after it, so that a change of the file in between is not missed.
++void ReadSoon(ui::SystemTheme system_theme) {
++  State& state = GetState();
++  if (state.reading) {
++    state.read_again = true;
++    return;
++  }
++  if (!base::ThreadPoolInstance::Get() ||
++      !base::SequencedTaskRunner::HasCurrentDefault()) {
++    return;
++  }
++  state.reading = base::ThreadPool::PostTaskAndReplyWithResult(
++      FROM_HERE, {base::MayBlock(), base::TaskPriority::USER_BLOCKING},
++      base::BindOnce(&ReadPalette),
++      base::BindOnce(&OnPaletteRead, system_theme));
++}
++
++}  // namespace
++
++void AddKavatPaletteColorMixer(ui::ColorProvider* provider,
++                               const ui::ColorProviderKey& key) {
++  if (key.system_theme == ui::SystemTheme::kDefault) {
++    return;
++  }
++  ReadSoon(key.system_theme);
++
++  const std::optional<Palette>& palette = GetState().palette;
++  if (!palette ||
++      key.forced_colors != ui::ColorProviderKey::ForcedColors::kNone ||
++      palette->dark !=
++          (key.color_mode == ui::ColorProviderKey::ColorMode::kDark)) {
++    return;
++  }
++
++  ui::ColorMixer& mixer = provider->AddMixer();
++  const auto has = [&palette](std::string_view name) {
++    return palette->colors.find(name) != palette->colors.end();
++  };
++  const auto set = [&palette, &mixer](ui::ColorId id, std::string_view name) {
++    const auto it = palette->colors.find(name);
++    if (it != palette->colors.end()) {
++      mixer[id] = {it->second};
++    }
++  };
++
++  // Surfaces: the page, cards and what stands over it.
++  set(ui::kColorSysSurface, "surface");
++  set(ui::kColorSysBase, "surface");
++  set(ui::kColorSysBaseContainerElevated, "surface");
++  set(ui::kColorSysHeaderContainer, "surface");
++  set(ui::kColorSysHeaderContainerInactive, "surface");
++  set(ui::kColorSysInverseOnSurface, "surface");
++  set(ui::kColorSysSurface2, "surface2");
++  set(ui::kColorSysSurface3, "surface2");
++  set(ui::kColorSysSurface4, "surface2");
++  set(ui::kColorSysSurface5, "surface2");
++  set(ui::kColorSysNeutralContainer, "surface2");
++  set(ui::kColorSysSecondaryContainer, "surface2");
++  set(ui::kColorSysBaseContainerOnSurface, "surface2");
++  if (has("surface") && has("surface2")) {
++    mixer[ui::kColorSysSurface1] = ui::AlphaBlend(
++        ui::kColorSysSurface2, ui::kColorSysSurface, SkAlpha{0x80});
++  }
++  // The frame around the page: the side panel's back and the tab strip.
++  set(ui::kColorSysBaseContainer, "bg");
++  set(ui::kColorSysHeader, "bg");
++  set(ui::kColorSysHeaderInactive, "bg");
++
++  // Text.
++  set(ui::kColorSysOnSurface, "text");
++  set(ui::kColorSysOnPrimaryContainer, "text");
++  set(ui::kColorSysOnSecondaryContainer, "text");
++  set(ui::kColorSysOnTonalContainer, "text");
++  set(ui::kColorSysOnBaseTonalContainer, "text");
++  set(ui::kColorSysOnHeaderPrimary, "text");
++  set(ui::kColorSysInverseSurface, "text");
++  set(ui::kColorSysOnSurfaceVariant, "muted");
++  set(ui::kColorSysOnSurfaceSubtle, "muted");
++  set(ui::kColorSysOnSurfaceSecondary, "muted");
++  set(ui::kColorSysOnHeaderPrimaryInactive, "muted");
++
++  // Lines.
++  set(ui::kColorSysOutline, "border");
++  set(ui::kColorSysNeutralOutline, "border");
++  set(ui::kColorSysDivider, "border");
++  set(ui::kColorSysSurfaceVariant, "border");
++  set(ui::kColorSysOnHeaderDivider, "border");
++  set(ui::kColorSysOnHeaderDividerInactive, "border");
++
++  // The accent: filled in it, written in it, and what is chosen.
++  set(ui::kColorSysPrimary, "accent");
++  set(ui::kColorSysTonalOutline, "accent");
++  set(ui::kColorSysStateFocusRing, "accent");
++  set(ui::kColorSysStateTextHighlight, "accent");
++  set(ui::kColorSysOnPrimary, "on_accent");
++  set(ui::kColorSysStateOnTextHighlight, "on_accent");
++  set(ui::kColorSysOnSurfacePrimary, "accent_text");
++  set(ui::kColorLinkForegroundDefault, "accent_text");
++  set(kColorNavMenuItemSelected, "accent_text");
++  set(ui::kColorSysPrimaryContainer, "selection");
++  set(ui::kColorSysTonalContainer, "selection");
++  set(ui::kColorSysBaseTonalContainer, "selection");
++
++  // Errors.
++  set(ui::kColorSysError, "danger");
++  set(ui::kColorSysOnError, "on_danger");
++
++  // Hover, press and the disabled: the text over what is under it, as
++  // Material does with its own neutral.
++  if (has("text")) {
++    mixer[ui::kColorSysStateHover] =
++        ui::SetAlpha(ui::kColorSysOnSurface, SkAlpha{0x14});
++    mixer[ui::kColorSysStateFocus] =
++        ui::SetAlpha(ui::kColorSysOnSurface, SkAlpha{0x1E});
++    mixer[ui::kColorSysStatePressed] =
++        ui::SetAlpha(ui::kColorSysOnSurface, SkAlpha{0x1E});
++    mixer[ui::kColorSysStateHoverOnSubtle] =
++        ui::SetAlpha(ui::kColorSysOnSurface, SkAlpha{0x0F});
++    mixer[ui::kColorSysStateFocusHighlight] =
++        ui::SetAlpha(ui::kColorSysOnSurface, SkAlpha{0x0F});
++    mixer[ui::kColorSysStateRippleNeutralOnSubtle] =
++        ui::SetAlpha(ui::kColorSysOnSurface, SkAlpha{0x14});
++    mixer[ui::kColorSysStateDisabled] =
++        ui::SetAlpha(ui::kColorSysOnSurface, SkAlpha{0x60});
++    mixer[ui::kColorSysStateDisabledContainer] =
++        ui::SetAlpha(ui::kColorSysOnSurface, SkAlpha{0x1E});
++  }
++  if (has("accent")) {
++    mixer[ui::kColorSysStateRipplePrimary] =
++        ui::SetAlpha(ui::kColorSysPrimary, SkAlpha{0x52});
++  }
++}
+diff -Naur a/chrome/browser/ui/color/linux/kavat_palette_color_mixer.h b/chrome/browser/ui/color/linux/kavat_palette_color_mixer.h
+--- a/chrome/browser/ui/color/linux/kavat_palette_color_mixer.h
++++ b/chrome/browser/ui/color/linux/kavat_palette_color_mixer.h
+@@ -0,0 +1,22 @@
++// Willwitcher-OS Kavat Edition: the system's palette in the browser's own colours.
++
++#ifndef CHROME_BROWSER_UI_COLOR_LINUX_KAVAT_PALETTE_COLOR_MIXER_H_
++#define CHROME_BROWSER_UI_COLOR_LINUX_KAVAT_PALETTE_COLOR_MIXER_H_
++
++#include "ui/color/color_provider_key.h"
++
++namespace ui {
++class ColorProvider;
++}
++
++// Adds a mixer that gives the Material "sys" colours, which the browser's own
++// pages, the side panel, menus and bubbles are drawn with, the colours of the
++// system's theme, as kavat-theme writes them in
++// $XDG_STATE_HOME/kavat/theme/current/browser/palette. It does nothing when
++// the browser does not take its look from the system (GTK or Qt), when that
++// file is not there, or when its mode is not the one asked for, as in a dark
++// Incognito window over a light system. It must be the last mixer added.
++void AddKavatPaletteColorMixer(ui::ColorProvider* provider,
++                               const ui::ColorProviderKey& key);
++
++#endif  // CHROME_BROWSER_UI_COLOR_LINUX_KAVAT_PALETTE_COLOR_MIXER_H_

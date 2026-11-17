@@ -1,0 +1,9 @@
+# Kavat Browser: the colours of the pages and panels it draws itself, its settings, history,
+# downloads and the side panel among them. Its bars take theirs from GTK; these go to the
+# rest, through the system's own patch to Chromium, which reads this file where it is made.
+#
+# There is nothing to reload: the change of GTK's theme name, which the gtk template makes
+# at each change, has the browser build its colours again, and it reads this file then.
+
+[[file]]
+from = "palette"

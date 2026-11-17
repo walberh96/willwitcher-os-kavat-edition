@@ -1,0 +1,109 @@
+kavat-builtin-extensions.patch: the system's two extensions are part of the browser.
+
+Kavat Browser loads two extensions of the system's, the Kavat one
+(aelpfjkmocfiooliocnpmmbgcmbpjcne) and the blocker, uBlock Origin Lite
+(ofdabgbaeilkjjdadjindcdlfonikhmo): the launcher passes them with
+--load-extension, from a copy in the user's own folder. The blocker is a feature
+of the browser that is always on, not a plugin that is turned on or off, and in
+a private window more than anywhere. With this patch the two:
+
+- work in private windows, as if "Allow in Incognito" were on, which cannot be
+  turned off: ExtensionPrefs::IsIncognitoEnabled says yes for them, and
+  everything that asks whether an extension runs in incognito (the requests the
+  blocker's rules see, the scripts it puts in pages, its buttons on the toolbar)
+  asks that in the end;
+- cannot be turned off or removed, from chrome://extensions or by another
+  extension: to the standard management policy they are as a component
+  extension is, and they must remain installed;
+- are not dropped when Enhanced Safe Browsing is on, which would otherwise
+  ignore --load-extension.
+
+They are not made component extensions, which would also need no launcher:
+a component extension's static rule sets of declarativeNetRequest are never
+loaded, because their checksums are only kept in the preferences when an
+extension is installed (RulesMonitorService::OnExtensionLoaded), and their
+index is written beside the extension, which in /usr cannot be written.
+
+--- a/chrome/browser/extensions/extension_service.cc
++++ b/chrome/browser/extensions/extension_service.cc
+@@ -424,11 +424,8 @@
+         << "--load-extension is not allowed in Google Chrome, ignoring.";
+     return;
+ #else   // BUILDFLAG(GOOGLE_CHROME_BRANDING) && !BUILDFLAG(IS_CHROMEOS)
+-    if (safe_browsing::IsEnhancedProtectionEnabled(*profile_->GetPrefs())) {
+-      VLOG(1) << "--load-extension is not allowed for users opted into "
+-              << "Enhanced Safe Browsing, ignoring.";
+-      return;
+-    }
++    // Willwitcher-OS Kavat Edition: the system's two extensions come with this
++    // switch, so Enhanced Safe Browsing does not turn them off.
+     if (ShouldBlockCommandLineExtension(*profile_)) {
+       // TODO(crbug.com/401529219): Deprecate this restriction once
+       // --load-extension removal on Chrome builds is fully launched.
+--- a/chrome/browser/extensions/standard_management_policy_provider.cc
++++ b/chrome/browser/extensions/standard_management_policy_provider.cc
+@@ -29,6 +29,14 @@
+ 
+ namespace {
+ 
++// Willwitcher-OS Kavat Edition: the system's two extensions, Kavat and the
++// blocker, are part of the browser: they cannot be turned off or removed, by
++// the user or by another extension.
++bool IsKavatSystemExtension(const Extension* extension) {
++  return extension->id() == "aelpfjkmocfiooliocnpmmbgcmbpjcne" ||
++         extension->id() == "ofdabgbaeilkjjdadjindcdlfonikhmo";
++}
++
+ bool AdminPolicyIsModifiable(ExtensionManagement* settings,
+                              const Extension* source_extension,
+                              const Extension* extension,
+@@ -74,6 +82,10 @@
+     }
+   }
+ 
++  if (IsKavatSystemExtension(extension)) {
++    is_modifiable = false;
++  }
++
+   if (is_modifiable) {
+     return true;
+   }
+@@ -296,6 +308,14 @@
+ bool StandardManagementPolicyProvider::MustRemainInstalled(
+     const Extension* extension,
+     std::u16string* error) const {
++  if (IsKavatSystemExtension(extension)) {
++    if (error) {
++      *error = l10n_util::GetStringFUTF16(
++          IDS_EXTENSION_CANT_UNINSTALL_POLICY_REQUIRED,
++          base::UTF8ToUTF16(extension->name()));
++    }
++    return true;
++  }
+   ManagedInstallationMode mode = settings_->GetInstallationMode(extension);
+   // Disallow removing of recommended extension, to avoid re-install it
+   // again while policy is reload. But disabling of recommended extension is
+--- a/extensions/browser/extension_prefs.cc
++++ b/extensions/browser/extension_prefs.cc
+@@ -1375,7 +1375,21 @@
+   return false;
+ }
+ 
++namespace {
++
++// Willwitcher-OS Kavat Edition: the system's two extensions, Kavat and the
++// blocker, are part of the browser and work in its private windows too.
++bool IsKavatSystemExtension(const ExtensionId& extension_id) {
++  return extension_id == "aelpfjkmocfiooliocnpmmbgcmbpjcne" ||
++         extension_id == "ofdabgbaeilkjjdadjindcdlfonikhmo";
++}
++
++}  // namespace
++
+ bool ExtensionPrefs::IsIncognitoEnabled(const ExtensionId& extension_id) const {
++  if (IsKavatSystemExtension(extension_id)) {
++    return true;
++  }
+   return ReadPrefAsBooleanAndReturn(extension_id, kPrefIncognitoEnabled);
+ }
+ 

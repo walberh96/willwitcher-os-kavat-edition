@@ -1,0 +1,15 @@
+# Made by kavat-theme from the theme's settings; what is changed here is lost.
+# The settings are in ~/.config/kavat/theme.toml.
+mode={{ mode }}
+bg={{ bg }}
+surface={{ surface }}
+surface2={{ surface2 }}
+text={{ text }}
+muted={{ muted }}
+border={{ border }}
+accent={{ accent }}
+on_accent={{ on_accent }}
+accent_text={{ accent_text }}
+selection={{ selection }}
+danger={{ danger }}
+on_danger={{ on_danger }}
