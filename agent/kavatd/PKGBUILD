@@ -1,0 +1,34 @@
+pkgname=kavatd
+pkgver=0.1.0
+pkgrel=1
+pkgdesc="Willwitcher-OS Kavat Edition: the daemon that runs the agent's typed tools, each at its permission level"
+arch=('x86_64')
+url='https://github.com/walberh96/willwitcher-os-kavat-edition'
+license=('LicenseRef-AllRightsReserved')
+# what the first tools run: kav, kavat-theme, hyprctl, kavat-mode, kavat-wallpaper, wpctl
+# and kavat-notes
+depends=('gcc-libs' 'kav' 'kavat-theme' 'hyprland' 'kavat-modes' 'kavat-wallpaper' 'wireplumber' 'kavat-notes')
+makedepends=('cargo')
+# no separate package of debugging symbols
+options=('!debug')
+
+# The program is built where it is, from the versions Cargo.lock fixes.
+build() {
+  cd "$startdir"
+  CARGO_HOME="$srcdir/cargo" CARGO_TARGET_DIR="$srcdir/target" cargo build --release --locked
+}
+
+check() {
+  cd "$startdir"
+  CARGO_HOME="$srcdir/cargo" CARGO_TARGET_DIR="$srcdir/target" cargo test --release --locked
+  # the tools as they will be installed: one that is wrong would leave the daemon with none
+  "$srcdir/target/release/kavatd" --check --tools "$startdir/tools" > /dev/null
+}
+
+package() {
+  install -Dm755 -t "$pkgdir/usr/bin" "$srcdir/target/release/kavatd" "$srcdir/target/release/kavat-ask"
+  # the system's tools: only root changes what the agent can run
+  install -Dm644 -t "$pkgdir/usr/share/kavat/agent/tools" "$startdir"/tools/*.toml
+  # the session's service; it is not turned on here: the agent's phase decides when
+  install -Dm644 -t "$pkgdir/usr/lib/systemd/user" "$startdir/kavatd.service"
+}

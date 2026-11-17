@@ -1,0 +1,26 @@
+# The system's modes, through kavat-mode.
+
+[[tool]]
+name = "mode.get"
+description = "Which system mode is on: coder, gamer or incognito"
+level = "read"
+timeout = 10
+command = ["/usr/bin/kavat-mode"]
+
+[[tool]]
+name = "mode.set"
+description = "Switch the system mode: coder for work, gamer for playing, incognito for privacy behind a VPN"
+level = "reversible"
+timeout = 60
+command = ["/usr/bin/kavat-mode", "{mode}"]
+
+[tool.undo]
+tool = "mode.set"
+before = { mode = ["/usr/bin/kavat-mode"] }
+
+# a name and not a list: a person can have modes of their own
+[tool.params.mode]
+type = "string"
+form = "name"
+description = "The mode: coder, gamer, incognito, or one of the person's own"
+max = 40

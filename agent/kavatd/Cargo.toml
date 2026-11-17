@@ -1,0 +1,31 @@
+[package]
+name = "kavatd"
+version = "0.1.0"
+edition = "2024"
+description = "Willwitcher-OS Kavat Edition: the daemon that runs the agent's typed tools, each at its permission level"
+license = "LicenseRef-AllRightsReserved"
+publish = false
+
+# Not in src/: that is the folder makepkg takes for itself next to a PKGBUILD.
+[lib]
+name = "kavatd"
+path = "core/lib.rs"
+
+[[bin]]
+name = "kavatd"
+path = "core/main.rs"
+
+[[bin]]
+name = "kavat-ask"
+path = "core/ask.rs"
+
+# No async runtime: a thread for each connection is enough for one person's clients.
+[dependencies]
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+toml = "1.2.1"
+
+[profile.release]
+lto = true
+strip = true
+panic = "abort"

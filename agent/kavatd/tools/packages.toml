@@ -1,0 +1,72 @@
+# The packages, through kav. kav itself takes the snapshot before a change and keeps what
+# is not on the reviewed list out; nothing here approves a package of the AUR.
+
+[[tool]]
+name = "packages.search"
+description = "Look for packages by name or by what they do, in the repositories and on the reviewed list of the AUR"
+level = "read"
+timeout = 60
+command = ["/usr/bin/kav", "search", "{query}"]
+
+[tool.params.query]
+type = "string"
+form = "words"
+description = "The words to look for"
+max = 80
+
+[[tool]]
+name = "packages.info"
+description = "A package's record: version, size, whether it is installed, where it would come from"
+level = "read"
+timeout = 60
+command = ["/usr/bin/kav", "info", "{name}"]
+
+[tool.params.name]
+type = "string"
+form = "name"
+description = "The package"
+max = 80
+
+[[tool]]
+name = "packages.list"
+description = "List packages: the installed ones, those asked for by name, the ones nothing needs any more, those no repository has, or the reviewed list of the AUR"
+level = "read"
+timeout = 60
+command = ["/usr/bin/kav", "list", "--{source}"]
+
+[tool.params.source]
+type = "enum"
+description = "Which ones"
+values = ["installed", "explicit", "orphans", "foreign", "aur"]
+
+[[tool]]
+name = "packages.install"
+description = "Install a package with kav"
+level = "with-snapshot"
+timeout = 1800
+command = ["/usr/bin/kav", "install", "{name}"]
+
+[tool.undo]
+say = "kav undo takes the system back to before this change of packages"
+
+[tool.params.name]
+type = "string"
+form = "name"
+description = "The package"
+max = 80
+
+[[tool]]
+name = "packages.remove"
+description = "Remove an installed package with kav, with what only it needed"
+level = "with-snapshot"
+timeout = 600
+command = ["/usr/bin/kav", "remove", "{name}"]
+
+[tool.undo]
+say = "kav undo takes the system back to before this change of packages"
+
+[tool.params.name]
+type = "string"
+form = "name"
+description = "The package"
+max = 80

@@ -1,0 +1,14 @@
+# The daemon that runs the agent's tools, inside the session: it speaks to Hyprland, to
+# the sound and to the theme as the person does. It listens on a socket of the session's
+# own folder and on nothing else.
+[Unit]
+Description=Kavat's tools
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+ExecStart=/usr/bin/kavatd
+Restart=on-failure
+
+[Install]
+WantedBy=graphical-session.target

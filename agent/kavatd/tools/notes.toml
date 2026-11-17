@@ -1,0 +1,25 @@
+# The notes, through kavat-notes.
+
+[[tool]]
+name = "notes.add"
+description = "Save a note. A day or a time at its end, like tomorrow 9:00, makes it a reminder"
+level = "reversible"
+command = ["/usr/bin/kavat-notes", "add", ["--to", "{notebook}"], "{text}"]
+
+[tool.params.text]
+type = "string"
+description = "What the note says"
+max = 500
+
+[tool.params.notebook]
+type = "string"
+form = "name"
+description = "The notebook; the inbox when left out"
+max = 60
+optional = true
+
+[[tool]]
+name = "notes.due"
+description = "The tasks and reminders that are overdue, due today or coming"
+level = "read"
+command = ["/usr/bin/kavat-notes", "due"]

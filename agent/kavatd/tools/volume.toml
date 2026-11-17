@@ -1,0 +1,34 @@
+# The volume of the output in use, through wpctl, which asks PipeWire.
+
+[[tool]]
+name = "volume.get"
+description = "How loud the sound is, and whether it is muted"
+level = "read"
+timeout = 10
+command = ["/usr/bin/wpctl", "get-volume", "@DEFAULT_AUDIO_SINK@"]
+
+[[tool]]
+name = "volume.set"
+description = "Set the volume to a level"
+level = "reversible"
+timeout = 10
+command = ["/usr/bin/wpctl", "set-volume", "@DEFAULT_AUDIO_SINK@", "{level}%"]
+
+[tool.params.level]
+type = "integer"
+description = "Percent"
+min = 0
+max = 100
+
+[[tool]]
+name = "volume.mute"
+description = "Mute or unmute the sound"
+level = "reversible"
+timeout = 10
+command = ["/usr/bin/wpctl", "set-mute", "@DEFAULT_AUDIO_SINK@", "{muted}"]
+
+[tool.params.muted]
+type = "boolean"
+description = "true to mute, false to unmute"
+yes = "1"
+no = "0"

@@ -1,0 +1,21 @@
+# The desktop's background, through kavat-wallpaper.
+
+[[tool]]
+name = "wallpaper.get"
+description = "What the desktop's background is: the theme's picture, an image or a video, and its file"
+level = "read"
+timeout = 10
+command = ["/usr/bin/kavat-wallpaper"]
+
+[[tool]]
+name = "wallpaper.set"
+description = "Set an image or a video as the desktop's background"
+level = "reversible"
+timeout = 60
+command = ["/usr/bin/kavat-wallpaper", "set", "{file}"]
+
+[tool.params.file]
+type = "string"
+form = "path"
+description = "The image or the video, by its whole path"
+max = 400

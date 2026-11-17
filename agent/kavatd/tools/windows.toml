@@ -1,0 +1,22 @@
+# The windows and the workspaces, through hyprctl. The daemon runs inside the session, so
+# hyprctl finds its Hyprland by itself.
+
+[[tool]]
+name = "windows.list"
+description = "The open windows, each with its app, its title and its workspace"
+level = "read"
+timeout = 10
+command = ["/usr/bin/hyprctl", "clients", "-j"]
+
+[[tool]]
+name = "workspaces.switch"
+description = "Show another workspace"
+level = "reversible"
+timeout = 10
+command = ["/usr/bin/hyprctl", "dispatch", "hl.dsp.focus({{ workspace = {workspace} }})"]
+
+[tool.params.workspace]
+type = "integer"
+description = "The workspace to show"
+min = 1
+max = 10

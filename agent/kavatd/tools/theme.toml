@@ -1,0 +1,42 @@
+# The look of the system, through kavat-theme.
+
+[[tool]]
+name = "theme.get"
+description = "The theme in force: palette, mode, accent and every other setting of the look"
+level = "read"
+command = ["/usr/bin/kavat-theme", "get"]
+
+[[tool]]
+name = "theme.set"
+description = "Change the look of the system: light or dark, the palette of colours, the accent colour. Any of the three, in one call"
+level = "reversible"
+command = ["/usr/bin/kavat-theme", "set", ["mode", "{mode}"], ["palette", "{palette}"], ["accent", "{accent}"]]
+
+# what each setting was is read before it changes: the same tool puts it back
+[tool.undo]
+tool = "theme.set"
+
+[tool.undo.before]
+mode = ["/usr/bin/kavat-theme", "get", "mode"]
+palette = ["/usr/bin/kavat-theme", "get", "palette"]
+accent = ["/usr/bin/kavat-theme", "get", "accent"]
+
+[tool.params.mode]
+type = "enum"
+description = "Light or dark"
+values = ["light", "dark"]
+optional = true
+
+[tool.params.palette]
+type = "string"
+form = "name"
+description = "The palette of colours, like kavat, nord, gruvbox or tokyo-night"
+max = 60
+optional = true
+
+[tool.params.accent]
+type = "string"
+form = "name"
+description = "One of the palette's accents, like amber, teal, frost or iris"
+max = 60
+optional = true
