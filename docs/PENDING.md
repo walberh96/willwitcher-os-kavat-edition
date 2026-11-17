@@ -16,6 +16,7 @@ Nothing waits for a decision.
 
 Settled on 16 November 2026:
 
+- **D51**, the browser in Incognito mode: the blocker is always there, in Incognito more than anywhere. The browser of the mode is one apart, with the system's extensions as always and its settings in memory, closed and deleted on leaving the mode; Chromium's private windows, where no extension runs, are not what the mode opens. A blocker that is part of the browser itself, and not an extension, comes with the Chromium compiled here (D46).
 - **D50**, remote access: yes, as proposed. Tailscale, the SSH server and Sunshine behind one switch, off as the system comes, on a page of its own; Tailscale's servers coordinate, with a field for a server of yours, and the terminal comes in with your keys. It is in the design document, under "Security and recovery".
 - **D45**, the aliases and functions from Endgame, gone over: two for now, `port-kill <port>` and `y`, Yazi's wrapper. They are in the design document, under "Preinstalled software".
 - **D46**, Kavat Browser's last part, which needs Chromium compiled: yes, it is compiled here. It was known from the start.

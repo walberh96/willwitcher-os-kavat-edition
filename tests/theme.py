@@ -45,7 +45,7 @@ def main():
         return output.split()[2][2:] if output.startswith('gradient data: ') else output
 
     def kitty(name):
-        _, output = user(f'kitty @ --to unix:{KITTY} get-colors')
+        _, output = user(f'kitty @ --use-password never --to unix:{KITTY} get-colors')
         found = [line.split()[1] for line in output.splitlines() if line.split()[:1] == [name]]
         return found[0] if found else output
 

@@ -285,6 +285,34 @@ None of this was seen on the PC yet. The virtual machine tried what it could; wh
 - [ ] **Searching for a setting.** `Super+T`, type `warmth` in the search: Displays is listed, with "Warmth" beside it. `password` or `clock` find theirs.
 - [ ] **Incognito and recent files.** In Incognito, open a file from a GTK app's file window: after leaving the mode, it is not among that app's recent files.
 
+## 20. What was built on 16 November, from the list of what was not
+
+None of this was seen on the PC. What the virtual machine could not try is said in each line.
+
+- [ ] **Changing a shortcut.** Keybindings: press "Files", type `Super+Shift+E`, Enter: `Super+E` opens nothing and `Super+Shift+E` opens Yazi. "As it comes" gives it back. Keys another shortcut has are refused, with its name.
+- [ ] **`port-kill` and `y`.** Start a dev server: `port-kill` lists its port with its program, `port-kill <port>` stops it and names it; `port-kill 53` says it is not yours and asks for the password. `y`, go to another folder in Yazi, `q`: the terminal is in that folder. *On the PC already installed: `cp /etc/skel/.config/kavat/aliases.zsh ~/.config/kavat/` first.*
+- [ ] **`sudo` on Esc twice, and more completions.** Type a command, press `Esc` twice: `sudo` is in front; twice more takes it away. `Tab` after a command only zsh-completions knows offers its options; with its switch off on the Shell page, a new terminal does not.
+- [ ] **`kavat-fetch`.** In Kitty the cat is a picture, in the accent, beside the lines and not over them; after changing the accent it has the new colour; inside tmux it is the cat in characters. The Health line says `✓ ok`, with the updates waiting after `kav check` finds some.
+- [ ] **No YouTube Shorts.** With a network: the home page has no Shorts shelf, the side bar no Shorts entry, a channel no Shorts tab, and the subscriptions and a search show none. Browser page, "Hide Shorts" off, back to the tab: they are there. *Never tried on the real site.*
+- [ ] **A page as an app.** `kavat webapp install`, a name, `https://music.youtube.com` and nothing for the icon: the launcher has the app with the site's icon; it opens in a window with no tabs and no address bar, logged in where the browser is. In the browser, `Ctrl+Shift+K`, "install app", Enter does it for the page in view. The Browser page lists them, with Remove.
+- [ ] **Wallpapers from the network.** Wallpaper, Online: search "mountains": pictures appear within seconds; press one: it becomes the background and is in `~/Pictures/Wallpapers/images`. With no network, the same search says so in a line.
+- [ ] **A video on one display.** With two displays: a video on one and an image on the other; both show, the video pauses under a full-screen window, and after logging out and in both are back. *Tried with stand-ins only.*
+- [ ] **The lock shows the background.** With an image or a video of yours as the background, `Super+Shift+L` shows it, or the video's still frame, behind the clock; with "The lock shows it" off on the Wallpaper page, the theme's picture.
+- [ ] **The browser in Incognito.** In the mode, `Super+B` opens a browser with nothing in it: no history, not logged in anywhere, and with the blocker's icon there and ads blocked. Log in somewhere, leave the mode: that browser closes; enter the mode again: it is logged in nowhere.
+- [ ] **Incognito hides what notifications say.** With the mode on, a message from a chat app shows the app's name and "Notification", in the toast and in the history; its button still opens the app; after leaving the mode, new ones show in full.
+- [ ] **The installer finds the disk again.** Started with the answers of the earlier installation, the disk page comes up with the same disk chosen although its nvme name changed, and the side bar says which; with a file from another machine, none is chosen and the side bar says so. *Check the disk it names before pressing Install: this was never tried with two real disks.*
+- [ ] **Claude beside the editor.** `kav install claude-code` once it is on the reviewed list, `claude` once in a terminal to log in. In Neovim, `Ctrl+Alt+B` opens Claude in a Kitty window to the right, and `/ide` there says it is connected; select lines, `Ctrl+Alt+K`: Claude has them; ask for a change: it opens as a diff, `<leader>aa` applies it and `<leader>ad` drops it; `Ctrl+Alt+B` again closes it. *Never tried with a real Kitty or a real Claude Code.*
+- [ ] **Remote access**, once it is in the system: it is written, but Sunshine has still to be built, and until then the page says it is not installed. It needs a Tailscale account and a second device with Tailscale and Moonlight; a phone will do.
+  - Before turning it on: the page says off, the bar has no mark, and `ssh` to this computer from the local network is refused.
+  - Turn it on: the password is asked for, the page shows an address and a picture to sign in with, and after signing in it shows this computer's name on the private network. The bar carries the mark.
+  - Paste the phone's public key on the page, `ssh` from the phone to that name: it comes in, a notification says so, and the mark counts it. With a password, or as root, it does not.
+  - From a machine of the local network that is not in the Tailscale network, `ssh` and Moonlight still do not reach it.
+  - In Moonlight, add this computer by its Tailscale name: it shows a PIN; typed on the page, the phone is paired and sees the desktop, with keyboard and mouse.
+  - Left alone, the computer stays awake and reachable, and the screen still locks. After a restart, `ssh` works before anyone logs in and the desktop only after.
+  - Enter Incognito: the phone cannot reach the computer; leave it: it can again.
+  - Turn it off: the mark goes, the phone reaches nothing, and `systemctl is-enabled tailscaled sshd` says disabled.
+  - *None of the lines above was ever tried: only that it is off as the system comes, and what the firewall is told.*
+
 ## What to send back
 
 For each line that failed: its number, what you did, what you saw. A photo of the screen is enough for anything before the login. After the login, `journalctl -b > ~/log.txt` right after it happens.
@@ -326,15 +354,13 @@ Seen on the way: the keyboard's indicator was not on the bar, its name misspelt 
 
 These are not failures: they are listed in the design document as left for later.
 
-- The settings panel has twenty-four pages of twenty-seven; two wait for the agent, and Remote access is not built.
-- In the modes: all that waits for the agent and the browser.
-- Wallpaper: a video of its own for each display, and the login and the lock showing a video's still frame.
+- The settings panel has twenty-five pages of twenty-seven; the other two wait for the agent.
+- Remote access is written and not installed: Sunshine, which it needs, has still to be built once for the system.
+- In the modes: what waits for the agent. 
+- Wallpaper: the login showing a video's still frame, and the lock showing each display's own background.
 - In the browser: the palette on the pages Chromium draws itself and hiding its native panels, which are to be built with a Chromium compiled here (D46); and the agent's panel.
-- Your aliases and functions from Endgame: they wait for you to go over them.
-- In the installer: the programs that are only in the AUR, which wait for their review (D44); and choosing the disk from the answer file.
-- `kavat-fetch` and `kavat-top` are fastfetch and btop with the theme, not the forks of the design yet.
-- In the notes: the agent's tools.
-- Neovim's side panels with Claude.
-- In `kav`: really building a package of the AUR was never tried, for want of a network in the test machine.
-- In the settings: changing a shortcut from the panel. In Incognito: notifications without their content.
-- Asked for on 16 November 2026 and in the design document: `port-kill` and `y`, the `sudo` and `zsh-completions` plugins, wallpapers searched online, YouTube Shorts hidden, and web apps. The agent's tools for containers, git and ports are phase 4. Remote access too, approved that day as D50: Tailscale, the SSH server and Sunshine behind one switch, off as the system comes.
+- More of your aliases and functions from Endgame, when you go over them: `port-kill` and `y` are in.
+- In the installer: the programs that are only in the AUR, which wait for their review (D44).
+- `kavat-top` is btop with the theme, not the fork of the design, which is phase 4; `kavat-fetch` has no line for the agent.
+- In the notes: the agent's tools. The agent's tools for containers, git, ports and remote access: phase 4.
+- In Neovim: the panels other than Claude's, popping a panel out, and a memory for each project.
