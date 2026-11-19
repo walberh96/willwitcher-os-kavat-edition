@@ -158,6 +158,10 @@ def main():
         until('and the right one opens it', 'pgrep -c -x hyprlock; echo open', '0\nopen')
         # the lock that comes by itself, when nobody is there or before sleeping, and the power
         # menu's, are the same lock screen: the shell's own is off
+        # hypridle is what hears the session being locked. The one running was started by this
+        # test, from outside the session, when it changed the lock's time: one of the session's
+        # own takes its place, as the settings panel would have started it.
+        user('pkill -x hypridle; hyprctl --instance 0 dispatch "hl.dsp.exec_cmd(\\"hypridle\\")" > /dev/null; sleep 3')
         machine.run('loginctl lock-sessions')
         until('the lock asked for by the session is the same lock screen, and the power menu has it',
               'pgrep -c -x hyprlock; kavat-shell msg config-get lockscreen.enabled; grep -c "loginctl lock-session" ~/.config/kavat-shell/kavat-theme.toml', '1\nfalse\n1')
