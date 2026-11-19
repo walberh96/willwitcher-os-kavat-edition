@@ -1,0 +1,9 @@
+#!/bin/sh
+# Part of kavat-base: when a connection comes up, what the installer left waiting for a
+# network is installed. NetworkManager runs this at each change of a connection.
+case $2 in
+  up | connectivity-change)
+    grep -q -s '^left_out *= *\[ *"' /etc/kavat/kavat-install.toml && systemctl start --no-block kavat-software-pending.service
+    ;;
+esac
+exit 0

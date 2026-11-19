@@ -1,0 +1,10 @@
+# Part of kavat-base: installs the programs chosen in the installer that had to wait for a
+# network. NetworkManager starts it when a connection comes up, through
+# /usr/lib/NetworkManager/dispatcher.d/50-kavat-software; it does nothing once none is waiting.
+[Unit]
+Description=Install the programs chosen in the installer that waited for a network
+ConditionPathExists=/etc/kavat/kavat-install.toml
+
+[Service]
+Type=oneshot
+ExecStart=/usr/lib/kavat/software-pending

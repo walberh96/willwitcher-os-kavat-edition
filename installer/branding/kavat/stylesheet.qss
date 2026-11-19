@@ -40,6 +40,8 @@ QPushButton {
 }
 QPushButton:hover { background-color: #2a2f3f; }
 QPushButton:default, QPushButton:checked { background-color: #f2a93b; color: #14110a; border-color: #f2a93b; }
+/* once the installation is done, Done is the button to press */
+QPushButton#view-button-cancel[done="true"] { background-color: #f2a93b; color: #14110a; border-color: #f2a93b; font-weight: bold; }
 QPushButton:disabled { color: #5c6170; border-color: #2a2f3f; }
 
 QCheckBox, QRadioButton { background: transparent; spacing: 8px; }

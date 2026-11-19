@@ -79,6 +79,11 @@ def install(machine, checks, pictures, encrypt):
     if not checks.report(status == 0, 'the live session is up', output):
         return False
 
+    # the installer opens by itself on the medium; the test starts one of its own, which
+    # writes down what it does
+    status, output = machine.wait_until('pgrep -x calamares', 60)
+    checks.report(status == 0, 'the installer opens by itself on the medium', output)
+    machine.run('pkill -x calamares; sleep 2; true')
     machine.run(f'({live} kavat-installer -d > {LOG} 2>&1 &)')
     status, output = machine.wait_until(f"grep -q 'Requirements model has' {LOG}", 90)
     if not checks.report(status == 0, 'the installer opens', output):

@@ -1,0 +1,86 @@
+#!/usr/bin/env python3
+"""The programs chosen in the installer that could not be installed then, installed now.
+
+usage: /usr/lib/kavat/software-pending
+
+An installation with no network leaves the programs checked on the Software page written
+down, in /etc/kavat/kavat-install.toml, under `left_out`. This runs as root each time
+a connection comes up, until that list is empty: it installs
+with pacman those that pacman knows, takes them off the list and tells whoever is logged
+in. What pacman does not know stays there: it is in the AUR, and comes in with `kav
+install` once it is on the reviewed list.
+"""
+import os
+import pwd
+import re
+import subprocess
+import sys
+import tomllib
+
+FILE = '/etc/kavat/kavat-install.toml'
+NAME = r'[a-z0-9][a-z0-9@._+-]*'
+
+
+def pacman(*arguments, timeout=3600):
+    try:
+        done = subprocess.run(['pacman', '--noconfirm', *arguments], capture_output=True, text=True, timeout=timeout, check=False)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        return str(error), False
+    return done.stdout + done.stderr, done.returncode == 0
+
+
+def tell(title, text):
+    """A notification for everybody with a session, each on their own bus."""
+    try:
+        users = os.listdir('/run/user')
+    except OSError:
+        return
+    for uid in users:
+        if not uid.isdigit() or int(uid) < 1000 or not os.path.exists(f'/run/user/{uid}/bus'):
+            continue
+        try:
+            name = pwd.getpwuid(int(uid)).pw_name
+        except KeyError:
+            continue
+        subprocess.run(['runuser', '-u', name, '--', 'env', f'DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/{uid}/bus',
+                        'notify-send', '--app-name', 'Software', '--icon', 'system-software-install', title, text],
+                       check=False, timeout=20, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+
+
+def main():
+    try:
+        with open(FILE, 'rb') as file:
+            software = tomllib.load(file).get('software', {})
+    except (OSError, tomllib.TOMLDecodeError):
+        return
+    waiting = [name for name in software.get('left_out', []) if isinstance(name, str) and re.fullmatch(NAME, name)]
+    if not waiting:
+        return
+    _, reached = pacman('-Sy', timeout=180)
+    if not reached:
+        return  # no network yet: the next time it comes up
+    known = [name for name in waiting if pacman('-Sp', '--', name, timeout=60)[1]]
+    if not known:
+        return
+    tell('Installing what you chose', 'The programs you checked in the installer: ' + ', '.join(known))
+    output, worked = pacman('-S', '--needed', '--', *known)
+    if not worked:
+        last = output.strip().splitlines()[-1][:200] if output.strip() else 'pacman failed'
+        tell('The programs you chose were not installed', last)
+        sys.exit(1)
+    rest = [name for name in waiting if name not in known]
+    quoted = lambda names: '[' + ', '.join(f'"{name}"' for name in names) + ']'
+    with open(FILE, encoding='utf-8') as file:
+        text = file.read()
+    text = re.sub(r'(?m)^left_out\s*=.*$', lambda _: f'left_out  = {quoted(rest)}', text)
+    text = re.sub(r'(?m)^installed\s*=.*$', lambda _: f'installed = {quoted(list(software.get("installed", [])) + known)}', text)
+    if not rest:
+        text = re.sub(r'(?m)^why\s*=.*\n', '', text)
+    with open(FILE + '.new', 'w', encoding='utf-8') as file:
+        file.write(text)
+    os.replace(FILE + '.new', FILE)
+    tell('Installed', ', '.join(known) + (f'. Still waiting, for `kav install`: {", ".join(rest)}' if rest else ''))
+
+
+if __name__ == '__main__':
+    main()

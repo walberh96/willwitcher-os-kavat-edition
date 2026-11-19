@@ -74,6 +74,9 @@ hl.on("hyprland.start", function()
     -- The screen locks when nobody is there. Not on the live medium, whose user has no
     -- password to come back with.
     hl.exec_cmd("test -e /run/archiso || hypridle")
+    -- On the installer's medium the installer opens by itself: it is what the medium is for.
+    -- Closed, it is in the launcher.
+    hl.exec_cmd("test -e /run/archiso && command -v kavat-installer > /dev/null && exec kavat-installer")
 end)
 
 -- the agent that holds the SSH keys, for every app of the session

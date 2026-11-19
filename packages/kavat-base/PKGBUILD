@@ -1,14 +1,16 @@
 pkgname=kavat-base
 pkgver=0.1.0
-pkgrel=5
+pkgrel=6
 pkgdesc="Willwitcher-OS Kavat Edition: settings of the base system"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
-depends=('zram-generator' 'nftables' 'openssh' 'pipewire' 'noise-suppression-for-voice' 'python' 'polkit' 'bubblewrap' 'xdg-dbus-proxy' 'util-linux')
+depends=('libnotify' 'zram-generator' 'nftables' 'openssh' 'pipewire' 'noise-suppression-for-voice' 'python' 'polkit' 'bubblewrap' 'xdg-dbus-proxy' 'util-linux')
 source=('zram.conf' 'firewall.nft' 'kavat-firewall.service' 'ssh.conf' 'pipewire-noise.conf' 'kavat-dns' 'org.kavat.dns.policy'
-        'kavat-sandbox' 'sandbox-browser.toml' 'sandbox-electron.toml')
-sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+        'kavat-sandbox' 'sandbox-browser.toml' 'sandbox-electron.toml'
+        'software-pending' 'kavat-software-pending.service' 'software-pending-dispatch')
+sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP'
+            'SKIP' 'SKIP' 'SKIP')
 
 package() {
   install -Dm644 zram.conf "$pkgdir/usr/lib/systemd/zram-generator.conf.d/kavat.conf"
@@ -30,6 +32,10 @@ package() {
   install -Dm755 kavat-sandbox "$pkgdir/usr/bin/kavat-sandbox"
   install -Dm644 sandbox-browser.toml "$pkgdir/usr/share/kavat/sandbox/browser.toml"
   install -Dm644 sandbox-electron.toml "$pkgdir/usr/share/kavat/sandbox/electron.toml"
+  # what was chosen in an installer with no network is installed when there is one
+  install -Dm755 software-pending "$pkgdir/usr/lib/kavat/software-pending"
+  install -Dm644 kavat-software-pending.service "$pkgdir/usr/lib/systemd/system/kavat-software-pending.service"
+  install -Dm755 software-pending-dispatch "$pkgdir/usr/lib/NetworkManager/dispatcher.d/50-kavat-software"
   install -d "$pkgdir/usr/lib/systemd/user/default.target.wants"
   ln -s ../ssh-agent.service "$pkgdir/usr/lib/systemd/user/default.target.wants/ssh-agent.service"
 }

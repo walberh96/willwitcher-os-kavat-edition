@@ -1,0 +1,26 @@
+--- a/src/calamares/CalamaresWindow.cpp
++++ b/src/calamares/CalamaresWindow.cpp
+@@ -35,6 +35,7 @@
+ #include <QFile>
+ #include <QFileInfo>
+ #include <QLabel>
++#include <QStyle>
+ #ifdef WITH_QML
+ #include <QQmlContext>
+ #include <QQmlEngine>
+@@ -266,7 +267,14 @@
+         QObject::connect( viewManager, &Calamares::ViewManager::quitEnabledChanged, quit, &QPushButton::setEnabled );
+         QObject::connect( viewManager, &Calamares::ViewManager::quitLabelChanged, quit, &QPushButton::setText );
+         QObject::connect(
+-            viewManager, &Calamares::ViewManager::quitIconChanged, [ = ]( QString n ) { setButtonIcon( quit, n ); } );
++            viewManager, &Calamares::ViewManager::quitIconChanged, [ = ]( QString n ) {
++                setButtonIcon( quit, n );
++                // Kavat: once the installation is done this is the button to press, and
++                // it says so to the stylesheet, which can then draw it as the main one.
++                quit->setProperty( "done", n != QStringLiteral( "dialog-cancel" ) );
++                quit->style()->unpolish( quit );
++                quit->style()->polish( quit );
++            } );
+         QObject::connect( viewManager, &Calamares::ViewManager::quitTooltipChanged, quit, &QPushButton::setToolTip );
+         QObject::connect( viewManager, &Calamares::ViewManager::quitVisibleChanged, quit, &QPushButton::setVisible );
+         bottomLayout->addWidget( quit );

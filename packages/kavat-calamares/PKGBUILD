@@ -5,7 +5,7 @@
 # 00ACD15E25A79FEE028B0EE57FEA3DA6169C77D6.
 pkgname=kavat-calamares
 pkgver=3.4.3
-pkgrel=3
+pkgrel=4
 pkgdesc='Calamares, the installer framework, as Willwitcher-OS Kavat Edition builds it'
 arch=('x86_64')
 url='https://codeberg.org/Calamares/calamares'
@@ -17,9 +17,9 @@ provides=("calamares=$pkgver")
 conflicts=('calamares')
 options=('!debug')
 source=("calamares-$pkgver.tar.gz::$url/releases/download/v$pkgver/calamares-$pkgver.tar.gz"
-        'initial-device.patch')
+        'initial-device.patch' 'done-button.patch')
 sha256sums=('144cbbf6bdcebfb21685950db4f0777218519df095f62f4aa392f28348110d18'
-            'SKIP')
+            'SKIP' 'SKIP')
 
 # The disk page writes the legend under its bars in black, whatever the colours of the rest:
 # it is made to use the text colour of the installer's stylesheet, which is light on dark.
@@ -27,11 +27,15 @@ sha256sums=('144cbbf6bdcebfb21685950db4f0777218519df095f62f4aa392f28348110d18'
 # initial-device.patch gives the disk page one more setting, initialDevice: the device its
 # chooser starts on, when it is one of those the page offers. The installer sets it from the
 # answers of an earlier installation. The page is shown all the same.
+#
+# done-button.patch marks the button at the bottom once the installation is done, when it
+# reads Done, so that the installer's stylesheet draws it as the one to press.
 prepare() {
   local file="calamares-$pkgver/src/modules/partition/gui/PartitionLabelsView.cpp"
   grep -q 'painter->setPen( Qt::black );' "$file"
   sed -i 's/painter->setPen( Qt::black );/painter->setPen( palette().windowText().color() );/' "$file"
   patch -d "calamares-$pkgver" -p1 < "$srcdir/initial-device.patch"
+  patch -d "calamares-$pkgver" -p1 < "$srcdir/done-button.patch"
 }
 
 build() {
