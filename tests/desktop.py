@@ -26,7 +26,9 @@ HOME = f'/home/{USER}'
 # commands as the user, inside the user's session
 SESSION = (f'runuser -u {USER} -- env HOME={HOME} XDG_RUNTIME_DIR=/run/user/$(id -u {USER}) '
            f'WAYLAND_DISPLAY=wayland-1 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u {USER})/bus sh -c ')
-GAMER, CODER = (279, 17), (226, 17)  # the modes on the bar, on a 1920x1080 screen
+# The mode on the bar, on a 1920x1080 screen: the one in force alone at the right end, and
+# where Gamer and Coder are once a press on it has shown the three
+MODE, GAMER, CODER = (1757, 17), (1688, 17), (1632, 17)
 IMAGES, LIVE = f'{HOME}/Pictures/Wallpapers/images', f'{HOME}/Pictures/Wallpapers/live'
 PLAYING = 'kavat-wallpaper playing'
 
@@ -77,8 +79,12 @@ def main():
         until('mpvpaper plays it', 'pgrep -c -x mpvpaper; ' + PLAYING, 'playing', 15)
         time.sleep(2)
         machine.screen.picture(f'{pictures}/desktop-video.png')
+        machine.screen.click(*MODE)
+        time.sleep(1.2)
         machine.screen.click(*GAMER)
         until('Gamer mode stops the video where it is', 'kavat-mode; ' + PLAYING, 'gamer\npaused', 15)
+        machine.screen.click(*MODE)
+        time.sleep(1.2)
         machine.screen.click(*CODER)
         until('and Coder lets it go on', 'kavat-mode; ' + PLAYING, 'coder\nplaying', 15)
         status, output = user('kavat-wallpaper option fit stretch && kavat-wallpaper option | tr "\\n" " "; kavat-wallpaper option fit round 2>&1 | head -n 1')
@@ -259,10 +265,10 @@ def main():
         checks.report(output.split('\n') == ['off', 'on\tquad9', '/run/systemd/resolve/stub-resolv.conf', '1', '1', 'off', 'inactive', 'a-file'],
                       'encrypted DNS is off as the system comes, asks one server over TLS when on, and goes back whole', output)
         status, output = user('kavat game new elden 1245620 > /dev/null; kavat-game | cut -f1,2; '
-                              'SteamAppId=1245620 kavat-game show /bin/true | grep -c -E "\\"profile\\": \\"elden\\"|MangoHud is not installed"; kavat-game run echo ran 2> /dev/null; '
+                              'SteamAppId=1245620 kavat-game show /bin/true | grep -c -E "\\"profile\\": \\"elden\\"|is not installed"; command -v mangohud gamescope lact | wc -l; kavat-game run echo ran 2> /dev/null; '
                               'kavat-game delete elden; kavat-game | wc -l')
-        checks.report(output.split('\n') == ['elden\t1245620', '2', 'ran', '0'],
-                      'a game has a profile of its own, found by its number in Steam, and starts all the same when what the profile asks for is not installed', output)
+        checks.report(output.split('\n') == ['elden\t1245620', '1', '3', 'ran', '0'],
+                      'a game has a profile of its own, found by its number in Steam, and what a profile uses, MangoHud, gamescope and LACT, comes with the system', output)
         status, output = user('kavat-conf set shell prompt full; kavat-conf set shell listing ls; kavat-conf set shell history_lines 10000; '
                               'zsh -i -c "echo \$HISTSIZE \$STARSHIP_CONFIG; alias ls" 2> /dev/null; echo "alias hey=\\"echo there\\"" > ~/.config/kavat/aliases.zsh; '
                               'kavat-conf set shell prompt short; kavat-conf set shell listing lsd; kavat-conf set shell history_lines 50000; '
