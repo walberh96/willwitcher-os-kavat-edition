@@ -325,6 +325,30 @@ The browser is now a Chromium compiled here, with three patches of the system's.
 - [ ] **Hiding its parts.** `kavat-browser parts tabs`: the tab strip goes; `toolbar`: the address bar goes; `bookmarks`, `sidepanel`; `none` gives everything back, live, in every window. The console's "hide tabs" and the rest do the same.
 - [ ] **Zen mode.** `Ctrl+Shift+Z`: the page alone, the window keeps its size and place among the others (it is not fullscreen); `Ctrl+L` brings the address bar back to type in; `Ctrl+T` opens a tab; `Ctrl+Shift+Z` again gives everything back. *Look at the window's corners with the tabs hidden: Chromium's close and maximise buttons may sit over the page.* A web app, a pop-up and `F11` are not touched by it. Closing and opening the browser starts with everything in view.
 
+## 22. The third pass: what was found, to try again
+
+What you found on 18 November 2026, each with what was done; the table is under "Found on the third pass". The virtual machine checked what it could; this is what it cannot see.
+
+- [ ] **The installer opens by itself.** Start from the USB: the installer's window is there without being asked for. Close it: it is in the launcher.
+- [ ] **Done is the button to press.** When the installation finishes, Done is in the accent.
+- [ ] **What you checked with no network is installed later.** Install with no network and Proton VPN checked on the Software page. In the installed system, join a network: within a minute or two a notification says it is installing what you chose, and then that it is installed; `protonvpn` is there. `cat /etc/kavat/kavat-install.toml` shows it under `installed` and no longer under `left_out`. *Never tried with a real network change: only that it does nothing without one.*
+- [ ] **A clean bar.** Nothing says "Nothing playing"; there is no brightness and no clipboard on it. Play music: what plays is on the bar, and gone when the player is closed. Start a call or record the screen: the mark shows, and goes when it ends. `Super+Shift+V` is the clipboard's history.
+- [ ] **The mode on the bar.** At the right end, the mode in force alone. A press shows the three; a press on Gamer enters it and the other two go; `Super+Shift+M` still goes round.
+- [ ] **Wi-Fi from the bar.** A press on the network's mark opens the list of networks: join one from there. A press with the right button opens the Network page, which now lists the networks in range without pressing "Look again", and joins one too. *Never tried: the virtual machine has no Wi-Fi.*
+- [ ] **The keyboard's own keys.** Volume up, down and mute, the microphone's key, the brightness keys on the laptop, and play, next and previous: each does its thing and the shell shows it. With the screen locked too.
+- [ ] **Leaving closes Steam.** With Steam open and a game's page in view, power menu, Shut down: Steam closes, then the machine turns off. At the next start Steam does not check its files. The same with Restart and with `Super+M`.
+- [ ] **The shell's icon.** In a notification of the shell's and in the password prompt, the icon is the system's mark under a bar, not Noctalia's.
+- [ ] **Wallpaper, the filter and the search.** Images: only images in the library, and a search finds images (Wallhaven). Live: only videos, and a search for "rain" finds live wallpapers from MotionBGs; a press downloads one and plays it. All: both. *The downloads were tried from the build PC, not from the page.*
+- [ ] **A new tab has no Web Store.** In a browser that has been nowhere, the start page's sites do not have Chromium's Web Store.
+- [ ] **Sliders give whole numbers.** Windows: drag Gaps, Gap at the edge and Corner radius: no error, and the windows follow.
+- [ ] **The panel on the small display.** On the other PC, `Super+T`: the whole panel is on the screen, with its foot; the list of pages and the page scroll with the wheel.
+- [ ] **LACT is there.** GPU: "Open LACT" opens it, with no installing; `systemctl is-active lactd` says active. Privacy & network: "Turn it on" turns OpenSnitch on with no download.
+- [ ] **One place for the settings.** Go through Launcher, Notifications, Panels, Dock & desktop, Screenshots and Kavat Shell, and the tabs "The bar" and "Each widget" of Bar & widgets: change a few and see them take. Search "clipboard" or "dock" in the panel's search. Nothing anywhere opens another settings window: the launcher's gear, the control center's gear and a press of the middle button on a widget of the bar all open this panel.
+- [ ] **One lock screen.** `Super+Shift+L`, the power menu's Lock, leaving the machine alone for ten minutes and closing the laptop's lid all show the same lock: the clock, your name, the background. *The idle one and the lid were the shell's own lock before.*
+- [ ] **Mouse & touchpad.** Turn Acceleration off: the pointer moves the same distance for the same movement of the hand, fast or slow. Speed, scrolling the other way and left-handed apply as they are changed; on the laptop, the touchpad's three.
+- [ ] **`Print`.** Drag a region: it is in the clipboard, with no file. Screenshots, "To a file" on: the next one is also kept as a file, in the folder that page names. "Draw on it before it goes": an editor opens first.
+- [ ] **Remote access** was not tried on this pass: its lines are in section 20.
+
 ## What to send back
 
 For each line that failed: its number, what you did, what you saw. A photo of the screen is enough for anything before the login. After the login, `journalctl -b > ~/log.txt` right after it happens.
@@ -362,11 +386,35 @@ The user went through the list on the PC on 15 November 2026 and left what was f
 
 Seen on the way: the keyboard's indicator was not on the bar, its name misspelt in the shell's settings. It is there now.
 
+## Found on the third pass
+
+The user went through the list on the PC on 18 November 2026. Section 22 tries each again.
+
+| What was seen | What was done |
+| --- | --- |
+| The top bar was cramped: "Nothing playing", marks for the microphone and the camera that nobody was using, the brightness, the clipboard | The bar shows only what is so now; the brightness and the clipboard are off it |
+| The three modes took a third of the bar | The mode in force alone, at the right end; a press shows the others |
+| The installer had to be looked for | It opens by itself on the medium |
+| At the end of the installation it was not clear which button to press | Done is in the accent |
+| A press on the Wi-Fi mark opened the settings, where no network could be joined | A press opens the list of networks, as Bluetooth's does; the Network page looks for the networks by itself |
+| The volume keys did nothing | The keyboard's keys for the sound, the light and what plays are bound |
+| Turning the machine off did not close Steam first, as Endgame did | It does, and so do restarting and leaving the session |
+| The shell had Noctalia's icon | It has its own |
+| The wallpaper's All, Images and Live filtered nothing | They filter the library and the online search, and Live searches MotionBGs |
+| The new tab had a link to Chromium's Web Store | It is left out |
+| A slider of the Windows page gave "shape.gap takes a whole number" | A slider gives its step |
+| On a smaller display the panel did not fit and could not be moved | It fits the display and scrolls inside |
+| LACT had to be installed for the GPU page to be of use | What the pages open comes with the system |
+| Bar & widgets had a button to another window with more settings: a system in pieces | There is one settings panel; the shell's own settings are pages of it, and its window has no door left. On the way: one lock screen instead of two, one night light, one screenshot tool |
+| Proton VPN, checked in an installation with no network, was never installed | What waited for a network is installed when there is one |
+| No settings for the mouse | A Mouse & touchpad page, with the acceleration |
+
 ## Known and not built
 
 These are not failures: they are listed in the design document as left for later.
 
-- The settings panel has twenty-five pages of twenty-seven; the other two wait for the agent.
+- The settings panel has thirty-three pages of thirty-five; the other two wait for the agent. Of the shell's own settings, its lists of actions, the keys of its own panels and its store of plugins are not drawn in the panel: they are in its file.
+- Remote access was never tried on real machines: section 20 has its lines.
 - In the modes: what waits for the agent. 
 - Wallpaper: the login showing a video's still frame, and the lock showing each display's own background.
 - In the browser: the agent's panel.

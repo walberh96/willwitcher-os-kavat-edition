@@ -9,36 +9,36 @@
 
 local PALETTES = "/usr/share/kavat/themes/palettes"
 
--- The pages, in the mockup's order: its name, what it is about when that is a program,
--- and, for the ones still to come, what they wait for
+-- The pages, in the groups the list at the side shows them in: its name, what it is about
+-- when that is a program, and, for the ones still to come, what they wait for
 local PAGES = {
-  { id = "appearance", name = "Appearance" },
+  { group = "Look", id = "appearance", name = "Appearance" },
   { id = "wallpaper", name = "Wallpaper" },
   { id = "accessibility", name = "Accessibility" },
-  { id = "windows", name = "Windows", about = "Hyprland" },
-  { id = "keys", name = "Keybindings" },
-  { id = "pointer", name = "Mouse & touchpad" },
-  { id = "displays", name = "Displays" },
-  { id = "gpu", name = "GPU" },
-  { id = "sound", name = "Sound" },
-  { id = "network", name = "Network", about = "& Bluetooth" },
-  { id = "terminal", name = "Terminal", about = "Kitty" },
-  { id = "editor", name = "Editor", about = "Neovim" },
-  { id = "files", name = "Files", about = "Yazi" },
-  { id = "notes", name = "Notes", about = "nb" },
-  { id = "shell", name = "Shell", about = "zsh" },
-  { id = "browser", name = "Browser" },
+  { group = "Desktop", id = "windows", name = "Windows", about = "Hyprland" },
   { id = "bar", name = "Bar & widgets" },
   { id = "launcher", name = "Launcher" },
   { id = "notifications", name = "Notifications" },
   { id = "panels", name = "Panels", about = "Control center" },
   { id = "dock", name = "Dock & desktop" },
   { id = "screenshots", name = "Screenshots" },
+  { id = "keys", name = "Keybindings" },
   { id = "modes", name = "Modes" },
+  { group = "Devices", id = "displays", name = "Displays" },
+  { id = "pointer", name = "Mouse & touchpad" },
+  { id = "sound", name = "Sound" },
+  { id = "network", name = "Network", about = "& Bluetooth" },
+  { id = "gpu", name = "GPU" },
+  { group = "Apps", id = "terminal", name = "Terminal", about = "Kitty" },
+  { id = "shell", name = "Shell", about = "zsh" },
+  { id = "editor", name = "Editor", about = "Neovim" },
+  { id = "files", name = "Files", about = "Yazi" },
+  { id = "notes", name = "Notes", about = "nb" },
+  { id = "browser", name = "Browser" },
   { id = "projects", name = "Projects" },
-  { id = "agent", name = "Agent & voice", waits = "the local agent" },
+  { group = "Kavat", id = "agent", name = "Agent & voice", waits = "the local agent" },
   { id = "skills", name = "Skills", waits = "the agent's skills" },
-  { id = "packages", name = "Packages", about = "kav" },
+  { group = "System", id = "packages", name = "Packages", about = "kav" },
   { id = "backup", name = "Backup & sync" },
   { id = "privacy", name = "Privacy & network" },
   { id = "remote", name = "Remote access" },
@@ -1883,6 +1883,9 @@ local function network()
         })
       end
     end
+    if net.wifi == "on" and #net.networks == 0 then
+      left[#left + 1] = note("No network is in range yet. They are looked for when this page opens; \"Look again\" asks once more.")
+    end
     if net.wifi == "on" then
       left[#left + 1] = ui.row({ gap = 8 }, { ui.button({ text = "Look again", variant = "outline", controlSize = "sm", enabled = not busy,
         onClick = function() net_does("Looking for networks…", "wifi", "scan") end }) })
@@ -2163,7 +2166,8 @@ local SHELL_OWNED = {
   "^shell%.session%.actions", "^shell%.session%.power", "^shell%.panel%.[%w_]*wallpaper", "^shell%.settings_",
   "^bar%.[^.]+%.start$", "^bar%.[^.]+%.center$", "^bar%.[^.]+%.end$", "^bar%.[^.]+%.enabled$",
   "^calendar%.enabled$", "^calendar%.reminders", "^calendar%.refresh", "^notification%.hide_content$", "^notification%.enable_daemon$",
-  "^nightlight%.", "^location%.custom_schedule$", "^location%.sun", "^shell%.launcher%.show_settings_button$",
+  "^nightlight%.", "^location%.custom_schedule$", "^location%.sun", "^shell%.launcher%.providers%.wallpaper",
+  "^osd%.kinds%.nightlight$",
 }
 
 local function shell_owned(path)
@@ -3210,6 +3214,12 @@ function render()
     end
     local by_name = search == "" or (entry.name .. " " .. (entry.about or "")):lower():find(search, 1, true)
     local setting = not by_name and found_inside(entry.id) or nil
+    -- the groups have their names over them, unless something is being searched for
+    if entry.group and search == "" then
+      nav[#nav + 1] = ui.row({ key = "group-" .. entry.group, paddingH = 12, minHeight = 26, align = "end" }, {
+        ui.label({ text = entry.group:upper(), fontSize = 10, fontWeight = "medium", color = "on_surface_variant" }),
+      })
+    end
     if by_name or setting then
       nav[#nav + 1] = ui.row({ key = "nav-" .. entry.id, align = "center", paddingH = 12, minHeight = 26, radius = 6,
         fill = entry.id == page and "surface_container_highest" or "surface_container_low", onClick = function() open_page(entry.id) end }, {

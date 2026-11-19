@@ -166,7 +166,7 @@ Icons and the cursor are made from the same theme: folders, system icons and the
 
 ## Everything is set in one place
 
-A settings panel inside the shell configures the whole core, on twenty-seven pages: from appearance, windows and keybindings to GPU, sound, notes, projects, backups, privacy and boot.
+A settings panel inside the shell configures the whole core, on thirty-five pages in six groups: from appearance, windows and keybindings to GPU, sound, notes, projects, backups, privacy and boot. It is the only one: the shell's own settings are pages of it too.
 
 - **One place per setting.** Each setting lives in its app's own config file, or in `~/.config/kavat/` for the system's own.
 - **Live and reversible.** Every change shows instantly, has undo and lands in a history.

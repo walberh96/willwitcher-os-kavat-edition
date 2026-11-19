@@ -170,7 +170,10 @@ def show():
     if has_wifi:
         saved = {name for name, kind, _ in kept if kind == '802-11-wireless'}
         seen = {}
-        for line in (out('nmcli', '-t', '-f', 'IN-USE,SSID,SIGNAL,SECURITY', 'device', 'wifi', 'list', '--rescan', 'no') or '').splitlines():
+        # The networks in range are looked for again when the list is older than half a
+        # minute: without that, a machine that was never told to look shows none.
+        again = 'auto' if radio == 'enabled' else 'no'
+        for line in (out('nmcli', '-t', '-f', 'IN-USE,SSID,SIGNAL,SECURITY', 'device', 'wifi', 'list', '--rescan', again) or '').splitlines():
             parts = fields(line)
             if len(parts) == 4 and parts[1] and (parts[1] not in seen or parts[0] == '*'):
                 seen[parts[1]] = ('network', parts[1], parts[2], 'locked' if parts[3] not in ('', '--') else 'open',
