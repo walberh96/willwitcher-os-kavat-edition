@@ -121,10 +121,21 @@ def main():
         lines = output.splitlines() + [''] * 5
         checks.report('adaptive' in lines[0] and 'flat' in lines[1] and '-0.3' in lines[2] and lines[3] == '1' and lines[4] == 'keyboard_first us',
                       "the mouse's acceleration is turned off and its speed set, live, and the keyboard's setting in the same file is kept", output)
+        # The system has one settings panel. The shell lists its own settings as data, the panel
+        # draws them, and what used to open the shell's settings window opens the panel.
+        status, output = user('kavat-shell config settings-list | python3 -c "import json, sys; found = json.load(sys.stdin); '
+                              'print(len(found) > 300, sum(1 for one in found if one[\\"path\\"] == \\"shell.launcher.app_grid\\" and one[\\"kind\\"] == \\"toggle\\"))"; '
+                              'kavat-shell config settings-list widget clock | python3 -c "import json, sys; print(json.load(sys.stdin)[0][\\"path\\"])"; '
+                              'kavat-shell msg panel-close > /dev/null; kavat-shell msg settings-open launcher > /dev/null; sleep 2; '
+                              'hyprctl --instance 0 layers | grep -c "kavat-shell-panel"; grep "opened \\"kavat/settings:panel\\"" ~/.cache/kavat-shell/kavat-shell.log | tail -n 1 | grep -c .; '
+                              'kavat-shell msg panel-close > /dev/null')
+        checks.report(output.split() == ['True', '1', 'widget.clock.format', '1', '1'],
+                      "the shell gives its settings as a list, a widget's too, and the door to its settings window opens the system's panel", output)
         # every page that is built has to draw: one that fails leaves a line in the shell's log
-        pages = 'wallpaper accessibility windows pointer displays sound network terminal editor files notes shell browser bar modes packages boot login language'
+        pages = ('wallpaper accessibility windows pointer displays sound network terminal editor files notes shell browser bar modes packages boot login language '
+                 'launcher notifications panels dock screenshots kavatshell privacy')
         status, output = user(f'for page in {pages}; do kavat-shell msg panel-open kavat/settings:panel $page > /dev/null; sleep 1.2; done; '
-                              'grep -c -i "kavat/settings.*error\\|luau.*error\\|panel.luau:" ~/.cache/kavat-shell/kavat-shell.log', 60)
+                              'grep -c -i "kavat/settings.*error\\|luau.*error\\|panel.luau:" ~/.cache/kavat-shell/kavat-shell.log', 120)
         checks.report(output == '0', 'each of the pages that are built is drawn without a failure', output)
         machine.screen.picture(f'{pictures}/settings-language.png')
         user('kavat-shell msg panel-open kavat/settings:panel keys')

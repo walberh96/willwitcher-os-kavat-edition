@@ -27,8 +27,9 @@ HOME = f'/home/{USER}'
 # commands as the user, inside the user's session
 SESSION = (f'runuser -u {USER} -- env HOME={HOME} XDG_RUNTIME_DIR=/run/user/$(id -u {USER}) '
            f'WAYLAND_DISPLAY=wayland-1 DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/$(id -u {USER})/bus sh -c ')
-# the three modes on the bar, on a 1920x1080 screen
-CODER, GAMER, INCOGNITO = (226, 17), (279, 17), (341, 17)
+# The mode on the bar, on a 1920x1080 screen: the one in force stands alone at the right
+# end, and a press on it shows the three, each where it is then
+MODE, CODER, GAMER, INCOGNITO = (1757, 17), (1632, 17), (1688, 17), (1748, 17)
 TIMERS = 'systemctl is-active plocate-updatedb.timer snapper-cleanup.timer | tr "\\n" " "; echo'
 # A VPN that leads nowhere: it comes up, as WireGuard does before it has heard from the
 # other end, which is all the mode needs to be tried
@@ -94,14 +95,21 @@ def main():
 
         print('the modes', flush=True)
         status, output = user('kavat-mode; kavat-mode list | cut -f1 | tr -d "\\n"; echo; kavat-shell msg plugins list | grep -c "kavat/modes.*enabled"; '
-                              'kavat-shell msg config-get bar.default.start | grep -c "kavat/modes:mode"; pgrep -f -c "[k]avat-mode watch"')
+                              'kavat-shell msg config-get bar.default.end | grep -c "kavat/modes:mode"; pgrep -f -c "[k]avat-mode watch"')
         checks.report(output.split('\n') == ['coder', '* coder  gamer  incognito', '1', '1', '1'],
-                      'the session starts in Coder, with the three modes on the bar and the watch for games running', output)
+                      'the session starts in Coder, with the mode at the end of the bar and the watch for games running', output)
+
+        def press(mode):
+            """Press the mode on the bar, which shows the three, and then one of them."""
+            machine.screen.click(*MODE)
+            time.sleep(1.2)
+            machine.screen.click(*mode)
+
         machine.screen.picture(f'{pictures}/modes-bar.png')
 
         print('Gamer', flush=True)
-        machine.screen.click(*GAMER)
-        until('pressing Gamer on the bar enters the mode', 'kavat-mode', 'gamer')
+        press(GAMER)
+        until('pressing the mode on the bar and then Gamer enters the mode', 'kavat-mode', 'gamer')
         status, output = user(f'{TIMERS}; kavat-shell msg notification-dnd-status; powerprofilesctl list | grep -c "performance:"; powerprofilesctl get')
         lines = output.split('\n')
         checks.report(lines[0].split() == ['inactive', 'inactive'] and 'on' in lines[1],
@@ -109,7 +117,7 @@ def main():
         if lines[2:3] == ['1']:  # a machine that has that profile; a virtual one may not
             checks.report(lines[3:4] == ['performance'], 'the processor is on its performance profile', output)
         machine.screen.picture(f'{pictures}/modes-gamer.png')
-        machine.screen.click(*CODER)
+        press(CODER)
         until('pressing Coder goes back', 'kavat-mode', 'coder')
         status, output = user(f'{TIMERS}; kavat-shell msg notification-dnd-status')
         lines = output.split('\n')
@@ -123,7 +131,7 @@ def main():
         print('Incognito', flush=True)
         machine.screen.press('super', 'shift', 'm')
         until('Super+Shift+M goes to the next mode', 'kavat-mode', 'gamer')
-        machine.screen.click(*INCOGNITO)
+        press(INCOGNITO)
         time.sleep(4)
         status, output = user('kavat-mode; kavat-mode incognito 2>&1 | head -n 1; sleep 1; '
                               'grep -c "opened \\"kavat/settings:panel\\"" ~/.cache/kavat-shell/kavat-shell.log; kavat-shell msg panel-close > /dev/null')
@@ -134,7 +142,7 @@ def main():
         status, output = user('kavat-mode vpns; kavat-mode vpn elsewhere 2>&1 | head -n 1; kavat-mode vpn nowhere; kavat-mode vpn')
         checks.report(output.split('\n')[0] == 'nowhere' and 'has no VPN called elsewhere' in output and output.endswith('nowhere'),
                       "the VPN for it is chosen from NetworkManager's", output)
-        machine.screen.click(*INCOGNITO)
+        press(INCOGNITO)
         until('with a VPN, pressing Incognito enters the mode', 'kavat-mode', 'incognito', 30)
         status, output = machine.run(f'nmcli -t -f NAME connection show --active | grep -c "^nowhere$"; '
                                      f'nft list table inet kavat_incognito | grep -c -E "oifname \\"wg-nowhere\\" accept|192.0.2.1|policy drop"; {DROPPED}')
@@ -151,8 +159,9 @@ def main():
         lines = output.split()
         checks.report(len(lines) == 3 and lines[0] != '0' and lines[1:] == ['0', '1'], 'in the mode the browser is one apart, with its blocker, and not a private window without it', output)
         machine.screen.picture(f'{pictures}/modes-incognito.png')
-        machine.screen.click(*CODER)
-        until('pressing Coder leaves it', 'kavat-mode', 'coder')
+        # the VPN's name stands beside the mode while it is up, so the modes are elsewhere: the key
+        machine.screen.press('super', 'shift', 'm')
+        until('Super+Shift+M leaves it, for Coder', 'kavat-mode', 'coder')
         status, output = user('sleep 2; pgrep -u $(id -u) -c -f "user-data-dir=$XDG_RUNTIME_DIR/kavat-browser-incognito"; ls -d $XDG_RUNTIME_DIR/kavat-browser-incognito 2> /dev/null | wc -l')
         checks.report(output.split() == ['0', '0'], 'and leaving the mode closes that browser and deletes all it kept', output)
         status, output = machine.run(f'nmcli -t -f NAME connection show --active | grep -c "^nowhere$"; nft list tables | grep -c kavat_incognito')
