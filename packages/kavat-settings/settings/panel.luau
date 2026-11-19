@@ -507,9 +507,16 @@ local function segmented(choices)
   return ui.row({ gap = 2, padding = 2, radius = 8, fill = "surface_container", flexGrow = 1 }, buttons)
 end
 
+-- A slider of the theme's. What it gives is a number with a fraction, wherever it is let
+-- go: it is brought to the nearest step, so that a setting counted in whole numbers is
+-- given a whole number.
 local function slider(key, min, max, step)
   return ui.slider({ min = min, max = max, step = step, value = tonumber(theme[key]) or min, flexGrow = 1,
-    controlSize = "sm", enabled = not busy, onDragEnd = function(now) set(key, tostring(now)) end })
+    controlSize = "sm", enabled = not busy, onDragEnd = function(now)
+      local value = math.floor((tonumber(now) or min) / step + 0.5) * step
+      value = math.max(min, math.min(max, value))
+      set(key, step == math.floor(step) and string.format("%d", value) or string.format("%.2f", value))
+    end })
 end
 
 local function toggle(key)
@@ -2685,6 +2692,8 @@ local function found_inside(id)
   return nil
 end
 
+-- The whole panel grows to the size the shell gives it, which on a small display is less
+-- than the size it asks for: the list of pages and the page then scroll inside it.
 function render()
   if search == "" then
     inside = nil
@@ -2776,7 +2785,7 @@ function render()
     })
   end
 
-  panel.render(ui.row({ gap = 0 }, {
+  panel.render(ui.row({ gap = 0, align = "stretch", flexGrow = 1 }, {
     ui.scroll({ gap = 1, padding = 14, width = 228, fill = "surface_container_low" }, nav),
     ui.column({ gap = 18, padding = 30, flexGrow = 1 }, body),
   }))

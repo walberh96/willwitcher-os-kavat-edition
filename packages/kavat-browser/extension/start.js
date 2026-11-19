@@ -27,7 +27,11 @@ document.getElementById('search').addEventListener('submit', (event) => {
 });
 
 async function sites() {
-  const found = (await chrome.topSites.get()).slice(0, 8);
+  // A browser that has been nowhere yet says its most visited site is Chromium's Web Store,
+  // which nobody went to: it is left out.
+  const found = (await chrome.topSites.get())
+    .filter((site) => !/^https?:\/\/(chromewebstore\.google\.com|chrome\.google\.com\/webstore)/.test(site.url))
+    .slice(0, 8);
   document.getElementById('sites').replaceChildren(...found.map((site) => {
     const link = document.createElement('a');
     link.href = site.url;

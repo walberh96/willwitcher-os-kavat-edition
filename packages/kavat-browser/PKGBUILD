@@ -4,7 +4,7 @@
 # rules of gijsdev/ublock-hide-yt-shorts, fetched here and made its own when this is built.
 pkgname=kavat-browser
 pkgver=0.1.0
-pkgrel=10
+pkgrel=11
 _ubol=2026.1110.1816
 # the list that hides YouTube's Shorts, as it was at this commit
 _shorts=62f0cb7c9c87dec07439c9c697aac6a61bf349a8
