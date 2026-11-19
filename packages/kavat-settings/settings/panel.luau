@@ -29,6 +29,11 @@ local PAGES = {
   { id = "shell", name = "Shell", about = "zsh" },
   { id = "browser", name = "Browser" },
   { id = "bar", name = "Bar & widgets" },
+  { id = "launcher", name = "Launcher" },
+  { id = "notifications", name = "Notifications" },
+  { id = "panels", name = "Panels", about = "Control center" },
+  { id = "dock", name = "Dock & desktop" },
+  { id = "screenshots", name = "Screenshots" },
   { id = "modes", name = "Modes" },
   { id = "projects", name = "Projects" },
   { id = "agent", name = "Agent & voice", waits = "the local agent" },
@@ -40,6 +45,7 @@ local PAGES = {
   { id = "boot", name = "Boot", about = "GRUB" },
   { id = "login", name = "Login & lock" },
   { id = "language", name = "Language & region" },
+  { id = "kavatshell", name = "Kavat Shell", about = "the rest" },
 }
 
 local page = "appearance"
@@ -1460,13 +1466,6 @@ local function files()
 end
 
 -- One of the shell's own panels, opened in the place of this one
-local function shell_panel(text, what)
-  return ui.button({ text = text, variant = "outline", onClick = function()
-    panel.close()
-    noctalia.runAsync("kavat-shell msg " .. what)
-  end })
-end
-
 local function wallpaper()
   local tiles, rows = {}, {}
   local own = nil  -- the image of the display being chosen for, when it has one
@@ -2147,18 +2146,417 @@ end
 -- through the shell itself, which keeps what is changed in its own file.
 local bar_now = { position = "top", margin_edge = 0, thickness = 34, auto_hide = false, start = {}, center = {}, ["end"] = {},
   notify_position = "top_right", notify_focused = false }
+-- The shell's own settings, drawn here as pages of the system's. `kavat-shell config
+-- settings-list` gives every one of them as data: where it is kept, what kind of control it
+-- is, its value and what it may be. A page of these is made from that list, and a change is
+-- written with `kavat-shell msg config-set`, as the shell's own window would write it.
+-- What the system keeps elsewhere is left out: the colours, the fonts and the corners come
+-- from Appearance, the background from Wallpaper, and the lock is the system's.
+local shell_all = nil          -- every setting of the shell's, as it lists them
+local shell_advanced = false   -- whether the ones the shell marks as advanced are shown
+local shell_tab = {}           -- for a page with tabs, the section in view
+
+-- settings of the shell's that the system decides, by where they are kept
+local SHELL_OWNED = {
+  "^theme%.", "^wallpaper%.", "^lockscreen", "^idle", "^shell%.font", "^shell%.corner_radius_scale$", "^shell%.animation%.",
+  "^shell%.setup_wizard", "^shell%.polkit_agent$", "^shell%.telemetry", "^shell%.lang$", "^plugins%.",
+  "^shell%.session%.actions", "^shell%.session%.power", "^shell%.panel%.[%w_]*wallpaper", "^shell%.settings_",
+  "^bar%.[^.]+%.start$", "^bar%.[^.]+%.center$", "^bar%.[^.]+%.end$", "^bar%.[^.]+%.enabled$",
+  "^calendar%.enabled$", "^calendar%.reminders", "^calendar%.refresh", "^notification%.hide_content$", "^notification%.enable_daemon$",
+  "^nightlight%.", "^location%.custom_schedule$", "^location%.sun", "^shell%.launcher%.show_settings_button$",
+}
+
+local function shell_owned(path)
+  for _, pattern in ipairs(SHELL_OWNED) do
+    if path:find(pattern) then
+      return true
+    end
+  end
+  return false
+end
+
+local widget_now = ""    -- the widget of the bar whose settings are in view
+local widget_all = nil   -- and its settings, as the shell lists them
+
+function read_widget()
+  if widget_now == "" then
+    return
+  end
+  local asked = widget_now
+  noctalia.runAsync({ "kavat-shell", "config", "settings-list", "widget", asked }, function(result)
+    if asked == widget_now then
+      local found = noctalia.json.decode(result.stdout or "")
+      widget_all = type(found) == "table" and found or {}
+      render()
+    end
+  end)
+end
+
+local function read_shell()
+  noctalia.runAsync("kavat-shell config settings-list 2> /dev/null", function(result)
+    local found = noctalia.json.decode(result.stdout or "")
+    if type(found) == "table" then
+      shell_all = found
+    elseif shell_all == nil then
+      shell_all = {}
+    end
+    render()
+  end)
+end
+
+-- a text as the shell's file writes it
+local function toml_text(text)
+  if not text:find("'", 1, true) and not text:find("\n", 1, true) then
+    return "'" .. text .. "'"
+  end
+  return '"' .. text:gsub("\\", "\\\\"):gsub('"', '\\"'):gsub("\n", "\\n") .. '"'
+end
+
+local function toml_list(items)
+  local quoted = {}
+  for index, item in ipairs(items) do
+    quoted[index] = toml_text(item)
+  end
+  return "[" .. table.concat(quoted, ", ") .. "]"
+end
+
+local function shell_set(entry, value)
+  said = ""
+  noctalia.runAsync({ "kavat-shell", "msg", "config-set", entry.path, value }, function(result)
+    if result.exitCode ~= 0 or (result.stdout or ""):find("^error") then
+      said = trim((result.stderr or "") ~= "" and result.stderr or result.stdout)
+    else
+      keep(entry.section_label .. ": " .. entry.title .. " " .. value)
+    end
+    if entry.section == "widget" then
+      read_widget()
+    else
+      read_shell()
+    end
+  end)
+end
+
+local function number_text(entry, value)
+  local step = tonumber(entry.step) or (entry.integer and 1 or 0.01)
+  if step > 0 then
+    value = math.floor(value / step + 0.5) * step
+  end
+  value = math.max(tonumber(entry.min) or value, math.min(tonumber(entry.max) or value, value))
+  if entry.integer then
+    return string.format("%d", math.floor(value + 0.5))
+  end
+  return (string.format("%.3f", value):gsub("0+$", ""):gsub("%.$", ".0"))
+end
+
+-- the control of one setting, by its kind; nil for a kind that is not drawn here
+local function shell_control(entry)
+  local kind, key = entry.kind, "shell-" .. entry.path
+  if kind == "toggle" then
+    return ui.row({ justify = "end", flexGrow = 1 }, {
+      ui.toggle({ key = key, checked = entry.value == true, enabled = entry.enabled ~= false,
+        onChange = function(now) shell_set(entry, now == "true" and "true" or "false") end }),
+    })
+  elseif kind == "select" and not entry.linked then
+    local options = entry.options or {}
+    local write = function(option)
+      shell_set(entry, entry.type == "string" and toml_text(option.value) or option.value)
+    end
+    if #options >= 2 and #options <= 4 then
+      local choices, longest = {}, 0
+      for _, option in ipairs(options) do
+        longest = math.max(longest, #option.label)
+        choices[#choices + 1] = { text = option.label, on = option.value == entry.value, pick = function() write(option) end }
+      end
+      -- side by side when their names fit whole
+      if longest <= ({ 0, 12, 7, 5 })[#options] then
+        return segmented(choices)
+      end
+    end
+    local names, at = {}, 0
+    for index, option in ipairs(options) do
+      names[index] = option.label
+      if option.value == entry.value then
+        at = index
+      end
+    end
+    if #names == 0 then
+      return nil
+    end
+    return ui.select({ key = key, options = names, selectedIndex = at - 1, flexGrow = 1, controlSize = "sm",
+      onChange = function(index)
+        local option = options[tonumber(index) + 1]
+        if option then write(option) end
+      end })
+  elseif kind == "slider" and not entry.linked then
+    local value = tonumber(entry.value) or 0
+    local shown = number_text(entry, value) .. (entry.suffix or "")
+    return ui.row({ gap = 8, align = "center", flexGrow = 1 }, {
+      ui.slider({ key = key, min = tonumber(entry.min) or 0, max = tonumber(entry.max) or 1, step = tonumber(entry.step) or 1, value = value,
+        flexGrow = 1, controlSize = "sm", onDragEnd = function(now) shell_set(entry, number_text(entry, tonumber(now) or value)) end }),
+      ui.label({ text = shown, fontSize = 12, color = "on_surface_variant", width = 52 }),
+    })
+  elseif kind == "optional-number" or kind == "number" then
+    local value = entry.value
+    return ui.input({ key = key, controlSize = "sm", flexGrow = 1, value = value ~= nil and number_text(entry, tonumber(value) or 0) or "",
+      placeholder = (entry.unset or "") ~= "" and entry.unset or "not set",
+      onSubmit = function(text)
+        local number = tonumber(text)
+        if number then
+          shell_set(entry, number_text(entry, number))
+        end
+      end })
+  elseif kind == "text" or kind == "color" then
+    return ui.input({ key = key, controlSize = "sm", flexGrow = 1, value = entry.value or "", placeholder = entry.placeholder or "",
+      onSubmit = function(text) shell_set(entry, toml_text(text)) end })
+  elseif kind == "multi" then
+    local chosen, chips = {}, {}
+    for _, value in ipairs(entry.value or {}) do
+      chosen[value] = true
+    end
+    for _, option in ipairs(entry.options or {}) do
+      local on = chosen[option.value] == true
+      chips[#chips + 1] = ui.button({ key = key .. "-" .. option.value, text = option.label, controlSize = "sm", flexGrow = 1,
+        variant = on and "secondary" or "ghost", selected = on, onClick = function()
+          local kept, count = {}, 0
+          for _, other in ipairs(entry.options) do
+            local stays = chosen[other.value] == true
+            if other.value == option.value then stays = not on end
+            if stays then count = count + 1 end
+            -- some are kept as what is left out, and some as what is chosen
+            if stays ~= (entry.keeps_unselected == true) then
+              kept[#kept + 1] = other.value
+            end
+          end
+          if count > 0 or not entry.at_least_one then
+            shell_set(entry, toml_list(kept))
+          end
+        end })
+    end
+    local lines = {}
+    for at = 1, #chips, 2 do
+      lines[#lines + 1] = ui.row({ gap = 4 }, { chips[at], chips[at + 1] or ui.spacer({ flexGrow = 1 }) })
+    end
+    return ui.column({ gap = 4, flexGrow = 1 }, lines)
+  elseif kind == "list" then
+    local items, lines = entry.value or {}, {}
+    local labels = {}
+    for _, option in ipairs(entry.options or {}) do
+      labels[option.value] = option.label
+    end
+    for index, item in ipairs(items) do
+      lines[#lines + 1] = ui.row({ key = key .. "-" .. index, gap = 6, align = "center" }, {
+        ui.label({ text = labels[item] or item, flexGrow = 1, fontSize = 12, maxWidth = 240 }),
+        ui.button({ text = "✕", variant = "ghost", controlSize = "sm", onClick = function()
+          local rest = {}
+          for other, value in ipairs(items) do
+            if other ~= index then rest[#rest + 1] = value end
+          end
+          shell_set(entry, toml_list(rest))
+        end }),
+      })
+    end
+    local add = function(value)
+      if value ~= "" then
+        local more = { table.unpack(items) }
+        more[#more + 1] = value
+        shell_set(entry, toml_list(more))
+      end
+    end
+    if #(entry.options or {}) > 0 then
+      local spare, names = {}, { "Add…" }
+      for _, option in ipairs(entry.options) do
+        local there = false
+        for _, item in ipairs(items) do
+          there = there or item == option.value
+        end
+        if not there then
+          spare[#spare + 1] = option.value
+          names[#names + 1] = option.label
+        end
+      end
+      lines[#lines + 1] = ui.select({ key = key .. "-add", options = names, selectedIndex = 0, controlSize = "sm",
+        onChange = function(index) if tonumber(index) > 0 then add(spare[tonumber(index)]) end end })
+    else
+      lines[#lines + 1] = ui.input({ key = key .. "-add", controlSize = "sm", placeholder = "Add, then Enter", onSubmit = add })
+    end
+    return ui.column({ gap = 4, flexGrow = 1 }, lines)
+  end
+  return nil
+end
+
+-- The settings of some of the shell's sections, as the two columns of a page. `only`
+-- keeps or leaves out a setting by its entry, when a page takes a part of a section; `from`
+-- is another list of settings to draw, a widget's, in place of the shell's.
+local function shell_columns(sections, only, from)
+  local wanted = {}
+  for _, name in ipairs(sections) do
+    wanted[name] = true
+  end
+  -- group by group, in the order the shell lists them
+  local groups, by_key = {}, {}
+  for _, entry in ipairs(from or shell_all or {}) do
+    if wanted[entry.section] and entry.visible and (shell_advanced or not entry.advanced) and entry.path ~= ""
+      and not shell_owned(entry.path) and (only == nil or only(entry)) then
+      local control = shell_control(entry)
+      if control then
+        local key = entry.section .. "/" .. entry.group
+        local group = by_key[key]
+        if not group then
+          group = { label = entry.group_label, rows = {} }
+          by_key[key] = group
+          groups[#groups + 1] = group
+        end
+        if gathering then
+          gathering[#gathering + 1] = entry.title
+        end
+        local tall = entry.kind == "multi" or entry.kind == "list"
+        group.rows[#group.rows + 1] = ui.row({ key = "row-" .. entry.path, align = tall and "start" or "center", gap = 12, minHeight = 34,
+          tooltip = entry.about ~= "" and entry.about or nil }, {
+          ui.column({ width = 190, minWidth = 190 }, { ui.label({ text = entry.title, color = "on_surface", maxWidth = 190 }) }),
+          control,
+        })
+      end
+    end
+  end
+  -- the groups go to the shorter column, so that the two end near each other
+  local left, right, left_rows, right_rows = {}, {}, 0, 0
+  for _, group in ipairs(groups) do
+    local into = left
+    if left_rows > right_rows then
+      into = right
+      right_rows = right_rows + #group.rows + 1
+    else
+      left_rows = left_rows + #group.rows + 1
+    end
+    into[#into + 1] = section(group.label)
+    for _, line in ipairs(group.rows) do
+      into[#into + 1] = line
+    end
+  end
+  return left, right
+end
+
+-- A page made of the shell's settings. `parts` is one or more { name, sections }: with more
+-- than one, the page has a tab for each.
+local function shell_page(id, title, sub, parts)
+  local part = parts[1]
+  for _, other in ipairs(parts) do
+    if other[1] == shell_tab[id] then
+      part = other
+    end
+  end
+  local left, right = {}, {}
+  if shell_all == nil then
+    left = { note("Reading the shell's settings…") }
+  else
+    left, right = shell_columns(part[2], part[3])
+    if #left == 0 then
+      left = { note("The shell has nothing to set here.") }
+    end
+  end
+  local tabs = {}
+  if gathering then
+    -- a search looks in every tab
+    for _, other in ipairs(parts) do
+      if other ~= part then shell_columns(other[2], other[3]) end
+    end
+  end
+  local wide = 0
+  for _, other in ipairs(parts) do
+    wide = wide + #other[1] * 8 + 34
+    tabs[#tabs + 1] = { text = other[1], on = other == part, pick = function() shell_tab[id] = other[1]; render() end }
+  end
+  local top = ui.row({ gap = 12, align = "center" }, {
+    #parts > 1 and ui.row({ width = math.min(wide, 760) }, { segmented(tabs) }) or ui.spacer({ width = 1 }),
+    ui.spacer({ flexGrow = 1 }),
+    ui.label({ text = "Advanced", color = "on_surface_variant", fontSize = 12 }),
+    ui.toggle({ key = "shell-advanced", checked = shell_advanced, onChange = function(now) shell_advanced = now == "true"; render() end }),
+  })
+  return { title = title, sub = sub, file = "~/.local/state/kavat-shell/settings.toml", top = top, left = left, right = right }
+end
+
+-- A page of the system's own with some of the shell's settings added at the end of its
+-- second column: the ones that are about the same thing. `groups` names them by the
+-- section they are in and the heading the shell gives them.
+local function with_shell(build, sections, groups)
+  return function()
+    local content = build()
+    local left, right = shell_columns(sections, function(entry) return groups[entry.group_label] == true end)
+    local into = content.right or content.left
+    if into then
+      for _, list in ipairs({ left, right }) do
+        for _, line in ipairs(list) do
+          into[#into + 1] = line
+        end
+      end
+    end
+    return content
+  end
+end
+
+-- one of the shell's sections, less the groups that are shown on other pages
+local function but(groups)
+  return function(entry) return groups[entry.group_label] ~= true end
+end
+
+local function launcher_page()
+  return shell_page("launcher", "Launcher", "Super+D · what it shows and what it finds", { { "Launcher", { "launcher" } } })
+end
+
+local function notifications_page()
+  return shell_page("notifications", "Notifications", "what apps tell you, and what the system shows when a key changes something", {
+    { "Notifications", { "notifications" } }, { "On-screen display", { "osd" } },
+  })
+end
+
+local function panels_page()
+  return shell_page("panels", "Panels", "the control center, the clipboard, the window switcher and how the shell's panels look", {
+    { "Control center", { "control-center" } },
+    { "Look", { "panels", "appearance" }, function(entry)
+      return entry.section == "panels" and (entry.group_label == "General" or entry.group_label == "Effects")
+        or entry.section == "appearance" and (entry.group_label == "Interface" or entry.group_label == "Borders" or entry.group_label == "Effects")
+    end },
+    { "Clipboard", { "panels", "shell" }, function(entry) return entry.group_label == "Clipboard" end },
+    { "Window switcher", { "shell" }, function(entry) return entry.group_label == "Window Switcher" end },
+    { "Password prompt", { "panels", "security" }, function(entry) return entry.group_label == "Polkit" or entry.path == "shell.password_style" end },
+    { "Power menu", { "power" }, function(entry) return entry.group_label == "Session Panel" end },
+  })
+end
+
+local function dock_page()
+  return shell_page("dock", "Dock & desktop", "a dock of apps, widgets on the desktop, and what the corners of the screen do", {
+    { "Dock", { "dock" } }, { "Desktop", { "desktop" } },
+  })
+end
+
+local function screenshots_page()
+  return shell_page("screenshots", "Screenshots", "Print · a region of the screen, where it goes and how", { { "Screenshots", { "screenshot" } } })
+end
+
+local function kavat_shell_page()
+  return shell_page("kavatshell", "Kavat Shell", "the rest of the shell's own settings", {
+    { "General", { "shell" }, function(entry) return entry.group_label == "General" end },
+    { "Weather", { "location" } },
+    { "Calendar", { "calendar" } },
+    { "System monitor", { "system" } },
+    { "Hooks", { "hooks" } },
+  })
+end
+
 local bar_adding = "end"  -- the part of the bar a widget is added to
 
--- Every widget the bar can show, by its name in the shell's file
+-- Every widget the bar can show, by its name in the shell's file. Three of the shell's are
+-- left out: its background picker, its night light and its light-or-dark switch act on the
+-- shell's own background and colours, which here are the system's.
 local WIDGETS = {
   { "launcher", "Launcher" }, { "workspaces", "Workspaces" }, { "active_window", "Window title" }, { "taskbar", "Open windows" },
   { "clock", "Clock and date" }, { "kavat/modes:mode", "Mode switcher" }, { "kavat/notes:due", "Notes due" }, { "media", "What is playing" },
   { "sysmon", "Processor and memory" }, { "privacy", "Recording indicator" }, { "tray", "Tray" }, { "notifications", "Notifications" },
   { "clipboard", "Clipboard" }, { "keyboard_layout", "Keyboard in use" }, { "kavat/settings:network", "Network" }, { "network", "Network, the shell's own" }, { "bluetooth", "Bluetooth" },
   { "volume", "Volume" }, { "brightness", "Brightness" }, { "battery", "Battery" }, { "session", "Power" },
-  { "control-center", "Control center" }, { "wallpaper", "Background picker" }, { "weather", "Weather" }, { "nightlight", "Night light" },
-  { "caffeine", "Keep awake" }, { "power_profile", "Power profile" }, { "screenshot", "Screenshot" }, { "theme_mode", "Light or dark" },
-  { "lock_keys", "Caps and Num lock" }, { "audio_visualizer", "Sound bars" }, { "settings", "Shell settings" }, { "spacer", "Empty space" },
+  { "control-center", "Control center" }, { "weather", "Weather" },
+  { "caffeine", "Keep awake" }, { "power_profile", "Power profile" }, { "screenshot", "Screenshot" },
+  { "lock_keys", "Caps and Num lock" }, { "audio_visualizer", "Sound bars" }, { "settings", "Settings" }, { "spacer", "Empty space" },
 }
 
 local function widget_name(id)
@@ -2224,7 +2622,68 @@ end
 
 local PARTS = { { "start", "Left" }, { "center", "Center" }, { "end", "Right" } }
 
+local bar_tab = "Widgets"  -- the part of the Bar & widgets page in view
+
+local function bar_tabs()
+  local tabs = {}
+  for _, name in ipairs({ "Widgets", "The bar", "Each widget" }) do
+    tabs[#tabs + 1] = { text = name, on = bar_tab == name, pick = function() bar_tab = name; render() end }
+  end
+  return ui.row({ gap = 12, align = "center" }, {
+    ui.row({ width = 360 }, { segmented(tabs) }),
+    ui.spacer({ flexGrow = 1 }),
+    bar_tab ~= "Widgets" and ui.label({ text = "Advanced", color = "on_surface_variant", fontSize = 12 }) or nil,
+    bar_tab ~= "Widgets" and ui.toggle({ key = "shell-advanced", checked = shell_advanced, onChange = function(now) shell_advanced = now == "true"; render() end }) or nil,
+  })
+end
+
 local function bar()
+  if bar_tab == "The bar" then
+    local left, right = shell_columns({ "bar" })
+    if shell_all == nil then
+      left = { note("Reading the shell's settings…") }
+    end
+    return { title = "Bar & widgets", sub = "Kavat Shell", file = "~/.local/state/kavat-shell/settings.toml", top = bar_tabs(), left = left, right = right }
+  elseif bar_tab == "Each widget" then
+    -- the widgets on the bar, to choose one; a plugin's widget has no settings of this kind
+    local names, ids, at = {}, {}, 0
+    for _, part in ipairs({ "start", "center", "end" }) do
+      for _, widget in ipairs(bar_now[part]) do
+        if not widget:find("/", 1, true) and widget ~= "spacer" then
+          ids[#ids + 1] = widget
+          names[#names + 1] = widget_name(widget)
+          if widget == widget_now then
+            at = #ids
+          end
+        end
+      end
+    end
+    if at == 0 and #ids > 0 then
+      at, widget_now, widget_all = 1, ids[1], nil
+      read_widget()
+    end
+    local left, right = {}, {}
+    if widget_all == nil then
+      left = { note(#ids == 0 and "The bar has no widget with settings of its own." or "Reading the widget's settings…") }
+    else
+      left, right = shell_columns({ "widget" }, nil, widget_all)
+      if #left == 0 then
+        left = { note("This widget has nothing to set.") }
+      end
+    end
+    local top = ui.column({ gap = 12 }, {
+      bar_tabs(),
+      ui.row({ gap = 12, align = "center" }, {
+        ui.label({ text = "Widget", color = "on_surface_variant" }),
+        ui.select({ key = "widget-choice", options = names, selectedIndex = at - 1, width = 260, controlSize = "sm", onChange = function(index)
+          widget_now, widget_all = ids[tonumber(index) + 1] or "", nil
+          render()
+          read_widget()
+        end }),
+      }),
+    })
+    return { title = "Bar & widgets", sub = "Kavat Shell", file = "~/.local/state/kavat-shell/settings.toml", top = top, left = left, right = right }
+  end
   local vertical = bar_now.position == "left" or bar_now.position == "right"
   local positions = {}
   for _, position in ipairs({ { "top", "Top" }, { "bottom", "Bottom" }, { "left", "Left" }, { "right", "Right" } }) do
@@ -2304,16 +2763,16 @@ local function bar()
     parts[#parts + 1] = { text = vertical and ({ "Top", "Middle", "Bottom" })[at] or part[2], on = bar_adding == part[1], pick = function() bar_adding = part[1]; render() end }
   end
 
-  return { title = "Bar & widgets", sub = "Kavat Shell", file = "~/.local/state/kavat-shell/settings.toml", left = {
+  if gathering then
+    -- a search looks in the other two parts too
+    shell_columns({ "bar" })
+  end
+  return { title = "Bar & widgets", sub = "Kavat Shell", file = "~/.local/state/kavat-shell/settings.toml", top = bar_tabs(), left = {
     section("Bar"),
     row("Position", segmented(positions)),
     row("Floating", switch(bar_now.margin_edge > 0, function(on) bar_set("bar.default.margin_edge", on and "8" or "0") end)),
     row("Density", segmented(sizes)),
     row("Hides by itself", switch(bar_now.auto_hide, function(on) bar_set("bar.default.auto_hide", on and "true" or "false") end)),
-    section("Notifications"),
-    row("Position", select(place_names, place_at, function(index) bar_set("notification.position", '"' .. places[index] .. '"') end)),
-    row("On the display in use", switch(bar_now.notify_focused, function(on) bar_set("notification.follow_focused_output", on and "true" or "false") end)),
-    note("Gamer mode keeps them quiet by itself."),
     section("Add"),
     row("To the", segmented(parts)),
     row("Widget", select(spare_names, 1, function(index)
@@ -2323,9 +2782,7 @@ local function bar()
         bar_widgets(bar_adding, list)
       end
     end)),
-    section("Everything else"),
-    ui.row({ gap = 8 }, { shell_panel("Open the shell's own settings", "settings-open") }),
-    note("Each widget's own settings, the launcher, the dock and the desktop's widgets are there. Its page for colours is not for this system: the colours come from Appearance."),
+    note("The rest of the bar's settings are in \"The bar\", and those of a widget, the clock's format or what the volume shows, in \"Each widget\". A press of the middle button on a widget of the bar opens this page."),
   }, right = right }
 end
 
@@ -2683,9 +3140,16 @@ local function keys()
     left = columns[1], right = columns[2] }
 end
 
-local BUILT = { appearance = appearance, wallpaper = wallpaper, accessibility = accessibility, windows = windows, keys = keys,
-  displays = pages_displays, sound = sound, network = network, terminal = terminal, shell = shell, editor = editor, files = files, notes = notes,
-  bar = bar, modes = pages_modes, backup = pages_backup, gpu = pages_gpu, browser = pages_browser, projects = pages_projects, privacy = pages_privacy, remote = pages_remote, packages = pages_packages, boot = boot, login = login, language = language, pointer = pointer }
+local BUILT = { appearance = appearance, wallpaper = wallpaper, windows = windows, keys = keys,
+  -- pages of the system's that end with the shell's settings about the same thing
+  accessibility = with_shell(accessibility, { "appearance" }, { Accessibility = true }),
+  displays = with_shell(pages_displays, { "services" }, { Brightness = true }),
+  sound = with_shell(sound, { "services" }, { Audio = true, Media = true }),
+  network = with_shell(network, { "services", "security" }, { Bluetooth = true, Network = true }),
+  -- pages made of the shell's settings
+  launcher = launcher_page, notifications = notifications_page, panels = panels_page, dock = dock_page, screenshots = screenshots_page,
+  kavatshell = kavat_shell_page, terminal = terminal, shell = shell, editor = editor, files = files, notes = notes,
+  bar = bar, modes = pages_modes, backup = pages_backup, gpu = pages_gpu, browser = pages_browser, projects = pages_projects, privacy = with_shell(pages_privacy, { "security" }, { Privacy = true }), remote = pages_remote, packages = pages_packages, boot = boot, login = login, language = language, pointer = pointer }
 
 local function waiting(entry)
   return { title = entry.name, sub = entry.about or "", left = {
@@ -2883,12 +3347,18 @@ function onOpen(context)
   boot_said = ""
   search = ""
   read_palettes()
+  -- a door of the shell's own names its section: the page that has it here
+  local theirs = { ["control-center"] = "panels", desktop = "dock", osd = "notifications", screenshot = "screenshots", shell = "kavatshell",
+    system = "kavatshell", services = "sound", location = "kavatshell", calendar = "kavatshell", hooks = "kavatshell", power = "panels",
+    security = "privacy", keybinds = "keys", plugins = "kavatshell", templates = "appearance" }
+  context = theirs[context] or context
   local wanted = page
   for _, entry in ipairs(PAGES) do
     if entry.id == context then
       wanted = context
     end
   end
+  read_shell()
   open_page(wanted)
 end
 

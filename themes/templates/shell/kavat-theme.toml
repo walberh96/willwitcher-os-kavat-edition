@@ -51,6 +51,33 @@ enabled  = true
 shutdown = "/usr/lib/kavat/leave shutdown"
 reboot   = "/usr/lib/kavat/leave reboot"
 
+# The control center's buttons are those that act on the system. The shell has a night
+# light and a light-or-dark switch of its own, which are not the system's: the night light is
+# on the Displays page of the settings, and light or dark on Appearance.
+[[control_center.shortcuts]]
+type = "wifi"
+
+[[control_center.shortcuts]]
+type = "bluetooth"
+
+[[control_center.shortcuts]]
+type = "audio"
+
+[[control_center.shortcuts]]
+type = "notification"
+
+[[control_center.shortcuts]]
+type = "caffeine"
+
+[[control_center.shortcuts]]
+type = "power_profile"
+
+# Print takes a region of the screen to the clipboard and keeps no file, as in Endgame; the
+# Screenshots page of the settings changes that.
+[shell.screenshot]
+copy_to_clipboard = true
+save_to_file      = false
+
 # The system has one lock screen, hyprlock, which wears the theme and shows the background;
 # hypridle brings it up when nobody is there and before the machine sleeps. The shell's
 # own is off, so that the two are never seen by turns, and the power menu's Lock is the

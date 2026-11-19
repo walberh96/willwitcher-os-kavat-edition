@@ -245,7 +245,10 @@ bind(mod .. " + SHIFT + V", hl.dsp.exec_cmd("kavat-shell msg panel-toggle clipbo
 bind(mod .. " + SHIFT + P", hl.dsp.exec_cmd("hyprpicker -a"))
 -- a region of the screen, read: its text goes to the clipboard
 bind("SHIFT + Print", hl.dsp.exec_cmd("/usr/lib/kavat/screen-text"))
-bind("Print", hl.dsp.exec_cmd('grim -g "$(slurp)" - | wl-copy'))
+-- A region of the screen, taken by the shell: to the clipboard, as the system comes, and
+-- to a file, with notes drawn on it or another way, as the Screenshots page of the
+-- settings says.
+bind("Print", hl.dsp.exec_cmd("kavat-shell msg screenshot-region"))
 bind(mod .. " + SHIFT + L", hl.dsp.exec_cmd("hyprlock"))
 -- leaving closes Steam first, as turning the machine off does
 bind(mod .. " + M", hl.dsp.exec_cmd("/usr/lib/kavat/leave logout"))

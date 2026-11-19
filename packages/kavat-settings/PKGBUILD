@@ -1,6 +1,6 @@
 pkgname=kavat-settings
 pkgver=0.1.0
-pkgrel=19
+pkgrel=20
 pkgdesc="Willwitcher-OS Kavat Edition: the system's settings, as a panel of the shell"
 arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'

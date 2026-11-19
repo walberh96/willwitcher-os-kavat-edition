@@ -1,0 +1,370 @@
+diff --git a/src/config/cli.cpp b/src/config/cli.cpp
+index de2d58a..d322026 100644
+--- a/src/config/cli.cpp
++++ b/src/config/cli.cpp
+@@ -7,7 +7,10 @@
+ #include "config/config_validate.h"
+ #include "core/log.h"
+ #include "core/toml.h" // IWYU pragma: keep
++#include "i18n/i18n.h"
++#include "i18n/i18n_service.h"
+ #include "shell/settings/settings_registry.h"
++#include "shell/settings/widget_settings_registry.h"
+ #include "util/file_utils.h"
+ #include "util/string_utils.h"
+ 
+@@ -19,6 +22,7 @@
+ #include <filesystem>
+ #include <fstream>
+ #include <map>
++#include <nlohmann/json.hpp>
+ #include <optional>
+ #include <print>
+ #include <string>
+@@ -138,6 +142,261 @@ namespace noctalia::config {
+       return 0;
+     }
+ 
++    // Kavat Shell: every setting the shell has, as data, for the settings of the system to
++    // draw them as its own pages. One object for each control of the shell's settings: the
++    // section and the group it is in, its name and what it says, the path it is kept at in
++    // the configuration, what kind of control it is, its value and what it may be. A control
++    // that is not a plain value, a list of actions or a store of plugins, is named and left
++    // without a value.
++    nlohmann::json optionsJson(const std::vector<settings::SelectOption>& options) {
++      auto out = nlohmann::json::array();
++      for (const auto& option : options) {
++        out.push_back({{"value", option.value}, {"label", option.label}});
++      }
++      return out;
++    }
++
++    int runSettingsList() {
++      setLogLevel(LogLevel::Warn);
++      ConfigService configService;
++      const Config& cfg = configService.config();
++      i18n::Service::instance().init("en");
++      settings::RegistryEnvironment env;
++      const BarConfig* bar = settings::findBar(cfg, "default");
++      if (bar == nullptr && !cfg.bars.empty()) {
++        bar = &cfg.bars.front();
++      }
++      const std::vector<settings::SettingEntry> registry = settings::buildSettingsRegistry(cfg, bar, nullptr, env);
++
++      auto out = nlohmann::json::array();
++      for (const auto& entry : registry) {
++        std::string path;
++        for (const auto& part : entry.path) {
++          if (!path.empty()) {
++            path += '.';
++          }
++          path += part;
++        }
++        nlohmann::json item = {
++            {"section", std::string(settings::settingsSectionId(entry.section))},
++            {"section_label", i18n::tr(settings::settingsSectionLabelKey(entry.section))},
++            {"group", entry.group},
++            {"group_label", i18n::tr("settings.navigation.groups." + entry.group)},
++            {"title", entry.title},
++            {"about", entry.subtitle},
++            {"path", path},
++            {"advanced", entry.advanced},
++            {"visible", passesVisibility(cfg, entry)},
++        };
++        std::visit(
++            [&item](const auto& control) {
++              using T = std::decay_t<decltype(control)>;
++              if constexpr (std::is_same_v<T, settings::ToggleSetting>) {
++                item["kind"] = "toggle";
++                item["value"] = control.checked;
++                item["enabled"] = control.enabled;
++              } else if constexpr (std::is_same_v<T, settings::SelectSetting>) {
++                item["kind"] = "select";
++                item["value"] = control.selectedValue;
++                item["options"] = optionsJson(control.options);
++                item["segmented"] = control.segmented;
++                item["type"] = control.valueType == settings::SelectValueType::Integer
++                    ? "integer"
++                    : control.valueType == settings::SelectValueType::Boolean ? "boolean" : "string";
++                item["linked"] = static_cast<bool>(control.groupedCommit);
++              } else if constexpr (std::is_same_v<T, settings::SliderSetting>) {
++                item["kind"] = "slider";
++                item["value"] = control.value;
++                item["min"] = control.minValue;
++                item["max"] = control.maxValue;
++                item["step"] = control.step;
++                item["integer"] = control.integerValue;
++                item["suffix"] = control.valueSuffix;
++                item["linked"] = static_cast<bool>(control.linkedCommit)
++                    || control.invertSlot == settings::SliderSetting::InvertSlot::Toggle;
++              } else if constexpr (std::is_same_v<T, settings::StepperSetting>) {
++                item["kind"] = "slider";
++                item["value"] = control.value;
++                item["min"] = control.minValue;
++                item["max"] = control.maxValue;
++                item["step"] = control.step;
++                item["integer"] = true;
++                item["suffix"] = control.valueSuffix;
++              } else if constexpr (std::is_same_v<T, settings::OptionalStepperSetting>) {
++                item["kind"] = "optional-number";
++                item["value"] = control.value ? nlohmann::json(*control.value) : nlohmann::json(nullptr);
++                item["min"] = control.minValue;
++                item["max"] = control.maxValue;
++                item["step"] = control.step;
++                item["integer"] = true;
++                item["unset"] = control.unsetLabel;
++                item["fallback"] = control.fallbackValue;
++              } else if constexpr (std::is_same_v<T, settings::OptionalNumberSetting>) {
++                item["kind"] = "optional-number";
++                item["value"] = control.value ? nlohmann::json(*control.value) : nlohmann::json(nullptr);
++                item["min"] = control.minValue;
++                item["max"] = control.maxValue;
++                item["integer"] = false;
++                item["unset"] = control.placeholder;
++              } else if constexpr (std::is_same_v<T, settings::TextSetting>) {
++                item["kind"] = "text";
++                item["value"] = control.value;
++                item["placeholder"] = control.placeholder;
++              } else if constexpr (std::is_same_v<T, settings::MultiSelectSetting>) {
++                item["kind"] = "multi";
++                item["value"] = control.selectedValues;
++                item["options"] = optionsJson(control.options);
++                item["at_least_one"] = control.requireAtLeastOne;
++                item["keeps_unselected"] = control.persistUnselected;
++              } else if constexpr (std::is_same_v<T, settings::ListSetting>) {
++                item["kind"] = "list";
++                item["value"] = control.items;
++                item["options"] = optionsJson(control.suggestedOptions);
++              } else if constexpr (std::is_same_v<T, settings::SearchPickerSetting>) {
++                item["kind"] = control.onSelect ? "other" : "select";
++                item["value"] = control.selectedValue;
++                item["options"] = optionsJson(control.options);
++                item["type"] = "string";
++              } else if constexpr (std::is_same_v<T, settings::ColorSpecPickerSetting>) {
++                item["kind"] = "color";
++                item["value"] = control.selectedValue;
++                item["none"] = control.allowNone;
++              } else {
++                item["kind"] = "other";
++              }
++            },
++            entry.control
++        );
++        out.push_back(std::move(item));
++      }
++      std::println("{}", out.dump());
++      return 0;
++    }
++
++    // The settings of one widget of the bar, by the name it has in the configuration, the
++    // same way: `kavat-shell config settings-list widget clock`.
++    int runWidgetSettingsList(const std::string& widget) {
++      setLogLevel(LogLevel::Warn);
++      ConfigService configService;
++      const Config& cfg = configService.config();
++      i18n::Service::instance().init("en");
++      const std::string type = settings::widgetTypeForReference(cfg, widget);
++      const auto found = cfg.widgets.find(widget);
++      const WidgetConfig* config = found != cfg.widgets.end() ? &found->second : nullptr;
++      const std::vector<settings::WidgetSettingSpec> specs =
++          settings::widgetSettingSpecs(type, config, cfg.shell.fontFamily, false);
++
++      auto out = nlohmann::json::array();
++      for (const auto& spec : specs) {
++        if (!spec.visibleInInspector) {
++          continue;
++        }
++        const WidgetSettingValue* now = config != nullptr ? config->findSetting(spec.schema.key) : nullptr;
++        const WidgetSettingValue& value = now != nullptr ? *now : spec.schema.defaultValue;
++        nlohmann::json plain = std::visit(
++            [](const auto& held) -> nlohmann::json {
++              using T = std::decay_t<decltype(held)>;
++              if constexpr (std::is_same_v<T, WidgetSettingStringMap>) {
++                auto map = nlohmann::json::object();
++                for (const auto& [key, text] : held) {
++                  map[key] = text;
++                }
++                return map;
++              } else {
++                return held;
++              }
++            },
++            value
++        );
++        std::string about = spec.literalDescription;
++        if (about.empty() && !spec.descriptionKey.empty()) {
++          about = i18n::tr(spec.descriptionKey);
++        }
++        nlohmann::json item = {
++            {"section", "widget"},
++            {"section_label", "Widget"},
++            {"group", spec.group},
++            {"group_label", i18n::tr("settings.entities.widget.settings.groups." + spec.group)},
++            {"title", spec.literalLabel.empty() ? i18n::tr(spec.labelKey) : spec.literalLabel},
++            {"about", about},
++            {"path", "widget." + widget + "." + spec.schema.key},
++            {"advanced", spec.advanced},
++            {"visible", settings::widgetSettingIsVisible(cfg, widget, spec, specs, settings::WidgetSettingCapabilities{})},
++            {"value", plain},
++        };
++        const bool bounded = spec.schema.minValue.has_value() && spec.schema.maxValue.has_value();
++        switch (spec.control) {
++        case settings::WidgetControlKind::Bool:
++          item["kind"] = "toggle";
++          break;
++        case settings::WidgetControlKind::Int:
++        case settings::WidgetControlKind::Double:
++          item["kind"] = bounded ? "slider" : "number";
++          item["integer"] = spec.control == settings::WidgetControlKind::Int;
++          if (spec.schema.minValue) {
++            item["min"] = *spec.schema.minValue;
++          }
++          if (spec.schema.maxValue) {
++            item["max"] = *spec.schema.maxValue;
++          }
++          item["step"] = spec.schema.step.value_or(spec.control == settings::WidgetControlKind::Int ? 1.0 : 0.05);
++          item["suffix"] = spec.valueSuffix;
++          break;
++        case settings::WidgetControlKind::OptionalDouble:
++          item["kind"] = "optional-number";
++          item["integer"] = false;
++          if (spec.schema.minValue) {
++            item["min"] = *spec.schema.minValue;
++          }
++          if (spec.schema.maxValue) {
++            item["max"] = *spec.schema.maxValue;
++          }
++          break;
++        case settings::WidgetControlKind::String:
++        case settings::WidgetControlKind::File:
++        case settings::WidgetControlKind::Folder:
++        case settings::WidgetControlKind::Glyph:
++          item["kind"] = "text";
++          break;
++        case settings::WidgetControlKind::StringList:
++          item["kind"] = "list";
++          item["options"] = nlohmann::json::array();
++          break;
++        case settings::WidgetControlKind::Select: {
++          item["kind"] = "select";
++          item["segmented"] = spec.segmented;
++          item["type"] = spec.integerValue ? "integer" : "string";
++          auto options = nlohmann::json::array();
++          for (const auto& option : spec.options) {
++            options.push_back(
++                {{"value", option.value},
++                 {"label", spec.literalLabels ? option.labelKey : i18n::tr(option.labelKey)}}
++            );
++          }
++          if (options.empty()) {
++            for (const auto& allowed : spec.schema.enumValues) {
++              options.push_back({{"value", allowed}, {"label", allowed}});
++            }
++          }
++          item["options"] = std::move(options);
++          if (plain.is_number_integer()) {
++            item["value"] = std::to_string(plain.get<std::int64_t>());
++          }
++          break;
++        }
++        case settings::WidgetControlKind::ColorSpec:
++          item["kind"] = "color";
++          break;
++        case settings::WidgetControlKind::StringMap:
++          item["kind"] = "other";
++          break;
++        }
++        out.push_back(std::move(item));
++      }
++      std::println("{}", out.dump());
++      return 0;
++    }
++
+     std::expected<void, std::string> writeTextFile(const std::filesystem::path& path, std::string_view content) {
+       std::error_code ec;
+       std::filesystem::create_directories(path.parent_path(), ec);
+@@ -453,6 +712,11 @@ namespace noctalia::config {
+       return runExport(argc, argv);
+     if (std::strcmp(argv[2], "settings-count") == 0)
+       return runSettingsCount(argc, argv);
++    if (std::strcmp(argv[2], "settings-list") == 0) {
++      if (argc == 5 && std::strcmp(argv[3], "widget") == 0)
++        return runWidgetSettingsList(argv[4]);
++      return runSettingsList();
++    }
+     if (std::strcmp(argv[2], "replay-report") == 0) {
+       auto parsed = cli::parseOrReport(
+           cli::kConfigReplayReportCmd, "noctalia config replay-report",
+diff --git a/src/shell/panel/panel_manager.cpp b/src/shell/panel/panel_manager.cpp
+index 9628fea..a48dafe 100644
+--- a/src/shell/panel/panel_manager.cpp
++++ b/src/shell/panel/panel_manager.cpp
+@@ -430,7 +430,30 @@ void PanelManager::setCloseDesktopWidgetsEditorCallback(std::function<void()> ca
+   m_closeDesktopWidgetsEditor = std::move(callback);
+ }
+ 
++// Kavat Shell: the shell is a piece of a system that has its settings in one place, a panel
++// of the system's own, where the shell's are too. Every door to the shell's settings, the
++// launcher's button, the control center's, a widget's and the commands, opens that panel
++// when it is there; the shell's own window is what opens when it is not.
++bool PanelManager::openSystemSettings(const std::string& context) {
++  static const std::string kSystemSettings = "kavat/settings:panel";
++  if (!m_panels.contains(kSystemSettings)) {
++    return false;
++  }
++  if (isOpen() && !m_closing && m_activePanelId == kSystemSettings) {
++    if (!context.empty() && m_activePanel != nullptr) {
++      m_activePanel->onOpen(context);
++      refresh();
++    }
++    return true;
++  }
++  openPanel(kSystemSettings, PanelOpenRequest{.context = context});
++  return true;
++}
++
+ void PanelManager::openSettingsWindow(std::string context) {
++  if (openSystemSettings(context)) {
++    return;
++  }
+   if (isOpen() && !m_closing) {
+     closePanel();
+   }
+@@ -456,6 +479,13 @@ void PanelManager::closeSettingsWindow() {
+ }
+ 
+ void PanelManager::toggleSettingsWindow(std::string context) {
++  if (isOpen() && !m_closing && m_activePanelId == "kavat/settings:panel") {
++    closePanel();
++    return;
++  }
++  if (openSystemSettings(context)) {
++    return;
++  }
+   if (isOpen() && !m_closing) {
+     closePanel();
+   }
+@@ -3170,6 +3200,10 @@ void PanelManager::registerIpc(IpcService& ipc) {
+       return "error: settings-open-widget takes either no arguments or <bar-name> <widget-name>\n";
+     }
+ 
++    // Kavat Shell: a widget's settings are on the system's page for the bar
++    if (openSystemSettings("bar")) {
++      return "ok\n";
++    }
+     if (!m_openWidgetSettings) {
+       return "error: settings window unavailable\n";
+     }
+diff --git a/src/shell/panel/panel_manager.h b/src/shell/panel/panel_manager.h
+index ce3fe2f..7573e6c 100644
+--- a/src/shell/panel/panel_manager.h
++++ b/src/shell/panel/panel_manager.h
+@@ -70,6 +70,8 @@ public:
+   void setCloseSettingsWindowCallback(std::function<void()> callback);
+   void setToggleSettingsWindowCallback(std::function<void(std::string)> callback);
+   void setCloseDesktopWidgetsEditorCallback(std::function<void()> callback);
++  // Kavat Shell: the system's settings panel in place of the shell's window; false when it is not there
++  bool openSystemSettings(const std::string& context);
+   void openSettingsWindow(std::string context = "");
+   // Closes any open panel, then opens the settings window at the plugin's settings.
+   // False when the settings window is unavailable, or the plugin is unknown, disabled, or
