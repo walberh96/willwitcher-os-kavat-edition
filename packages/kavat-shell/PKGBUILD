@@ -1,6 +1,6 @@
 pkgname=kavat-shell
 pkgver=5.4.1
-pkgrel=5
+pkgrel=6
 pkgdesc="Willwitcher-OS Kavat Edition: Kavat Shell, the desktop shell; it began as Noctalia and asks the network for nothing by itself"
 arch=('x86_64')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
@@ -61,9 +61,9 @@ makedepends=(
 )
 source=("noctalia-$pkgver.tar.gz::https://github.com/noctalia-dev/noctalia/archive/refs/tags/v$pkgver.tar.gz"
         'no-ping.patch' 'no-network.patch' 'arrange.patch' 'no-first-wallpaper.patch'
-        'private-notifications.patch' 'rename.py')
+        'private-notifications.patch' 'rename.py' 'kavat-shell.svg')
 sha256sums=('6069d922e9d72488c74e4ce335314ce2203f08bd4641380bfe1bd137004597fa'
-            'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
+            'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP' 'SKIP')
 options=('!debug')
 
 # What the fork changes, in this order:
@@ -84,6 +84,7 @@ options=('!debug')
 #                      app sends is shown and kept as who sent it and "Notification", with
 #                      no text and no picture. Incognito mode turns it on.
 #   rename.py          the name: the command, the folders, the D-Bus names and every text.
+#   kavat-shell.svg    its icon: the system's mark under a bar, in place of Noctalia's.
 prepare() {
   cd "noctalia-$pkgver"
   patch -p1 < "$srcdir/no-ping.patch"
@@ -92,6 +93,10 @@ prepare() {
   patch -p1 < "$srcdir/no-first-wallpaper.patch"
   patch -p1 < "$srcdir/private-notifications.patch"
   python "$srcdir/rename.py" .
+  local icon
+  for icon in assets/noctalia.svg assets/kavat-shell.svg; do
+    [[ ! -e $icon ]] || cp "$srcdir/kavat-shell.svg" "$icon"
+  done
 }
 
 build() {

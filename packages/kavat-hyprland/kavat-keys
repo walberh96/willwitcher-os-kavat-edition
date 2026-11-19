@@ -27,7 +27,7 @@ MODS = {'super': 'SUPER', 'shift': 'SHIFT', 'ctrl': 'CTRL', 'control': 'CTRL', '
 # the keys the list writes as people say them, and Hyprland's names for them
 NAMES = {'/': 'slash', 'enter': 'Return', 'esc': 'Escape'}
 # what cannot be one shortcut's keys: they stand for several, or for the mouse
-MANY = ('Arrows', '…', 'mouse', 'Mouse')
+MANY = ('Arrows', '…', 'mouse', 'Mouse', ' keys')
 
 
 def shortcuts():

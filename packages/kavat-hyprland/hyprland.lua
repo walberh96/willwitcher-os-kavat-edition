@@ -210,7 +210,31 @@ bind(mod .. " + SHIFT + P", hl.dsp.exec_cmd("hyprpicker -a"))
 bind("SHIFT + Print", hl.dsp.exec_cmd("/usr/lib/kavat/screen-text"))
 bind("Print", hl.dsp.exec_cmd('grim -g "$(slurp)" - | wl-copy'))
 bind(mod .. " + SHIFT + L", hl.dsp.exec_cmd("hyprlock"))
-bind(mod .. " + M", hl.dsp.exit())
+-- leaving closes Steam first, as turning the machine off does
+bind(mod .. " + M", hl.dsp.exec_cmd("/usr/lib/kavat/leave logout"))
+
+-- The keyboard's own keys for the sound, the screen's light and what is playing. They work
+-- with the screen locked too, and the first six repeat while held. The shell changes the
+-- value and shows it.
+for key, message in pairs({
+    XF86AudioRaiseVolume  = "volume-up",
+    XF86AudioLowerVolume  = "volume-down",
+    XF86MonBrightnessUp   = "brightness-up",
+    XF86MonBrightnessDown = "brightness-down",
+}) do
+    hl.bind(key, hl.dsp.exec_cmd("kavat-shell msg " .. message), { repeating = true, locked = true })
+end
+for key, message in pairs({
+    XF86AudioMute     = "volume-mute",
+    XF86AudioMicMute  = "mic-mute",
+    XF86AudioPlay     = "media toggle",
+    XF86AudioPause    = "media toggle",
+    XF86AudioNext     = "media next",
+    XF86AudioPrev     = "media previous",
+    XF86AudioStop     = "media stop",
+}) do
+    hl.bind(key, hl.dsp.exec_cmd("kavat-shell msg " .. message), { locked = true })
+end
 
 bind(mod .. " + mouse:272", hl.dsp.window.drag(), { mouse = true })
 bind(mod .. " + mouse:273", hl.dsp.window.resize(), { mouse = true })

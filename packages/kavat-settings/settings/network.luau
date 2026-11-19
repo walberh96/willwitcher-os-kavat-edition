@@ -1,6 +1,6 @@
 -- The network on the bar: whether the machine is connected, and through what. A press
--- opens the Network page of the settings; a press with the right button, the shell's own
--- network controls. On the installer's medium it says it in words too, since what the
+-- opens the list of networks, to join one, as a press on Bluetooth opens its devices; a
+-- press with the right button, the Network page of the settings. On the installer's medium it says it in words too, since what the
 -- installer can add to the system depends on it: "Online", or "No network · offline install".
 -- NetworkManager is asked every few seconds; nothing is asked of the network itself.
 
@@ -19,8 +19,8 @@ end
 
 function update() read() end
 function onIpc() read() end
-function onClick() noctalia.runAsync("kavat-shell msg panel-open kavat/settings:panel network") end
-function onRightClick() noctalia.runAsync("kavat-shell msg panel-toggle control-center network") end
+function onClick() noctalia.runAsync("kavat-shell msg panel-toggle control-center network") end
+function onRightClick() noctalia.runAsync("kavat-shell msg panel-open kavat/settings:panel network") end
 
 noctalia.setUpdateInterval(5000)
 read()

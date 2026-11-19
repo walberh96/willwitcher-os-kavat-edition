@@ -1,0 +1,31 @@
+#!/bin/bash
+# kavat-leave: turn the machine off, restart it or end the session, closing first what
+# does not take being cut off.
+#
+# usage: /usr/lib/kavat/leave shutdown|reboot|logout
+#
+# Steam is asked to close and waited for, as Endgame's power menu did: cut off, it checks
+# its games' files again at the next start and can lose what a game was saving to the cloud.
+# The power menu of the shell, its entries in the launcher and `kavat-shell msg session`
+# all come here.
+set -u
+what=${1:-}
+case $what in
+  shutdown | reboot | logout) ;;
+  *) echo 'usage: leave shutdown|reboot|logout' >&2; exit 2 ;;
+esac
+
+if pgrep -u "$(id -u)" -x steam > /dev/null; then
+  steam -shutdown > /dev/null 2>&1 &
+  # up to twenty seconds: Steam saves and closes its games' sessions
+  for _ in $(seq 40); do
+    pgrep -u "$(id -u)" -x steam > /dev/null || break
+    sleep 0.5
+  done
+fi
+
+case $what in
+  shutdown) exec systemctl poweroff ;;
+  reboot) exec systemctl reboot ;;
+  logout) exec hyprctl dispatch 'hl.dsp.exit()' ;;
+esac

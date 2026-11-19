@@ -31,6 +31,9 @@ Super+Shift+S	Send the window to the scratchpad	Workspaces
 Super+Shift+V	Clipboard history	Tools
 Super+Shift+P	Colour picker	Tools
 Print	Screenshot of a region, to the clipboard	Tools
+Volume keys	Louder, quieter, mute; the microphone's key mutes it	Keyboard
+Brightness keys	The screen's light, up and down	Keyboard
+Media keys	Play or pause, next, previous, stop	Keyboard
 Super+Shift+L	Lock the screen	Session
 Super+Shift+M	The next mode: Coder, Gamer, Incognito	Session
 Super+Escape	Power menu	Session

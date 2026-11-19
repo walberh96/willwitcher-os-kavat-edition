@@ -1,28 +1,40 @@
--- The system's mode on the bar: one button for each mode, the one in force in the accent.
--- A press changes the mode; a press with the right button opens the Modes page. kavat-mode
--- is asked what there is and what is in force, and tells this widget when that changes.
--- While a VPN is up its name stands beside the modes, so that it is seen at a glance that
--- what leaves the machine goes through it.
+-- The system's mode on the bar: the one in force, alone, in the accent. A press opens it
+-- into one button for each mode, and a press on one of them changes the mode and closes it
+-- again; a press with the right button opens the Modes page. kavat-mode is asked what
+-- there is and what is in force, and tells this widget when that changes. While a VPN is
+-- up its name stands beside the mode, so that it is seen at a glance that what leaves the
+-- machine goes through it.
 
 local modes = {}      -- each: word, name, on
 local changing = nil  -- the word of the mode being entered, while it is
 local vpn = ""        -- the VPN that is up, when one is
+local open = false    -- whether every mode is shown, to choose one
 
 local function draw()
   local buttons = {}
   for _, mode in ipairs(modes) do
     local on = mode.on and changing == nil or changing == mode.word
-    buttons[#buttons + 1] = ui.row({ key = "mode-" .. mode.word, align = "center", paddingH = 9, minHeight = 20, radius = 10,
-      fill = on and "primary" or "surface_container",
-      onClick = function()
-        if changing == nil and not mode.on then
-          changing = mode.word
+    if on or open then
+      buttons[#buttons + 1] = ui.row({ key = "mode-" .. mode.word, align = "center", paddingH = 9, minHeight = 20, radius = 10,
+        fill = on and "primary" or "surface_container",
+        onClick = function()
+          if changing ~= nil then
+            return
+          end
+          if not open then
+            open = true
+          elseif mode.on then
+            open = false
+          else
+            open = false
+            changing = mode.word
+            noctalia.runAsync({ "kavat-mode", mode.word }, function() changing = nil; read() end)
+          end
           draw()
-          noctalia.runAsync({ "kavat-mode", mode.word }, function() changing = nil; read() end)
-        end
-      end }, {
-      ui.label({ text = mode.name, fontSize = 11, fontWeight = on and "bold" or "normal", color = on and "on_primary" or "on_surface_variant" }),
-    })
+        end }, {
+        ui.label({ text = mode.name, fontSize = 11, fontWeight = on and "bold" or "normal", color = on and "on_primary" or "on_surface_variant" }),
+      })
+    end
   end
   if vpn ~= "" then
     buttons[#buttons + 1] = ui.row({ key = "vpn", align = "center", gap = 4, paddingH = 9, minHeight = 20, radius = 10,
@@ -31,7 +43,7 @@ local function draw()
     })
   end
   local container = barWidget.isVertical() and ui.column or ui.row
-  barWidget.render(container({ gap = 2, align = "center", padding = 2, radius = 12, fill = "surface_container" }, buttons))
+  barWidget.render(container({ gap = 2, align = "center", padding = open and 2 or 0, radius = 12, fill = open and "surface_container" or nil }, buttons))
 end
 
 function read()
