@@ -1131,7 +1131,7 @@ const P = {
   rose:{n:'Rosé Pine',d:['#191724','#1f1d2e','#26233a','#e0def4','#908caa','#403d52'],l:['#ede3d9','#faf4ed','#f2e9e1','#575279','#797593','#dfdad9'],a:['#ebbcba','#c4a7e7','#9ccfd8','#f6c177','#eb6f92']},
   everforest:{n:'Everforest',d:['#232a2e','#2d353b','#3d484d','#d3c6aa','#9da9a0','#475258'],l:['#efebd4','#fdf6e3','#e6e2cc','#5c6a72','#829181','#d5d0b8'],a:['#a7c080','#7fbbb3','#dbbc7f','#e69875','#d699b6']},
 };
-const S = {remote:false,ico:'colour',istep:'',inet:true,ttab:'proc',notices:false,calc:false,dlay:'pv',dsel:0,voice:'auto',clip:false,cap:false,rem:false,copy:false,gsel:'main',ps:'logo',cfg:'',pick:false,fsel:'img',wall:'theme',bare:false,ktab:'dash',fnd:'home',afind:false,spage:'windows',sys:'coder',scene:'desk',pal:'kavat',mode:'dark',acc:0,rad:.9,gap:.7,blur:true,oled:false};
+const S = {mopen:false,remote:false,ico:'colour',istep:'',inet:true,ttab:'proc',notices:false,calc:false,dlay:'pv',dsel:0,voice:'auto',clip:false,cap:false,rem:false,copy:false,gsel:'main',ps:'logo',cfg:'',pick:false,fsel:'img',wall:'theme',bare:false,ktab:'dash',fnd:'home',afind:false,spage:'windows',sys:'coder',scene:'desk',pal:'kavat',mode:'dark',acc:0,rad:.9,gap:.7,blur:true,oled:false};
 location.hash.slice(1).split('&').forEach(kv=>{const [k,v]=kv.split('=');if(k in S)S[k]=isNaN(v)?(v==='true'?true:v==='false'?false:v):+v});
 
 const $=(s,r=document)=>r.querySelector(s), $$=(s,r=document)=>[...r.querySelectorAll(s)];
@@ -1229,6 +1229,7 @@ function apply(){
   $$('.js-acc').forEach(el=>el.innerHTML=p.a.map((a,i)=>`<button class="${i===S.acc?'on':''}" data-acc="${i}" style="background:${a}"></button>`).join(''));
   screen_.dataset.sys=S.sys;
   $$('[data-sys]').forEach(b=>b.classList.toggle('on',b.dataset.sys===S.sys));
+  $$('.modes').forEach(e=>e.classList.toggle('open',S.mopen));
   const g=S.sys==='gamer', inc=S.sys==='incog';
   $$('.js-agentpill').forEach(e=>{e.textContent=g?'Kavat off':inc?'Kavat · no history':'Kavat';e.classList.toggle('off',g);e.classList.toggle('accent',!g)});
   $$('.js-ram').forEach(e=>e.textContent=g?'RAM 3.1 GB':'RAM 9.2 GB');
@@ -1329,10 +1330,9 @@ document.addEventListener('click',e=>{
   else if(t.dataset.ktab)S.ktab=t.dataset.ktab;
   else if(t.dataset.fnd)S.fnd=t.dataset.fnd;
   else if(t.dataset.spage)S.spage=t.dataset.spage;
-  else if(t.dataset.sys){const bar=t.closest('.modes');
+  else if(t.dataset.sys){
     // on the bar the mode in force stands alone: a press opens the others, and a press on one of them enters it
-    if(bar&&!bar.classList.contains('open')){bar.classList.add('open');return}
-    if(bar)bar.classList.remove('open');S.sys=t.dataset.sys}
+    if(t.closest('.modes')&&!S.mopen)S.mopen=true;else{S.mopen=false;S.sys=t.dataset.sys}}
   else if(t.dataset.scene){S.scene=t.dataset.scene;S.afind=false;S.pick=false;S.cfg='';S.copy=false;S.cap=false;S.rem=false;S.clip=false}
   else if(t.dataset.mode)S.mode=t.dataset.mode;
   else if(t.dataset.pal){S.pal=t.dataset.pal;S.acc=0}

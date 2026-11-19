@@ -9,6 +9,9 @@
 // Kavat (pip install supertonic, in a virtual environment; it downloads the model on first use).
 //   SUPERTONIC   path to the supertonic command, when it is not on the PATH
 //   CHROME       path to the browser, when it is not Google Chrome on macOS
+//   CHROME_ARGS  more options for the browser, with spaces between them. On Linux, where a
+//                headless browser draws without the graphics card unless told, and a frame
+//                then takes seconds: --use-angle=vulkan --enable-features=Vulkan
 //   CACHE        folder that keeps the spoken lines and the picture between runs
 //                (by default kavat-video-cache in the system's temporary folder)
 //   MUSIC=0      no music and no sound at the chapter cards: the voice alone
@@ -150,7 +153,8 @@ const song = (file, total, from, to) => {
   const browser = await puppeteer.launch({
     executablePath: process.env.CHROME || '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
     // the last one gives the browser room to keep every picture drawn: with less, it drops parts of them
-    headless: 'new', args: ['--hide-scrollbars', '--allow-file-access-from-files', '--force-gpu-mem-available-mb=8192'],
+    headless: 'new', args: ['--hide-scrollbars', '--allow-file-access-from-files', '--force-gpu-mem-available-mb=8192',
+      ...(process.env.CHROME_ARGS || '').split(' ').filter(Boolean)],
     defaultViewport: { width: 1920, height: 1080 }, protocolTimeout: 600000,
   });
   const page = await browser.newPage();

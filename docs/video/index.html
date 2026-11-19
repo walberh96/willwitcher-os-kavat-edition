@@ -100,7 +100,7 @@ body{font-family:Inter,-apple-system,"SF Pro Display","Segoe UI",sans-serif;colo
   </div></div>
   <div id="title"><h1></h1><p>Kavat Edition</p></div>
   <div id="end"><h2>Willwitcher-OS <i>Kavat Edition</i></h2><p>Arch, with an opinion. And a cat.</p>
-    <div id="stats"><div><b data-n="27">0</b>settings pages</div><div><b data-n="7">0</b>palettes</div><div><b data-n="3">0</b>modes</div><div><b data-n="0">0</b>clouds</div><div><b data-n="1">0</b>cat</div></div></div>
+    <div id="stats"><div><b data-n="35">0</b>settings pages</div><div><b data-n="7">0</b>palettes</div><div><b data-n="3">0</b>modes</div><div><b data-n="0">0</b>clouds</div><div><b data-n="1">0</b>cat</div></div></div>
   <div class="halo"></div><div class="halo"></div><div class="halo"></div>
   <svg id="kavat" viewBox="0 0 340 120">
     <g id="whs"></g>
@@ -124,7 +124,7 @@ body{font-family:Inter,-apple-system,"SF Pro Display","Segoe UI",sans-serif;colo
 //   acts: [{at: when, from 0 to 1, sel: the control the pointer presses, set: what that changes,
 //           run: something for the mockup to do, once, as that moment passes}],
 //   tips: [{at, til, x, y, t}], a label over the picture}.
-const PAGES=['wallpaper','access','windows','keys','displays','gpu','sound','network','remote','terminal','editor','files','notes','shell','browser','bar','modes','projects','agent','skills','packages','backup','privacy','boot','login','lang','appearance'];
+const PAGES=['wallpaper','access','windows','bar','launcher','notifications','panels','dock','screenshots','keys','modes','displays','pointer','sound','network','gpu','terminal','shell','editor','files','notes','browser','projects','agent','skills','packages','backup','privacy','remote','boot','login','lang','kavatshell','appearance'];
 const SEG = [
   {ch:'Meet Kavat', say:"Hi! I'm Kavat. I live inside this computer, and today I get to show it off.", shots:[]},
   {ch:'Arch, with an opinion', say:"This is Willwitcher OS, Kavat Edition. Pure Arch Linux underneath. On top: one theme, one voice, and a desktop that already knows how you work.", shots:[
@@ -163,13 +163,14 @@ const SEG = [
     {s:'scene=desk&wall=ember', w:6.5, cam:[[800,500,1],[800,500,1.06]]}]},
   {ch:'Three modes', say:"Three modes switch the whole machine. Coder, for every day. Gamer starts by itself when you launch a game: I step aside, and hand it every last megabyte. And in Incognito, everything leaves through a VPN, and I keep no history.", shots:[
     {s:'scene=settings&spage=modes', w:6.2, cam:[[800,480,1.1],[915,330,1.42]]},
-    {s:'scene=desk', w:16.4, cam:[[960,300,1.3],[1090,150,1.62],[1090,150,1.62],[1090,150,1.62],[1090,150,1.62],[960,440,1.2]], acts:[
-      {at:.1,sel:'[data-sys="gamer"]',set:{sys:'gamer'}},{at:.56,sel:'[data-sys="incog"]',set:{sys:'incog'}}]}]},
+    {s:'scene=desk', w:16.4, cam:[[960,300,1.3],[1100,160,1.6],[1100,160,1.6],[1100,160,1.6],[1100,160,1.6],[960,440,1.2]], acts:[
+      {at:.05,sel:'.modes button.on',set:{mopen:true}},{at:.12,sel:'[data-sys="gamer"]',set:{sys:'gamer',mopen:false}},
+      {at:.5,sel:'.modes button.on',set:{mopen:true}},{at:.57,sel:'[data-sys="incog"]',set:{sys:'incog',mopen:false}}]}]},
   {ch:'kav', say:"Need an app? Ask me, and kav installs it. Official packages go straight in. The AUR only enters through a reviewed list, pinned to the exact commit. I can summarize a change for you, but I can never approve it. And every install leaves a snapshot you can boot back into.", shots:[
     {s:'scene=kav&ktab=dash', cam:[[800,500,1.1],[800,510,1.17]], acts:[
       {at:.15,sel:'[data-ktab="browse"]',set:{ktab:'browse'}},{at:.28,sel:'[data-ktab="aur"]',set:{ktab:'aur'}},{at:.77,sel:'[data-ktab="snaps"]',set:{ktab:'snaps'}}],
       tips:[{at:.46,til:.74,x:1060,y:345,t:'two flagged lines · only a person approves'},{at:.84,x:560,y:300,t:'boot back into any of them'}]}]},
-  {ch:'Two-way settings', say:"Twenty seven pages of settings, and every one is a plain file. Change it in the panel, change it in Neovim, or just tell me: raise the gaps to ten. Same value, same undo.", shots:[
+  {ch:'Two-way settings', say:"Thirty five pages of settings, in one place, and every one is a plain file. Change it in the panel, change it in Neovim, or just tell me: raise the gaps to ten. Same value, same undo.", shots:[
     {s:'scene=settings&spage=appearance', w:6.4, cam:[[800,510,1.1],[800,510,1.14]], acts:PAGES.map((p,j)=>({at:.05+j*.9/PAGES.length,set:{spage:p},q:1}))},
     {s:'scene=settings&spage=windows', w:3.6, cam:[[800,400,1.25],[650,290,1.6]], acts:[{at:.6,sel:'[data-bind="gap"]',set:{gap:1}}]},
     {s:'scene=editor&cfg=windows', w:8, cam:[[520,300,1.4],[430,280,1.75],[430,280,1.78]], acts:[{at:.5,set:{gap:1.43},q:1}], tips:[{at:.58,x:680,y:440,t:'the same value, in a plain file'}]}]},
