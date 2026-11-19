@@ -51,6 +51,38 @@ enabled  = true
 shutdown = "/usr/lib/kavat/leave shutdown"
 reboot   = "/usr/lib/kavat/leave reboot"
 
+# The system has one lock screen, hyprlock, which wears the theme and shows the background;
+# hypridle brings it up when nobody is there and before the machine sleeps. The shell's
+# own is off, so that the two are never seen by turns, and the power menu's Lock is the
+# system's. Leaving the session closes Steam first too.
+[lockscreen]
+enabled = false
+
+[[shell.session.actions]]
+action  = "command"
+label   = "Lock"
+glyph   = "lock"
+command = "loginctl lock-session"
+shortcut = "1"
+
+[[shell.session.actions]]
+action  = "logout"
+command = "/usr/lib/kavat/leave logout"
+shortcut = "2"
+
+[[shell.session.actions]]
+action  = "suspend"
+shortcut = "3"
+
+[[shell.session.actions]]
+action  = "reboot"
+shortcut = "4"
+
+[[shell.session.actions]]
+action  = "shutdown"
+variant = "destructive"
+shortcut = "5"
+
 [shell.animation]
 enabled = {{ animations }}
 speed   = {{ animation_speed }}

@@ -114,8 +114,15 @@ def main():
         lines = output.splitlines() + [''] * 4
         checks.report(lines[0] == 'keyboard_first us' and 'es,us' in lines[1] and 'us,es' in lines[2] and 'grp:alt_shift_toggle' in lines[3],
                       'the keyboard is the one of the installation, with the other behind it, and the first can be changed', output)
+        status, output = user('hyprctl --instance 0 getoption input:accel_profile | head -n 1; kavat-conf set pointer mouse_acceleration false && '
+                              'kavat-conf set pointer mouse_speed -3 && hyprctl --instance 0 getoption input:accel_profile | head -n 1; '
+                              'hyprctl --instance 0 getoption input:sensitivity | head -n 1; kavat-conf set pointer mouse_speed 30 2>&1 | grep -c "mouse_speed takes"; '
+                              'kavat-conf set pointer mouse_acceleration true; kavat-conf set pointer mouse_speed 0; kavat-conf show language')
+        lines = output.splitlines() + [''] * 5
+        checks.report('adaptive' in lines[0] and 'flat' in lines[1] and '-0.3' in lines[2] and lines[3] == '1' and lines[4] == 'keyboard_first us',
+                      "the mouse's acceleration is turned off and its speed set, live, and the keyboard's setting in the same file is kept", output)
         # every page that is built has to draw: one that fails leaves a line in the shell's log
-        pages = 'wallpaper accessibility windows displays sound network terminal editor files notes shell browser bar modes packages boot login language'
+        pages = 'wallpaper accessibility windows pointer displays sound network terminal editor files notes shell browser bar modes packages boot login language'
         status, output = user(f'for page in {pages}; do kavat-shell msg panel-open kavat/settings:panel $page > /dev/null; sleep 1.2; done; '
                               'grep -c -i "kavat/settings.*error\\|luau.*error\\|panel.luau:" ~/.cache/kavat-shell/kavat-shell.log', 60)
         checks.report(output == '0', 'each of the pages that are built is drawn without a failure', output)
@@ -138,6 +145,15 @@ def main():
         machine.screen.type(PASSWORD)
         machine.screen.press('enter')
         until('and the right one opens it', 'pgrep -c -x hyprlock; echo open', '0\nopen')
+        # the lock that comes by itself, when nobody is there or before sleeping, and the power
+        # menu's, are the same lock screen: the shell's own is off
+        machine.run('loginctl lock-sessions')
+        until('the lock asked for by the session is the same lock screen, and the power menu has it',
+              'pgrep -c -x hyprlock; kavat-shell msg config-get lockscreen.enabled; grep -c "loginctl lock-session" ~/.config/kavat-shell/kavat-theme.toml', '1\nfalse\n1')
+        time.sleep(2)
+        machine.screen.type(PASSWORD)
+        machine.screen.press('enter')
+        until('and it opens with the password', 'pgrep -c -x hyprlock; echo open', '0\nopen')
         status, output = user('hyprctl --instance 0 configerrors')
         checks.report(status == 0 and not output, "Hyprland's configuration loads without errors", output)
         if checks.failed:

@@ -6,7 +6,7 @@ usage: kavat-conf show <page>                 the settings of a page and their v
        kavat-conf file <page>                 the file a page's settings are kept in
 
 The pages: terminal (Kitty), shell (zsh), editor (Neovim), files (Yazi), language (the keyboard),
-sound (the microphone) and lock (the lock screen).
+pointer (the mouse and the touchpad), sound (the microphone) and lock (the lock screen).
 
 Each setting lives in one place, the file of its app: this only changes that setting's
 line there, and leaves the rest of the file, comments and all, as it was. A setting that
@@ -83,6 +83,22 @@ PAGES = {
         'reload': ['sh', '-c', 'hyprctl reload > /dev/null 2>&1 || hyprctl --instance 0 reload > /dev/null 2>&1'],
         'settings': {
             'keyboard_first': (['us', 'es'], 'us'),
+        },
+    },
+    'pointer': {
+        # the same file as the keyboard's: Hyprland's configuration reads both from it
+        'file': f'{CONFIG}/kavat/desktop.json', 'style': 'json',
+        'reload': ['sh', '-c', 'hyprctl reload > /dev/null 2>&1 || hyprctl --instance 0 reload > /dev/null 2>&1'],
+        'settings': {
+            # off, the pointer moves as far as the hand does, however fast: what a game wants
+            'mouse_acceleration': (['true', 'false'], 'true'),
+            # tenths, from -1.0, the slowest, to 1.0
+            'mouse_speed': ([str(number) for number in range(-10, 11)], '0'),
+            'mouse_natural_scroll': (['true', 'false'], 'false'),
+            'left_handed': (['true', 'false'], 'false'),
+            'touchpad_natural_scroll': (['true', 'false'], 'true'),
+            'touchpad_tap': (['true', 'false'], 'true'),
+            'touchpad_off_while_typing': (['true', 'false'], 'true'),
         },
     },
     'sound': {
@@ -227,7 +243,7 @@ def write(page, name, value):
             kept = json.loads(text or '{}')
         except ValueError:
             kept = {}
-        kept[name] = {'true': True, 'false': False}.get(value, int(value) if value.isdigit() else value)
+        kept[name] = {'true': True, 'false': False}.get(value, int(value) if re.fullmatch(r'-?\d+', value) else value)
         lines = json.dumps(kept, indent=2).splitlines()
     elif page['style'] == 'idle':
         now = values(page)

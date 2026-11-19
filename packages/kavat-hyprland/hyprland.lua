@@ -133,6 +133,40 @@ local function keyboards()
 end
 hl.config({ input = { kb_layout = keyboards(), kb_options = "grp:alt_shift_toggle" } })
 
+-- The mouse and the touchpad, as the Mouse & touchpad page of the settings wrote them in
+-- the same file. With nothing written: the pointer speeds up with the hand, a touchpad
+-- scrolls the way the fingers go, a tap is a click, and it is off while typing.
+local function pointer()
+    local config = os.getenv("XDG_CONFIG_HOME")
+    if not config or config == "" then
+        config = os.getenv("HOME") .. "/.config"
+    end
+    local file, text = io.open(config .. "/kavat/desktop.json"), ""
+    if file then
+        text = file:read("a")
+        file:close()
+    end
+    local function on(name, default)
+        local value = text:match('"' .. name .. '"%s*:%s*(%a+)')
+        if value == "true" then return true end
+        if value == "false" then return false end
+        return default
+    end
+    local speed = tonumber(text:match('"mouse_speed"%s*:%s*"?(-?%d+)')) or 0
+    return {
+        accel_profile  = on("mouse_acceleration", true) and "adaptive" or "flat",
+        sensitivity    = math.max(-1, math.min(1, speed / 10)),
+        natural_scroll = on("mouse_natural_scroll", false),
+        left_handed    = on("left_handed", false),
+        touchpad       = {
+            natural_scroll       = on("touchpad_natural_scroll", true),
+            tap_to_click         = on("touchpad_tap", true),
+            disable_while_typing = on("touchpad_off_while_typing", true),
+        },
+    }
+end
+hl.config({ input = pointer() })
+
 hl.config({
     general = {
         layout = "dwindle",

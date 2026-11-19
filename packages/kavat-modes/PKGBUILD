@@ -1,12 +1,13 @@
 # The system's modes: Coder, Gamer and Incognito, switched from the bar.
 pkgname=kavat-modes
 pkgver=0.1.0
-pkgrel=12
+pkgrel=13
 pkgdesc="Willwitcher-OS Kavat Edition: the modes of the system, and their switch on the bar"
 arch=('any')
 url="https://github.com/walberh96/willwitcher-os-kavat-edition"
 license=('LicenseRef-AllRightsReserved')
-depends=('python' 'kavat-shell' 'power-profiles-daemon' 'networkmanager' 'nftables' 'wireguard-tools'
+# with what a game's profile uses: MangoHud, gamescope and LACT
+depends=('python' 'kavat-shell' 'power-profiles-daemon' 'networkmanager' 'nftables' 'wireguard-tools' 'mangohud' 'gamescope' 'lact'
          'polkit' 'libnotify' 'wl-clipboard')
 optdepends=('kavat-remote: remote access, which Incognito pauses'
             'mangohud: the performance monitor and the limit of frames of a game profile'

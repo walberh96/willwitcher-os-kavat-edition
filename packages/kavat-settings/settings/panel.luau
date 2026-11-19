@@ -17,6 +17,7 @@ local PAGES = {
   { id = "accessibility", name = "Accessibility" },
   { id = "windows", name = "Windows", about = "Hyprland" },
   { id = "keys", name = "Keybindings" },
+  { id = "pointer", name = "Mouse & touchpad" },
   { id = "displays", name = "Displays" },
   { id = "gpu", name = "GPU" },
   { id = "sound", name = "Sound" },
@@ -1090,7 +1091,8 @@ local function pages_gpu()
       gpu.lact == "yes" and ui.button({ text = "Open LACT", variant = "primary", controlSize = "sm", onClick = function()
         noctalia.runAsync("setsid -f lact gui > /dev/null 2>&1")
         panel.close()
-      end }) or ui.button({ text = "Install LACT", variant = "outline", controlSize = "sm", onClick = function()
+      end }) or ui.button({ text = "Bring LACT back", variant = "outline", controlSize = "sm", onClick = function()
+        -- it comes with the system; this is for a system it was taken out of
         noctalia.runInTerminal("kav install lact && sudo systemctl enable --now lactd; echo; read -r -n 1 -s -p 'Any key closes.'")
         panel.close()
       end }),
@@ -1279,7 +1281,7 @@ local function pages_privacy()
         noctalia.runAsync("setsid -f opensnitch-ui > /dev/null 2>&1")
         panel.close()
       end }) or ui.button({ text = "Turn it on", variant = "outline", controlSize = "sm", onClick = function()
-        noctalia.runInTerminal("kav install opensnitch && sudo systemctl enable --now opensnitchd && (setsid -f opensnitch-ui > /dev/null 2>&1); echo; read -r -n 1 -s -p 'Any key closes.'")
+        noctalia.runInTerminal("sudo systemctl enable --now opensnitchd && (setsid -f opensnitch-ui > /dev/null 2>&1); echo; read -r -n 1 -s -p 'Any key closes.'")
         panel.close()
       end }),
     }),
@@ -2342,6 +2344,31 @@ local function language()
   } }
 end
 
+-- The mouse and the touchpad: what kavat-conf keeps for Hyprland, which reads it again at
+-- each change
+local function pointer()
+  local now = conf.pointer or {}
+  local speed = tonumber(now.mouse_speed) or 0
+  return { title = "Mouse & touchpad", sub = "Hyprland · changes apply live", file = "~/.config/kavat/desktop.json", left = {
+    section("Mouse"),
+    row("Acceleration", conf_toggle("pointer", "mouse_acceleration", "true", "false")),
+    note("On, the pointer goes further the faster the hand moves. Off, it goes as far as the hand does, whatever the speed: what aiming in a game wants."),
+    row("Speed", ui.slider({ min = -10, max = 10, step = 1, value = speed, flexGrow = 1, controlSize = "sm", enabled = not busy,
+      onDragEnd = function(to)
+        set_conf("pointer", "mouse_speed", string.format("%d", math.max(-10, math.min(10, math.floor((tonumber(to) or 0) + 0.5)))))
+      end })),
+    row("Scroll the other way", conf_toggle("pointer", "mouse_natural_scroll", "true", "false")),
+    row("Left-handed", conf_toggle("pointer", "left_handed", "true", "false")),
+    note("Left-handed swaps the two buttons, on the mouse and on the touchpad."),
+  }, right = {
+    section("Touchpad"),
+    row("Tap to click", conf_toggle("pointer", "touchpad_tap", "true", "false")),
+    row("Scroll the way the fingers go", conf_toggle("pointer", "touchpad_natural_scroll", "true", "false")),
+    row("Off while typing", conf_toggle("pointer", "touchpad_off_while_typing", "true", "false")),
+    note("These are for a laptop's touchpad; a machine with none keeps them for when one is plugged in."),
+  } }
+end
+
 local displays_read = 0
 local night = { state = "off", warmth = "4000", from = "20:00", to = "07:00" }  -- the night light, as kavat-displays says it
 
@@ -2658,7 +2685,7 @@ end
 
 local BUILT = { appearance = appearance, wallpaper = wallpaper, accessibility = accessibility, windows = windows, keys = keys,
   displays = pages_displays, sound = sound, network = network, terminal = terminal, shell = shell, editor = editor, files = files, notes = notes,
-  bar = bar, modes = pages_modes, backup = pages_backup, gpu = pages_gpu, browser = pages_browser, projects = pages_projects, privacy = pages_privacy, remote = pages_remote, packages = pages_packages, boot = boot, login = login, language = language }
+  bar = bar, modes = pages_modes, backup = pages_backup, gpu = pages_gpu, browser = pages_browser, projects = pages_projects, privacy = pages_privacy, remote = pages_remote, packages = pages_packages, boot = boot, login = login, language = language, pointer = pointer }
 
 local function waiting(entry)
   return { title = entry.name, sub = entry.about or "", left = {
@@ -2800,6 +2827,8 @@ function open_page(id)
     read_theme()
   elseif id == "language" then
     read_conf("language")
+  elseif id == "pointer" then
+    read_conf("pointer")
   elseif id == "displays" then
     read_displays()
   elseif id == "backup" then

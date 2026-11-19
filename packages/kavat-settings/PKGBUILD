@@ -6,7 +6,9 @@ arch=('any')
 url='https://github.com/walberh96/willwitcher-os-kavat-edition'
 license=('LicenseRef-AllRightsReserved')
 # the shell that draws the panel, and the programs its pages show and change
-depends=('kavat-shell' 'kavat-theme' 'kav' 'kavat-notes' 'kitty' 'python' 'pciutils'
+# with what its pages open or turn on: LACT for the graphics card, OpenSnitch for the
+# programs that reach the network, and ddcutil for the light of a display on a cable
+depends=('kavat-shell' 'kavat-theme' 'kav' 'kavat-notes' 'kitty' 'python' 'pciutils' 'lact' 'opensnitch' 'ddcutil'
          'networkmanager' 'bluez-utils' 'libpulse' 'pipewire-pulse' 'yazi')
 source=('kavat-conf' 'gpu-state' 'kavat-network' 'kavat-sound')
 sha256sums=('SKIP' 'SKIP' 'SKIP' 'SKIP')
