@@ -1,0 +1,13 @@
+# A source of the wallpaper search: MotionBGs, live wallpapers, videos that play in a loop.
+#
+# It has no data to ask for, so its search page is read: each wallpaper there is a link
+# with its name, a small picture, and a number its video is downloaded by. kavat-wallpaper's
+# own header says what each line is.
+name = "MotionBGs"
+kind = "video"
+search = "https://motionbgs.com/search?q={words}"
+each = '<a title="?(?P<name>[^">]*?) live wallpaper"? href=/[a-z0-9-]+>.*?<img [^>]*src=(?P<small>/i/c/[0-9x]+/media/(?P<id>\d+)/[^ >]+)'
+id = "{name}"
+small = "{small}"
+full = "https://motionbgs.com/dl/hd/{id}/"
+size = "1920x1080"

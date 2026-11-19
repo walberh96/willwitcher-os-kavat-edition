@@ -236,8 +236,8 @@ def main():
                               'kavat-browser shorts; kavat-browser shorts on; kavat-browser shorts off; test -s /usr/share/kavat-browser/extensions/kavat/shorts-rules.js && echo rules; '
                               'kavat-wallpaper sources | cut -f1,2 | tr "\\t" "|"; kavat-wallpaper search sea 2>&1 | grep -c "no network"; kavat-wallpaper option | grep -c "^lock background"; '
                               'readlink ~/.cache/kavat/lock/background.png | grep -c "kavat/lock/kavat-"', 60)
-        checks.report(output.split('\n') == ['Test|https://example.invalid/|kavat-browser', '1', '2', '0', 'off', 'on', 'off', 'rules', 'wallhaven|on', '1', '1', '1'],
-                      'a page is installed as an app and removed, only from a web address; Shorts are hidden unless asked for; the online search of wallpapers has its source and says there is no network; the lock is given its picture', output)
+        checks.report(output.split('\n') == ['Test|https://example.invalid/|kavat-browser', '1', '2', '0', 'off', 'on', 'off', 'rules', 'motionbgs|on', 'wallhaven|on', '1', '1', '1'],
+                      'a page is installed as an app and removed, only from a web address; Shorts are hidden unless asked for; the online search of wallpapers has its two sources, of images and of live ones, and says there is no network; the lock is given its picture', output)
         # remote access comes in when Sunshine, which it needs, is built: until then there is nothing to check
         if machine.run('test -x /usr/bin/kavat-remote')[0] == 0:
             status, output = machine.run('systemctl is-enabled tailscaled sshd kavat-remote-awake 2>&1 | sort -u | tr "\\n" " "; echo; ss -Hltn | grep -c -E ":(22|47984|47989|47990|48010)\\b"; '

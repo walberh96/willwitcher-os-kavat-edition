@@ -9,8 +9,10 @@ usage: kavat-wallpaper                  what the background is: theme, image or 
        kavat-wallpaper theme            back to the theme's own picture
        kavat-wallpaper list             the library: each file of ~/Pictures/Wallpapers, what it is, and a picture of it
        kavat-wallpaper add <file>       copy a file into the library
-       kavat-wallpaper search <words>   ask the sources that are on for pictures: what they answer, one to a line
-       kavat-wallpaper fetch <address> [name]   download a picture to the library's images, and set it; get is the same
+       kavat-wallpaper search [--images|--live] <words>
+                                        ask the sources that are on for wallpapers: what they answer, one to a
+                                        line; only those of images, or only those of videos
+       kavat-wallpaper fetch <address> [name]   download an image or a video to the library, and set it; get is the same
        kavat-wallpaper sources          each source of the search, whether it is on, and its name
        kavat-wallpaper source <name> on|off
        kavat-wallpaper pause|resume     stop the videos where they are, and let them go on
@@ -41,15 +43,21 @@ the system's in /usr/share/kavat/wallpaper-sources and yours in
     small = "thumbs.small"                  the small picture's address,
     full = "path"                           the full one's,
     size = "resolution"                     and its size as 1920x1080; or width = and height =
+    kind = "video"                          what it gives, when it is videos and not images
 
-A place in the answer is its keys joined by dots; a number is a place in a list. search
-prints one picture to a line, six columns with tabs between them, - for one that is
-missing: the source, the picture's name there, the small picture's address, the full
-one's, its size as WxH, and the file the small picture was downloaded to, under
-~/.cache/kavat/wallpaper/online. Only the first 24 of each source are listed.
+A place in the answer is its keys joined by dots; a number is a place in a list. A source
+that answers with a page and not with data has `each` in place of `list`: a regular
+expression that matches once for each wallpaper on the page, with named groups; its id,
+small, full and size are then texts in which {group} is what that group matched, and an
+address that begins with / is the site's. search prints one wallpaper to a line, seven
+columns with tabs between them, - for one that is missing: the source, the wallpaper's
+name there, the small picture's address, the full one's, its size as WxH, the file the
+small picture was downloaded to, under ~/.cache/kavat/wallpaper/online, and image or
+video. Only the first 24 of each source are listed.
 """
 import colorsys
 import hashlib
+import html
 import http.client
 import json
 import os
@@ -79,10 +87,12 @@ SLIDES = 'kavat-wallpaper-slideshow'
 OPTIONS = {'sound': ('off', 'on'), 'fit': ('fill', 'fit', 'stretch'), 'gpu': ('on', 'off'), 'slideshow': ('off', '5', '15', '30', '60'),
            'lock': ('background', 'theme')}
 LOCK = (os.environ.get('XDG_CACHE_HOME') or f'{HOME}/.cache') + '/kavat/lock'
+FETCHED = {}                           # what the last download said of itself: the name of its file
 SOURCES = ('/usr/share/kavat/wallpaper-sources', f'{CONFIG}/kavat/wallpaper-sources')
 ONLINE = f'{CACHE}/online'
 PAGE = 24                              # how many pictures of each source a search lists
 SMALL, FULL = 2 << 20, 60 << 20        # the most a small picture and a wallpaper may weigh
+VIDEO = 300 << 20                      # and a video
 
 
 def settings():
@@ -392,6 +402,8 @@ def download(address, limit, seconds):
     until = time.monotonic() + seconds
     data = b''
     with opener.open(urllib.request.Request(address, headers={'User-Agent': 'kavat-wallpaper'}), timeout=min(seconds, 15)) as answer:
+        said = re.search(r'filename="?([^";]+)', answer.headers.get('Content-Disposition') or '')
+        FETCHED['name'] = os.path.basename(said.group(1)) if said else None
         while chunk := answer.read(1 << 16):
             data += chunk
             if len(data) > limit:
@@ -428,7 +440,8 @@ def sources():
                     source = tomllib.load(file)
             except (OSError, ValueError):
                 continue
-            if all(isinstance(source.get(key), str) for key in ('search', 'list', 'small', 'full')) and web(source['search']):
+            if (all(isinstance(source.get(key), str) for key in ('search', 'small', 'full')) and web(source['search'])
+                    and isinstance(source.get('each', source.get('list')), str) and source.get('kind', 'image') in LIBRARY):
                 found[name[:-5]] = source
     return found
 
@@ -464,16 +477,38 @@ def small_picture(address):
     return stem + ending
 
 
-def search(words):
+def on_page(page, source):
+    """The wallpapers a page lists, for a source that answers with one: each as data would give it."""
+    found = []
+    try:
+        each = re.compile(source['each'], re.S)
+    except re.error:
+        return found
+    site = '{0.scheme}://{0.netloc}'.format(urllib.parse.urlsplit(source['search']))
+    for match in each.finditer(page):
+        groups = {name: html.unescape(value or '') for name, value in match.groupdict().items()}
+        filled = {}
+        for key in ('id', 'small', 'full', 'size'):
+            text = source.get(key)
+            if isinstance(text, str):
+                text = re.sub(r'\{(\w+)\}', lambda group: groups.get(group.group(1), ''), text)
+                filled[key] = site + text if key in ('small', 'full') and text.startswith('/') else text
+        found.append(filled)
+    return found
+
+
+def search(words, kind=None):
     now = settings()
-    asked = {name: source for name, source in sources().items() if name not in now.get('sources_off', [])}
+    asked = {name: source for name, source in sources().items()
+             if name not in now.get('sources_off', []) and kind in (None, source.get('kind', 'image'))}
     if not asked:
-        sys.exit('kavat-wallpaper: no source is on; kavat-wallpaper sources lists them')
+        sys.exit('kavat-wallpaper: no source ' + ('of those ' if kind else '') + 'is on; kavat-wallpaper sources lists them')
     found, failed, reached = [], [], False
     for name, source in asked.items():
         title = source.get('name', name)
         try:
-            answer = json.loads(download(source['search'].replace('{words}', urllib.parse.quote_plus(words)), 4 << 20, 20))
+            answer = download(source['search'].replace('{words}', urllib.parse.quote_plus(words)), 4 << 20, 20)
+            answer = answer.decode('utf-8', 'replace') if 'each' in source else json.loads(answer)
         except urllib.error.HTTPError as error:
             reached = True
             failed.append(f'{title} answered with error {error.code}')
@@ -486,17 +521,21 @@ def search(words):
             failed.append(f'{title} did not answer with data')
             continue
         reached = True
-        pictures = at(answer, source['list'])
+        if 'each' in source:
+            # a page: what its expression matched is already each wallpaper's own
+            pictures, place = on_page(answer, source), lambda picture, key: picture.get(key)
+        else:
+            pictures, place = at(answer, source['list']), lambda picture, key: at(picture, source.get(key))
         for picture in pictures[:PAGE] if isinstance(pictures, list) else []:
-            small, full = at(picture, source['small']), at(picture, source['full'])
+            small, full = place(picture, 'small'), place(picture, 'full')
             if not web(small) or not web(full):
                 continue
-            size = at(picture, source.get('size'))
-            if 'width' in source:
+            size = place(picture, 'size')
+            if 'width' in source and 'each' not in source:
                 size = f'{at(picture, source["width"])}x{at(picture, source.get("height"))}'
             size = size if isinstance(size, str) and re.fullmatch(r'\d+x\d+', size) else '-'
-            called = re.sub(r'\s+', ' ', str(at(picture, source.get('id')) or '')).strip() or os.path.basename(urllib.parse.urlsplit(full).path)
-            found.append([name, called or '-', small, full, size])
+            called = re.sub(r'\s+', ' ', str(place(picture, 'id') or '')).strip() or os.path.basename(urllib.parse.urlsplit(full).path)
+            found.append([name, called or '-', small, full, size, source.get('kind', 'image')])
     if not found and failed:
         sys.exit('kavat-wallpaper: ' + ('; '.join(failed) if reached else 'there is no network, so nothing could be searched'))
     for failure in failed:
@@ -505,7 +544,7 @@ def search(words):
     with ThreadPoolExecutor(8) as pool:
         kept = list(pool.map(small_picture, [picture[2] for picture in found]))
     for picture, file in zip(found, kept):
-        print('\t'.join(picture + [file or '-']))
+        print('\t'.join(picture[:5] + [file or '-', picture[5]]))
     # the small pictures of earlier searches go after a day
     for name in os.listdir(ONLINE):
         file = f'{ONLINE}/{name}'
@@ -513,34 +552,50 @@ def search(words):
             os.remove(file)
 
 
+def video_ending(data):
+    """The ending for the name of a video, read from what it is: MP4 or WebM."""
+    if data[4:8] == b'ftyp':
+        return '.mp4'
+    if data.startswith(b'\x1a\x45\xdf\xa3'):
+        return '.webm'
+    return None
+
+
 def fetch(address, name=None):
-    """Download a picture to the library's images, and set it as the background."""
+    """Download an image or a video to the library, and set it as the background."""
     if not web(address):
         sys.exit(f'kavat-wallpaper: {address} is not an http or https address')
     try:
-        data = download(address, FULL, 180)
+        data = download(address, VIDEO, 900)
     except urllib.error.HTTPError as error:
-        sys.exit(f'kavat-wallpaper: the picture was not given: error {error.code}')
+        sys.exit(f'kavat-wallpaper: the wallpaper was not given: error {error.code}')
     except ValueError:
-        sys.exit(f'kavat-wallpaper: the picture is larger than {FULL >> 20} MB')
+        sys.exit(f'kavat-wallpaper: the wallpaper is larger than {VIDEO >> 20} MB')
     except TimeoutError:
-        sys.exit('kavat-wallpaper: the picture took too long to arrive')
+        sys.exit('kavat-wallpaper: the wallpaper took too long to arrive')
     except (OSError, http.client.HTTPException):
-        sys.exit('kavat-wallpaper: there is no network, so the picture could not be downloaded')
-    ending = image_ending(data)
+        sys.exit('kavat-wallpaper: there is no network, so the wallpaper could not be downloaded')
+    ending, kind = image_ending(data), 'image'
     if ending is None:
-        sys.exit('kavat-wallpaper: what that address gives is not a PNG, JPG or WebP image')
+        ending, kind = video_ending(data), 'video'
+    if ending is None:
+        sys.exit('kavat-wallpaper: what that address gives is not a PNG, JPG or WebP image, or an MP4 or WebM video')
+    if kind == 'image' and len(data) > FULL:
+        sys.exit(f'kavat-wallpaper: the picture is larger than {FULL >> 20} MB')
+    if name is None:
+        # a video is called what its site calls it, when it says
+        name = FETCHED.get('name')
     # the name it is kept under: letters, digits, dots and dashes of the one given, or of the address's
     stem = os.path.splitext(os.path.basename(name or urllib.parse.urlsplit(address).path))[0]
     stem = re.sub(r'[^A-Za-z0-9._-]+', '-', stem).strip('.-')[:80] or 'wallpaper'
-    os.makedirs(LIBRARY['image'], exist_ok=True)
-    path, number = f'{LIBRARY["image"]}/{stem}{ending}', 1
+    os.makedirs(LIBRARY[kind], exist_ok=True)
+    path, number = f'{LIBRARY[kind]}/{stem}{ending}', 1
     while os.path.exists(path):
         with open(path, 'rb') as file:
             if file.read() == data:
                 break
         number += 1
-        path = f'{LIBRARY["image"]}/{stem}-{number}{ending}'
+        path = f'{LIBRARY[kind]}/{stem}-{number}{ending}'
     else:
         with open(path + '.part', 'wb') as file:
             file.write(data)
@@ -706,6 +761,8 @@ def main():
             sys.exit(f'kavat-wallpaper: {arguments[1]} is not an image or a video this can show')
         os.makedirs(LIBRARY[kind], exist_ok=True)
         print(shutil.copy2(arguments[1], LIBRARY[kind]))
+    elif arguments[0] == 'search' and len(arguments) > 2 and arguments[1] in ('--images', '--live'):
+        search(' '.join(arguments[2:]), 'image' if arguments[1] == '--images' else 'video')
     elif arguments[0] == 'search' and len(arguments) > 1:
         search(' '.join(arguments[1:]))
     elif arguments[0] in ('fetch', 'get') and len(arguments) in (2, 3):

@@ -65,6 +65,7 @@ local display_tried = 0    -- above zero while a change of the displays waits to
 local walls = { list = {}, displays = {}, kind = "theme", file = "", sound = "off", fit = "fill", gpu = "on" }  -- the background, as kavat-wallpaper says it
 local wall_display = ""  -- the display a background is being chosen for; none is all of them
 local wall_filter = "all"
+local wall_asked = "all"   -- the filter the last search was made with
 local wall_words = ""      -- what is searched for online
 local wall_found = {}      -- what the sources answered: each a small picture, the full one's address and its size
 local wall_searching = false
@@ -1510,20 +1511,28 @@ local function wallpaper()
     }),
     ui.column({ gap = 12 }, rows),
   })
-  -- Online: the words go to the sources that are on, and what they answer is drawn; a press
-  -- downloads the picture to the library and sets it. Nothing is asked until Search is pressed.
+  -- Online: the words go to the sources that are on, those of images, those of live
+  -- wallpapers or both, as the filter above says, and what they answer is drawn; a press
+  -- downloads the image or the video to the library and sets it. Nothing is asked until
+  -- Search is pressed.
   local search = function()
     if wall_words == "" or wall_searching then
       return
     end
     wall_searching, wall_found, said = true, {}, ""
     render()
-    noctalia.runAsync({ "kavat-wallpaper", "search", wall_words }, function(result)
+    local command = { "kavat-wallpaper", "search" }
+    if wall_filter ~= "all" then
+      command[#command + 1] = wall_filter == "video" and "--live" or "--images"
+    end
+    command[#command + 1] = wall_words
+    wall_asked = wall_filter
+    noctalia.runAsync(command, function(result)
       wall_searching = false
       for line in result.stdout:gmatch("[^\n]+") do
-        local source, id, small, full, size, file = line:match("^([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)$")
+        local source, id, small, full, size, file, kind = line:match("^([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)\t([^\t]*)$")
         if file and file ~= "-" and full ~= "-" then
-          wall_found[#wall_found + 1] = { source = source, full = full, size = size, file = file }
+          wall_found[#wall_found + 1] = { source = source, name = id, full = full, size = size, file = file, kind = kind }
         end
       end
       if result.exitCode ~= 0 then
@@ -1537,21 +1546,33 @@ local function wallpaper()
   local online = {
     ui.row({ gap = 8, align = "center" }, {
       section("Online"),
-      ui.input({ key = "wall-words", placeholder = "Search wallpapers on the network: mountains, city at night…", controlSize = "sm", flexGrow = 1, value = wall_words,
+      ui.input({ key = "wall-words", placeholder = wall_filter == "video" and "Search live wallpapers on the network: rain, city at night…"
+          or wall_filter == "image" and "Search images on the network: mountains, city at night…"
+          or "Search wallpapers on the network, images and live: mountains, city at night…", controlSize = "sm", flexGrow = 1, value = wall_words,
         onChange = function(text) wall_words = text end, onSubmit = search }),
       ui.button({ text = wall_searching and "Searching…" or "Search", variant = "outline", controlSize = "sm", enabled = not wall_searching, onClick = search }),
       #wall_found > 0 and ui.button({ text = "✕", variant = "ghost", controlSize = "sm", onClick = function() wall_found = {}; render() end }) or nil,
     }),
   }
-  for at = 1, #wall_found, 5 do
+  -- what was found is filtered as the library is
+  local found = {}
+  for _, picture in ipairs(wall_found) do
+    if wall_filter == "all" or picture.kind == wall_filter then
+      found[#found + 1] = picture
+    end
+  end
+  if #wall_found > 0 and #found == 0 then
+    online[#online + 1] = note("The search was for " .. (wall_asked == "video" and "live wallpapers" or "images") .. ": press Search again for " .. (wall_filter == "video" and "live ones." or "images."))
+  end
+  for at = 1, #found, 5 do
     local line = {}
-    for index = at, math.min(at + 4, #wall_found) do
-      local picture = wall_found[index]
+    for index = at, math.min(at + 4, #found) do
+      local picture = found[index]
       line[#line + 1] = ui.column({ key = "online-" .. picture.file, gap = 4, width = 178 }, {
         ui.image({ path = picture.file, width = 178, height = 100, radius = 8, fit = "cover", border = "outline_variant", borderWidth = 1,
           onClick = function() wall_does("fetch", picture.full) end }),
         ui.row({ gap = 6 }, {
-          ui.label({ text = picture.size ~= "-" and picture.size or "", fontSize = 11, color = "on_surface_variant" }),
+          ui.label({ text = picture.kind == "video" and "▶ Live" or picture.size ~= "-" and picture.size or "", fontSize = 11, color = "on_surface_variant" }),
           ui.spacer({ flexGrow = 1 }),
           ui.label({ text = picture.source, fontSize = 11, color = "on_surface_variant" }),
         }),
